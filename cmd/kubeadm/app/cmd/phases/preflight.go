@@ -78,7 +78,7 @@ func NewPreflightMasterPhase() workflow.Phase {
 func runPreflightMaster(c workflow.RunData) error {
 	data, ok := c.(preflightMasterData)
 	if !ok {
-		return fmt.Errorf("preflight phase invoked with an invalid data struct")
+		return errors.New("preflight phase invoked with an invalid data struct")
 	}
 
 	fmt.Println("[preflight] running pre-flight checks")

@@ -26,6 +26,7 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/golang/glog"
+	pkgerrors "github.com/pkg/errors"
 )
 
 // semVerDotsCount is the number of dots in a valid semantic version.
@@ -45,7 +46,7 @@ func newPackageManager() (packageManager, error) {
 	if m, ok := newDPKG(); ok {
 		return m, nil
 	}
-	return nil, fmt.Errorf("failed to find package manager")
+	return nil, pkgerrors.New("failed to find package manager")
 }
 
 // dpkg implements packageManager. It uses "dpkg-query" to retrieve package
@@ -67,11 +68,11 @@ func newDPKG() (packageManager, bool) {
 func (_ dpkg) getPackageVersion(packageName string) (string, error) {
 	output, err := exec.Command("dpkg-query", "--show", "--showformat='${Version}'", packageName).Output()
 	if err != nil {
-		return "", fmt.Errorf("dpkg-query failed: %s", err)
+		return "", pkgerrors.Wrap(err, "dpkg-query failed")
 	}
 	version := extractUpstreamVersion(string(output))
 	if version == "" {
-		return "", fmt.Errorf("no version information")
+		return "", pkgerrors.New("no version information")
 	}
 	return version, nil
 }
@@ -153,7 +154,7 @@ func (self *packageValidator) validate(packageSpecs []PackageSpec, manager packa
 		if versionRange(sv) {
 			self.reporter.Report(nameWithVerRange, version, good)
 		} else {
-			errs = append(errs, fmt.Errorf("package \"%s %s\" does not meet the spec \"%s (%s)\"", packageName, sv, packageName, spec.VersionRange))
+			errs = append(errs, pkgerrors.Errorf("package \"%s %s\" does not meet the spec \"%s (%s)\"", packageName, sv, packageName, spec.VersionRange))
 			self.reporter.Report(nameWithVerRange, version, bad)
 		}
 	}
@@ -164,7 +165,7 @@ func (self *packageValidator) validate(packageSpecs []PackageSpec, manager packa
 func getKernelRelease() (string, error) {
 	output, err := exec.Command("uname", "-r").Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get kernel release: %s", err)
+		return "", pkgerrors.Wrap(err, "failed to get kernel release")
 	}
 	return strings.TrimSpace(string(output)), nil
 }
@@ -174,7 +175,7 @@ func getOSDistro() (string, error) {
 	f := "/etc/lsb-release"
 	b, err := ioutil.ReadFile(f)
 	if err != nil {
-		return "", fmt.Errorf("failed to read %q: %s", f, err)
+		return "", pkgerrors.Wrapf(err, "failed to read %q", f)
 	}
 	content := string(b)
 	switch {
@@ -185,7 +186,7 @@ func getOSDistro() (string, error) {
 	case strings.Contains(content, "CoreOS"):
 		return "coreos", nil
 	default:
-		return "", fmt.Errorf("failed to get OS distro: %s", content)
+		return "", pkgerrors.Errorf("failed to get OS distro: %s", content)
 	}
 }
 

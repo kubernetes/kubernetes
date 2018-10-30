@@ -170,7 +170,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
 			if len(args) < 1 {
-				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
+				kubeadmutil.CheckErr(errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
 			}
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
@@ -303,7 +303,8 @@ func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken st
 		// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tokenIDOrToken)
 		if err != nil {
-			return fmt.Errorf("given token or token id %q didn't match pattern %q or %q", tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+			return errors.Errorf("given token or token id %q didn't match pattern %q or %q",
+				tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
 		}
 		tokenID = bts.ID
 	}

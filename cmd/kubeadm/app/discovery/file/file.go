@@ -19,6 +19,9 @@ package file
 import (
 	"fmt"
 	"io/ioutil"
+
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +69,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		user := config.Contexts[config.CurrentContext].AuthInfo
 		authInfo, ok := config.AuthInfos[user]
 		if !ok || authInfo == nil {
-			return nil, fmt.Errorf("empty settings for user %q", user)
+			return nil, errors.Errorf("empty settings for user %q", user)
 		}
 		if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
 			clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
@@ -84,7 +87,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		}
 
 		if len(authInfo.ClientCertificateData) == 0 || len(authInfo.ClientKeyData) == 0 {
-			return nil, fmt.Errorf("couldn't read authentication info from the given kubeconfig file")
+			return nil, errors.New("couldn't read authentication info from the given kubeconfig file")
 		}
 		kubeconfig = kubeconfigutil.CreateWithCerts(
 			defaultCluster.Server,
@@ -141,11 +144,11 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, error) {
 	kubeConfigString, ok := cm.Data[bootstrapapi.KubeConfigKey]
 	if !ok || len(kubeConfigString) == 0 {
-		return nil, fmt.Errorf("no %s key in ConfigMap", bootstrapapi.KubeConfigKey)
+		return nil, errors.Errorf("no %s key in ConfigMap", bootstrapapi.KubeConfigKey)
 	}
 	parsedKubeConfig, err := clientcmd.Load([]byte(kubeConfigString))
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s ConfigMap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+		return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	}
 	return parsedKubeConfig, nil
 }
@@ -153,11 +156,11 @@ func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, e
 // validateKubeConfig makes sure the user-provided KubeConfig file is valid
 func validateKubeConfig(config *clientcmdapi.Config) error {
 	if len(config.Clusters) < 1 {
-		return fmt.Errorf("the provided cluster-info KubeConfig file must have at least one Cluster defined")
+		return errors.New("the provided cluster-info KubeConfig file must have at least one Cluster defined")
 	}
 	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
 	if defaultCluster == nil {
-		return fmt.Errorf("the provided cluster-info KubeConfig file must have an unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
+		return errors.New("the provided cluster-info KubeConfig file must have an unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
 	}
 	return clientcmd.Validate(*config)
 }

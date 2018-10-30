@@ -25,7 +25,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -100,7 +102,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// gets ClusterConfiguration from kubeadm-config
 	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
 	if !ok {
-		return nil, fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
+		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
 		return nil, err
@@ -143,7 +145,7 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 
 	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
 	if !ok {
-		return fmt.Errorf("Node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+		return errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
 	}
 
 	// returns the nodeRegistration attributes
@@ -183,7 +185,7 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 			return "", err
 		}
 	} else {
-		return "", errors.New("Invalid kubelet.conf. X509 certificate expected")
+		return "", errors.New("invalid kubelet.conf. X509 certificate expected")
 	}
 
 	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
@@ -224,7 +226,7 @@ func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubea
 		}
 
 		if ok := registration.SetToInternalConfig(obj, clusterConfiguration); !ok {
-			return fmt.Errorf("couldn't save componentconfig value for kind %q", string(kind))
+			return errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 		}
 	}
 	return nil

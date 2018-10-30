@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -52,7 +54,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	}
 
 	if err := certTree.CreateTree(cfg); err != nil {
-		return fmt.Errorf("Error creating PKI assets: %v", err)
+		return errors.Wrap(err, "error creating PKI assets")
 	}
 
 	fmt.Printf("[certificates] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
@@ -86,7 +88,7 @@ func NewServiceAccountSigningKey() (*rsa.PrivateKey, error) {
 	// The key does NOT exist, let's generate it now
 	saSigningKey, err := certutil.NewPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("failure while creating service account token signing key: %v", err)
+		return nil, errors.Wrap(err, "failure while creating service account token signing key")
 	}
 
 	return saSigningKey, nil
@@ -97,7 +99,7 @@ func NewCACertAndKey(certSpec *certutil.Config) (*x509.Certificate, *rsa.Private
 
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(certSpec)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failure while generating CA certificate and key: %v", err)
+		return nil, nil, errors.Wrap(err, "failure while generating CA certificate and key")
 	}
 
 	return caCert, caKey, nil
@@ -107,7 +109,7 @@ func NewCACertAndKey(certSpec *certutil.Config) (*x509.Certificate, *rsa.Private
 // The certSpec should be one of the variables from this package.
 func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
 	if certSpec.CAName != "" {
-		return fmt.Errorf("This function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
+		return errors.Errorf("this function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
 	}
 	glog.V(1).Infof("creating a new certificate authority for %s", certSpec.Name)
 
@@ -133,12 +135,12 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 // The certSpec and caCertSpec should both be one of the variables from this package.
 func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
 	if certSpec.CAName != caCertSpec.Name {
-		return fmt.Errorf("Expected CAname for %s to be %q, but was %s", certSpec.Name, certSpec.CAName, caCertSpec.Name)
+		return errors.Errorf("expected CAname for %s to be %q, but was %s", certSpec.Name, certSpec.CAName, caCertSpec.Name)
 	}
 
 	caCert, caKey, err := LoadCertificateAuthority(cfg.CertificatesDir, caCertSpec.BaseName)
 	if err != nil {
-		return fmt.Errorf("Couldn't load CA certificate %s: %v", caCertSpec.Name, err)
+		return errors.Wrapf(err, "couldn't load CA certificate %s", caCertSpec.Name)
 	}
 
 	return certSpec.CreateFromCA(cfg, caCert, caKey)
@@ -148,18 +150,18 @@ func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert,
 func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
 	// Checks if certificate authority exists in the PKI directory
 	if !pkiutil.CertOrKeyExist(pkiDir, baseName) {
-		return nil, nil, fmt.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
+		return nil, nil, errors.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
 	}
 
 	// Try to load certificate authority .crt and .key from the PKI directory
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failure loading %s certificate authority: %v", baseName, err)
+		return nil, nil, errors.Wrapf(err, "failure loading %s certificate authority", baseName)
 	}
 
 	// Make sure the loaded CA cert actually is a CA
 	if !caCert.IsCA {
-		return nil, nil, fmt.Errorf("%s certificate is not a certificate authority", baseName)
+		return nil, nil, errors.Errorf("%s certificate is not a certificate authority", baseName)
 	}
 
 	return caCert, caKey, nil
@@ -177,12 +179,12 @@ func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, c
 		// Try to load .crt and .key from the PKI directory
 		caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 		if err != nil {
-			return fmt.Errorf("failure loading %s certificate: %v", baseName, err)
+			return errors.Wrapf(err, "failure loading %s certificate", baseName)
 		}
 
 		// Check if the existing cert is a CA
 		if !caCert.IsCA {
-			return fmt.Errorf("certificate %s is not a CA", baseName)
+			return errors.Errorf("certificate %s is not a CA", baseName)
 		}
 
 		// kubeadm doesn't validate the existing certificate Authority more than this;
@@ -193,7 +195,7 @@ func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, c
 
 		// Write .crt and .key files to disk
 		if err := pkiutil.WriteCertAndKey(pkiDir, baseName, caCert, caKey); err != nil {
-			return fmt.Errorf("failure while saving %s certificate and key: %v", baseName, err)
+			return errors.Wrapf(err, "failure while saving %s certificate and key", baseName)
 		}
 
 		fmt.Printf("[certificates] Generated %s certificate and key.\n", baseName)
@@ -212,12 +214,12 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 		// Try to load signed certificate .crt and .key from the PKI directory
 		signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 		if err != nil {
-			return fmt.Errorf("failure loading %s certificate: %v", baseName, err)
+			return errors.Wrapf(err, "failure loading %s certificate", baseName)
 		}
 
 		// Check if the existing cert is signed by the given CA
 		if err := signedCert.CheckSignatureFrom(signingCert); err != nil {
-			return fmt.Errorf("certificate %s is not signed by corresponding CA", baseName)
+			return errors.Errorf("certificate %s is not signed by corresponding CA", baseName)
 		}
 
 		// kubeadm doesn't validate the existing certificate more than this;
@@ -229,7 +231,7 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 
 		// Write .crt and .key files to disk
 		if err := pkiutil.WriteCertAndKey(pkiDir, baseName, cert, key); err != nil {
-			return fmt.Errorf("failure while saving %s certificate and key: %v", baseName, err)
+			return errors.Wrapf(err, "failure while saving %s certificate and key", baseName)
 		}
 
 		fmt.Printf("[certificates] Generated %s certificate and key.\n", baseName)
@@ -253,7 +255,7 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 		// Try to load .key from the PKI directory
 		_, err := pkiutil.TryLoadKeyFromDisk(pkiDir, baseName)
 		if err != nil {
-			return fmt.Errorf("%s key existed but it could not be loaded properly: %v", baseName, err)
+			return errors.Wrapf(err, "%s key existed but it could not be loaded properly", baseName)
 		}
 
 		// kubeadm doesn't validate the existing certificate key more than this;
@@ -264,11 +266,11 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 
 		// Write .key and .pub files to disk
 		if err := pkiutil.WriteKey(pkiDir, baseName, key); err != nil {
-			return fmt.Errorf("failure while saving %s key: %v", baseName, err)
+			return errors.Wrapf(err, "failure while saving %s key", baseName)
 		}
 
 		if err := pkiutil.WritePublicKey(pkiDir, baseName, &key.PublicKey); err != nil {
-			return fmt.Errorf("failure while saving %s public key: %v", baseName, err)
+			return errors.Wrapf(err, "failure while saving %s public key", baseName)
 		}
 		fmt.Printf("[certificates] Generated %s key and public key.\n", baseName)
 	}
@@ -320,7 +322,7 @@ func UsingExternalCA(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); !os.IsNotExist(err) {
-		return false, fmt.Errorf("%s exists", kubeadmconstants.CAKeyName)
+		return false, errors.Errorf("%s exists", kubeadmconstants.CAKeyName)
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerCertAndKeyBaseName, "API server"}); err != nil {
@@ -341,7 +343,7 @@ func UsingExternalCA(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 
 	frontProxyCAKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)
 	if _, err := os.Stat(frontProxyCAKeyPath); !os.IsNotExist(err) {
-		return false, fmt.Errorf("%s exists", kubeadmconstants.FrontProxyCAKeyName)
+		return false, errors.Errorf("%s exists", kubeadmconstants.FrontProxyCAKeyName)
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, "front-proxy client"}); err != nil {
@@ -356,12 +358,12 @@ func validateCACert(l certKeyLocation) error {
 	// Check CA Cert
 	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
-		return fmt.Errorf("failure loading certificate for %s: %v", l.uxName, err)
+		return errors.Wrapf(err, "failure loading certificate for %s", l.uxName)
 	}
 
 	// Check if cert is a CA
 	if !caCert.IsCA {
-		return fmt.Errorf("certificate %s is not a CA", l.uxName)
+		return errors.Errorf("certificate %s is not a CA", l.uxName)
 	}
 	return nil
 }
@@ -375,7 +377,7 @@ func validateCACertAndKey(l certKeyLocation) error {
 
 	_, err := pkiutil.TryLoadKeyFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
-		return fmt.Errorf("failure loading key for %s: %v", l.uxName, err)
+		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
 	}
 	return nil
 }
@@ -386,7 +388,7 @@ func validateSignedCert(l certKeyLocation) error {
 	// Try to load CA
 	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
-		return fmt.Errorf("failure loading certificate authority for %s: %v", l.uxName, err)
+		return errors.Wrapf(err, "failure loading certificate authority for %s", l.uxName)
 	}
 
 	return validateSignedCertWithCA(l, caCert)
@@ -397,12 +399,12 @@ func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error
 	// Try to load key and signed certificate
 	signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(l.pkiDir, l.baseName)
 	if err != nil {
-		return fmt.Errorf("failure loading certificate for %s: %v", l.uxName, err)
+		return errors.Wrapf(err, "failure loading certificate for %s", l.uxName)
 	}
 
 	// Check if the cert is signed by the CA
 	if err := signedCert.CheckSignatureFrom(caCert); err != nil {
-		return fmt.Errorf("certificate %s is not signed by corresponding CA", l.uxName)
+		return errors.Wrapf(err, "certificate %s is not signed by corresponding CA", l.uxName)
 	}
 	return nil
 }
@@ -412,7 +414,7 @@ func validatePrivatePublicKey(l certKeyLocation) error {
 	// Try to load key
 	_, _, err := pkiutil.TryLoadPrivatePublicKeyFromDisk(l.pkiDir, l.baseName)
 	if err != nil {
-		return fmt.Errorf("failure loading key for %s: %v", l.uxName, err)
+		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
 	}
 	return nil
 }

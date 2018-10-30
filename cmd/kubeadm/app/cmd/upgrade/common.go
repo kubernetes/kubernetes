@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -54,12 +55,12 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
+		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
-		return nil, fmt.Errorf("[upgrade/health] FATAL: %v", err)
+		return nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
@@ -75,9 +76,9 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your master.\n")
 			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
 			fmt.Println("")
-			err = fmt.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+		return nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
 	// If a new k8s version should be set, apply the change before printing the config
@@ -89,7 +90,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 		if err != nil {
-			return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+			return nil, errors.Wrap(err, "[upgrade/config] FATAL")
 		}
 	}
 
@@ -98,7 +99,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		for _, m := range msg {
 			fmt.Printf("[upgrade/config] %s\n", m)
 		}
-		return nil, fmt.Errorf("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
+		return nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
@@ -153,7 +154,7 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		// API Server's version
 		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get server version: %v", err)
+			return nil, errors.Wrap(err, "failed to get server version")
 		}
 
 		// Get the fake clientset
@@ -165,7 +166,7 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		// we can convert it to that struct.
 		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
 		if !ok {
-			return nil, fmt.Errorf("couldn't set fake discovery's server version")
+			return nil, errors.New("couldn't set fake discovery's server version")
 		}
 		// Lastly, set the right server version to be used
 		fakeclientDiscovery.FakedServerVersion = realServerVersion
@@ -191,12 +192,12 @@ func InteractivelyConfirmUpgrade(question string) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("couldn't read from standard input: %v", err)
+		return errors.Wrap(err, "couldn't read from standard input")
 	}
 	answer := scanner.Text()
 	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
 		return nil
 	}
 
-	return fmt.Errorf("won't proceed; the user didn't answer (Y|y) in order to continue")
+	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }

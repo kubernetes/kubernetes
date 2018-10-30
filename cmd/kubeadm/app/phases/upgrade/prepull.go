@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,7 +71,7 @@ func (d *DaemonSetPrepuller) CreateFunc(component string) error {
 
 	// Create the DaemonSet in the API Server
 	if err := apiclient.CreateOrUpdateDaemonSet(d.client, ds); err != nil {
-		return fmt.Errorf("unable to create a DaemonSet for prepulling the component %q: %v", component, err)
+		return errors.Wrapf(err, "unable to create a DaemonSet for prepulling the component %q", component)
 	}
 	return nil
 }
@@ -84,7 +86,7 @@ func (d *DaemonSetPrepuller) WaitFunc(component string) {
 func (d *DaemonSetPrepuller) DeleteFunc(component string) error {
 	dsName := addPrepullPrefix(component)
 	if err := apiclient.DeleteDaemonSetForeground(d.client, metav1.NamespaceSystem, dsName); err != nil {
-		return fmt.Errorf("unable to cleanup the DaemonSet used for prepulling %s: %v", component, err)
+		return errors.Wrapf(err, "unable to cleanup the DaemonSet used for prepulling %s", component)
 	}
 	fmt.Printf("[upgrade/prepull] Prepulled image for component %s.\n", component)
 	return nil
@@ -130,7 +132,7 @@ func waitForItemsFromChan(timeoutChan <-chan time.Time, stringChan chan string, 
 	for {
 		select {
 		case <-timeoutChan:
-			return fmt.Errorf("The prepull operation timed out")
+			return errors.New("The prepull operation timed out")
 		case result := <-stringChan:
 			i++
 			// If the cleanup function errors; error here as well

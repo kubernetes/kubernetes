@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -43,7 +44,7 @@ const (
 // upgrade - when the etcd cluster is already up and running (and the --initial-cluster flag have no impact)
 func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
 	if cfg.ClusterConfiguration.Etcd.External != nil {
-		return fmt.Errorf("etcd static pod manifest cannot be generated for cluster using external etcd")
+		return errors.New("etcd static pod manifest cannot be generated for cluster using external etcd")
 	}
 	glog.V(1).Infoln("creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec

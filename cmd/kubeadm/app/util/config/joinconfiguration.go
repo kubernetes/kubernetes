@@ -17,17 +17,17 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"io/ioutil"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -56,7 +56,7 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+			return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 		}
 
 		if err := DetectUnsupportedVersion(b); err != nil {
@@ -76,7 +76,7 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 		}
 
 		if len(joinBytes) == 0 {
-			return nil, fmt.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
+			return nil, errors.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
 		}
 
 		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), joinBytes, internalcfg); err != nil {

@@ -443,12 +443,12 @@ func runInit(i *initData, out io.Writer) error {
 		if i.cfg.AuditPolicyConfiguration.Path != "" {
 			// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
 			if _, err := os.Stat(i.cfg.AuditPolicyConfiguration.Path); err != nil {
-				return fmt.Errorf("error getting file info for audit policy file %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+				return errors.Wrapf(err, "error getting file info for audit policy file %q", i.cfg.AuditPolicyConfiguration.Path)
 			}
 		} else {
 			i.cfg.AuditPolicyConfiguration.Path = filepath.Join(kubeConfigDir, kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
 			if err := auditutil.CreateDefaultAuditLogPolicy(i.cfg.AuditPolicyConfiguration.Path); err != nil {
-				return fmt.Errorf("error creating default audit policy %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+				return errors.Wrapf(err, "error creating default audit policy %q ", i.cfg.AuditPolicyConfiguration.Path)
 			}
 		}
 	}
@@ -565,7 +565,7 @@ func runInit(i *initData, out io.Writer) error {
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	glog.V(1).Infof("[init] creating RBAC rules to automatic approval of CSRs automatically")
 	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return errors.Wrap(err, "error auto-approving node bootstrap tokens: %v")
+		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically

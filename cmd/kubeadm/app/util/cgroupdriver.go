@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -41,7 +40,7 @@ func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
 
 func validateCgroupDriver(driver string) error {
 	if driver != "cgroupfs" && driver != "systemd" {
-		return fmt.Errorf("unknown cgroup driver %q", driver)
+		return errors.Errorf("unknown cgroup driver %q", driver)
 	}
 	return nil
 }
