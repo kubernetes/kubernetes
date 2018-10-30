@@ -18,17 +18,15 @@ package kubeconfig
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"crypto/rsa"
-
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -88,32 +86,11 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 	)
 }
 
-// CreateAdminKubeConfigFile create a kubeconfig file for the admin to use and for kubeadm itself.
+// CreateKubeConfigFile creates a kubeconfig file.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateAdminKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("create a kubeconfig file for the admin and for kubeadm itself")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.AdminKubeConfigFileName)
-}
-
-// CreateKubeletKubeConfigFile create a kubeconfig file for the Kubelet to use.
-// If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateKubeletKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating a kubeconfig file for the Kubelet")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.KubeletKubeConfigFileName)
-}
-
-// CreateControllerManagerKubeConfigFile create a kubeconfig file for the ControllerManager to use.
-// If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateControllerManagerKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating kubeconfig file for the ControllerManager")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.ControllerManagerKubeConfigFileName)
-}
-
-// CreateSchedulerKubeConfigFile create a create a kubeconfig file for the Scheduler to use.
-// If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateSchedulerKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating kubeconfig file for Scheduler")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.SchedulerKubeConfigFileName)
+func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
+	glog.V(1).Infof("creating kubeconfig file for %s", kubeConfigFileName)
+	return createKubeConfigFiles(outDir, cfg, kubeConfigFileName)
 }
 
 // createKubeConfigFiles creates all the requested kubeconfig files.
@@ -248,12 +225,12 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 
 	// Check if the file exist, and if it doesn't, just write it to disk
 	if _, err := os.Stat(kubeConfigFilePath); os.IsNotExist(err) {
+		fmt.Printf("[kubeconfig] Writing %q kubeconfig file\n", filename)
+
 		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
 		if err != nil {
 			return errors.Wrapf(err, "failed to save kubeconfig file %s on disk", kubeConfigFilePath)
 		}
-
-		fmt.Printf("[kubeconfig] Wrote KubeConfig file to disk: %q\n", kubeConfigFilePath)
 		return nil
 	}
 
