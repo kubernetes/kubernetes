@@ -2437,6 +2437,71 @@ func TestValidateVolumes(t *testing.T) {
 			}},
 		},
 		{
+			name: "valid replacementTimeout positive value",
+			vol: core.Volume{
+				Name: "iscsi",
+				VolumeSource: core.VolumeSource{
+					ISCSI: &core.ISCSIVolumeSource{
+						TargetPortal:       "127.0.0.1",
+						IQN:                "iqn.2015-02.example.com:test",
+						Lun:                1,
+						InitiatorName:      &validInitiatorName,
+						FSType:             "ext4",
+						ReadOnly:           false,
+						ReplacementTimeout: utilpointer.Int32Ptr(300),
+					},
+				},
+			},
+		},
+		{
+			name: "valid replacementTimeout with negative value",
+			vol: core.Volume{
+				Name: "iscsi",
+				VolumeSource: core.VolumeSource{
+					ISCSI: &core.ISCSIVolumeSource{
+						TargetPortal:       "127.0.0.1",
+						IQN:                "iqn.2015-02.example.com:test",
+						Lun:                1,
+						FSType:             "ext4",
+						ReadOnly:           false,
+						ReplacementTimeout: utilpointer.Int32Ptr(-120),
+					},
+				},
+			},
+		},
+		{
+			name: "No replacementTimeout field",
+			vol: core.Volume{
+				Name: "iscsi",
+				VolumeSource: core.VolumeSource{
+					ISCSI: &core.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "iqn.2015-02.example.com:test",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+		},
+		{
+			name: "empty replacementTimeout",
+			vol: core.Volume{
+				Name: "iscsi",
+				VolumeSource: core.VolumeSource{
+					ISCSI: &core.ISCSIVolumeSource{
+						TargetPortal:       "127.0.0.1",
+						IQN:                "iqn.2015-02.example.com:test",
+						Lun:                1,
+						InitiatorName:      &validInitiatorName,
+						FSType:             "ext4",
+						ReadOnly:           false,
+						ReplacementTimeout: nil,
+					},
+				},
+			},
+		},
+		{
 			name: "empty secret",
 			vol: core.Volume{
 				Name: "iscsi",

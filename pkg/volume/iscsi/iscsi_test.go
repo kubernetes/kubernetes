@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -312,12 +313,13 @@ type testcase struct {
 	defaultNs string
 	spec      *volume.Spec
 	// Expected return of the test
-	expectedName          string
-	expectedNs            string
-	expectedIface         string
-	expectedError         error
-	expectedDiscoveryCHAP bool
-	expectedSessionCHAP   bool
+	expectedName               string
+	expectedNs                 string
+	expectedIface              string
+	expectedError              error
+	expectedDiscoveryCHAP      bool
+	expectedSessionCHAP        bool
+	expectedReplacementTimeout string
 }
 
 func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
@@ -509,6 +511,112 @@ func TestGetISCSICHAP(t *testing.T) {
 			if err != testcase.expectedError || resultDiscoveryCHAP != testcase.expectedDiscoveryCHAP || resultSessionCHAP != testcase.expectedSessionCHAP {
 				t.Errorf("%s failed: expected err=%v DiscoveryCHAP=%v SessionCHAP=%v, got %v/%v/%v", testcase.name, testcase.expectedError, testcase.expectedDiscoveryCHAP, testcase.expectedSessionCHAP,
 					err, resultDiscoveryCHAP, resultSessionCHAP)
+			}
+		}
+	}
+}
+
+func TestGetISCSITimeoutSettingInfo(t *testing.T) {
+	tests := []testcase{
+		{
+			name: "Valid ReplacementTimeout ",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							ISCSI: &v1.ISCSIPersistentVolumeSource{
+								ReplacementTimeout: utilpointer.Int32Ptr(300),
+							},
+						},
+					},
+				},
+			},
+			expectedError:              nil,
+			expectedReplacementTimeout: "300",
+		},
+		{
+			name: "Valid ReplacementTimeout",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{
+							ReplacementTimeout: utilpointer.Int32Ptr(-120),
+						},
+					},
+				},
+			},
+			expectedError:              nil,
+			expectedReplacementTimeout: "-120",
+		},
+		{
+			name: "Valid ReplacementTimeout",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{
+							ReplacementTimeout: utilpointer.Int32Ptr(0),
+						},
+					},
+				},
+			},
+			expectedError:              nil,
+			expectedReplacementTimeout: "0",
+		},
+		{
+			name: "No ReplacementTimeout",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{},
+					},
+				},
+			},
+			expectedError:              nil,
+			expectedReplacementTimeout: "",
+		},
+		{
+			name: "No ReplacementTimeout",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{},
+					},
+				},
+			},
+			expectedError:              nil,
+			expectedReplacementTimeout: "",
+		},
+		{
+			name: "No ReplacementTimeout",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						ISCSI: &v1.ISCSIVolumeSource{
+							TargetPortal:   "127.0.0.1:3260",
+							IQN:            "iqn.2014-12.server:storage.target01",
+							FSType:         "ext4",
+							Lun:            0,
+							ISCSIInterface: "tcp",
+						},
+					},
+				},
+			},
+			expectedError:              nil,
+			expectedReplacementTimeout: "",
+		},
+	}
+	var fakeReplacementTimeout string
+	for _, testcase := range tests {
+		fakeReplacementTimeout = getISCSITimeoutSettingInfo(testcase.spec)
+		switch testcase.name {
+		case "Valid ReplacementTimeout":
+			if fakeReplacementTimeout != testcase.expectedReplacementTimeout {
+				t.Errorf("%s failed: expected ReplacementTimeout=%v and got %v",
+					testcase.name, testcase.expectedReplacementTimeout, fakeReplacementTimeout)
+			}
+		default:
+			if fakeReplacementTimeout != testcase.expectedReplacementTimeout {
+				t.Errorf("%s failed expected %v and got %v", testcase.name, testcase.expectedReplacementTimeout, fakeReplacementTimeout)
 			}
 		}
 	}

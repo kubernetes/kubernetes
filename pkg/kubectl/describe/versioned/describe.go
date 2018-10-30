@@ -925,8 +925,9 @@ func printISCSIVolumeSource(iscsi *corev1.ISCSIVolumeSource, w PrefixWriter) {
 		"    DiscoveryCHAPAuth:\t%v\n"+
 		"    SessionCHAPAuth:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    InitiatorName:\t%v\n",
-		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator)
+		"    InitiatorName:\t%v\n"+
+		"    ReplacementTimeout: \t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator, iscsi.ReplacementTimeout)
 }
 
 func printISCSIPersistentVolumeSource(iscsi *corev1.ISCSIPersistentVolumeSource, w PrefixWriter) {
@@ -945,8 +946,9 @@ func printISCSIPersistentVolumeSource(iscsi *corev1.ISCSIPersistentVolumeSource,
 		"    DiscoveryCHAPAuth:\t%v\n"+
 		"    SessionCHAPAuth:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    InitiatorName:\t%v\n",
-		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiatorName)
+		"    InitiatorName:\t%v\n"+
+		"    ReplacementTimeout: \t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiatorName, iscsi.ReplacementTimeout)
 }
 
 func printGlusterfsVolumeSource(glusterfs *corev1.GlusterfsVolumeSource, w PrefixWriter) {

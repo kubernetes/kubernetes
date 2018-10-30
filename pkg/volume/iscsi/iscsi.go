@@ -262,17 +262,18 @@ func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName
 }
 
 type iscsiDisk struct {
-	VolName        string
-	podUID         types.UID
-	Portals        []string
-	Iqn            string
-	Lun            string
-	Iface          string
-	chap_discovery bool
-	chap_session   bool
-	secret         map[string]string
-	InitiatorName  string
-	plugin         *iscsiPlugin
+	VolName            string
+	podUID             types.UID
+	Portals            []string
+	Iqn                string
+	Lun                string
+	Iface              string
+	chap_discovery     bool
+	chap_session       bool
+	secret             map[string]string
+	replacementTimeout string
+	InitiatorName      string
+	plugin             *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	volume.MetricsProvider
@@ -506,12 +507,23 @@ func getISCSISecretNameAndNamespace(spec *volume.Spec, defaultSecretNamespace st
 	return "", "", fmt.Errorf("Spec does not reference an ISCSI volume type")
 }
 
+// getISCSITimeoutSettingInfo will get iSCSI Timeout value
+func getISCSITimeoutSettingInfo(spec *volume.Spec) string {
+	var replacementTimeout string
+	if spec.Volume != nil && spec.Volume.ISCSI != nil && spec.Volume.ISCSI.ReplacementTimeout != nil {
+		replacementTimeout = strconv.Itoa(int(*spec.Volume.ISCSI.ReplacementTimeout))
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.ISCSI != nil && spec.PersistentVolume.Spec.ISCSI.ReplacementTimeout != nil {
+		replacementTimeout = strconv.Itoa(int(*spec.PersistentVolume.Spec.ISCSI.ReplacementTimeout))
+	}
+	return replacementTimeout
+}
+
 func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, manager diskManager, secret map[string]string) (*iscsiDisk, error) {
 	tp, portals, iqn, lunStr, err := getISCSITargetInfo(spec)
 	if err != nil {
 		return nil, err
 	}
-
 	lun := strconv.Itoa(int(lunStr))
 	portal := portalMounter(tp)
 	var bkportal []string
@@ -538,19 +550,23 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		return nil, err
 	}
 
+	//Fetching iscsi timeout settings from PV object as a string value
+	replacementTimeout := getISCSITimeoutSettingInfo(spec)
+
 	return &iscsiDisk{
-		podUID:         podUID,
-		VolName:        spec.Name(),
-		Portals:        bkportal,
-		Iqn:            iqn,
-		Lun:            lun,
-		Iface:          iface,
-		chap_discovery: chapDiscovery,
-		chap_session:   chapSession,
-		secret:         secret,
-		InitiatorName:  initiatorName,
-		manager:        manager,
-		plugin:         plugin}, nil
+		podUID:             podUID,
+		VolName:            spec.Name(),
+		Portals:            bkportal,
+		Iqn:                iqn,
+		Lun:                lun,
+		Iface:              iface,
+		chap_discovery:     chapDiscovery,
+		chap_session:       chapSession,
+		secret:             secret,
+		replacementTimeout: replacementTimeout,
+		InitiatorName:      initiatorName,
+		manager:            manager,
+		plugin:             plugin}, nil
 }
 
 func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (map[string]string, error) {

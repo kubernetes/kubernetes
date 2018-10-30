@@ -707,6 +707,12 @@ func validateISCSIVolumeSource(iscsi *core.ISCSIVolumeSource, fldPath *field.Pat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
 		}
 	}
+	if iscsi.ReplacementTimeout != nil {
+		timeout := string(*iscsi.ReplacementTimeout)
+		if len(timeout) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("replacementTimeout"), timeout, "must be provided"))
+		}
+	}
 	return allErrs
 }
 
@@ -750,6 +756,12 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
 		} else if strings.HasPrefix(initiator, "naa") && !iscsiInitiatorNaaRegex.MatchString(initiator) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+		}
+	}
+	if iscsi.ReplacementTimeout != nil {
+		timeout := string(*iscsi.ReplacementTimeout)
+		if len(timeout) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("replacementTimeout"), timeout, "must be provided"))
 		}
 	}
 	return allErrs

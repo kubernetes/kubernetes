@@ -1136,6 +1136,8 @@ type NFSVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
+// +k8s:deepcopy-gen
+
 // Represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
@@ -1180,7 +1182,18 @@ type ISCSIVolumeSource struct {
 	// <target portal>:<volume name> will be created for the connection.
 	// +optional
 	InitiatorName *string `json:"initiatorName,omitempty" protobuf:"bytes,12,opt,name=initiatorName"`
+	// ReplacementTimeout controls how long the iSCSI layer should wait for a
+	// timed-out path/session to reestablish itself before failing any commands on it.
+	// If the ReplacementTimeout value is 0, IO will be failed immediately.
+	// If the ReplacementTImeout value is less than 0, IO will remain queued until the session
+	// is logged back in, or until the user runs the logout command.
+	// If the ReplacementTimeout field is not provided or empty then it remains with
+	// default value i.e 120 seconds.
+	// +optional
+	ReplacementTimeout *int32 `json:"replacementTimeout,omitempty"`
 }
+
+// +k8s:deepcopy-gen
 
 // ISCSIPersistentVolumeSource represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
@@ -1226,6 +1239,15 @@ type ISCSIPersistentVolumeSource struct {
 	// <target portal>:<volume name> will be created for the connection.
 	// +optional
 	InitiatorName *string `json:"initiatorName,omitempty" protobuf:"bytes,12,opt,name=initiatorName"`
+	// ReplacementTimeout controls how long the iSCSI layer should wait for a
+	// timed-out path/session to reestablish itself before failing any commands on it.
+	// If the ReplacementTimeout value is 0, IO will be failed immediately.
+	// If the ReplacementTImeout value is less than 0, IO will remain queued until the session
+	// is logged back in, or until the user runs the logout command.
+	// If the ReplacementTimeout field is not provided or empty then it remains with
+	// default value i.e 120 seconds.
+	// +optional
+	ReplacementTimeout *int32 `json:"replacementTimeout,omitempty"`
 }
 
 // Represents a Fibre Channel volume.
