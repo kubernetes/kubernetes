@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -108,11 +108,12 @@ func (o *PluginListOptions) Run() error {
 
 	pluginsFound := false
 	isFirstFile := true
+	pluginErrors := []error{}
 	pluginWarnings := 0
-	paths := sets.NewString(filepath.SplitList(os.Getenv(path))...)
-	for _, dir := range paths.List() {
+	for _, dir := range filepath.SplitList(os.Getenv(path)) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
+			pluginErrors = append(pluginErrors, fmt.Errorf("error: unable to read directory %q in your PATH: %v", dir, err))
 			continue
 		}
 
@@ -146,15 +147,23 @@ func (o *PluginListOptions) Run() error {
 	}
 
 	if !pluginsFound {
-		return fmt.Errorf("error: unable to find any kubectl plugins in your PATH")
+		pluginErrors = append(pluginErrors, fmt.Errorf("error: unable to find any kubectl plugins in your PATH"))
 	}
 
 	if pluginWarnings > 0 {
-		fmt.Fprintln(o.ErrOut)
 		if pluginWarnings == 1 {
-			return fmt.Errorf("one plugin warning was found")
+			pluginErrors = append(pluginErrors, fmt.Errorf("error: one plugin warning was found"))
+		} else {
+			pluginErrors = append(pluginErrors, fmt.Errorf("error: %v plugin warnings were found", pluginWarnings))
 		}
-		return fmt.Errorf("%v plugin warnings were found", pluginWarnings)
+	}
+	if len(pluginErrors) > 0 {
+		fmt.Fprintln(o.ErrOut)
+		errs := bytes.NewBuffer(nil)
+		for _, e := range pluginErrors {
+			fmt.Fprintln(errs, e)
+		}
+		return fmt.Errorf("%s", errs.String())
 	}
 
 	return nil
