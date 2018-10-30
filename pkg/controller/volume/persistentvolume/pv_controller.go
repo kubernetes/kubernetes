@@ -1127,7 +1127,19 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 		klog.V(3).Infof("can't recycle volume %q: %v", volume.Name, err)
 		return
 	}
-	if used {
+
+	// Verify the claim is in cache: if so, then it is a different PVC with the same name
+	// since the volume is known to be released at this moment. Ths new (cached) PVC must use
+	// a different PV -- we checked that the PV is unused in isVolumeReleased.
+	// So the old PV is safe to be recycled.
+	claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
+	_, claimCached, err := ctrl.claims.GetByKey(claimName)
+	if err != nil {
+		klog.V(3).Infof("error getting the claim %s from cache", claimName)
+		return
+	}
+
+	if used && !claimCached {
 		msg := fmt.Sprintf("Volume is used by pods: %s", strings.Join(pods, ","))
 		klog.V(3).Infof("can't recycle volume %q: %s", volume.Name, msg)
 		ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeFailedRecycle, msg)
