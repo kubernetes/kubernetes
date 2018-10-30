@@ -45,38 +45,47 @@ var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 type WebhookTokenAuthenticator struct {
 	tokenReview    authenticationclient.TokenReviewInterface
 	initialBackoff time.Duration
+	implicitAuds   authenticator.Audiences
 }
 
 // NewFromInterface creates a webhook authenticator using the given tokenReview
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(tokenReview, retryBackoff)
+func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
-// New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
-func New(kubeConfigFile string) (*WebhookTokenAuthenticator, error) {
+// New creates a new WebhookTokenAuthenticator from the provided kubeconfig
+// file. It is recommend to wrap this authenticator with the token cache
+// authenticator implemented in
+// k8s.io/apiserver/pkg/authentication/token/cache.
+func New(kubeConfigFile string, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
 	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, retryBackoff)
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, initialBackoff}, nil
+func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, initialBackoff time.Duration, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, initialBackoff, implicitAuds}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
 func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	reqAuds, checkAuds := authenticator.AudiencesFrom(ctx)
 	r := &authentication.TokenReview{
-		Spec: authentication.TokenReviewSpec{Token: token},
+		Spec: authentication.TokenReviewSpec{
+			Token: token,
+			// Audiences: auds,
+		},
 	}
 	var (
 		result *authentication.TokenReview
 		err    error
+		auds   authenticator.Audiences
 	)
 	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
 		result, err = w.tokenReview.Create(r)
@@ -87,6 +96,21 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 		glog.Errorf("Failed to make webhook authenticator request: %v", err)
 		return nil, false, err
 	}
+
+	if checkAuds {
+		// TODO: Once TokenReview supports Audiences, we will only need to check
+		// this if the TokenReviewStatus comes back with an empty Audiences field
+		// (i.e.  when the backend is not audience aware.
+		respAuds := w.implicitAuds
+		// if len(result.Status.Audiences) > 0 {
+		//	respAuds = result.Status.Audiences
+		// }
+		auds = reqAuds.Intersect(respAuds)
+		if len(auds) == 0 {
+			return nil, false, nil
+		}
+	}
+
 	r.Status = result.Status
 	if !r.Status.Authenticated {
 		return nil, false, nil
@@ -107,6 +131,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 			Groups: r.Status.User.Groups,
 			Extra:  extra,
 		},
+		Audiences: auds,
 	}, true, nil
 }
 

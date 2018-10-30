@@ -114,6 +114,8 @@ type DelegatingAuthenticationOptions struct {
 	// CacheTTL is the length of time that a token authentication answer will be cached.
 	CacheTTL time.Duration
 
+	APIAudiences []string
+
 	ClientCert    ClientCertAuthenticationOptions
 	RequestHeader RequestHeaderAuthenticationOptions
 
@@ -147,6 +149,10 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	if s.RemoteKubeConfigFileOptional {
 		optionalKubeConfigSentence = " This is optional. If empty, all token requests are considered to be anonymous and no client CA is looked up in the cluster."
 	}
+	fs.StringSliceVar(&s.APIAudiences, "api-audiences", s.APIAudiences, ""+
+		"Identifiers of the API. Authenticators will validate that tokens used "+
+		"against the API are bound to at least one of these audiences.")
+
 	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
 		"tokenaccessreviews.authentication.k8s.io."+optionalKubeConfigSentence)
@@ -169,8 +175,9 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 	}
 
 	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous: true,
-		CacheTTL:  s.CacheTTL,
+		Anonymous:    true,
+		CacheTTL:     s.CacheTTL,
+		APIAudiences: s.APIAudiences,
 	}
 
 	client, err := s.getClient()

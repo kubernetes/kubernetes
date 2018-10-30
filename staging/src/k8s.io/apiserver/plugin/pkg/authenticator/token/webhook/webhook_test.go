@@ -39,6 +39,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
+var apiAuds = authenticator.Audiences{"api"}
+
 // Service mocks a remote authentication service.
 type Service interface {
 	// Review looks at the TokenReviewSpec and provides an authentication
@@ -168,7 +170,7 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newTokenAuthenticator creates a temporary kubeconfig file from the provided
 // arguments and attempts to load a new WebhookTokenAuthenticator from it.
-func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (authenticator.Token, error) {
+func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -196,7 +198,7 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 		return nil, err
 	}
 
-	authn, err := newWithBackoff(c, 0)
+	authn, err := newWithBackoff(c, 0, implicitAuds)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +259,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newTokenAuthenticator(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0)
+			wh, err := newTokenAuthenticator(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, nil)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -312,20 +314,17 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	}
 	defer s.Close()
 
-	wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	expTypeMeta := metav1.TypeMeta{
 		APIVersion: "authentication.k8s.io/v1beta1",
 		Kind:       "TokenReview",
 	}
 
 	tests := []struct {
+		implicitAuds, reqAuds authenticator.Audiences
 		serverResponse        v1beta1.TokenReviewStatus
 		expectedAuthenticated bool
 		expectedUser          *user.DefaultInfo
+		expectedAuds          authenticator.Audiences
 	}{
 		// Successful response should pass through all user info.
 		{
@@ -378,31 +377,98 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			expectedAuthenticated: false,
 			expectedUser:          nil,
 		},
+		// good audience
+		{
+			implicitAuds: apiAuds,
+			reqAuds:      apiAuds,
+			serverResponse: v1beta1.TokenReviewStatus{
+				Authenticated: true,
+				User: v1beta1.UserInfo{
+					Username: "somebody",
+				},
+			},
+			expectedAuthenticated: true,
+			expectedUser: &user.DefaultInfo{
+				Name: "somebody",
+			},
+			expectedAuds: apiAuds,
+		},
+		{
+			implicitAuds: append(apiAuds, "other"),
+			reqAuds:      apiAuds,
+			serverResponse: v1beta1.TokenReviewStatus{
+				Authenticated: true,
+				User: v1beta1.UserInfo{
+					Username: "somebody",
+				},
+			},
+			expectedAuthenticated: true,
+			expectedUser: &user.DefaultInfo{
+				Name: "somebody",
+			},
+			expectedAuds: apiAuds,
+		},
+		// bad audiences
+		{
+			implicitAuds: apiAuds,
+			reqAuds:      authenticator.Audiences{"other"},
+			serverResponse: v1beta1.TokenReviewStatus{
+				Authenticated: false,
+			},
+			expectedAuthenticated: false,
+		},
+		{
+			implicitAuds: apiAuds,
+			reqAuds:      authenticator.Audiences{"other"},
+			// webhook authenticator hasn't been upgraded to support audience.
+			serverResponse: v1beta1.TokenReviewStatus{
+				Authenticated: true,
+				User: v1beta1.UserInfo{
+					Username: "somebody",
+				},
+			},
+			expectedAuthenticated: false,
+		},
 	}
 	token := "my-s3cr3t-t0ken"
 	for i, tt := range tests {
-		serv.response = tt.serverResponse
-		resp, authenticated, err := wh.AuthenticateToken(context.Background(), token)
-		if err != nil {
-			t.Errorf("case %d: authentication failed: %v", i, err)
-			continue
-		}
-		if serv.lastRequest.Spec.Token != token {
-			t.Errorf("case %d: Server did not see correct token. Got %q, expected %q.",
-				i, serv.lastRequest.Spec.Token, token)
-		}
-		if !reflect.DeepEqual(serv.lastRequest.TypeMeta, expTypeMeta) {
-			t.Errorf("case %d: Server did not see correct TypeMeta. Got %v, expected %v",
-				i, serv.lastRequest.TypeMeta, expTypeMeta)
-		}
-		if authenticated != tt.expectedAuthenticated {
-			t.Errorf("case %d: Plugin returned incorrect authentication response. Got %t, expected %t.",
-				i, authenticated, tt.expectedAuthenticated)
-		}
-		if resp != nil && tt.expectedUser != nil && !reflect.DeepEqual(resp.User, tt.expectedUser) {
-			t.Errorf("case %d: Plugin returned incorrect user. Got %#v, expected %#v",
-				i, resp.User, tt.expectedUser)
-		}
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ctx := context.Background()
+			if tt.reqAuds != nil {
+				ctx = authenticator.WithAudiences(ctx, tt.reqAuds)
+			}
+
+			serv.response = tt.serverResponse
+			resp, authenticated, err := wh.AuthenticateToken(ctx, token)
+			if err != nil {
+				t.Fatalf("authentication failed: %v", err)
+			}
+			if serv.lastRequest.Spec.Token != token {
+				t.Errorf("Server did not see correct token. Got %q, expected %q.",
+					serv.lastRequest.Spec.Token, token)
+			}
+			if !reflect.DeepEqual(serv.lastRequest.TypeMeta, expTypeMeta) {
+				t.Errorf("Server did not see correct TypeMeta. Got %v, expected %v",
+					serv.lastRequest.TypeMeta, expTypeMeta)
+			}
+			if authenticated != tt.expectedAuthenticated {
+				t.Errorf("Plugin returned incorrect authentication response. Got %t, expected %t.",
+					authenticated, tt.expectedAuthenticated)
+			}
+			if resp != nil && tt.expectedUser != nil && !reflect.DeepEqual(resp.User, tt.expectedUser) {
+				t.Errorf("Plugin returned incorrect user. Got %#v, expected %#v",
+					resp.User, tt.expectedUser)
+			}
+			if resp != nil && tt.expectedAuds != nil && !reflect.DeepEqual(resp.Audiences, tt.expectedAuds) {
+				t.Errorf("Plugin returned incorrect audiences. Got %#v, expected %#v",
+					resp.Audiences, tt.expectedAuds)
+			}
+		})
 	}
 }
 
@@ -440,7 +506,7 @@ func TestWebhookCacheAndRetry(t *testing.T) {
 	defer s.Close()
 
 	// Create an authenticator that caches successful responses "forever" (100 days).
-	wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 2400*time.Hour)
+	wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
