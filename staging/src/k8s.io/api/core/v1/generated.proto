@@ -2939,6 +2939,9 @@ message PodSecurityContext {
   // sysctls (by the container runtime) might fail to launch.
   // +optional
   repeated Sysctl sysctls = 7;
+
+  // +optional
+  optional string seccompProfile = 8;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -4083,6 +4086,9 @@ message SecurityContext {
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
   optional string procMount = 9;
+
+  // +optional
+  optional string seccompProfile = 10;
 }
 
 // SerializedReference is a reference to serialized object.

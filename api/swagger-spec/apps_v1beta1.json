@@ -6169,6 +6169,9 @@
    "v1.SecurityContext": {
     "id": "v1.SecurityContext",
     "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
+    "required": [
+     "seccompProfile"
+    ],
     "properties": {
      "capabilities": {
       "$ref": "v1.Capabilities",
@@ -6207,6 +6210,9 @@
      "procMount": {
       "$ref": "v1.ProcMountType",
       "description": "procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled."
+     },
+     "seccompProfile": {
+      "type": "string"
      }
     }
    },
@@ -6300,6 +6306,9 @@
        "$ref": "v1.Sysctl"
       },
       "description": "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch."
+     },
+     "seccompProfile": {
+      "type": "string"
      }
     }
    },

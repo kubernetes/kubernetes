@@ -890,6 +890,12 @@ message PodSecurityPolicySpec {
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
   repeated string allowedProcMountTypes = 21;
+
+  // +optional
+  optional string defaultSeccompProfile = 23;
+
+  // +optional
+  repeated string allowedSeccompProfiles = 24;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for

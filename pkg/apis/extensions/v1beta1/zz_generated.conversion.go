@@ -1554,6 +1554,8 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(i
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
 	out.AllowedProcMountTypes = *(*[]core.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
+	out.DefaultSeccompProfile = (*string)(unsafe.Pointer(in.DefaultSeccompProfile))
+	out.AllowedSeccompProfiles = *(*[]string)(unsafe.Pointer(&in.AllowedSeccompProfiles))
 	return nil
 }
 
@@ -1595,6 +1597,8 @@ func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
 	out.AllowedProcMountTypes = *(*[]v1.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
+	out.DefaultSeccompProfile = (*string)(unsafe.Pointer(in.DefaultSeccompProfile))
+	out.AllowedSeccompProfiles = *(*[]string)(unsafe.Pointer(&in.AllowedSeccompProfiles))
 	return nil
 }
 

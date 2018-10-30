@@ -385,6 +385,16 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 		*out = make([]core.ProcMountType, len(*in))
 		copy(*out, *in)
 	}
+	if in.DefaultSeccompProfile != nil {
+		in, out := &in.DefaultSeccompProfile, &out.DefaultSeccompProfile
+		*out = new(string)
+		**out = **in
+	}
+	if in.AllowedSeccompProfiles != nil {
+		in, out := &in.AllowedSeccompProfiles, &out.AllowedSeccompProfiles
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
