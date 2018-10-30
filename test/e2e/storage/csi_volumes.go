@@ -17,8 +17,10 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -30,6 +32,7 @@ import (
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -57,6 +60,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-volumes")
 
 	var (
+		cancel    context.CancelFunc
 		cs        clientset.Interface
 		crdclient apiextensionsclient.Interface
 		csics     csiclient.Interface
@@ -66,10 +70,39 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	)
 
 	BeforeEach(func() {
+		ctx, c := context.WithCancel(context.Background())
+		cancel = c
+
 		cs = f.ClientSet
 		crdclient = f.APIExtensionsClientSet
 		csics = f.CSIClientSet
 		ns = f.Namespace
+
+		// Debugging of the following tests heavily depends on the log output
+		// of the different containers. Therefore include all of that in log
+		// files (when using --report-dir, as in the CI) or the output stream
+		// (otherwise).
+		to := podlogs.LogOutput{
+			StatusWriter: GinkgoWriter,
+		}
+		if framework.TestContext.ReportDir == "" {
+			to.LogWriter = GinkgoWriter
+		} else {
+			test := CurrentGinkgoTestDescription()
+			reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
+			// We end the prefix with a slash to ensure that all logs
+			// end up in a directory named after the current test.
+			to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
+				reg.ReplaceAllString(test.FullTestText, "_") + "/"
+		}
+		podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
+
+		// pod events are something that the framework already collects itself
+		// after a failed test. Logging them live is only useful for interactive
+		// debugging, not when we collect reports.
+		if framework.TestContext.ReportDir == "" {
+			podlogs.WatchPods(ctx, cs, ns.Name, GinkgoWriter)
+		}
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node = nodes.Items[rand.Intn(len(nodes.Items))]
@@ -82,6 +115,10 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			WaitForCompletion: true,
 		}
 		createCSICRDs(crdclient)
+	})
+
+	AfterEach(func() {
+		cancel()
 	})
 
 	for driverName, initCSIDriver := range csiTestDrivers {

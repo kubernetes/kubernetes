@@ -162,6 +162,7 @@ filegroup(
         "//test/e2e/framework/ginkgowrapper:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
         "//test/e2e/framework/metrics:all-srcs",
+        "//test/e2e/framework/podlogs:all-srcs",
         "//test/e2e/framework/providers/aws:all-srcs",
         "//test/e2e/framework/providers/azure:all-srcs",
         "//test/e2e/framework/providers/gce:all-srcs",
