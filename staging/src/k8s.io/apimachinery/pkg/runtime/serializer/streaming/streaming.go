@@ -52,7 +52,6 @@ type decoder struct {
 	reader    io.ReadCloser
 	decoder   runtime.Decoder
 	buf       []byte
-	maxBytes  int
 	resetRead bool
 }
 
@@ -64,11 +63,8 @@ func NewDecoder(r io.ReadCloser, d runtime.Decoder) Decoder {
 		reader:   r,
 		decoder:  d,
 		buf:      make([]byte, 1024),
-		maxBytes: 1024 * 1024,
 	}
 }
-
-var ErrObjectTooLarge = fmt.Errorf("object to decode was longer than maximum allowed size")
 
 // Decode reads the next object from the stream and decodes it.
 func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
@@ -83,15 +79,9 @@ func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object)
 				continue
 			}
 			// double the buffer size up to maxBytes
-			if len(d.buf) < d.maxBytes {
-				base += n
-				d.buf = append(d.buf, make([]byte, len(d.buf))...)
-				continue
-			}
-			// must read the rest of the frame (until we stop getting ErrShortBuffer)
-			d.resetRead = true
-			base = 0
-			return nil, nil, ErrObjectTooLarge
+			base += n
+			d.buf = append(d.buf, make([]byte, len(d.buf))...)
+			continue
 		}
 		if err != nil {
 			return nil, nil, err

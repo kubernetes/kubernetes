@@ -72,7 +72,7 @@ func TestDecoder(t *testing.T) {
 	if _, _, err := dec.Decode(nil, nil); err != nil || !bytes.Equal(d.got, frames[1]) {
 		t.Fatalf("unexpected %v %v", err, len(d.got))
 	}
-	if _, _, err := dec.Decode(nil, nil); err != ErrObjectTooLarge || !bytes.Equal(d.got, frames[1]) {
+	if _, _, err := dec.Decode(nil, nil); err != nil || !bytes.Equal(d.got, frames[2]) {
 		t.Fatalf("unexpected %v %v", err, len(d.got))
 	}
 	if _, _, err := dec.Decode(nil, nil); err != nil || !bytes.Equal(d.got, frames[3]) {
