@@ -292,22 +292,6 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 				kubeadmconstants.SchedulerKubeConfigFileName,
 			},
 		},
-		{ // Test CreateAdminKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateAdminKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.AdminKubeConfigFileName},
-		},
-		{ // Test CreateKubeletKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateKubeletKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.KubeletKubeConfigFileName},
-		},
-		{ // Test CreateControllerManagerKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateControllerManagerKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.ControllerManagerKubeConfigFileName},
-		},
-		{ // Test createKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateSchedulerKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.SchedulerKubeConfigFileName},
-		},
 	}
 
 	for _, test := range tests {

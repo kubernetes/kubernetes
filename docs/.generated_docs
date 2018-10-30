@@ -36,11 +36,6 @@ docs/admin/kubeadm_alpha_phase_controlplane_scheduler.md
 docs/admin/kubeadm_alpha_phase_etcd.md
 docs/admin/kubeadm_alpha_phase_etcd_local.md
 docs/admin/kubeadm_alpha_phase_kubeconfig.md
-docs/admin/kubeadm_alpha_phase_kubeconfig_admin.md
-docs/admin/kubeadm_alpha_phase_kubeconfig_all.md
-docs/admin/kubeadm_alpha_phase_kubeconfig_controller-manager.md
-docs/admin/kubeadm_alpha_phase_kubeconfig_kubelet.md
-docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
 docs/admin/kubeadm_alpha_phase_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubelet_config.md
@@ -81,6 +76,11 @@ docs/admin/kubeadm_init_phase_certs_etcd-server.md
 docs/admin/kubeadm_init_phase_certs_front-proxy-ca.md
 docs/admin/kubeadm_init_phase_certs_front-proxy-client.md
 docs/admin/kubeadm_init_phase_certs_sa.md
+docs/admin/kubeadm_init_phase_kubeconfig.md
+docs/admin/kubeadm_init_phase_kubeconfig_admin.md
+docs/admin/kubeadm_init_phase_kubeconfig_controller-manager.md
+docs/admin/kubeadm_init_phase_kubeconfig_kubelet.md
+docs/admin/kubeadm_init_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_init_phase_kubelet-start.md
 docs/admin/kubeadm_init_phase_preflight.md
 docs/admin/kubeadm_join.md
@@ -132,11 +132,6 @@ docs/man/man1/kubeadm-alpha-phase-controlplane-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-controlplane.1
 docs/man/man1/kubeadm-alpha-phase-etcd-local.1
 docs/man/man1/kubeadm-alpha-phase-etcd.1
-docs/man/man1/kubeadm-alpha-phase-kubeconfig-admin.1
-docs/man/man1/kubeadm-alpha-phase-kubeconfig-all.1
-docs/man/man1/kubeadm-alpha-phase-kubeconfig-controller-manager.1
-docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
-docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-annotate-cri.1
@@ -179,6 +174,11 @@ docs/man/man1/kubeadm-init-phase-certs-front-proxy-ca.1
 docs/man/man1/kubeadm-init-phase-certs-front-proxy-client.1
 docs/man/man1/kubeadm-init-phase-certs-sa.1
 docs/man/man1/kubeadm-init-phase-certs.1
+docs/man/man1/kubeadm-init-phase-kubeconfig-admin.1
+docs/man/man1/kubeadm-init-phase-kubeconfig-controller-manager.1
+docs/man/man1/kubeadm-init-phase-kubeconfig-kubelet.1
+docs/man/man1/kubeadm-init-phase-kubeconfig-scheduler.1
+docs/man/man1/kubeadm-init-phase-kubeconfig.1
 docs/man/man1/kubeadm-init-phase-kubelet-start.1
 docs/man/man1/kubeadm-init-phase-preflight.1
 docs/man/man1/kubeadm-init-phase.1

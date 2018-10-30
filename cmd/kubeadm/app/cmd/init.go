@@ -50,7 +50,6 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
@@ -130,6 +129,7 @@ type initData struct {
 	ignorePreflightErrors sets.String
 	certificatesDir       string
 	dryRunDir             string
+	externalCA            bool
 	client                clientset.Interface
 }
 
@@ -146,7 +146,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			data := c.(initData)
-			fmt.Printf("[init] using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
+			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
 			err = initRunner.Run()
 			kubeadmutil.CheckErr(err)
@@ -166,8 +166,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
-	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeletStartPhase())
+	initRunner.AppendPhase(phases.NewCertsPhase())
+	initRunner.AppendPhase(phases.NewKubeConfigPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -313,6 +314,9 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		}
 	}
 
+	// Checks if an external CA is provided by the user.
+	externalCA, _ := certsphase.UsingExternalCA(cfg)
+
 	return initData{
 		cfg:                   cfg,
 		certificatesDir:       cfg.CertificatesDir,
@@ -320,6 +324,7 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		dryRun:                options.dryRun,
 		dryRunDir:             dryRunDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
+		externalCA:            externalCA,
 	}, nil
 }
 
@@ -380,6 +385,11 @@ func (d initData) KubeletDir() string {
 	return kubeadmconstants.KubeletRunDirectory
 }
 
+// ExternalCA returns true if an external CA is provided by the user.
+func (d initData) ExternalCA() bool {
+	return d.externalCA
+}
+
 // Client returns a Kubernetes client to be used by kubeadm.
 // This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
 // Important. This function must be called after the admin.conf kubeconfig file is created.
@@ -425,18 +435,6 @@ func runInit(i *initData, out io.Writer) error {
 	i.cfg.CertificatesDir = certsDirToWriteTo
 
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
-
-	if res, _ := certsphase.UsingExternalCA(i.cfg); !res {
-
-		// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-		glog.V(2).Infof("[init] generating kubeconfig files")
-		if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg); err != nil {
-			return err
-		}
-
-	} else {
-		fmt.Println("[externalca] the file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated")
-	}
 
 	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
 		// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
