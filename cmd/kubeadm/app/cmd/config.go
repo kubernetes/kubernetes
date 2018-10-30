@@ -277,7 +277,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 		Discovery: kubeadmapiv1beta1.Discovery{
 			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
-				APIServerEndpoints:       []string{"kube-apiserver:6443"},
+				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},

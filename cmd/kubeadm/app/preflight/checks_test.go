@@ -256,7 +256,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 			cfg: &kubeadmapi.JoinConfiguration{
 				Discovery: kubeadmapi.Discovery{
 					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-						APIServerEndpoints: []string{"192.168.1.15"},
+						APIServerEndpoint: "192.168.1.15",
 					},
 				},
 			},
@@ -266,7 +266,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 			cfg: &kubeadmapi.JoinConfiguration{
 				Discovery: kubeadmapi.Discovery{
 					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-						APIServerEndpoints: []string{"2001:1234::1:15"},
+						APIServerEndpoint: "2001:1234::1:15",
 					},
 				},
 			},

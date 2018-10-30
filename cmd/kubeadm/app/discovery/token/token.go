@@ -60,7 +60,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 
 	// The function below runs for every endpoint, and all endpoints races with each other.
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
-	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.Discovery.BootstrapToken.APIServerEndpoints, cfg.Discovery.Timeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
+	baseKubeConfig, err := fetchKubeConfigWithTimeout(cfg.Discovery.BootstrapToken.APIServerEndpoint, cfg.Discovery.Timeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
 		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, cfg.ClusterName)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
@@ -184,36 +184,36 @@ func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte, clustername 
 	return bootstrapConfig
 }
 
-// runForEndpointsAndReturnFirst loops the endpoints slice and let's the endpoints race for connecting to the master
-func runForEndpointsAndReturnFirst(endpoints []string, discoveryTimeout time.Duration, fetchKubeConfigFunc func(string) (*clientcmdapi.Config, error)) (*clientcmdapi.Config, error) {
+// fetchKubeConfigWithTimeout tries to run fetchKubeConfigFunc on every DiscoveryRetryInterval, but until discoveryTimeout is reached
+func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Duration, fetchKubeConfigFunc func(string) (*clientcmdapi.Config, error)) (*clientcmdapi.Config, error) {
 	stopChan := make(chan struct{})
 	var resultingKubeConfig *clientcmdapi.Config
 	var once sync.Once
 	var wg sync.WaitGroup
-	for _, endpoint := range endpoints {
-		wg.Add(1)
-		go func(apiEndpoint string) {
-			defer wg.Done()
-			wait.Until(func() {
-				fmt.Printf("[discovery] Trying to connect to API Server %q\n", apiEndpoint)
-				cfg, err := fetchKubeConfigFunc(apiEndpoint)
-				if err != nil {
-					fmt.Printf("[discovery] Failed to connect to API Server %q: %v\n", apiEndpoint, err)
-					return
-				}
-				fmt.Printf("[discovery] Successfully established connection with API Server %q\n", apiEndpoint)
 
-				// connection established, stop all wait threads
-				once.Do(func() {
-					close(stopChan)
-					resultingKubeConfig = cfg
-				})
-			}, constants.DiscoveryRetryInterval, stopChan)
-		}(endpoint)
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		wait.Until(func() {
+			fmt.Printf("[discovery] Trying to connect to API Server %q\n", apiEndpoint)
+			cfg, err := fetchKubeConfigFunc(apiEndpoint)
+			if err != nil {
+				fmt.Printf("[discovery] Failed to connect to API Server %q: %v\n", apiEndpoint, err)
+				return
+			}
+			fmt.Printf("[discovery] Successfully established connection with API Server %q\n", apiEndpoint)
+			once.Do(func() {
+				resultingKubeConfig = cfg
+				close(stopChan)
+			})
+		}, constants.DiscoveryRetryInterval, stopChan)
+	}()
+
 	select {
 	case <-time.After(discoveryTimeout):
-		close(stopChan)
+		once.Do(func() {
+			close(stopChan)
+		})
 		err := errors.Errorf("abort connecting to API servers after timeout of %v", discoveryTimeout)
 		fmt.Printf("[discovery] %v\n", err)
 		wg.Wait()
