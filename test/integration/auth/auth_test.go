@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -84,11 +85,11 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err := json.NewEncoder(kubecfgFile).Encode(config); err != nil {
 		return nil, err
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), 2*time.Minute)
+	webhookTokenAuth, err := webhook.New(kubecfgFile.Name())
 	if err != nil {
 		return nil, err
 	}
-	return bearertoken.New(webhookTokenAuth), nil
+	return bearertoken.New(cache.New(webhookTokenAuth, false, 2*time.Minute, 2*time.Minute)), nil
 }
 
 func path(resource, namespace, name string) string {
