@@ -41,6 +41,7 @@ type StorageClassTest struct {
 	Name               string
 	CloudProviders     []string
 	Provisioner        string
+	StorageClassName   string
 	Parameters         map[string]string
 	DelayBinding       bool
 	ClaimSize          string
