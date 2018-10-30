@@ -5,6 +5,10 @@ approvers:
 - api-approvers
 reviewers:
 - api-reviewers
+- deads2k
+- luxas
+- mtaufen
+- sttts
+- stewart-yu
 labels:
-- sig/architecture
 - kind/api-change

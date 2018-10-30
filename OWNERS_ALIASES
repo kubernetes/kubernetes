@@ -1,4 +1,7 @@
 aliases:
+  sig-storage-reviewers:
+    - saad-ali
+    - childsb
   sig-scheduling-maintainers:
     - bsalamat
     - davidopp
