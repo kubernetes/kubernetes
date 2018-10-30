@@ -61,7 +61,6 @@ type ClusterInfoDumpOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),

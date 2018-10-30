@@ -88,5 +88,5 @@ func toBool(propertyValue string) (bool, error) {
 func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	cmd.Help()
 	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s\n", msg)
+	return fmt.Errorf("%s", msg)
 }

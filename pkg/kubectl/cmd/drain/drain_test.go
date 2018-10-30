@@ -57,7 +57,7 @@ const (
 )
 
 var node *corev1.Node
-var cordoned_node *corev1.Node
+var cordonedNode *corev1.Node
 
 func boolptr(b bool) *bool { return &b }
 
@@ -72,8 +72,8 @@ func TestMain(m *testing.M) {
 	}
 
 	// A copy of the same node, but cordoned.
-	cordoned_node = node.DeepCopy()
-	cordoned_node.Spec.Unschedulable = true
+	cordonedNode = node.DeepCopy()
+	cordonedNode.Spec.Unschedulable = true
 	os.Exit(m.Run())
 }
 
@@ -88,7 +88,7 @@ func TestCordon(t *testing.T) {
 	}{
 		{
 			description: "node/node syntax",
-			node:        cordoned_node,
+			node:        cordonedNode,
 			expected:    node,
 			cmd:         NewCmdUncordon,
 			arg:         "node/node",
@@ -96,7 +96,7 @@ func TestCordon(t *testing.T) {
 		},
 		{
 			description: "uncordon for real",
-			node:        cordoned_node,
+			node:        cordonedNode,
 			expected:    node,
 			cmd:         NewCmdUncordon,
 			arg:         "node",
@@ -112,8 +112,8 @@ func TestCordon(t *testing.T) {
 		},
 		{
 			description: "cordon does nothing",
-			node:        cordoned_node,
-			expected:    cordoned_node,
+			node:        cordonedNode,
+			expected:    cordonedNode,
 			cmd:         NewCmdCordon,
 			arg:         "node",
 			expectFatal: false,
@@ -121,7 +121,7 @@ func TestCordon(t *testing.T) {
 		{
 			description: "cordon for real",
 			node:        node,
-			expected:    cordoned_node,
+			expected:    cordonedNode,
 			cmd:         NewCmdCordon,
 			arg:         "node",
 			expectFatal: false,
@@ -145,14 +145,14 @@ func TestCordon(t *testing.T) {
 		{
 			description: "cordon for multiple nodes",
 			node:        node,
-			expected:    cordoned_node,
+			expected:    cordonedNode,
 			cmd:         NewCmdCordon,
 			arg:         "node node1 node2",
 			expectFatal: false,
 		},
 		{
 			description: "uncordon for multiple nodes",
-			node:        cordoned_node,
+			node:        cordonedNode,
 			expected:    node,
 			cmd:         NewCmdUncordon,
 			arg:         "node node1 node2",
@@ -168,7 +168,7 @@ func TestCordon(t *testing.T) {
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := scheme.Codecs
 
-			new_node := &corev1.Node{}
+			newNode := &corev1.Node{}
 			updated := false
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -202,14 +202,14 @@ func TestCordon(t *testing.T) {
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
-						if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+						if err := runtime.DecodeInto(codec, appliedPatch, newNode); err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
-						if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
-							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, new_node.Spec.Unschedulable)
+						if !reflect.DeepEqual(test.expected.Spec, newNode.Spec) {
+							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, newNode.Spec.Unschedulable)
 						}
 						updated = true
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 						return nil, nil
@@ -221,7 +221,7 @@ func TestCordon(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 			cmd := test.cmd(tf, ioStreams)
 
-			saw_fatal := false
+			sawFatal := false
 			func() {
 				defer func() {
 					// Recover from the panic below.
@@ -230,7 +230,7 @@ func TestCordon(t *testing.T) {
 					cmdutil.DefaultBehaviorOnFatal()
 				}()
 				cmdutil.BehaviorOnFatal(func(e string, code int) {
-					saw_fatal = true
+					sawFatal = true
 					panic(e)
 				})
 				cmd.SetArgs(strings.Split(test.arg, " "))
@@ -238,7 +238,7 @@ func TestCordon(t *testing.T) {
 			}()
 
 			if test.expectFatal {
-				if !saw_fatal {
+				if !sawFatal {
 					t.Fatalf("%s: unexpected non-error", test.description)
 				}
 				if updated {
@@ -246,7 +246,7 @@ func TestCordon(t *testing.T) {
 				}
 			}
 
-			if !test.expectFatal && saw_fatal {
+			if !test.expectFatal && sawFatal {
 				t.Fatalf("%s: unexpected error", test.description)
 			}
 			if !reflect.DeepEqual(test.expected.Spec, test.node.Spec) && !updated {
@@ -272,7 +272,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	rc_pod := corev1.Pod{
+	rcPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -305,7 +305,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds_pod := corev1.Pod{
+	dsPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -326,7 +326,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds_terminated_pod := corev1.Pod{
+	dsTerminatedPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -350,7 +350,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds_pod_with_emptyDir := corev1.Pod{
+	dsPodWithEmptyDir := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -377,7 +377,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	orphaned_ds_pod := corev1.Pod{
+	orphanedDsPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -400,7 +400,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	job_pod := corev1.Pod{
+	jobPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -427,7 +427,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	terminated_job_pod_with_local_storage := corev1.Pod{
+	terminatedJobPodWithLocalStorage := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -469,7 +469,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	rs_pod := corev1.Pod{
+	rsPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -490,7 +490,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	naked_pod := corev1.Pod{
+	nakedPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -502,7 +502,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	emptydir_pod := corev1.Pod{
+	emptydirPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -519,7 +519,7 @@ func TestDrain(t *testing.T) {
 			},
 		},
 	}
-	emptydir_terminated_pod := corev1.Pod{
+	emptydirTerminatedPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
@@ -555,8 +555,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "RC-managed pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{rc_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{rcPod},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -565,8 +565,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "DS-managed pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{ds_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{dsPod},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  true,
@@ -575,8 +575,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "DS-managed terminated pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{ds_terminated_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{dsTerminatedPod},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -585,8 +585,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "orphaned DS-managed pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{orphaned_ds_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{orphanedDsPod},
 			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node"},
 			expectFatal:  true,
@@ -595,8 +595,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "orphaned DS-managed pod with --force",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{orphaned_ds_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{orphanedDsPod},
 			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node", "--force"},
 			expectFatal:  false,
@@ -605,8 +605,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "DS-managed pod with --ignore-daemonsets",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{ds_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{dsPod},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node", "--ignore-daemonsets"},
 			expectFatal:  false,
@@ -615,19 +615,19 @@ func TestDrain(t *testing.T) {
 		{
 			description:   "DS-managed pod with emptyDir with --ignore-daemonsets",
 			node:          node,
-			expected:      cordoned_node,
-			pods:          []corev1.Pod{ds_pod_with_emptyDir},
+			expected:      cordonedNode,
+			pods:          []corev1.Pod{dsPodWithEmptyDir},
 			rcs:           []corev1.ReplicationController{rc},
 			args:          []string{"node", "--ignore-daemonsets"},
-			expectWarning: "WARNING: Ignoring DaemonSet-managed pods: bar",
+			expectWarning: "WARNING: ignoring DaemonSet-managed Pods: bar",
 			expectFatal:   false,
 			expectDelete:  false,
 		},
 		{
 			description:  "Job-managed pod with local storage",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{job_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{jobPod},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node", "--force", "--delete-local-data=true"},
 			expectFatal:  false,
@@ -636,8 +636,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "Job-managed terminated pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{terminated_job_pod_with_local_storage},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{terminatedJobPodWithLocalStorage},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -646,8 +646,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "RS-managed pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{rs_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{rsPod},
 			replicaSets:  []extensionsv1beta1.ReplicaSet{rs},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -656,8 +656,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "naked pod",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{naked_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{nakedPod},
 			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node"},
 			expectFatal:  true,
@@ -666,8 +666,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "naked pod with --force",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{naked_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{nakedPod},
 			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node", "--force"},
 			expectFatal:  false,
@@ -676,8 +676,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "pod with EmptyDir",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{emptydir_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{emptydirPod},
 			args:         []string{"node", "--force"},
 			expectFatal:  true,
 			expectDelete: false,
@@ -685,8 +685,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "terminated pod with emptyDir",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{emptydir_terminated_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{emptydirTerminatedPod},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
@@ -695,8 +695,8 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "pod with EmptyDir and --delete-local-data",
 			node:         node,
-			expected:     cordoned_node,
-			pods:         []corev1.Pod{emptydir_pod},
+			expected:     cordonedNode,
+			pods:         []corev1.Pod{emptydirPod},
 			args:         []string{"node", "--force", "--delete-local-data=true"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -704,7 +704,7 @@ func TestDrain(t *testing.T) {
 		{
 			description:  "empty node",
 			node:         node,
-			expected:     cordoned_node,
+			expected:     cordonedNode,
 			pods:         []corev1.Pod{},
 			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
@@ -724,7 +724,7 @@ func TestDrain(t *testing.T) {
 		}
 		for _, test := range tests {
 			t.Run(test.description, func(t *testing.T) {
-				new_node := &corev1.Node{}
+				newNode := &corev1.Node{}
 				deleted := false
 				evicted := false
 				tf := cmdtesting.NewTestFactory()
@@ -788,10 +788,10 @@ func TestDrain(t *testing.T) {
 							if err != nil {
 								t.Fatalf("%s: unexpected error: %v", test.description, err)
 							}
-							get_params := make(url.Values)
-							get_params["fieldSelector"] = []string{"spec.nodeName=node"}
-							if !reflect.DeepEqual(get_params, values) {
-								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, get_params, values)
+							getParams := make(url.Values)
+							getParams["fieldSelector"] = []string{"spec.nodeName=node"}
+							if !reflect.DeepEqual(getParams, values) {
+								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, getParams, values)
 							}
 							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{Items: test.pods})}, nil
 						case m.isFor("GET", "/replicationcontrollers"):
@@ -810,13 +810,13 @@ func TestDrain(t *testing.T) {
 							if err != nil {
 								t.Fatalf("%s: unexpected error: %v", test.description, err)
 							}
-							if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+							if err := runtime.DecodeInto(codec, appliedPatch, newNode); err != nil {
 								t.Fatalf("%s: unexpected error: %v", test.description, err)
 							}
-							if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
-								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
+							if !reflect.DeepEqual(test.expected.Spec, newNode.Spec) {
+								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, newNode.Spec)
 							}
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 						case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 							deleted = true
 							return &http.Response{StatusCode: 204, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
@@ -834,8 +834,8 @@ func TestDrain(t *testing.T) {
 				ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
 				cmd := NewCmdDrain(tf, ioStreams)
 
-				saw_fatal := false
-				fatal_msg := ""
+				sawFatal := false
+				fatalMsg := ""
 				func() {
 					defer func() {
 						// Recover from the panic below.
@@ -843,17 +843,17 @@ func TestDrain(t *testing.T) {
 						// Restore cmdutil behavior
 						cmdutil.DefaultBehaviorOnFatal()
 					}()
-					cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; fatal_msg = e; panic(e) })
+					cmdutil.BehaviorOnFatal(func(e string, code int) { sawFatal = true; fatalMsg = e; panic(e) })
 					cmd.SetArgs(test.args)
 					cmd.Execute()
 				}()
 				if test.expectFatal {
-					if !saw_fatal {
+					if !sawFatal {
 						t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
 					}
 				} else {
-					if saw_fatal {
-						t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatal_msg)
+					if sawFatal {
+						t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatalMsg)
 
 					}
 				}

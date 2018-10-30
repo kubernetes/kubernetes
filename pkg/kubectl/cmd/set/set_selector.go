@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
-// SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// SetSelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type SetSelectorOptions struct {
 	// Bound
@@ -73,6 +73,7 @@ var (
         kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
+// NewSelectorOptions returns an initialized SelectorOptions instance
 func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().

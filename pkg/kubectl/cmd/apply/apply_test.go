@@ -377,7 +377,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			name:         "view resource/name invalid format",
 			filePath:     "",
 			outputFormat: "wide",
-			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples.",
+			expectedErr:  "error: Unexpected -o output mode: wide, the flag 'output' must be one of yaml|json\nSee 'view-last-applied -h' for help and examples",
 			expectedOut:  "",
 			selector:     "",
 			args:         []string{"replicationcontroller", "test-rc"},
@@ -648,7 +648,7 @@ func TestApplyRetry(t *testing.T) {
 					case p == pathRC && m == "PATCH":
 						if firstPatch {
 							firstPatch = false
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil
@@ -1280,7 +1280,7 @@ func TestForceApply(t *testing.T) {
 					case strings.HasSuffix(p, pathRC) && m == "PATCH":
 						counts["patch"]++
 						if counts["patch"] <= 6 {
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil

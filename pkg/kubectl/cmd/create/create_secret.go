@@ -73,6 +73,7 @@ var (
 	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
 )
 
+// SecretGenericOpts holds the options for 'create secret' sub command
 type SecretGenericOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -108,6 +109,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *SecretGenericOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -132,7 +134,7 @@ func (o *SecretGenericOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateSecretGeneric is the implementation of the create secret generic command
+// Run calls the CreateSubcommandOptions.Run in SecretGenericOpts instance
 func (o *SecretGenericOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -158,6 +160,7 @@ var (
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`))
 )
 
+// SecretDockerRegistryOpts holds the options for 'create secret docker-registry' sub command
 type SecretDockerRegistryOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -197,6 +200,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *SecretDockerRegistryOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -232,7 +236,7 @@ func (o *SecretDockerRegistryOpts) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateSecretDockerRegistry is the implementation of the create secret docker-registry command
+// Run calls CreateSubcommandOptions.Run in SecretDockerRegistryOpts instance
 func (o *SecretDockerRegistryOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -249,6 +253,7 @@ var (
 	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
 )
 
+// SecretTLSOpts holds the options for 'create secret tls' sub command
 type SecretTLSOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -282,6 +287,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -310,7 +316,7 @@ func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateSecretTLS is the implementation of the create secret tls command
+// Run calls CreateSubcommandOptions.Run in the SecretTLSOpts instance
 func (o *SecretTLSOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

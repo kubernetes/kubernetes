@@ -84,79 +84,72 @@ const (
 	EvictionKind        = "Eviction"
 	EvictionSubresource = "pods/eviction"
 
-	kDaemonsetFatal      = "DaemonSet-managed pods (use --ignore-daemonsets to ignore)"
-	kDaemonsetWarning    = "Ignoring DaemonSet-managed pods"
-	kLocalStorageFatal   = "pods with local storage (use --delete-local-data to override)"
-	kLocalStorageWarning = "Deleting pods with local storage"
-	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
-	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
+	daemonsetFatal      = "DaemonSet-managed Pods (use --ignore-daemonsets to ignore)"
+	daemonsetWarning    = "ignoring DaemonSet-managed Pods"
+	localStorageFatal   = "Pods with local storage (use --delete-local-data to override)"
+	localStorageWarning = "deleting Pods with local storage"
+	unmanagedFatal      = "Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
+	unmanagedWarning    = "deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
 )
 
 var (
-	cordon_long = templates.LongDesc(i18n.T(`
+	cordonLong = templates.LongDesc(i18n.T(`
 		Mark node as unschedulable.`))
 
-	cordon_example = templates.Examples(i18n.T(`
+	cordonExample = templates.Examples(i18n.T(`
 		# Mark node "foo" as unschedulable.
 		kubectl cordon foo`))
 )
 
 func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &DrainOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("cordoned").WithTypeSetter(scheme.Scheme),
-
-		IOStreams: ioStreams,
-	}
+	o := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "cordon NODE",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Mark node as unschedulable"),
-		Long:                  cordon_long,
-		Example:               cordon_example,
+		Long:                  cordonLong,
+		Example:               cordonExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
 		},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
 var (
-	uncordon_long = templates.LongDesc(i18n.T(`
+	uncordonLong = templates.LongDesc(i18n.T(`
 		Mark node as schedulable.`))
 
-	uncordon_example = templates.Examples(i18n.T(`
+	uncordonExample = templates.Examples(i18n.T(`
 		# Mark node "foo" as schedulable.
 		$ kubectl uncordon foo`))
 )
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &DrainOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("uncordoned").WithTypeSetter(scheme.Scheme),
-		IOStreams:  ioStreams,
-	}
+	o := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "uncordon NODE",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Mark node as schedulable"),
-		Long:                  uncordon_long,
-		Example:               uncordon_example,
+		Long:                  uncordonLong,
+		Example:               uncordonExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
 		},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
 var (
-	drain_long = templates.LongDesc(i18n.T(`
+	drainLong = templates.LongDesc(i18n.T(`
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
@@ -181,7 +174,7 @@ var (
 
 		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)`))
 
-	drain_example = templates.Examples(i18n.T(`
+	drainExample = templates.Examples(i18n.T(`
 		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.
 		$ kubectl drain foo --force
 
@@ -199,26 +192,26 @@ func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 }
 
 func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := NewDrainOptions(f, ioStreams)
+	o := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "drain NODE",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Drain node in preparation for maintenance"),
-		Long:                  drain_long,
-		Example:               drain_example,
+		Long:                  drainLong,
+		Example:               drainExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.RunDrain())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&options.Force, "force", options.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
-	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", options.IgnoreDaemonsets, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", options.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
-	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", options.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up, zero means infinite")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
+	cmd.Flags().BoolVar(&o.Force, "force", o.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
+	cmd.Flags().BoolVar(&o.IgnoreDaemonsets, "ignore-daemonsets", o.IgnoreDaemonsets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&o.DeleteLocalData, "delete-local-data", o.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
+	cmd.Flags().IntVar(&o.GracePeriodSeconds, "grace-period", o.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
+	cmd.Flags().StringVarP(&o.PodSelector, "pod-selector", "", o.PodSelector, "Label selector to filter pods on the node")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -386,10 +379,10 @@ func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fata
 		return true, nil, nil
 	}
 	if o.Force {
-		return true, &warning{kUnmanagedWarning}, nil
+		return true, &warning{unmanagedWarning}, nil
 	}
 
-	return false, nil, &fatal{kUnmanagedFatal}
+	return false, nil, &fatal{unmanagedFatal}
 }
 
 func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
@@ -418,10 +411,10 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	}
 
 	if !o.IgnoreDaemonsets {
-		return false, nil, &fatal{kDaemonsetFatal}
+		return false, nil, &fatal{daemonsetFatal}
 	}
 
-	return false, &warning{kDaemonsetWarning}, nil
+	return false, &warning{daemonsetWarning}, nil
 }
 
 func mirrorPodFilter(pod corev1.Pod) (bool, *warning, *fatal) {
@@ -450,10 +443,10 @@ func (o *DrainOptions) localStorageFilter(pod corev1.Pod) (bool, *warning, *fata
 		return true, nil, nil
 	}
 	if !o.DeleteLocalData {
-		return false, nil, &fatal{kLocalStorageFatal}
+		return false, nil, &fatal{localStorageFatal}
 	}
 
-	return true, &warning{kLocalStorageWarning}, nil
+	return true, &warning{localStorageWarning}, nil
 }
 
 // Map of status message to a list of pod names having that status.
