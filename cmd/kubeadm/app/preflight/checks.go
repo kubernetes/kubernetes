@@ -617,7 +617,7 @@ func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
 		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
 	}
 	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
-		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubadm can support. Please upgrade kubelet", kubeletVersion)}
+		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
 
 	if kubever.KubernetesVersion != "" {
