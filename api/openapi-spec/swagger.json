@@ -77796,6 +77796,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.apps.v1.DeploymentStrategy"
      },
      "template": {
@@ -78516,6 +78517,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStrategy"
      },
      "template": {
@@ -79301,6 +79303,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DeploymentStrategy"
      },
      "template": {
