@@ -104,7 +104,7 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 			fakeTestPod.Labels = test.podLabels
 
 			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeSelector)
-			assert.EqualValuesf(t, test.expectedResult, realValue, "Faild to test: %s", test.name)
+			assert.EqualValuesf(t, test.expectedResult, realValue, "Failed to test: %s", test.name)
 		})
 	}
 
