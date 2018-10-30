@@ -20,9 +20,10 @@ package cni
 
 import (
 	"fmt"
-
-	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
+	"github.com/Microsoft/hcsshim"
 	"github.com/golang/glog"
+	"strings"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
@@ -37,25 +38,21 @@ func (plugin *cniNetworkPlugin) platformInit() error {
 
 // GetPodNetworkStatus : Assuming addToNetwork is idempotent, we can call this API as many times as required to get the IPAddress
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	netnsPath, err := plugin.host.GetNetNS(id.ID)
+	eps, err := hcsshim.HNSListEndpointRequest()
 	if err != nil {
-		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
-	}
-
-	result, err := plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
-
-	glog.V(5).Infof("GetPodNetworkStatus result %+v", result)
-	if err != nil {
-		glog.Errorf("error while adding to cni network: %s", err)
 		return nil, err
 	}
 
-	// Parse the result and get the IPAddress
-	var result020 *cniTypes020.Result
-	result020, err = cniTypes020.GetResult(result)
-	if err != nil {
-		glog.Errorf("error while cni parsing result: %s", err)
-		return nil, err
+	for _, ep := range eps {
+		glog.V(5).Infof("GetPodNetworkStatus examining endpoint %v, %v", ep.Name, ep.IPAddress)
+		if ep.IsRemoteEndpoint {
+			continue
+		}
+		if strings.Contains(ep.Name, id.ID) {
+			glog.V(5).Infof("GetPodNetworkStatus Found matching endpoint %v, %v", ep.Name, ep.IPAddress)
+			return &network.PodNetworkStatus{IP: ep.IPAddress}, nil
+		}
 	}
-	return &network.PodNetworkStatus{IP: result020.IP4.IP.IP}, nil
+
+	return nil, fmt.Errorf("GetPodNetworkStatus: Failed to look up endpoint for %s / %s / %s", namespace, name, id)
 }
