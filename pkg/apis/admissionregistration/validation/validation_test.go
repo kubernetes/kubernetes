@@ -540,7 +540,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `[0].clientConfig.url: Required value: exactly one of url or service is required`,
+			expectedError: `[0].clientConfig: Required value: exactly one of url or service is required`,
 		},
 		{
 			name: "blank URL",
