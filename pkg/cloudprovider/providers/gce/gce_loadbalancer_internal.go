@@ -405,16 +405,19 @@ func (gce *GCECloud) ensureInternalHealthCheck(name string, svcName types.Namesp
 		return hc, nil
 	}
 
-	if healthChecksEqual(expectedHC, hc) {
-		return hc, nil
+	if needToUpdateHealthChecks(hc, expectedHC) {
+		glog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
+		expectedHC = mergeHealthChecks(hc, expectedHC)
+		if err := gce.UpdateHealthCheck(expectedHC); err != nil {
+			glog.Warningf("Failed to reconcile http health check %v parameters", name)
+			return nil, err
+		}
+		glog.V(2).Infof("ensureInternalHealthCheck: corrected health check %v parameters successful", name)
+		hc, err = gce.GetHealthCheck(name)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	glog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
-	if err := gce.UpdateHealthCheck(expectedHC); err != nil {
-		glog.Warningf("Failed to reconcile http health check %v parameters", name)
-		return nil, err
-	}
-	glog.V(2).Infof("ensureInternalHealthCheck: corrected health check %v parameters successful", name)
 	return hc, nil
 }
 
@@ -620,15 +623,37 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 		equalStringSets(a.TargetTags, b.TargetTags)
 }
 
-func healthChecksEqual(a, b *compute.HealthCheck) bool {
-	return a.HttpHealthCheck != nil && b.HttpHealthCheck != nil &&
-		a.HttpHealthCheck.Port == b.HttpHealthCheck.Port &&
-		a.HttpHealthCheck.RequestPath == b.HttpHealthCheck.RequestPath &&
-		a.Description == b.Description &&
-		a.CheckIntervalSec == b.CheckIntervalSec &&
-		a.TimeoutSec == b.TimeoutSec &&
-		a.UnhealthyThreshold == b.UnhealthyThreshold &&
-		a.HealthyThreshold == b.HealthyThreshold
+// mergeHealthChecks reconciles HealthCheck configures to be no smaller than
+// the default values.
+// E.g. old health check interval is 2s, new default is 8.
+// The HC interval will be reconciled to 8 seconds.
+// If the existing health check is larger than the default interval,
+// the configuration will be kept.
+func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
+	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
+		newHC.CheckIntervalSec = hc.CheckIntervalSec
+	}
+	if hc.TimeoutSec > newHC.TimeoutSec {
+		newHC.TimeoutSec = hc.TimeoutSec
+	}
+	if hc.UnhealthyThreshold > newHC.UnhealthyThreshold {
+		newHC.UnhealthyThreshold = hc.UnhealthyThreshold
+	}
+	if hc.HealthyThreshold > newHC.HealthyThreshold {
+		newHC.HealthyThreshold = hc.HealthyThreshold
+	}
+	return newHC
+}
+
+// needToUpdateHealthChecks checks whether the healthcheck needs to be updated.
+func needToUpdateHealthChecks(hc, newHC *compute.HealthCheck) bool {
+	if hc.HttpHealthCheck == nil || newHC.HttpHealthCheck == nil {
+		return true
+	}
+	changed := hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port || hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath || hc.Description != newHC.Description
+	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
+	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
+	return changed
 }
 
 // backendsListEqual asserts that backend lists are equal by instance group link only
