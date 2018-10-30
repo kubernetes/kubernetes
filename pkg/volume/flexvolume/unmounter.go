@@ -69,5 +69,5 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	} else if !pathExists {
 		return nil
 	}
-	return os.Remove(dir)
+	return os.RemoveAll(dir)
 }
