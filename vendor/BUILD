@@ -60,6 +60,7 @@ filegroup(
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/repos:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/resolve:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/rule:all-srcs",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/testtools:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/version:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/walk:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/wspace:all-srcs",
