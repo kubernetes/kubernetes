@@ -599,17 +599,6 @@ func runInit(i *initData, out io.Writer) error {
 		return errors.Wrap(err, "error ensuring proxy addon")
 	}
 
-	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
-	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
-		glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
-		// Temporary control plane is up, now we create our self hosted control
-		// plane components and remove the static manifests:
-		fmt.Println("[self-hosted] creating self-hosted control plane")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
-			return errors.Wrap(err, "error creating self hosted control plane")
-		}
-	}
-
 	// Exit earlier if we're dryrunning
 	if i.dryRun {
 		fmt.Println("[dryrun] finished dry-running successfully. Above are the resources that would be created")
