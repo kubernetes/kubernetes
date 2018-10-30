@@ -31,7 +31,7 @@ func TestHPAGenerate(t *testing.T) {
 		HPAName            string
 		scaleRefKind       string
 		scaleRefName       string
-		scaleRefApiVersion string
+		scaleRefAPIVersion string
 		minReplicas        int32
 		maxReplicas        int32
 		CPUPercent         int32
@@ -46,7 +46,7 @@ func TestHPAGenerate(t *testing.T) {
 			CPUPercent:         80,
 			scaleRefKind:       "kind",
 			scaleRefName:       "name",
-			scaleRefApiVersion: "apiVersion",
+			scaleRefAPIVersion: "apiVersion",
 			expected: &autoscalingv1.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -68,7 +68,7 @@ func TestHPAGenerate(t *testing.T) {
 			name:               "'name' is a required parameter",
 			scaleRefKind:       "kind",
 			scaleRefName:       "name",
-			scaleRefApiVersion: "apiVersion",
+			scaleRefAPIVersion: "apiVersion",
 			expectErr:          true,
 		},
 		{
@@ -76,7 +76,7 @@ func TestHPAGenerate(t *testing.T) {
 			HPAName:            "foo",
 			scaleRefKind:       "kind",
 			scaleRefName:       "name",
-			scaleRefApiVersion: "apiVersion",
+			scaleRefAPIVersion: "apiVersion",
 			expectErr:          true,
 		},
 		{
@@ -86,7 +86,7 @@ func TestHPAGenerate(t *testing.T) {
 			maxReplicas:        1,
 			scaleRefKind:       "kind",
 			scaleRefName:       "name",
-			scaleRefApiVersion: "apiVersion",
+			scaleRefAPIVersion: "apiVersion",
 			expectErr:          true,
 		},
 		{
@@ -96,7 +96,7 @@ func TestHPAGenerate(t *testing.T) {
 			maxReplicas:        -10,
 			scaleRefKind:       "kind",
 			scaleRefName:       "name",
-			scaleRefApiVersion: "apiVersion",
+			scaleRefAPIVersion: "apiVersion",
 			expectErr:          true,
 		},
 	}
@@ -107,7 +107,7 @@ func TestHPAGenerate(t *testing.T) {
 				Name:               tt.HPAName,
 				ScaleRefKind:       tt.scaleRefKind,
 				ScaleRefName:       tt.scaleRefName,
-				ScaleRefApiVersion: tt.scaleRefApiVersion,
+				ScaleRefAPIVersion: tt.scaleRefAPIVersion,
 				MinReplicas:        tt.minReplicas,
 				MaxReplicas:        tt.maxReplicas,
 				CPUPercent:         tt.CPUPercent,

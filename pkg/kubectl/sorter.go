@@ -37,7 +37,7 @@ import (
 	"vbom.ml/util/sortorder"
 )
 
-// Sorting printer sorts list types before delegating to another printer.
+// SortingPrinter sorts list types before delegating to another printer.
 // Non-list types are simply passed through
 type SortingPrinter struct {
 	SortField string
@@ -296,7 +296,8 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	return less
 }
 
-// Returns the starting (original) position of a particular index.  e.g. If OriginalPosition(0) returns 5 than the
+// OriginalPosition returns the starting (original) position of a particular index.
+// e.g. If OriginalPosition(0) returns 5 than the
 // the item currently at position 0 was at position 5 in the original unsorted array.
 func (r *RuntimeSort) OriginalPosition(ix int) int {
 	if ix < 0 || ix > len(r.origPosition) {

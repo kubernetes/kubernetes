@@ -159,7 +159,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 				CPUPercent:         o.CpuPercent,
 				ScaleRefName:       name,
 				ScaleRefKind:       mapping.GroupVersionKind.Kind,
-				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
+				ScaleRefAPIVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}, nil
 		default:
 			return nil, cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", o.Generator)

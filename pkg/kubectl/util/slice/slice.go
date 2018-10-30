@@ -20,5 +20,5 @@ import (
 	"sort"
 )
 
-// Sorts []int64 in increasing order
+// SortInts64 sorts []int64 in increasing order
 func SortInts64(a []int64) { sort.Slice(a, func(i, j int) bool { return a[i] < a[j] }) }
