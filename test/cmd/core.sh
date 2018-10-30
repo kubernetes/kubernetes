@@ -1096,31 +1096,31 @@ run_rc_tests() {
 
   ### Expose deployments by creating a service
   # Uses deployment selectors for created service
+  kubectl apply -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment.yaml "${kube_flags[@]}"
   output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
   # Post-condition: service created for deployment.
   kube::test::if_has_string "${output_message}" 'service/expose-test-deployment exposed'
   # Clean-up
   kubectl delete service/expose-test-deployment "${kube_flags[@]}"
+  kubectl delete -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment.yaml "${kube_flags[@]}"
+
   # Uses deployment selectors for created service
+  kubectl apply -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta2deployment.yaml "${kube_flags[@]}"
   output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta2deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
   # Post-condition: service created for deployment.
   kube::test::if_has_string "${output_message}" 'service/expose-test-deployment exposed'
   # Clean-up
   kubectl delete service/expose-test-deployment "${kube_flags[@]}"
+  kubectl delete -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta2deployment.yaml "${kube_flags[@]}"
+
   # Uses deployment selectors for created service
+  kubectl apply -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta1deployment.yaml "${kube_flags[@]}"
   output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta1deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
   # Post-condition: service created for deployment.
   kube::test::if_has_string "${output_message}" 'service/expose-test-deployment exposed'
   # Clean-up
   kubectl delete service/expose-test-deployment "${kube_flags[@]}"
-  # Contains no selectors, should fail.
-  output_message=$(! kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment-no-selectors.yaml --port 80 2>&1 "${kube_flags[@]}")
-  # Post-condition: service created for deployment.
-  kube::test::if_has_string "${output_message}" 'invalid deployment: no selectors'
-  # Contains no selectors, should fail.
-  output_message=$(! kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta2deployment-no-selectors.yaml --port 80 2>&1 "${kube_flags[@]}")
-  # Post-condition: service created for deployment.
-  kube::test::if_has_string "${output_message}" 'invalid deployment: no selectors'
+  kubectl delete -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta1deployment.yaml "${kube_flags[@]}"
 
   ### Expose a deployment as a service
   kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]}"
@@ -1170,6 +1170,8 @@ run_rc_tests() {
   kube::test::if_has_string "${output_message}" 'cannot expose'
 
   ### Try to generate a service with invalid name (exceeding maximum valid size)
+  # First we create the pod
+  kubectl apply -f hack/testdata/pod-with-large-name.yaml "${kube_flags[@]}"
   # Pre-condition: use --name flag
   output_message=$(! kubectl expose -f hack/testdata/pod-with-large-name.yaml --name=invalid-large-service-name-that-has-more-than-sixty-three-characters --port=8081 2>&1 "${kube_flags[@]}")
   # Post-condition: should fail due to invalid name
@@ -1180,8 +1182,10 @@ run_rc_tests() {
   kube::test::if_has_string "${output_message}" 'kubernetes-serve-hostname-testing-sixty-three-characters-in-len exposed'
   # Clean-up
   kubectl delete svc kubernetes-serve-hostname-testing-sixty-three-characters-in-len "${kube_flags[@]}"
+  kubectl delete -f hack/testdata/pod-with-large-name.yaml "${kube_flags[@]}"
 
   ### Expose multiport object as a new service
+  kubectl apply -f test/fixtures/doc-yaml/admin/high-availability/etcd.yaml "${kube_flags[@]}"
   # Pre-condition: don't use --port flag
   output_message=$(kubectl expose -f test/fixtures/doc-yaml/admin/high-availability/etcd.yaml --selector=test=etcd 2>&1 "${kube_flags[@]}")
   # Post-condition: expose succeeded
@@ -1191,6 +1195,7 @@ run_rc_tests() {
   kube::test::get_object_assert 'service etcd-server' "{{$second_port_name}} {{$second_port_field}}" 'port-2 2379'
   # Clean-up
   kubectl delete svc etcd-server "${kube_flags[@]}"
+  kubectl delete -f test/fixtures/doc-yaml/admin/high-availability/etcd.yaml "${kube_flags[@]}"
 
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller exists

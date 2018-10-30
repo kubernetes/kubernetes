@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -234,6 +233,10 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
+			return err
+		}
+
+		if err := info.Get(); err != nil {
 			return err
 		}
 
