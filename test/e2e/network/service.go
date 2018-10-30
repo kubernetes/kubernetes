@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1528,6 +1529,78 @@ var _ = SIGDescribe("Services", func() {
 
 		By("switching to ClusterIP type to destroy loadbalancer")
 		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, createTimeout)
+	})
+
+	// This test creates a load balancer, make sure its health check interval
+	// equals to gceHcCheckIntervalSeconds. Then the interval is manipulated
+	// to be something else, see if the interval will be reconciled.
+	It("should reconcile LB health check interval [Slow][Serial]", func() {
+		const gceHcCheckIntervalSeconds = int64(8)
+		// This test is for clusters on GCE/GKE.
+		framework.SkipUnlessProviderIs("gce")
+		clusterID, err := framework.GetClusterID(cs)
+		if err != nil {
+			framework.Failf("framework.GetClusterID(cs) = _, %v; want nil", err)
+		}
+		gceCloud, err := framework.GetGCECloud()
+		if err != nil {
+			framework.Failf("framework.GetGCECloud() = _, %v; want nil", err)
+		}
+
+		namespace := f.Namespace.Name
+		serviceName := "lb-hc-int"
+		jig := framework.NewServiceTestJig(cs, serviceName)
+
+		By("create load balancer service")
+		// Create loadbalancer service with source range from node[0] and podAccept
+		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		})
+
+		// Clean up loadbalancer service
+		defer func() {
+			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeNodePort
+			})
+			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
+		}()
+
+		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, framework.LoadBalancerCreateTimeoutDefault)
+
+		hcName := gcecloud.MakeNodesHealthCheckName(clusterID)
+		hc, err := gceCloud.GetHttpHealthCheck(hcName)
+		if err != nil {
+			framework.Failf("gceCloud.GetHttpHealthCheck(%q) = _, %v; want nil", hcName, err)
+		}
+		Expect(hc.CheckIntervalSec).To(Equal(gceHcCheckIntervalSeconds))
+
+		By("modify the health check interval")
+		hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
+		if err = gceCloud.UpdateHttpHealthCheck(hc); err != nil {
+			framework.Failf("gcecloud.UpdateHttpHealthCheck(%#v) = %v; want nil", hc, err)
+		}
+
+		By("restart kube-controller-manager")
+		if err := framework.RestartControllerManager(); err != nil {
+			framework.Failf("framework.RestartControllerManager() = %v; want nil", err)
+		}
+		if err := framework.WaitForControllerManagerUp(); err != nil {
+			framework.Failf("framework.WaitForControllerManagerUp() = %v; want nil", err)
+		}
+
+		By("health check should be reconciled")
+		pollInterval := framework.Poll * 10
+		if pollErr := wait.PollImmediate(pollInterval, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+			hc, err := gceCloud.GetHttpHealthCheck(hcName)
+			if err != nil {
+				framework.Logf("Failed to get HttpHealthCheck(%q): %v", hcName, err)
+				return false, err
+			}
+			framework.Logf("hc.CheckIntervalSec = %v", hc.CheckIntervalSec)
+			return hc.CheckIntervalSec == gceHcCheckIntervalSeconds, nil
+		}); pollErr != nil {
+			framework.Failf("Health check %q does not reconcile its check interval to %d.", hcName, gceHcCheckIntervalSeconds)
+		}
 	})
 })
 

@@ -101,6 +101,7 @@ go_test(
         "gce_disks_test.go",
         "gce_healthchecks_test.go",
         "gce_loadbalancer_external_test.go",
+        "gce_loadbalancer_internal_test.go",
         "gce_test.go",
         "gce_util_test.go",
         "metrics_test.go",
