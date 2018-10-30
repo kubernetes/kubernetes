@@ -257,7 +257,7 @@ func validatePruneAll(prune, all bool, selector string) error {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 	if prune && !all && selector == "" {
-		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector.")
+		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag if you did not mean to prune all resources, specify a label selector")
 	}
 	return nil
 }
@@ -285,7 +285,7 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 		case meta.RESTScopeNameRoot:
 			namespaced = false
 		default:
-			return pruneResources, fmt.Errorf("Unknown namespace scope: %q", namespaceScope)
+			return pruneResources, fmt.Errorf("unknown namespace scope: %q", namespaceScope)
 		}
 
 		pruneResources = append(pruneResources, pruneResource{gvk[0], gvk[1], gvk[2], namespaced})
@@ -867,7 +867,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		// but still propagate and advertise error to user
 		recreated, recreateErr := p.Helper.Create(namespace, true, original, &options)
 		if recreateErr != nil {
-			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
+			err = fmt.Errorf("error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
 		} else {
 			createdObject = recreated
 		}

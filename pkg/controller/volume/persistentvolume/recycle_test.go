@@ -120,7 +120,7 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
-			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("Mock recycle error")}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("mock recycle error")}, testSyncVolume),
 		},
 		{
 			// recycle success(?) - volume is deleted before doRecycle() starts
@@ -258,7 +258,7 @@ func TestRecycleMultiSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
-			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("Mock recycle error"), nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("mock recycle error"), nil}, testSyncVolume),
 		},
 	}
 

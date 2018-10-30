@@ -265,7 +265,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
 	if !validImageRef {
-		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
+		return fmt.Errorf("invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
 	}
 
 	if o.TTY && !o.Interactive {

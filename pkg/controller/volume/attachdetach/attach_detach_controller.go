@@ -139,7 +139,7 @@ func NewAttachDetachController(
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -384,7 +384,7 @@ func (adc *attachDetachController) getNodeVolumeDevicePath(
 		}
 	}
 	if !found {
-		err = fmt.Errorf("Volume %s not found on node %s", volumeName, nodeName)
+		err = fmt.Errorf("volume %s not found on node %s", volumeName, nodeName)
 	}
 
 	return devicePath, err
@@ -551,7 +551,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 func (adc *attachDetachController) enqueuePVC(obj interface{}) {
 	key, err := kcache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		runtime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 	adc.pvcQueue.Add(key)
@@ -574,7 +574,7 @@ func (adc *attachDetachController) processNextItem() bool {
 		// Rather than wait for a full resync, re-add the key to the
 		// queue to be processed.
 		adc.pvcQueue.AddRateLimited(keyObj)
-		runtime.HandleError(fmt.Errorf("Failed to sync pvc %q, will retry again: %v", keyObj.(string), err))
+		runtime.HandleError(fmt.Errorf("failed to sync pvc %q, will retry again: %v", keyObj.(string), err))
 		return true
 	}
 
@@ -684,11 +684,11 @@ func (adc *attachDetachController) GetKubeClient() clientset.Interface {
 }
 
 func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
+	return nil, fmt.Errorf("not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
 func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
-	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
+	return nil, fmt.Errorf("not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
 func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
@@ -704,7 +704,7 @@ func (adc *attachDetachController) GetHostName() string {
 }
 
 func (adc *attachDetachController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
+	return nil, fmt.Errorf("not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -713,19 +713,19 @@ func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error)
 
 func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(_, _ string) (*v1.Secret, error) {
-		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
+		return nil, fmt.Errorf("unsupported in attachDetachController")
 	}
 }
 
 func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(_, _ string) (*v1.ConfigMap, error) {
-		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
+		return nil, fmt.Errorf("unsupported in attachDetachController")
 	}
 }
 
 func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-		return nil, fmt.Errorf("GetServiceAccountToken unsupported in attachDetachController")
+		return nil, fmt.Errorf("unsupported in attachDetachController")
 	}
 }
 
@@ -754,7 +754,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 }
 
 func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
-	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
+	return nil, fmt.Errorf("unsupported in Attach/Detach controller")
 }
 
 func (adc *attachDetachController) GetNodeName() types.NodeName {

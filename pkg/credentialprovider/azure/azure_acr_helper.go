@@ -99,22 +99,22 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 
 	var challenge *http.Response
 	if challenge, err = client.Do(r); err != nil {
-		return nil, fmt.Errorf("Error reaching registry endpoint %s, error: %s", challengeURL.String(), err)
+		return nil, fmt.Errorf("error reaching registry endpoint %s, error: %s", challengeURL.String(), err)
 	}
 	defer challenge.Body.Close()
 
 	if challenge.StatusCode != 401 {
-		return nil, fmt.Errorf("Registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
+		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
 	}
 
 	var authHeader []string
 	var ok bool
 	if authHeader, ok = challenge.Header["Www-Authenticate"]; !ok {
-		return nil, fmt.Errorf("Challenge response does not contain header 'Www-Authenticate'")
+		return nil, fmt.Errorf("challenge response does not contain header 'Www-Authenticate'")
 	}
 
 	if len(authHeader) != 1 {
-		return nil, fmt.Errorf("Registry did not issue a valid AAD challenge, authenticate header [%s]",
+		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, authenticate header [%s]",
 			strings.Join(authHeader, ", "))
 	}
 
@@ -122,18 +122,18 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 	authType := strings.ToLower(authSections[0])
 	var authParams *map[string]string
 	if authParams, err = parseAssignments(authSections[1]); err != nil {
-		return nil, fmt.Errorf("Unable to understand the contents of Www-Authenticate header %s", authSections[1])
+		return nil, fmt.Errorf("unable to understand the contents of Www-Authenticate header %s", authSections[1])
 	}
 
 	// verify headers
 	if !strings.EqualFold("Bearer", authType) {
-		return nil, fmt.Errorf("Www-Authenticate: expected realm: Bearer, actual: %s", authType)
+		return nil, fmt.Errorf("www-Authenticate: expected realm: Bearer, actual: %s", authType)
 	}
 	if len((*authParams)["service"]) == 0 {
-		return nil, fmt.Errorf("Www-Authenticate: missing header \"service\"")
+		return nil, fmt.Errorf("www-Authenticate: missing header \"service\"")
 	}
 	if len((*authParams)["realm"]) == 0 {
-		return nil, fmt.Errorf("Www-Authenticate: missing header \"realm\"")
+		return nil, fmt.Errorf("www-Authenticate: missing header \"realm\"")
 	}
 
 	return &authDirective{
@@ -145,16 +145,16 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 func parseAcrToken(identityToken string) (token *acrTokenPayload, err error) {
 	tokenSegments := strings.Split(identityToken, ".")
 	if len(tokenSegments) < 2 {
-		return nil, fmt.Errorf("Invalid existing refresh token length: %d", len(tokenSegments))
+		return nil, fmt.Errorf("invalid existing refresh token length: %d", len(tokenSegments))
 	}
 	payloadSegmentEncoded := tokenSegments[1]
 	var payloadBytes []byte
 	if payloadBytes, err = jwt.DecodeSegment(payloadSegmentEncoded); err != nil {
-		return nil, fmt.Errorf("Error decoding payload segment from refresh token, error: %s", err)
+		return nil, fmt.Errorf("error decoding payload segment from refresh token, error: %s", err)
 	}
 	var payload acrTokenPayload
 	if err = json.Unmarshal(payloadBytes, &payload); err != nil {
-		return nil, fmt.Errorf("Error unmarshalling acr payload, error: %s", err)
+		return nil, fmt.Errorf("error unmarshalling acr payload, error: %s", err)
 	}
 	return &payload, nil
 }
@@ -175,7 +175,7 @@ func performTokenExchange(
 
 	var realmURL *url.URL
 	if realmURL, err = url.Parse(directive.realm); err != nil {
-		return "", fmt.Errorf("Www-Authenticate: invalid realm %s", directive.realm)
+		return "", fmt.Errorf("www-Authenticate: invalid realm %s", directive.realm)
 	}
 	authEndpoint := fmt.Sprintf("%s://%s/oauth2/exchange", realmURL.Scheme, realmURL.Host)
 
@@ -188,22 +188,22 @@ func performTokenExchange(
 
 	var exchange *http.Response
 	if exchange, err = client.Do(r); err != nil {
-		return "", fmt.Errorf("Www-Authenticate: failed to reach auth url %s", authEndpoint)
+		return "", fmt.Errorf("www-Authenticate: failed to reach auth url %s", authEndpoint)
 	}
 
 	defer exchange.Body.Close()
 	if exchange.StatusCode != 200 {
-		return "", fmt.Errorf("Www-Authenticate: auth url %s responded with status code %d", authEndpoint, exchange.StatusCode)
+		return "", fmt.Errorf("www-Authenticate: auth url %s responded with status code %d", authEndpoint, exchange.StatusCode)
 	}
 
 	var content []byte
 	if content, err = ioutil.ReadAll(exchange.Body); err != nil {
-		return "", fmt.Errorf("Www-Authenticate: error reading response from %s", authEndpoint)
+		return "", fmt.Errorf("www-Authenticate: error reading response from %s", authEndpoint)
 	}
 
 	var authResp acrAuthResponse
 	if err = json.Unmarshal(content, &authResp); err != nil {
-		return "", fmt.Errorf("Www-Authenticate: unable to read response %s", content)
+		return "", fmt.Errorf("www-Authenticate: unable to read response %s", content)
 	}
 
 	return authResp.RefreshToken, nil

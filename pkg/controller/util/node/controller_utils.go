@@ -267,7 +267,7 @@ func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		node := originalObj.(*v1.Node).DeepCopy()
 		if err := f(node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add: %v", err))
+			utilruntime.HandleError(fmt.Errorf("error while processing Node Add: %v", err))
 		}
 	}
 }
@@ -279,7 +279,7 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 		prevNode := origOldObj.(*v1.Node).DeepCopy()
 
 		if err := f(prevNode, node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
+			utilruntime.HandleError(fmt.Errorf("error while processing Node Add/Delete: %v", err))
 		}
 	}
 }
@@ -304,7 +304,7 @@ func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) 
 		}
 		node := originalNode.DeepCopy()
 		if err := f(node); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
+			utilruntime.HandleError(fmt.Errorf("error while processing Node Add/Delete: %v", err))
 		}
 	}
 }

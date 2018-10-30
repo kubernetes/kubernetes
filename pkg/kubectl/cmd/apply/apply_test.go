@@ -624,7 +624,7 @@ func TestApplyRetry(t *testing.T) {
 					case p == pathRC && m == "PATCH":
 						if firstPatch {
 							firstPatch = false
-							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first"))
 							bodyBytes, _ := json.Marshal(statusErr)
 							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil

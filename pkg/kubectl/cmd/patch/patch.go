@@ -289,7 +289,7 @@ func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk s
 			msg := err.Error()
 			ix := strings.Index(msg, "key:")
 			key := msg[ix+5:]
-			return bytes, fmt.Errorf("Object to be patched is missing field (%s)", key)
+			return bytes, fmt.Errorf("object to be patched is missing field (%s)", key)
 		}
 		return bytes, err
 

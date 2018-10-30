@@ -189,7 +189,7 @@ func (e *EndpointController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := e.getPodServiceMemberships(pod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
 	}
 	for key := range services {
@@ -280,14 +280,14 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 
 	services, err := e.getPodServiceMemberships(newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		return
 	}
 
 	if labelsChanged {
 		oldServices, err := e.getPodServiceMemberships(oldPod)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
+			utilruntime.HandleError(fmt.Errorf("unable to get pod %v/%v's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
 			return
 		}
 		services = determineNeededServiceUpdates(oldServices, services, podChangedFlag)
@@ -316,12 +316,12 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 		return
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
 		return
 	}
 	klog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
@@ -332,7 +332,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 func (e *EndpointController) enqueueService(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -423,7 +423,7 @@ func (e *EndpointController) syncService(key string) error {
 		if err == nil {
 			tolerateUnreadyEndpoints = b
 		} else {
-			utilruntime.HandleError(fmt.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err))
+			utilruntime.HandleError(fmt.Errorf("failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err))
 		}
 	}
 
@@ -536,7 +536,7 @@ func (e *EndpointController) syncService(key string) error {
 func (e *EndpointController) checkLeftoverEndpoints() {
 	list, err := e.endpointsLister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
+		utilruntime.HandleError(fmt.Errorf("unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
 		return
 	}
 	for _, ep := range list {
@@ -550,7 +550,7 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 		}
 		key, err := controller.KeyFunc(ep)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
+			utilruntime.HandleError(fmt.Errorf("unable to get key for endpoint %#v", ep))
 			continue
 		}
 		e.queue.Add(key)

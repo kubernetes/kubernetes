@@ -58,7 +58,7 @@ func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume)
 		return err
 	}
 	if pv != expectedPV {
-		return fmt.Errorf("GetPV() returned %p, expected %p", pv, expectedPV)
+		return fmt.Errorf("%p was returned, expected %p", pv, expectedPV)
 	}
 	return nil
 }
@@ -320,7 +320,7 @@ func verifyPVC(cache PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVo
 		return err
 	}
 	if pvc != expectedPVC {
-		return fmt.Errorf("GetPVC() returned %p, expected %p", pvc, expectedPVC)
+		return fmt.Errorf("%p was returned, expected %p", pvc, expectedPVC)
 	}
 	return nil
 }

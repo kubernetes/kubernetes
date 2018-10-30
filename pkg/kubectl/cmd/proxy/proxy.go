@@ -103,7 +103,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	address := cmdutil.GetFlagString(cmd, "address")
 
 	if port != defaultPort && path != "" {
-		return errors.New("Don't specify both --unix-socket and --port")
+		return errors.New("don't specify both --unix-socket and --port")
 	}
 
 	clientConfig, err := f.ToRESTConfig()

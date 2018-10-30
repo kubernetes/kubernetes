@@ -125,7 +125,7 @@ func (c *Controller) processNextWorkItem() bool {
 
 	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey.(string))
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error parsing PVC key %q: %v", pvcKey, err))
+		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %v", pvcKey, err))
 		return true
 	}
 
@@ -245,7 +245,7 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 	}
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
 		return
 	}
 	klog.V(4).Infof("Got event on PVC %s", key)
@@ -261,12 +261,12 @@ func (c *Controller) podAddedDeletedUpdated(obj interface{}, deleted bool) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
 			return
 		}
 	}

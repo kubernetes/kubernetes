@@ -61,7 +61,7 @@ func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 		case apply.DROP:
 			// Drop the list item value
 		default:
-			panic(fmt.Errorf("Unexpected result operation type %+v", m))
+			panic(fmt.Errorf("unexpected result operation type %+v", m))
 		}
 	}
 
@@ -118,7 +118,7 @@ func (v mergeStrategy) doMergeMap(e map[string]apply.Element) (apply.Result, err
 		case apply.DROP:
 			// Drop the map item value
 		default:
-			panic(fmt.Errorf("Unexpected result operation type %+v", result))
+			panic(fmt.Errorf("unexpected result operation type %+v", result))
 		}
 	}
 
@@ -146,7 +146,7 @@ func (v mergeStrategy) doAddOrDelete(e apply.Element) (apply.Result, bool) {
 
 // MergePrimitive returns and error.  Primitive elements can't be merged, only replaced.
 func (v mergeStrategy) MergePrimitive(diff apply.PrimitiveElement) (apply.Result, error) {
-	return apply.Result{}, fmt.Errorf("Cannot merge primitive element %v", diff.Name)
+	return apply.Result{}, fmt.Errorf("cannot merge primitive element %v", diff.Name)
 }
 
 // MergeEmpty returns an empty result

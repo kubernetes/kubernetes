@@ -46,7 +46,7 @@ import (
 // each is needed.
 func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	if len(nodes) == 0 {
-		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
+		return nil, fmt.Errorf("cannot EnsureLoadBalancer() with no hosts")
 	}
 
 	hostNames := nodeNames(nodes)
@@ -508,7 +508,7 @@ func (g *Cloud) ensureTargetPoolAndHealthCheck(tpExists, tpNeedsRecreation bool,
 		klog.Infof("ensureTargetPoolAndHealthCheck(%s): Updated target pool (with %d hosts).", lbRefStr, len(hosts))
 		if hcToCreate != nil {
 			if hc, err := g.ensureHTTPHealthCheck(hcToCreate.Name, hcToCreate.RequestPath, int32(hcToCreate.Port)); err != nil || hc == nil {
-				return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", loadBalancerName, hcToCreate.Port, hcToCreate.RequestPath, err)
+				return fmt.Errorf("failed to ensure health check for %v port %d path %v: %v", loadBalancerName, hcToCreate.Port, hcToCreate.RequestPath, err)
 			}
 		}
 	} else {
@@ -607,7 +607,7 @@ func (g *Cloud) updateTargetPool(loadBalancerName string, hosts []*gceInstance) 
 	if len(updatedPool.Instances) != len(hosts) {
 		klog.Errorf("Unexpected number of instances (%d) in target pool %s after updating (expected %d). Instances in updated pool: %s",
 			len(updatedPool.Instances), loadBalancerName, len(hosts), strings.Join(updatedPool.Instances, ","))
-		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, len(hosts))
+		return fmt.Errorf("unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, len(hosts))
 	}
 	return nil
 }
@@ -790,7 +790,7 @@ func loadBalancerPortRange(ports []v1.ServicePort) (string, error) {
 
 	// The service controller verified all the protocols match on the ports, just check and use the first one
 	if ports[0].Protocol != v1.ProtocolTCP && ports[0].Protocol != v1.ProtocolUDP {
-		return "", fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(ports[0].Protocol))
+		return "", fmt.Errorf("invalid protocol %s, only TCP and UDP are supported", string(ports[0].Protocol))
 	}
 
 	minPort := int32(65536)

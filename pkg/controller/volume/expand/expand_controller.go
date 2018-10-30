@@ -114,7 +114,7 @@ func NewExpandController(
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for Expand Controller : %+v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -268,11 +268,11 @@ func (expc *expandController) GetKubeClient() clientset.Interface {
 }
 
 func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return nil, fmt.Errorf("NewWrapperMounter not supported by expand controller's VolumeHost implementation")
+	return nil, fmt.Errorf("not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
-	return nil, fmt.Errorf("NewWrapperUnmounter not supported by expand controller's VolumeHost implementation")
+	return nil, fmt.Errorf("not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) GetCloudProvider() cloudprovider.Interface {
@@ -292,7 +292,7 @@ func (expc *expandController) GetHostName() string {
 }
 
 func (expc *expandController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
+	return nil, fmt.Errorf("not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -301,19 +301,19 @@ func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
 
 func (expc *expandController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(_, _ string) (*v1.Secret, error) {
-		return nil, fmt.Errorf("GetSecret unsupported in expandController")
+		return nil, fmt.Errorf("unsupported in expandController")
 	}
 }
 
 func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(_, _ string) (*v1.ConfigMap, error) {
-		return nil, fmt.Errorf("GetConfigMap unsupported in expandController")
+		return nil, fmt.Errorf("unsupported in expandController")
 	}
 }
 
 func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-		return nil, fmt.Errorf("GetServiceAccountToken unsupported in expandController")
+		return nil, fmt.Errorf("unsupported in expandController")
 	}
 }
 
@@ -324,7 +324,7 @@ func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
 }
 
 func (expc *expandController) GetNodeLabels() (map[string]string, error) {
-	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
+	return nil, fmt.Errorf("unsupported in expandController")
 }
 
 func (expc *expandController) GetNodeName() types.NodeName {

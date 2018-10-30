@@ -66,8 +66,8 @@ var cleanUpDummyVMLock sync.RWMutex
 
 // Error Messages
 const (
-	MissingUsernameErrMsg = "Username is missing"
-	MissingPasswordErrMsg = "Password is missing"
+	MissingUsernameErrMsg = "username is missing"
+	MissingPasswordErrMsg = "password is missing"
 )
 
 // Error constants

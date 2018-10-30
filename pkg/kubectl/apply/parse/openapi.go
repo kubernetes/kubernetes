@@ -83,31 +83,31 @@ type baseSchemaVisitor struct {
 // VisitArray implements openapi
 func (v *baseSchemaVisitor) VisitArray(array *proto.Array) {
 	v.Kind = "array"
-	v.Err = fmt.Errorf("Array type not expected")
+	v.Err = fmt.Errorf("array type not expected")
 }
 
 // MergeMap implements openapi
 func (v *baseSchemaVisitor) VisitMap(*proto.Map) {
 	v.Kind = "map"
-	v.Err = fmt.Errorf("Map type not expected")
+	v.Err = fmt.Errorf("map type not expected")
 }
 
 // MergePrimitive implements openapi
 func (v *baseSchemaVisitor) VisitPrimitive(*proto.Primitive) {
 	v.Kind = "primitive"
-	v.Err = fmt.Errorf("Primitive type not expected")
+	v.Err = fmt.Errorf("primitive type not expected")
 }
 
 // VisitKind implements openapi
 func (v *baseSchemaVisitor) VisitKind(*proto.Kind) {
 	v.Kind = "kind"
-	v.Err = fmt.Errorf("Kind type not expected")
+	v.Err = fmt.Errorf("kind type not expected")
 }
 
 // VisitReference implements openapi
 func (v *baseSchemaVisitor) VisitReference(reference proto.Reference) {
 	v.Kind = "reference"
-	v.Err = fmt.Errorf("Reference type not expected")
+	v.Err = fmt.Errorf("reference type not expected")
 }
 
 type kindSchemaVisitor struct {
@@ -134,7 +134,7 @@ func copyExtensions(field string, from, to map[string]interface{}) error {
 	for key, val := range from {
 		if curr, found := to[key]; found {
 			// Don't allow the same extension to be defined both on the field and on the type
-			return fmt.Errorf("Cannot override value for extension %s on field %s from %v to %v",
+			return fmt.Errorf("cannot override value for extension %s on field %s from %v to %v",
 				key, field, curr, val)
 		}
 		to[key] = val
@@ -181,7 +181,7 @@ func copySubElementPatchStrategy(field string, from, to map[string]interface{}) 
 	if ext, found := from["x-kubernetes-patch-strategy"]; found {
 		strategy, ok := ext.(string)
 		if !ok {
-			return fmt.Errorf("Expected string value for x-kubernetes-patch-strategy on %s, was %T",
+			return fmt.Errorf("expected string value for x-kubernetes-patch-strategy on %s, was %T",
 				field, ext)
 		}
 		// Check of the parent patch strategy has a sub patch strategy, and if so copy to the sub type
@@ -190,7 +190,7 @@ func copySubElementPatchStrategy(field string, from, to map[string]interface{}) 
 			if len(strategies) != 2 {
 				// Only 1 sub strategy is supported
 				return fmt.Errorf(
-					"Expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v",
+					"expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v",
 					strategies)
 			}
 			to["x-kubernetes-patch-strategy"] = strategies[1]

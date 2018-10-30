@@ -424,7 +424,7 @@ func TestConflictWhenProcessServiceUpdate(t *testing.T) {
 	controller, _, client := newController()
 	client.PrependReactor("update", "services", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), svcName, errors.New("Object changed"))
+		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), svcName, errors.New("object changed"))
 	})
 
 	svcCache := controller.cache.getOrCreate(svcName)
@@ -470,7 +470,7 @@ func TestSyncService(t *testing.T) {
 				//TODO:	our tests, currently we only test if there is an error.
 				//Error should be non-nil
 				if e == nil {
-					return fmt.Errorf("Expected=unexpected key format: %q, Obtained=nil", "invalid/key/string")
+					return fmt.Errorf("expected=unexpected key format: %q, obtained=nil", "invalid/key/string")
 				}
 				return nil
 			},
@@ -502,7 +502,7 @@ func TestSyncService(t *testing.T) {
 			expectedFn: func(e error) error {
 				//error should be nil
 				if e != nil {
-					return fmt.Errorf("Expected=nil, Obtained=%v", e)
+					return fmt.Errorf("expected=nil, obtained=%v", e)
 				}
 				return nil
 			},
@@ -554,15 +554,15 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
-				cloud.Err = fmt.Errorf("Error Deleting the Loadbalancer")
+				cloud.Err = fmt.Errorf("error deleting the Loadbalancer")
 
 			},
 			expectedFn: func(svcErr error) error {
 
-				expectedError := "Error Deleting the Loadbalancer"
+				expectedError := "error deleting the Loadbalancer"
 
 				if svcErr == nil || svcErr.Error() != expectedError {
-					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, svcErr)
+					return fmt.Errorf("expected=%v obtained=%v", expectedError, svcErr)
 				}
 
 				return nil
@@ -581,7 +581,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 			},
 			expectedFn: func(svcErr error) error {
 				if svcErr != nil {
-					return fmt.Errorf("Expected=nil Obtained=%v", svcErr)
+					return fmt.Errorf("expected=nil obtained=%v", svcErr)
 				}
 
 				// It should no longer be in the workqueue.
@@ -740,7 +740,7 @@ func TestServiceCache(t *testing.T) {
 			checkCacheFn: func() error {
 				//There must be exactly one element
 				if len(sc.serviceMap) != 1 {
-					return fmt.Errorf("Expected=1 Obtained=%d", len(sc.serviceMap))
+					return fmt.Errorf("expected=1 obtained=%d", len(sc.serviceMap))
 				}
 				return nil
 			},
@@ -754,7 +754,7 @@ func TestServiceCache(t *testing.T) {
 			checkCacheFn: func() error {
 				//Now it should have no element
 				if len(sc.serviceMap) != 0 {
-					return fmt.Errorf("Expected=0 Obtained=%d", len(sc.serviceMap))
+					return fmt.Errorf("expected=0 obtained=%d", len(sc.serviceMap))
 				}
 				return nil
 			},
@@ -768,10 +768,10 @@ func TestServiceCache(t *testing.T) {
 				//Now it should have one element
 				Cs, bool := sc.get("addTest")
 				if !bool {
-					return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
+					return fmt.Errorf("is Available expected=true obtained=%v", bool)
 				}
 				if Cs == nil {
-					return fmt.Errorf("CachedService expected:non-nil Obtained=nil")
+					return fmt.Errorf("cachedService expected:non-nil obtained=nil")
 				}
 				return nil
 			},
@@ -786,7 +786,7 @@ func TestServiceCache(t *testing.T) {
 				//It should have two elements
 				keys := sc.ListKeys()
 				if len(keys) != 2 {
-					return fmt.Errorf("Elementes Expected=2 Obtained=%v", len(keys))
+					return fmt.Errorf("elementes expected=2 obtained=%v", len(keys))
 				}
 				return nil
 			},
@@ -798,7 +798,7 @@ func TestServiceCache(t *testing.T) {
 				//It should have two elements
 				svc, isKey, err := sc.GetByKey("addTest")
 				if svc == nil || isKey == false || err != nil {
-					return fmt.Errorf("Expected(non-nil, true, nil) Obtained(%v,%v,%v)", svc, isKey, err)
+					return fmt.Errorf("expected(non-nil, true, nil) obtained(%v,%v,%v)", svc, isKey, err)
 				}
 				return nil
 			},
@@ -810,7 +810,7 @@ func TestServiceCache(t *testing.T) {
 				//It should return two elements
 				svcArray := sc.allServices()
 				if len(svcArray) != 2 {
-					return fmt.Errorf("Expected(2) Obtained(%v)", len(svcArray))
+					return fmt.Errorf("expected=2 obtained=%v", len(svcArray))
 				}
 				return nil
 			},
@@ -842,9 +842,9 @@ func TestNodeSlicesEqualForLB(t *testing.T) {
 	}
 
 	if !nodeSlicesEqualForLB(nArray, nArray) {
-		t.Errorf("nodeSlicesEqualForLB() Expected=true Obtained=false")
+		t.Errorf("nodeSlicesEqualForLB() expected=true obtained=false")
 	}
 	if nodeSlicesEqualForLB(nArray, mArray) {
-		t.Errorf("nodeSlicesEqualForLB() Expected=false Obtained=true")
+		t.Errorf("nodeSlicesEqualForLB() expected=false obtained=true")
 	}
 }

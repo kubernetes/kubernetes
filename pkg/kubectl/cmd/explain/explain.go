@@ -106,10 +106,10 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 func (o *ExplainOptions) Validate(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("You must specify the type of resource to explain. %s\n", cmdutil.SuggestApiResources(o.CmdParent))
+		return fmt.Errorf("you must specify the type of resource to explain %s\n", cmdutil.SuggestApiResources(o.CmdParent))
 	}
 	if len(args) > 1 {
-		return fmt.Errorf("We accept only this format: explain RESOURCE\n")
+		return fmt.Errorf("we accept only this format: explain RESOURCE\n")
 	}
 
 	return nil
@@ -151,7 +151,7 @@ func (o *ExplainOptions) Run(args []string) error {
 
 	schema := o.Schema.LookupResource(gvk)
 	if schema == nil {
-		return fmt.Errorf("Couldn't find resource for %q", gvk)
+		return fmt.Errorf("couldn't find resource for %q", gvk)
 	}
 
 	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, recursive)

@@ -317,7 +317,7 @@ func (o *RollingUpdateOptions) Run() error {
 		}
 		if newRc != nil {
 			if inProgressImage := newRc.Spec.Template.Spec.Containers[0].Image; inProgressImage != o.Image {
-				return fmt.Errorf("Found existing in-progress update to image (%s).\nEither continue in-progress update with --image=%s or rollback with --rollback", inProgressImage, inProgressImage)
+				return fmt.Errorf("found existing in-progress update to image (%s).\nEither continue in-progress update with --image=%s or rollback with --rollback", inProgressImage, inProgressImage)
 			}
 			fmt.Fprintf(o.Out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
@@ -361,7 +361,7 @@ func (o *RollingUpdateOptions) Run() error {
 		}
 
 		if newRc == nil {
-			return fmt.Errorf("Could not find %s to rollback.\n", newName)
+			return fmt.Errorf("could not find %s to rollback", newName)
 		}
 	}
 

@@ -141,7 +141,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 	if err := cc.syncFunc(cKey.(string)); err != nil {
 		cc.queue.AddRateLimited(cKey)
 		if _, ignorable := err.(ignorableError); !ignorable {
-			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+			utilruntime.HandleError(fmt.Errorf("sync %v failed with : %v", cKey, err))
 		} else {
 			klog.V(4).Infof("Sync %v failed with : %v", cKey, err)
 		}
@@ -156,7 +156,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 	cc.queue.Add(key)

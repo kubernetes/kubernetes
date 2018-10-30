@@ -101,7 +101,7 @@ type testCall func(ctrl *PersistentVolumeController, reactor *volumeReactor, tes
 const testNamespace = "default"
 const mockPluginName = "kubernetes.io/mock-volume"
 
-var versionConflictError = errors.New("VersionError")
+var versionConflictError = errors.New("version error")
 var novolumes []*v1.PersistentVolume
 var noclaims []*v1.PersistentVolumeClaim
 var noevents = []string{}
@@ -176,7 +176,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		// check the volume does not exist
 		_, found := r.volumes[volume.Name]
 		if found {
-			return true, nil, fmt.Errorf("Cannot create volume %s: volume already exists", volume.Name)
+			return true, nil, fmt.Errorf("cannot create volume %s: volume already exists", volume.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -202,7 +202,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			volume = volume.DeepCopy()
 			volume.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
-			return true, nil, fmt.Errorf("Cannot update volume %s: volume not found", volume.Name)
+			return true, nil, fmt.Errorf("cannot update volume %s: volume not found", volume.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -228,7 +228,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			claim = claim.DeepCopy()
 			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
 		} else {
-			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
+			return true, nil, fmt.Errorf("cannot update claim %s: claim not found", claim.Name)
 		}
 
 		// Store the updated object to appropriate places.
@@ -246,7 +246,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			return true, volume, nil
 		} else {
 			klog.V(4).Infof("GetVolume: volume %s not found", name)
-			return true, nil, fmt.Errorf("Cannot find volume %s", name)
+			return true, nil, fmt.Errorf("cannot find volume %s", name)
 		}
 
 	case action.Matches("delete", "persistentvolumes"):
@@ -258,7 +258,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			r.changedSinceLastSync++
 			return true, nil, nil
 		} else {
-			return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
+			return true, nil, fmt.Errorf("cannot delete volume %s: not found", name)
 		}
 
 	case action.Matches("delete", "persistentvolumeclaims"):
@@ -270,7 +270,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			r.changedSinceLastSync++
 			return true, nil, nil
 		} else {
-			return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
+			return true, nil, fmt.Errorf("cannot delete claim %s: not found", name)
 		}
 	}
 
@@ -328,7 +328,7 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) err
 	if !reflect.DeepEqual(expectedMap, gotMap) {
 		// Print ugly but useful diff of expected and received objects for
 		// easier debugging.
-		return fmt.Errorf("Volume check failed [A-expected, B-got]: %s", diff.ObjectDiff(expectedMap, gotMap))
+		return fmt.Errorf("volume check failed [A-expected, B-got]: %s", diff.ObjectDiff(expectedMap, gotMap))
 	}
 	return nil
 }
@@ -357,7 +357,7 @@ func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	if !reflect.DeepEqual(expectedMap, gotMap) {
 		// Print ugly but useful diff of expected and received objects for
 		// easier debugging.
-		return fmt.Errorf("Claim check failed [A-expected, B-got result]: %s", diff.ObjectDiff(expectedMap, gotMap))
+		return fmt.Errorf("claim check failed [A-expected, B-got result]: %s", diff.ObjectDiff(expectedMap, gotMap))
 	}
 	return nil
 }
@@ -395,18 +395,18 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	for i, expected := range expectedEvents {
 		if len(gotEvents) <= i {
 			t.Errorf("Event %q not emitted", expected)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 			continue
 		}
 		received := gotEvents[i]
 		if !strings.HasPrefix(received, expected) {
 			t.Errorf("Unexpected event received, expected %q, got %q", expected, received)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 		}
 	}
 	for i := len(expectedEvents); i < len(gotEvents); i++ {
 		t.Errorf("Unexpected event received: %q", gotEvents[i])
-		err = fmt.Errorf("Events do not match")
+		err = fmt.Errorf("events do not match")
 	}
 	return err
 }
@@ -1173,11 +1173,11 @@ func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string
 }
 
 func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
-	return nil, fmt.Errorf("Mounter is not supported by this plugin")
+	return nil, fmt.Errorf("not supported by this plugin")
 }
 
 func (plugin *mockVolumePlugin) NewUnmounter(name string, podUID types.UID) (vol.Unmounter, error) {
-	return nil, fmt.Errorf("Unmounter is not supported by this plugin")
+	return nil, fmt.Errorf("not supported by this plugin")
 }
 
 // Provisioner interfaces
@@ -1189,20 +1189,20 @@ func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.P
 		plugin.provisionOptions = options
 		return plugin, nil
 	} else {
-		return nil, fmt.Errorf("Mock plugin error: no provisionCalls configured")
+		return nil, fmt.Errorf("no provisionCalls configured")
 	}
 }
 
 func (plugin *mockVolumePlugin) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if len(plugin.provisionCalls) <= plugin.provisionCallCounter {
-		return nil, fmt.Errorf("Mock plugin error: unexpected provisioner call %d", plugin.provisionCallCounter)
+		return nil, fmt.Errorf("unexpected provisioner call %d", plugin.provisionCallCounter)
 	}
 
 	var pv *v1.PersistentVolume
 	call := plugin.provisionCalls[plugin.provisionCallCounter]
 	if !reflect.DeepEqual(call.expectedParameters, plugin.provisionOptions.Parameters) {
 		klog.Errorf("invalid provisioner call, expected options: %+v, got: %+v", call.expectedParameters, plugin.provisionOptions.Parameters)
-		return nil, fmt.Errorf("Mock plugin error: invalid provisioner call")
+		return nil, fmt.Errorf("mock plugin error: invalid provisioner call")
 	}
 	if call.ret == nil {
 		// Create a fake PV with known GCE volume (to match expected volume)
@@ -1241,13 +1241,13 @@ func (plugin *mockVolumePlugin) NewDeleter(spec *vol.Spec) (vol.Deleter, error) 
 		klog.V(4).Infof("mock plugin NewDeleter called, returning mock deleter")
 		return plugin, nil
 	} else {
-		return nil, fmt.Errorf("Mock plugin error: no deleteCalls configured")
+		return nil, fmt.Errorf("no deleteCalls configured")
 	}
 }
 
 func (plugin *mockVolumePlugin) Delete() error {
 	if len(plugin.deleteCalls) <= plugin.deleteCallCounter {
-		return fmt.Errorf("Mock plugin error: unexpected deleter call %d", plugin.deleteCallCounter)
+		return fmt.Errorf("unexpected deleter call %d", plugin.deleteCallCounter)
 	}
 	ret := plugin.deleteCalls[plugin.deleteCallCounter]
 	plugin.deleteCallCounter++
@@ -1269,11 +1269,11 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 
 func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if len(plugin.recycleCalls) == 0 {
-		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
+		return fmt.Errorf("no recycleCalls configured")
 	}
 
 	if len(plugin.recycleCalls) <= plugin.recycleCallCounter {
-		return fmt.Errorf("Mock plugin error: unexpected recycle call %d", plugin.recycleCallCounter)
+		return fmt.Errorf("unexpected recycle call %d", plugin.recycleCallCounter)
 	}
 	ret := plugin.recycleCalls[plugin.recycleCallCounter]
 	plugin.recycleCallCounter++

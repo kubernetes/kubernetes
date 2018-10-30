@@ -291,7 +291,7 @@ func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 	}
 	if !o.overwrite {
 		if exists := checkIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
-			return "", fmt.Errorf("Node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
+			return "", fmt.Errorf("node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
 		}
 	}
 	operation, newTaints, err := reorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)

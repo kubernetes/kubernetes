@@ -626,7 +626,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 				errors = append(errors, err)
 			}
 		case <-globalTimeoutCh:
-			return fmt.Errorf("Drain did not complete within %v", globalTimeout)
+			return fmt.Errorf("drain did not complete within %v", globalTimeout)
 		}
 	}
 	return utilerrors.NewAggregate(errors)

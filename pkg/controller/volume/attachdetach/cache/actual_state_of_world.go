@@ -337,7 +337,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
-		return fmt.Errorf("Failed to SetVolumeMountedByNode with error: %v", err)
+		return fmt.Errorf("failed to SetVolumeMountedByNode with error: %v", err)
 	}
 
 	if mounted {
@@ -375,7 +375,7 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
-		return 0, fmt.Errorf("Failed to set detach request time with error: %v", err)
+		return 0, fmt.Errorf("failed to set detach request time with error: %v", err)
 	}
 	// If there is no previous detach request, set it to the current time
 	if nodeObj.detachRequestedTime.IsZero() {
@@ -473,7 +473,7 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if !nodeToUpdateExists {
 		// should not happen
-		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
+		errMsg := fmt.Sprintf("failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
 			needed, nodeName)
 		return fmt.Errorf(errMsg)
 	}

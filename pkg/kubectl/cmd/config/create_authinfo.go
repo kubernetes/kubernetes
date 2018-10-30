@@ -242,18 +242,18 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		return fmt.Errorf("Unexpected args: %v", args)
+		return fmt.Errorf("unexpected args: %v", args)
 	}
 
 	authProviderArgs, err := cmd.Flags().GetStringSlice(flagAuthProviderArg)
 	if err != nil {
-		return fmt.Errorf("Error: %s\n", err)
+		return err
 	}
 
 	if len(authProviderArgs) > 0 {
 		newPairs, removePairs, err := cmdutil.ParsePairs(authProviderArgs, flagAuthProviderArg, true)
 		if err != nil {
-			return fmt.Errorf("Error: %s\n", err)
+			return err
 		}
 		o.authProviderArgs = newPairs
 		o.authProviderArgsToRemove = removePairs

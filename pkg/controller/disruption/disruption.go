@@ -447,7 +447,7 @@ func (dc *DisruptionController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %v", dKey.(string), err))
+	utilruntime.HandleError(fmt.Errorf("error syncing PodDisruptionBudget %v, requeuing: %v", dKey.(string), err))
 	dc.queue.AddRateLimited(dKey)
 
 	return true

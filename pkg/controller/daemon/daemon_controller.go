@@ -248,12 +248,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj))
 			return
 		}
 	}
@@ -310,7 +310,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ds, err))
 		return
 	}
 
@@ -321,7 +321,7 @@ func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 func (dsc *DaemonSetsController) enqueueRateLimited(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ds, err))
 		return
 	}
 
@@ -331,7 +331,7 @@ func (dsc *DaemonSetsController) enqueueRateLimited(ds *apps.DaemonSet) {
 func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -462,12 +462,12 @@ func (dsc *DaemonSetsController) deleteHistory(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 			return
 		}
 		history, ok = tombstone.Obj.(*apps.ControllerRevision)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ControllerRevision %#v", obj))
 			return
 		}
 	}

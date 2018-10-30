@@ -393,7 +393,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 
 		// Check if pv.ClaimRef got dropped by unbindVolume()
 		if pv.Spec.ClaimRef == nil || pv.Spec.ClaimRef.UID == "" {
-			return false, fmt.Errorf("ClaimRef got reset for pv %q", pv.Name)
+			return false, fmt.Errorf("claimRef got reset for pv %q", pv.Name)
 		}
 
 		// Check if pvc is fully bound

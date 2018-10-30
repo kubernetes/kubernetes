@@ -472,7 +472,7 @@ func getNodeAddressesByProviderIDOrName(instances cloudprovider.Instances, node 
 		providerIDErr := err
 		nodeAddresses, err = instances.NodeAddresses(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
-			return nil, fmt.Errorf("NodeAddress: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+			return nil, fmt.Errorf("error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
 	}
 	return nodeAddresses, nil
@@ -519,7 +519,7 @@ func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *
 		providerIDErr := err
 		instanceType, err = instances.InstanceType(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
-			return "", fmt.Errorf("InstanceType: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+			return "", fmt.Errorf("error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
 	}
 	return instanceType, err
@@ -533,7 +533,7 @@ func getZoneByProviderIDOrName(zones cloudprovider.Zones, node *v1.Node) (cloudp
 		providerIDErr := err
 		zone, err = zones.GetZoneByNodeName(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
-			return cloudprovider.Zone{}, fmt.Errorf("Zone: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+			return cloudprovider.Zone{}, fmt.Errorf("error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
 	}
 

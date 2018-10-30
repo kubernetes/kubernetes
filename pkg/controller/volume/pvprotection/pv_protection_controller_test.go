@@ -82,7 +82,7 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 				t.Fatalf("Reactor got non-update action: %+v", action)
 			}
 			acc, _ := meta.Accessor(update.GetObject())
-			return true, nil, apierrors.NewForbidden(update.GetResource().GroupResource(), acc.GetName(), errors.New("Mock error"))
+			return true, nil, apierrors.NewForbidden(update.GetResource().GroupResource(), acc.GetName(), errors.New("mock error"))
 		}
 		// Update succeeds
 		return false, nil, nil

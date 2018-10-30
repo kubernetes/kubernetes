@@ -104,14 +104,14 @@ func getFieldMeta(s proto.Schema, name string) (apply.FieldMetaImpl, error) {
 		if e, found := ext["x-kubernetes-patch-strategy"]; found {
 			strategy, ok := e.(string)
 			if !ok {
-				return apply.FieldMetaImpl{}, fmt.Errorf("Expected string for x-kubernetes-patch-strategy by got %T", e)
+				return apply.FieldMetaImpl{}, fmt.Errorf("expected string for x-kubernetes-patch-strategy by got %T", e)
 			}
 
 			// Take the first strategy if there are substrategies.
 			// Sub strategies are copied to sub types in openapi.go
 			strategies := strings.Split(strategy, ",")
 			if len(strategies) > 2 {
-				return apply.FieldMetaImpl{}, fmt.Errorf("Expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v", strategies)
+				return apply.FieldMetaImpl{}, fmt.Errorf("expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v", strategies)
 			}
 			// For lists, choose the strategy for this type, not the subtype
 			m.MergeType = strategies[0]
@@ -119,7 +119,7 @@ func getFieldMeta(s proto.Schema, name string) (apply.FieldMetaImpl, error) {
 		if k, found := ext["x-kubernetes-patch-merge-key"]; found {
 			key, ok := k.(string)
 			if !ok {
-				return apply.FieldMetaImpl{}, fmt.Errorf("Expected string for x-kubernetes-patch-merge-key by got %T", k)
+				return apply.FieldMetaImpl{}, fmt.Errorf("expected string for x-kubernetes-patch-merge-key by got %T", k)
 			}
 			m.MergeKeys = apply.MergeKeys(strings.Split(key, ","))
 		}
@@ -158,7 +158,7 @@ func getGroupVersionKind(config map[string]interface{}) (schema.GroupVersionKind
 	if gv, found := config["apiVersion"]; found {
 		casted, ok := gv.(string)
 		if !ok {
-			return gvk, fmt.Errorf("Expected string for apiVersion, found %T", gv)
+			return gvk, fmt.Errorf("expected string for apiVersion, found %T", gv)
 		}
 		s := strings.Split(casted, "/")
 		if len(s) != 1 {
@@ -166,16 +166,16 @@ func getGroupVersionKind(config map[string]interface{}) (schema.GroupVersionKind
 		}
 		gvk.Version = s[len(s)-1]
 	} else {
-		return gvk, fmt.Errorf("Missing apiVersion in Kind %v", config)
+		return gvk, fmt.Errorf("missing apiVersion in Kind %v", config)
 	}
 	if k, found := config["kind"]; found {
 		casted, ok := k.(string)
 		if !ok {
-			return gvk, fmt.Errorf("Expected string for kind, found %T", k)
+			return gvk, fmt.Errorf("expected string for kind, found %T", k)
 		}
 		gvk.Kind = casted
 	} else {
-		return gvk, fmt.Errorf("Missing kind in Kind %v", config)
+		return gvk, fmt.Errorf("missing kind in Kind %v", config)
 	}
 	return gvk, nil
 }

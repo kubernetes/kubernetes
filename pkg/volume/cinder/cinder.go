@@ -215,7 +215,7 @@ func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
 				return nil, fmt.Errorf("unable to create OpenStack cloud provider from default path : %v", err)
 			}
 		} else {
-			return nil, fmt.Errorf("OpenStack cloud provider was not initialized properly : %v", err)
+			return nil, fmt.Errorf("cloud provider was not initialized properly : %v", err)
 		}
 	}
 
@@ -430,7 +430,7 @@ func (c *cinderVolumeUnmounter) TearDown() error {
 // resource was the last reference to that disk on the kubelet.
 func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil

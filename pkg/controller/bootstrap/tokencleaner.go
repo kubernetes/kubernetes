@@ -150,7 +150,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 
 	if err := tc.syncFunc(key.(string)); err != nil {
 		tc.queue.AddRateLimited(key)
-		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", key, err))
+		utilruntime.HandleError(fmt.Errorf("sync %v failed with : %v", key, err))
 		return true
 	}
 

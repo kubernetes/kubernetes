@@ -309,7 +309,7 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 	}
 
 	if class.VolumeBindingMode == nil {
-		return false, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", className)
+		return false, fmt.Errorf("volumeBindingMode not set for StorageClass %q", className)
 	}
 
 	return *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer, nil
@@ -331,7 +331,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 		volume, err := ctrl.volumes.findBestMatchForClaim(claim, delayBinding)
 		if err != nil {
 			klog.V(2).Infof("synchronizing unbound PersistentVolumeClaim[%s]: Error finding PV for claim: %v", claimToClaimKey(claim), err)
-			return fmt.Errorf("Error finding PV for claim %q: %v", claimToClaimKey(claim), err)
+			return fmt.Errorf("error finding PV for claim %q: %v", claimToClaimKey(claim), err)
 		}
 		if volume == nil {
 			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
@@ -387,7 +387,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 		} else {
 			volume, ok := obj.(*v1.PersistentVolume)
 			if !ok {
-				return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
+				return fmt.Errorf("cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
 			}
 			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
 			if volume.Spec.ClaimRef == nil {
@@ -435,7 +435,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					// This should never happen because someone had to remove
 					// annBindCompleted annotation on the claim.
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
-					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
+					return fmt.Errorf("invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 				}
 			}
 		}
@@ -469,7 +469,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *v1.PersistentVolum
 	} else {
 		volume, ok := obj.(*v1.PersistentVolume)
 		if !ok {
-			return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
+			return fmt.Errorf("cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
 		}
 
 		klog.V(4).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
@@ -576,7 +576,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			var ok bool
 			claim, ok = obj.(*v1.PersistentVolumeClaim)
 			if !ok {
-				return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
+				return fmt.Errorf("cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
 			}
 			klog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s found: %s", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef), getClaimStatusForLogging(claim))
 		}
@@ -739,7 +739,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 		if claim.Status.Phase != phase {
 			volumeCap, ok := volume.Spec.Capacity[v1.ResourceStorage]
 			if !ok {
-				return nil, fmt.Errorf("PersistentVolume %q is without a storage capacity", volume.Name)
+				return nil, fmt.Errorf("PV %q is without a storage capacity", volume.Name)
 			}
 			claimCap, ok := claim.Status.Capacity[v1.ResourceStorage]
 			if !ok || volumeCap.Cmp(claimCap) != 0 {
@@ -910,7 +910,7 @@ func (ctrl *PersistentVolumeController) getBindVolumeToClaim(volume *v1.Persiste
 
 		claimRef, err := ref.GetReference(scheme.Scheme, claim)
 		if err != nil {
-			return nil, false, fmt.Errorf("Unexpected error getting claim reference: %v", err)
+			return nil, false, fmt.Errorf("unexpected error getting claim reference: %v", err)
 		}
 		volumeClone.Spec.ClaimRef = claimRef
 		dirty = true
@@ -1276,7 +1276,7 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 		var ok bool
 		claim, ok = obj.(*v1.PersistentVolumeClaim)
 		if !ok {
-			return false, fmt.Errorf("Cannot convert object from claim cache to claim!?: %#v", obj)
+			return false, fmt.Errorf("cannot convert object from claim cache to claim!?: %#v", obj)
 		}
 	}
 	if claim != nil && claim.UID == volume.Spec.ClaimRef.UID {
@@ -1346,7 +1346,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 	deleter, err := plugin.NewDeleter(spec)
 	if err != nil {
 		// Cannot create deleter
-		return pluginName, false, fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
+		return pluginName, false, fmt.Errorf("failed to create deleter for volume %q: %v", volume.Name, err)
 	}
 
 	opComplete := util.OperationCompleteHook(pluginName, "volume_delete")
@@ -1696,7 +1696,7 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 	plugin, err := ctrl.volumePluginMgr.FindDeletablePluginBySpec(spec)
 	if err != nil {
 		// No deleter found. Emit an event and mark the volume Failed.
-		return nil, fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
+		return nil, fmt.Errorf("error getting deleter volume plugin for volume %q: %v", volume.Name, err)
 	}
 	return plugin, nil
 }

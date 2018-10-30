@@ -924,7 +924,7 @@ func TestDeletePods(t *testing.T) {
 			expectError:       true,
 			expectedError:     nil,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
-				return nil, errors.New("This is a random error for testing")
+				return nil, errors.New("this is a random error for testing")
 			},
 		},
 	}

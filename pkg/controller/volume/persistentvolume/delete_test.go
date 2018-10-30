@@ -81,7 +81,7 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
-			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error")}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("mock delete error")}, testSyncVolume),
 		},
 		{
 			// delete success(?) - volume is deleted before doDelete() starts
@@ -220,7 +220,7 @@ func TestDeleteMultiSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,
-			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error"), nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("mock delete error"), nil}, testSyncVolume),
 		},
 	}
 

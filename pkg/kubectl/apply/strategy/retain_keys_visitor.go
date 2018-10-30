@@ -18,6 +18,7 @@ package strategy
 
 import (
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 
@@ -56,17 +57,17 @@ func (v retainKeysStrategy) MergeType(e apply.TypeElement) (apply.Result, error)
 
 // MergeMap returns an error.  Only TypeElements can have retainKeys.
 func (v retainKeysStrategy) MergeMap(e apply.MapElement) (apply.Result, error) {
-	return apply.Result{}, fmt.Errorf("Cannot use retainkeys with map element %v", e.Name)
+	return apply.Result{}, fmt.Errorf("cannot use retainkeys with map element %v", e.Name)
 }
 
 // MergeList returns an error.  Only TypeElements can have retainKeys.
 func (v retainKeysStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
-	return apply.Result{}, fmt.Errorf("Cannot use retainkeys with list element %v", e.Name)
+	return apply.Result{}, fmt.Errorf("cannot use retainkeys with list element %v", e.Name)
 }
 
 // MergePrimitive returns an error.  Only TypeElements can have retainKeys.
 func (v retainKeysStrategy) MergePrimitive(diff apply.PrimitiveElement) (apply.Result, error) {
-	return apply.Result{}, fmt.Errorf("Cannot use retainkeys with primitive element %v", diff.Name)
+	return apply.Result{}, fmt.Errorf("cannot use retainkeys with primitive element %v", diff.Name)
 }
 
 // MergeEmpty returns an empty result

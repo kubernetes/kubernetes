@@ -285,7 +285,7 @@ func (o LogsOptions) Validate() error {
 	}
 
 	if logsOptions.TailLines != nil && *logsOptions.TailLines < 0 {
-		return fmt.Errorf("TailLines must be greater than or equal to 0")
+		return fmt.Errorf("tailLines must be greater than or equal to 0")
 	}
 
 	return nil

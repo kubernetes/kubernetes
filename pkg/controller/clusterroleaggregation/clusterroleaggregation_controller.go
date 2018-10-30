@@ -189,7 +189,7 @@ func (c *ClusterRoleAggregationController) enqueue() {
 	// is a problem updating a single role
 	allClusterRoles, err := c.clusterRoleLister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't list all objects %v", err))
+		utilruntime.HandleError(fmt.Errorf("couldn't list all objects %v", err))
 		return
 	}
 	for _, clusterRole := range allClusterRoles {
@@ -199,7 +199,7 @@ func (c *ClusterRoleAggregationController) enqueue() {
 		}
 		key, err := controller.KeyFunc(clusterRole)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", clusterRole, err))
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", clusterRole, err))
 			return
 		}
 		c.queue.Add(key)

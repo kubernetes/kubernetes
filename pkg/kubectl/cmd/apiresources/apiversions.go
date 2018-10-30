@@ -82,7 +82,7 @@ func (o *ApiVersionsOptions) RunApiVersions() error {
 
 	groupList, err := o.discoveryClient.ServerGroups()
 	if err != nil {
-		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
+		return fmt.Errorf("couldn't get available api versions from server: %v\n", err)
 	}
 	apiVersions := metav1.ExtractGroupVersions(groupList)
 	sort.Strings(apiVersions)

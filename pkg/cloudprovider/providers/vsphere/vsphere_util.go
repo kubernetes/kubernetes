@@ -144,7 +144,7 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, 
 		} else {
 			sharedDatastores = intersect(sharedDatastores, accessibleDatastores)
 			if len(sharedDatastores) == 0 {
-				return nil, fmt.Errorf("No shared datastores found in the Kubernetes cluster for nodeVmDetails: %+v", nodeVmDetails)
+				return nil, fmt.Errorf("no shared datastores found in the Kubernetes cluster for nodeVmDetails: %+v", nodeVmDetails)
 			}
 		}
 	}
@@ -225,7 +225,7 @@ func getPbmCompatibleDatastore(ctx context.Context, dc *vclib.Datacenter, storag
 		return "", err
 	}
 	if len(sharedDs) == 0 {
-		msg := "No shared datastores found in the endpoint virtual center"
+		msg := "no shared datastores found in the endpoint virtual center"
 		klog.Errorf(msg)
 		return "", errors.New(msg)
 	}
@@ -528,7 +528,7 @@ func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) 
 		}
 	}
 	if nodeName == "" {
-		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
+		msg := fmt.Sprintf("error while obtaining Kubernetes nodename for providerID %s.", providerID)
 		return "", errors.New(msg)
 	}
 	return nodeName, nil
@@ -544,13 +544,13 @@ func GetVMUUID() (string, error) {
 	uuid := strings.TrimSpace(uuidFromFile)
 	// check the uuid starts with "VMware-"
 	if !strings.HasPrefix(uuid, UUIDPrefix) {
-		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
+		return "", fmt.Errorf("failed to match Prefix, UUID read from the file is %v", uuidFromFile)
 	}
 	// Strip the prefix and white spaces and -
 	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
 	uuid = strings.Replace(uuid, "-", "", -1)
 	if len(uuid) != 32 {
-		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
+		return "", fmt.Errorf("length check failed, UUID read from the file is %v", uuidFromFile)
 	}
 	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
 	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])

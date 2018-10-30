@@ -111,8 +111,8 @@ type fileSpec struct {
 }
 
 var (
-	errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
-	errFileCannotBeEmpty         = errors.New("Filepath can not be empty")
+	errFileSpecDoesntMatchFormat = errors.New("filespec must match the canonical format: [[namespace/]pod:]file/path")
+	errFileCannotBeEmpty         = errors.New("filepath can not be empty")
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
