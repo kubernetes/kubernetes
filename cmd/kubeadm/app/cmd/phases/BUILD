@@ -7,6 +7,7 @@ go_library(
         "bootstraptoken.go",
         "certs.go",
         "controlplane.go",
+        "dynamickubletconfig.go",
         "etcd.go",
         "kubeconfig.go",
         "kubelet.go",

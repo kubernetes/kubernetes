@@ -182,6 +182,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 	initRunner.AppendPhase(phases.NewUploadConfigPhase())
+	initRunner.AppendPhase(phases.NewEnableDynamicKubeletConfigPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
