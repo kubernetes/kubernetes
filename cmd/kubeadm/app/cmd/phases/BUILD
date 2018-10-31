@@ -46,6 +46,7 @@ go_library(
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
+        "//cmd/kubeadm/app/util/audit:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/util/normalizer:go_default_library",
@@ -53,7 +54,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -68,7 +68,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "addons_test.go",
-        "controlplane_test.go",
         "etcd_test.go",
         "kubeconfig_test.go",
         "kubelet_test.go",

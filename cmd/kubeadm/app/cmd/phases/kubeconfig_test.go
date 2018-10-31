@@ -46,6 +46,8 @@ func TestKubeConfigCSubCommandsHasFlags(t *testing.T) {
 	cmdtestutil.AssertSubCommandHasFlags(t, []*cobra.Command{cmd}, "user", flags...)
 }
 
+const phaseTestK8sVersion = "v1.11.0"
+
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 
 	// Temporary folders for the test case
