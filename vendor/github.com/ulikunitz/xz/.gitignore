@@ -1,0 +1,25 @@
+# .gitignore
+
+TODO.html
+README.html
+
+lzma/writer.txt
+lzma/reader.txt
+
+cmd/gxz/gxz
+cmd/xb/xb
+
+# test executables
+*.test
+
+# profile files
+*.out
+
+# vim swap file
+.*.swp
+
+# executables on windows
+*.exe
+
+# default compression test file
+enwik8*

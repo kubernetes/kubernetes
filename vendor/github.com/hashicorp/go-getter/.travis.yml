@@ -1,0 +1,23 @@
+sudo: false
+
+addons:
+  apt:
+    sources:
+      - sourceline: 'ppa:git-core/ppa'
+    packages:
+      - git
+
+language: go
+
+go:
+  - 1.8.x
+  - 1.9.x
+  - master
+
+branches:
+  only:
+    - master
+
+matrix:
+  allow_failures:
+    - go: master

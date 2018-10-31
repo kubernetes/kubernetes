@@ -1,0 +1,16 @@
+version: "build-{branch}-{build}"
+image: Visual Studio 2017
+clone_folder: c:\gopath\github.com\hashicorp\go-getter
+environment:
+  GOPATH: c:\gopath
+install:
+- cmd: >-
+    echo %Path%
+
+    go version
+
+    go env
+
+    go get -d -v -t ./...
+build_script:
+- cmd: go test -v ./...

@@ -1,0 +1,13 @@
+language: go
+
+go:
+    - 1.8
+    - 1.x
+    - tip
+
+script:
+    - go test
+
+matrix:
+    allow_failures:
+        - go: tip
