@@ -1591,7 +1591,7 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">url</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>url</code> gives the location of the webhook, in standard URL form (<code>[scheme://]host:port/path</code>). Exactly one of <code>url</code> or <code>service</code> must be specified.<br>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>url</code> gives the location of the webhook, in standard URL form (<code>scheme://host:port/path</code>). Exactly one of <code>url</code> or <code>service</code> must be specified.<br>
 <br>
 The <code>host</code> should not refer to a service running in the cluster; use the <code>service</code> field instead. The host might be resolved via external DNS in some apiservers (e.g., <code>kube-apiserver</code> cannot resolve in-cluster DNS as that would be a layering violation). <code>host</code> may also be an IP address.<br>
 <br>
