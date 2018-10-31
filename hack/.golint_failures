@@ -380,7 +380,6 @@ pkg/util/env
 pkg/util/file
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem
-pkg/util/ipconfig
 pkg/util/iptables
 pkg/util/iptables/testing
 pkg/util/labels
@@ -391,7 +390,6 @@ pkg/util/oom
 pkg/util/parsers
 pkg/util/procfs
 pkg/util/removeall
-pkg/util/resourcecontainer
 pkg/util/rlimit
 pkg/util/selinux
 pkg/util/sysctl
