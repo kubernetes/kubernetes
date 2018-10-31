@@ -348,7 +348,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 	service := obj.(*api.Service)
 	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
-		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Namespace does not match the provided context"))
 	}
 
 	// Copy over non-user fields

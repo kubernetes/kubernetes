@@ -43,11 +43,11 @@ func (m *realMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool,
 	klog.V(5).Infof("Determining mount medium of %v", path)
 	notMnt, err := m.mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
-		return v1.StorageMediumDefault, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
+		return v1.StorageMediumDefault, false, fmt.Errorf("IsLikelyNotMountPoint (%q): %v", path, err)
 	}
 	buf := unix.Statfs_t{}
 	if err := unix.Statfs(path, &buf); err != nil {
-		return v1.StorageMediumDefault, false, fmt.Errorf("statfs(%q): %v", path, err)
+		return v1.StorageMediumDefault, false, fmt.Errorf("statfs (%q): %v", path, err)
 	}
 
 	klog.V(5).Infof("Statfs_t of %v: %+v", path, buf)

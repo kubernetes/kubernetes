@@ -200,7 +200,7 @@ func (s ServiceCommonGeneratorV1) validate() error {
 		return fmt.Errorf("type must be specified")
 	}
 	if s.ClusterIP == v1.ClusterIPNone && s.Type != v1.ServiceTypeClusterIP {
-		return fmt.Errorf("ClusterIP=None can only be used with ClusterIP service type")
+		return fmt.Errorf("ClusterIP = None can only be used with ClusterIP service type")
 	}
 	if s.ClusterIP != v1.ClusterIPNone && len(s.TCP) == 0 && s.Type != v1.ServiceTypeExternalName {
 		return fmt.Errorf("at least one tcp port specifier must be provided")

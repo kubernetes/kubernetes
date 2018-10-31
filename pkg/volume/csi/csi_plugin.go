@@ -408,7 +408,7 @@ var _ volume.BlockVolumePlugin = &csiPlugin{}
 
 func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
 	if !p.blockEnabled {
-		return nil, errors.New("CSI BlockVolume feature not enabled")
+		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
 
 	pvSource, err := getCSISourceFromSpec(spec)
@@ -475,7 +475,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 
 func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
 	if !p.blockEnabled {
-		return nil, errors.New("CSI BlockVolume feature not enabled")
+		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
 
 	klog.V(4).Infof(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))

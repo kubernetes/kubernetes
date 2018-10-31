@@ -134,25 +134,25 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		klog.Infof("azureDisk - SetupAt:Mount disk:%s at dir:%s failed during mounting with error:%v, will attempt to clean up", diskName, dir, mountErr)
 		mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 		if err != nil {
-			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup IsLikelyNotMountPoint check failed for disk:%s on dir:%s with error %v original-mountErr:%v", diskName, dir, err, mountErr)
+			return fmt.Errorf("IsLikelyNotMountPoint check failed for disk:%s on dir:%s with error %v original-mountErr:%v", diskName, dir, err, mountErr)
 		}
 
 		if !mountPoint {
 			if err = mounter.Unmount(dir); err != nil {
-				return fmt.Errorf("setupAt:Mount:Failure:cleanup failed to unmount disk:%s on dir:%s with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
+				return fmt.Errorf("failed to unmount disk:%s on dir:%s with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
 			}
 			mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 			if err != nil {
-				return fmt.Errorf("setupAt:Mount:Failure:cleanup IsLikelyNotMountPoint for disk:%s on dir:%s check failed with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
+				return fmt.Errorf("IsLikelyNotMountPoint for disk:%s on dir:%s check failed with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
 			}
 			if !mountPoint {
 				// not cool. leave for next sync loop.
-				return fmt.Errorf("setupAt:Mount:Failure:cleanup disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount(). Will try again next sync loop", diskName, dir, mountErr)
+				return fmt.Errorf("disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount(). Will try again next sync loop", diskName, dir, mountErr)
 			}
 		}
 
 		if err = os.Remove(dir); err != nil {
-			return fmt.Errorf("SetupAt:Mount:Failure error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
+			return fmt.Errorf("error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
 		}
 
 		klog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, mountErr)
@@ -183,26 +183,26 @@ func (u *azureDiskUnmounter) TearDownAt(dir string) error {
 	mounter := u.plugin.host.GetMounter(u.plugin.GetPluginName())
 	mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		return fmt.Errorf("azureDisk - TearDownAt: %s failed to do IsLikelyNotMountPoint %s", dir, err)
+		return fmt.Errorf("%s failed to do IsLikelyNotMountPoint %s", dir, err)
 	}
 	if mountPoint {
 		if err := os.Remove(dir); err != nil {
-			return fmt.Errorf("azureDisk - TearDownAt: %s failed to do os.Remove %s", dir, err)
+			return fmt.Errorf("%s failed to do os.Remove %s", dir, err)
 		}
 	}
 	if err := mounter.Unmount(dir); err != nil {
-		return fmt.Errorf("azureDisk - TearDownAt: %s failed to do mounter.Unmount %s", dir, err)
+		return fmt.Errorf("%s failed to do mounter.Unmount %s", dir, err)
 	}
 	mountPoint, err = mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		return fmt.Errorf("azureDisk - TearTownAt:IsLikelyNotMountPoint check failed: %v", err)
+		return fmt.Errorf("IsLikelyNotMountPoint check failed: %v", err)
 	}
 
 	if mountPoint {
 		return os.Remove(dir)
 	}
 
-	return fmt.Errorf("azureDisk - failed to un-bind-mount volume dir")
+	return fmt.Errorf("failed to un-bind-mount volume dir")
 }
 
 func (u *azureDiskUnmounter) GetPath() string {

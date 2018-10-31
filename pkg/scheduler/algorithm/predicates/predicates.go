@@ -1413,7 +1413,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if !matchFound && len(affinityTerms) > 0 {
 				affTermsMatch, termsSelectorMatch, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, affinityTerms)
 				if err != nil {
-					errMessage := fmt.Sprintf("Cannot schedule pod %+v onto node %v, because of PodAffinity, err: %v", podName(pod), node.Name, err)
+					errMessage := fmt.Sprintf("cannot schedule pod %+v onto node %v, because of PodAffinity, err: %v", podName(pod), node.Name, err)
 					klog.Error(errMessage)
 					return ErrPodAffinityRulesNotMatch, errors.New(errMessage)
 				}

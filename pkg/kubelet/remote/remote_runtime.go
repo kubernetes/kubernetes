@@ -441,7 +441,7 @@ func (r *RemoteRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 
 	if resp.Status == nil || len(resp.Status.Conditions) < 2 {
 		errorMessage := "RuntimeReady or NetworkReady condition are not set"
-		klog.Errorf("Status failed: %s", errorMessage)
+		klog.Errorf("status failed: %s", errorMessage)
 		return nil, errors.New(errorMessage)
 	}
 

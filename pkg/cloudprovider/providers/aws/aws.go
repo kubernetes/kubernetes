@@ -2209,7 +2209,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	awsID := EBSVolumeID(aws.StringValue(response.VolumeId))
 	if awsID == "" {
-		return "", fmt.Errorf("volumeID was not returned by CreateVolume")
+		return "", fmt.Errorf("VolumeID was not returned by CreateVolume")
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 

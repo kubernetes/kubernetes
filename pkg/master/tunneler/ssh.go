@@ -57,7 +57,7 @@ func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
 		}
 		lag := tunneler.SecondsSinceSync()
 		if lag > 600 {
-			return fmt.Errorf("Tunnel sync is taking too long: %d", lag)
+			return fmt.Errorf("tunnel sync is taking too long: %d", lag)
 		}
 		sshKeyLag := tunneler.SecondsSinceSSHKeySync()
 		// Since we are syncing ssh-keys every 5 minutes, the allowed
@@ -66,7 +66,7 @@ func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
 		// For now set it to 3x, which is 15 minutes.
 		// For more details see: http://pr.k8s.io/59347
 		if sshKeyLag > 900 {
-			return fmt.Errorf("SSHKey sync is taking too long: %d", sshKeyLag)
+			return fmt.Errorf("SSH key sync is taking too long: %d", sshKeyLag)
 		}
 		return nil
 	}

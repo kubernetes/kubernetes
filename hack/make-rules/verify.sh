@@ -40,6 +40,7 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
+  "verify-error-msg.sh"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"

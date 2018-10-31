@@ -759,7 +759,7 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 // end with punctuation.  However, the real predicate error message does
 // end with a period.
 func makePredicateError(failReason string) error {
-	s := fmt.Sprintf("0/1 nodes are available: %v.", failReason)
+	s := fmt.Sprintf("0/1 nodes are available: %v", failReason)
 	return fmt.Errorf(s)
 }
 

@@ -21,10 +21,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kubernetes/kubernetes/pkg/apis/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
@@ -36,10 +36,10 @@ var _ SELinuxStrategy = &mustRunAs{}
 
 func NewMustRunAs(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, error) {
 	if options == nil {
-		return nil, fmt.Errorf("MustRunAs requires SELinuxContextStrategyOptions")
+		return nil, fmt.Errorf("mustRunAs requires SELinuxContextStrategyOptions")
 	}
 	if options.SELinuxOptions == nil {
-		return nil, fmt.Errorf("MustRunAs requires SELinuxOptions")
+		return nil, fmt.Errorf("mustRunAs requires SELinuxOptions")
 	}
 
 	internalSELinuxOptions := &api.SELinuxOptions{}

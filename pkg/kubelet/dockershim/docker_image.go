@@ -168,7 +168,7 @@ func filterHTTPError(err error, image string) error {
 	if ok && (jerr.Code == http.StatusBadGateway ||
 		jerr.Code == http.StatusServiceUnavailable ||
 		jerr.Code == http.StatusGatewayTimeout) {
-		return fmt.Errorf("RegistryUnavailable: %v", err)
+		return fmt.Errorf("registry unavailable: %v", err)
 	}
 	return err
 

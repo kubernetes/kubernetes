@@ -1114,7 +1114,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	}
 
 	if len(cfg.url) == 0 {
-		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", glusterfsPluginName)
+		return nil, fmt.Errorf("storage class for provisioner %s must contain 'resturl' parameter", glusterfsPluginName)
 	}
 
 	if len(parseVolumeType) == 0 {
@@ -1145,7 +1145,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 				}
 				cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityEC, Disperse: gapi.DisperseDurability{Data: newDisperseData, Redundancy: newDisperseRedundancy}}
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %q must have data:redundancy count set for disperse volumes in storage class option '%s'", glusterfsPluginName, "volumetype")
+				return nil, fmt.Errorf("storage class for provisioner %q must have data:redundancy count set for disperse volumes in storage class option '%s'", glusterfsPluginName, "volumetype")
 			}
 		case "none":
 			cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityDistributeOnly}
@@ -1170,20 +1170,20 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 				return nil, err
 			}
 		} else {
-			return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", glusterfsPluginName)
+			return nil, fmt.Errorf("storage class for provisioner %q must have secretNamespace and secretName either both set or both empty", glusterfsPluginName)
 		}
 	} else {
 		cfg.secretValue = cfg.userKey
 	}
 
 	if cfg.gidMin > cfg.gidMax {
-		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax value >= gidMin", glusterfsPluginName)
+		return nil, fmt.Errorf("storage class for provisioner %q must have gidMax value >= gidMin", glusterfsPluginName)
 	}
 
 	if len(parseVolumeOptions) != 0 {
 		volOptions := dstrings.Split(parseVolumeOptions, ",")
 		if len(volOptions) == 0 {
-			return nil, fmt.Errorf("StorageClass for provisioner %q must have valid (for e.g., 'client.ssl on') volume option", glusterfsPluginName)
+			return nil, fmt.Errorf("storage class for provisioner %q must have valid (for e.g., 'client.ssl on') volume option", glusterfsPluginName)
 		}
 		cfg.volumeOptions = volOptions
 
@@ -1191,7 +1191,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 
 	if len(parseVolumeNamePrefix) != 0 {
 		if dstrings.Contains(parseVolumeNamePrefix, "_") {
-			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
+			return nil, fmt.Errorf("storage class parameter 'volumenameprefix' should not contain '_' in its value")
 		}
 		cfg.volumeNamePrefix = parseVolumeNamePrefix
 	}

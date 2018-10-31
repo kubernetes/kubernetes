@@ -328,11 +328,11 @@ func doTestPlugin(scenario struct {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			allErrs = append(allErrs,
-				fmt.Errorf("SetUp() failed, volume path not created: %s", path))
+				fmt.Errorf("SetUp failed, volume path not created: %s", path))
 			return allErrs
 		} else {
 			allErrs = append(allErrs,
-				fmt.Errorf("SetUp() failed: %v", err))
+				fmt.Errorf("SetUp failed: %v", err))
 			return allErrs
 		}
 	}
@@ -343,10 +343,10 @@ func doTestPlugin(scenario struct {
 	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
 		if os.IsNotExist(err) {
 			allErrs = append(allErrs,
-				fmt.Errorf("SetUp() failed, empty-dir wrapper path is not created: %s", podWrapperMetadataDir))
+				fmt.Errorf("SetUp failed, empty-dir wrapper path is not created: %s", podWrapperMetadataDir))
 		} else {
 			allErrs = append(allErrs,
-				fmt.Errorf("SetUp() failed: %v", err))
+				fmt.Errorf("SetUp failed: %v", err))
 		}
 	}
 
@@ -369,10 +369,10 @@ func doTestPlugin(scenario struct {
 	}
 	if _, err := os.Stat(path); err == nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("TearDown() failed, volume path still exists: %s", path))
+			fmt.Errorf("TearDown failed, volume path still exists: %s", path))
 	} else if !os.IsNotExist(err) {
 		allErrs = append(allErrs,
-			fmt.Errorf("TearDown() failed: %v", err))
+			fmt.Errorf("TearDown failed: %v", err))
 	}
 	return allErrs
 }

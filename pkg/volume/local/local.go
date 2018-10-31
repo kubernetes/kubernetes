@@ -425,7 +425,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
 
 	if m.globalPath == "" {
-		return fmt.Errorf("LocalVolume volume %q path is empty", m.volName)
+		return fmt.Errorf("local volume %q path is empty", m.volName)
 	}
 
 	err := validation.ValidatePathNoBacksteps(m.globalPath)

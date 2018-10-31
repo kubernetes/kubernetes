@@ -66,8 +66,8 @@ var cleanUpDummyVMLock sync.RWMutex
 
 // Error Messages
 const (
-	MissingUsernameErrMsg = "username is missing"
-	MissingPasswordErrMsg = "password is missing"
+	MissingUsernameErrMsg = "Username is missing"
+	MissingPasswordErrMsg = "Password is missing"
 )
 
 // Error constants
@@ -329,15 +329,15 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 
 		if cfg.Global.WorkingDir == "" {
 			klog.Error("Global.WorkingDir is empty!")
-			return nil, errors.New("Global.WorkingDir is empty!")
+			return nil, errors.New("WorkingDir is empty")
 		}
 		if cfg.Global.VCenterIP == "" {
 			klog.Error("Global.VCenterIP is empty!")
-			return nil, errors.New("Global.VCenterIP is empty!")
+			return nil, errors.New("VCenterIP is empty")
 		}
 		if cfg.Global.Datacenter == "" {
 			klog.Error("Global.Datacenter is empty!")
-			return nil, errors.New("Global.Datacenter is empty!")
+			return nil, errors.New("Datacenter is empty")
 		}
 		cfg.Workspace.VCenterIP = cfg.Global.VCenterIP
 		cfg.Workspace.Datacenter = cfg.Global.Datacenter
