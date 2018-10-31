@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 const (
@@ -32,7 +31,7 @@ const (
 
 func NewAuthenticator() authenticator.Request {
 	return authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-		auds, _ := request.AudiencesFrom(req.Context())
+		auds, _ := authenticator.AudiencesFrom(req.Context())
 		return &authenticator.Response{
 			User: &user.DefaultInfo{
 				Name:   anonymousUser,
