@@ -4,6 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "performance_manager.go",
+        "performance_manager_data.go",
         "root_folder.go",
         "service_content.go",
         "setting.go",

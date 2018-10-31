@@ -13,6 +13,7 @@ go_library(
         "host_storage_device_info.go",
         "host_system.go",
         "performance_manager.go",
+        "performance_manager_data.go",
         "resource_pool.go",
         "root_folder.go",
         "service_content.go",

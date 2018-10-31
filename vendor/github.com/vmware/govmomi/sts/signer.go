@@ -218,3 +218,12 @@ func (s *Signer) Sign(env soap.Envelope) ([]byte, error) {
 		Body:   body,
 	})
 }
+
+func (s *Signer) NewRequest() TokenRequest {
+	return TokenRequest{
+		Token:       s.Token,
+		Certificate: s.Certificate,
+		Userinfo:    s.user,
+		KeyID:       s.keyID,
+	}
+}

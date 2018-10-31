@@ -627,9 +627,14 @@ func (pc *PropertyCollector) apply(ctx *Context, update *types.UpdateSet) types.
 
 func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpdatesEx) soap.HasFault {
 	wait, cancel := context.WithCancel(context.Background())
+	oneUpdate := false
 	if r.Options != nil {
 		if max := r.Options.MaxWaitSeconds; max != nil {
-			wait, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(*max))
+			// A value of 0 causes WaitForUpdatesEx to do one update calculation and return any results.
+			oneUpdate = (*max == 0)
+			if *max > 0 {
+				wait, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(*max))
+			}
 		}
 	}
 	pc.mu.Lock()
@@ -688,6 +693,10 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 			pc.updates = nil // clear updates collected by the managed object CRUD listeners
 			pc.mu.Unlock()
 			if len(updates) == 0 {
+				if oneUpdate == true {
+					body.Res.Returnval = nil
+					return body
+				}
 				continue
 			}
 
@@ -730,6 +739,10 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 				}
 			}
 			if len(set.FilterSet) != 0 {
+				return body
+			}
+			if oneUpdate == true {
+				body.Res.Returnval = nil
 				return body
 			}
 		}

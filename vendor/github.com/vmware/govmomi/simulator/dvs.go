@@ -112,10 +112,12 @@ func (s *DistributedVirtualSwitch) ReconfigureDvsTask(req *types.ReconfigureDvs_
 
 				Map.AppendReference(host, &host.Network, s.Portgroup...)
 				s.Summary.HostMember = append(s.Summary.HostMember, member.Host)
+				parent := hostParent(&host.HostSystem)
 
 				for _, ref := range s.Portgroup {
 					pg := Map.Get(ref).(*DistributedVirtualPortgroup)
 					Map.AddReference(pg, &pg.Host, member.Host)
+					Map.AddReference(parent, &parent.Network, ref)
 				}
 			case types.ConfigSpecOperationRemove:
 				for _, ref := range host.Vm {

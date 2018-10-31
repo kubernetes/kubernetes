@@ -3,7 +3,7 @@ sudo: required
 language: go
 
 go:
-   - '1.10'
+   - '1.11'
 go_import_path: github.com/vmware/govmomi
 
 before_install:
@@ -25,4 +25,4 @@ deploy:
   on:
     tags: true
     condition: $TRAVIS_OS_NAME = linux
-    go: '1.10'
+    go: '1.11'
