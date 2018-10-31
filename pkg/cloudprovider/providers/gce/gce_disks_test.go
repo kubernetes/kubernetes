@@ -17,21 +17,119 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"testing"
 
 	"fmt"
 
+	"github.com/stretchr/testify/assert"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // TODO TODO write a test for GetDiskByNameUnknownZone and make sure casting logic works
 // TODO TODO verify that RegionDisks.Get does not return non-replica disks
+
+func TestGetLabelsForVolume_Basic(t *testing.T) {
+	/* Arrange */
+	gceProjectId := "test-project"
+	gceRegion := "us-central1"
+	zone := "us-central1-c"
+	zonesWithNodes := []string{zone}
+	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	diskName := "disk"
+	diskType := DiskTypeSSD
+	const sizeGb int64 = 128
+	alphaFeatureGate := NewAlphaFeatureGate([]string{})
+	gce := GCECloud{
+		manager:            fakeManager,
+		managedZones:       zonesWithNodes,
+		AlphaFeatureGate:   alphaFeatureGate,
+		nodeZones:          createNodeZones(zonesWithNodes),
+		nodeInformerSynced: func() bool { return true },
+	}
+	pv := createPersistentVolume(&v1.GCEPersistentDiskVolumeSource{
+		PDName: diskName,
+	})
+	pv.SetLabels(map[string]string{
+		kubeletapis.LabelZoneFailureDomain: zone,
+	})
+
+	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
+
+	/* Act */
+	labels, err := gce.GetLabelsForVolume(context.TODO(), pv)
+
+	/* Assert */
+	assert.NoError(t, err, "No error should occur when getting labels.")
+	assert.Equal(t, zone, labels[kubeletapis.LabelZoneFailureDomain], "Failure domain and zone should match.")
+	assert.Equal(t, gceRegion, labels[kubeletapis.LabelZoneRegion], "Region should match.")
+}
+
+func TestGetLabelsForVolume_NotFound(t *testing.T) {
+	/* Arrange */
+	gceProjectId := "test-project"
+	gceRegion := "us-central1"
+	zone := "us-central1-c"
+	zonesWithNodes := []string{zone}
+	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	diskName := "disk"
+	alphaFeatureGate := NewAlphaFeatureGate([]string{})
+	gce := GCECloud{
+		manager:            fakeManager,
+		managedZones:       zonesWithNodes,
+		AlphaFeatureGate:   alphaFeatureGate,
+		nodeZones:          createNodeZones(zonesWithNodes),
+		nodeInformerSynced: func() bool { return true },
+	}
+	pv := createPersistentVolume(&v1.GCEPersistentDiskVolumeSource{
+		PDName: diskName,
+	})
+	pv.SetLabels(map[string]string{
+		kubeletapis.LabelZoneFailureDomain: zone,
+	})
+
+	/* Act */
+	labels, err := gce.GetLabelsForVolume(context.TODO(), pv)
+
+	/* Assert */
+	assert.NotNil(t, err, "Error should occur for non-existing disk.")
+	assert.Nil(t, labels, "No labels should be returned for non-existing disk.")
+}
+func TestGetLabelsForVolume_NonGCEPersistentDisk(t *testing.T) {
+	/* Arrange */
+	gce := GCECloud{}
+	pv := createPersistentVolume(nil)
+
+	/* Act */
+	labels, err := gce.GetLabelsForVolume(context.TODO(), pv)
+
+	/* Assert */
+	assert.Nil(t, labels, "Non GCEPersistentDisk volumes should be ignored, yet labels are returned.")
+	assert.Nil(t, err, "Non GCEPersistentDisk volumes should be ignored, yet an error is returned.")
+}
+
+func TestGetLabelsForVolume_ProvisionedVolume(t *testing.T) {
+	/* Arrange */
+	gce := GCECloud{}
+	pv := createPersistentVolume(&v1.GCEPersistentDiskVolumeSource{
+		PDName: volume.ProvisionedVolumeName,
+	})
+
+	/* Act */
+	labels, err := gce.GetLabelsForVolume(context.TODO(), pv)
+
+	/* Assert */
+	assert.Nil(t, labels, "Volumes which are being provisioned should be ignored, yet labels are returned.")
+	assert.Nil(t, err, "Volumes which are being provisioned should be ignored, yet an error is returned.")
+}
 
 func TestCreateDisk_Basic(t *testing.T) {
 	/* Arrange */
@@ -889,4 +987,14 @@ func createNodeZones(zones []string) map[string]sets.String {
 		nodeZones[zone] = sets.NewString("dummynode")
 	}
 	return nodeZones
+}
+
+func createPersistentVolume(vs *v1.GCEPersistentDiskVolumeSource) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: vs,
+			},
+		},
+	}
 }

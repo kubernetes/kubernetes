@@ -511,6 +511,11 @@ func newDiskMetricContextRegional(request, region string) *metricContext {
 }
 
 func (gce *GCECloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes which are not GCEPersistentDisk
+	if pv.Spec.GCEPersistentDisk == nil {
+		return nil, nil
+	}
+
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.GCEPersistentDisk.PDName == volume.ProvisionedVolumeName {
 		return nil, nil
