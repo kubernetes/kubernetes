@@ -34,8 +34,6 @@ docs/admin/kubeadm_alpha_phase_bootstrap-token_create.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-auto-approve.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-post-csrs.md
-docs/admin/kubeadm_alpha_phase_etcd.md
-docs/admin/kubeadm_alpha_phase_etcd_local.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
 docs/admin/kubeadm_alpha_phase_selfhosting.md
 docs/admin/kubeadm_alpha_phase_selfhosting_convert-from-staticpods.md
@@ -73,6 +71,8 @@ docs/admin/kubeadm_init_phase_control-plane.md
 docs/admin/kubeadm_init_phase_control-plane_apiserver.md
 docs/admin/kubeadm_init_phase_control-plane_controller-manager.md
 docs/admin/kubeadm_init_phase_control-plane_scheduler.md
+docs/admin/kubeadm_init_phase_etcd.md
+docs/admin/kubeadm_init_phase_etcd_local.md
 docs/admin/kubeadm_init_phase_kubeconfig.md
 docs/admin/kubeadm_init_phase_kubeconfig_admin.md
 docs/admin/kubeadm_init_phase_kubeconfig_controller-manager.md
@@ -128,8 +128,6 @@ docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-auto-approve.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-post-csrs.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token.1
-docs/man/man1/kubeadm-alpha-phase-etcd-local.1
-docs/man/man1/kubeadm-alpha-phase-etcd.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
 docs/man/man1/kubeadm-alpha-phase-selfhosting-convert-from-staticpods.1
 docs/man/man1/kubeadm-alpha-phase-selfhosting.1
@@ -168,6 +166,8 @@ docs/man/man1/kubeadm-init-phase-control-plane-apiserver.1
 docs/man/man1/kubeadm-init-phase-control-plane-controller-manager.1
 docs/man/man1/kubeadm-init-phase-control-plane-scheduler.1
 docs/man/man1/kubeadm-init-phase-control-plane.1
+docs/man/man1/kubeadm-init-phase-etcd-local.1
+docs/man/man1/kubeadm-init-phase-etcd.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-admin.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-controller-manager.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-kubelet.1
