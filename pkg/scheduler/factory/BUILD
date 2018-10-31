@@ -23,7 +23,7 @@ go_library(
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
-        "//pkg/scheduler/internal/cache/comparer:go_default_library",
+        "//pkg/scheduler/internal/cache/debugger:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
