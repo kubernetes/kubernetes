@@ -323,7 +323,8 @@ type DeploymentSpec struct {
 
 	// The deployment strategy to use to replace existing pods with new ones.
 	// +optional
-	Strategy DeploymentStrategy `json:"strategy,omitempty" protobuf:"bytes,4,opt,name=strategy"`
+	// +patchStrategy=retainKeys
+	Strategy DeploymentStrategy `json:"strategy,omitempty" patchStrategy:"retainKeys" protobuf:"bytes,4,opt,name=strategy"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
