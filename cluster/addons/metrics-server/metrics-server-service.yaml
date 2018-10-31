@@ -6,10 +6,10 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    kubernetes.io/name: "Metrics-server"
+    app.kubernetes.io/name: "metrics-server"
 spec:
   selector:
-    k8s-app: metrics-server
+    app.kubernetes.io/name: metrics-server
   ports:
   - port: 443
     protocol: TCP
