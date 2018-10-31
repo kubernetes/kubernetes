@@ -224,6 +224,35 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	return b
 }
 
+func (b *Builder) FilenameParamWithKustomization(enforceNamespace bool, filenameOptions *FilenameOptions) *Builder {
+	recursive := filenameOptions.Recursive
+	paths := filenameOptions.Filenames
+	for _, s := range paths {
+		switch {
+		case s == "-":
+			b.Stdin()
+		case strings.Index(s, "http://") == 0 || strings.Index(s, "https://") == 0:
+			url, err := url.Parse(s)
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
+				continue
+			}
+			b.URL(defaultHttpGetAttempts, url)
+		default:
+			if !recursive {
+				b.singleItemImplied = true
+			}
+			b.PathWithKustomization(recursive, s)
+		}
+	}
+
+	if enforceNamespace {
+		b.RequireNamespace()
+	}
+
+	return b
+}
+
 // Unstructured updates the builder so that it will request and send unstructured
 // objects. Unstructured objects preserve all fields sent by the server in a map format
 // based on the object's JSON structure which means no data is lost when the client
@@ -345,6 +374,34 @@ func (b *Builder) Path(recursive bool, paths ...string) *Builder {
 		}
 
 		visitors, err := ExpandPathsToFileVisitors(b.mapper, p, recursive, FileExtensions, b.schema)
+		if err != nil {
+			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
+		}
+		if len(visitors) > 1 {
+			b.dir = true
+		}
+
+		b.paths = append(b.paths, visitors...)
+	}
+	if len(b.paths) == 0 && len(b.errs) == 0 {
+		b.errs = append(b.errs, fmt.Errorf("error reading %v: recognized file extensions are %v", paths, FileExtensions))
+	}
+	return b
+}
+
+func (b *Builder) PathWithKustomization(recursive bool, paths ...string) *Builder {
+	for _, p := range paths {
+		_, err := os.Stat(p)
+		if os.IsNotExist(err) {
+			b.errs = append(b.errs, fmt.Errorf("the path %q does not exist", p))
+			continue
+		}
+		if err != nil {
+			b.errs = append(b.errs, fmt.Errorf("the path %q cannot be accessed: %v", p, err))
+			continue
+		}
+
+		visitors, err := ExpandPathsToKustomizationVisitors(b.mapper, p, recursive, FileExtensions, b.schema)
 		if err != nil {
 			b.errs = append(b.errs, fmt.Errorf("error reading %q: %v", p, err))
 		}

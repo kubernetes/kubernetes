@@ -311,7 +311,7 @@ func (o *ApplyOptions) Run() error {
 		Schema(o.Validator).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+		FilenameParamWithKustomization(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		LabelSelectorParam(o.Selector).
 		IncludeUninitialized(o.ShouldIncludeUninitialized).
 		Flatten().
