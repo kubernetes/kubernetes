@@ -53,7 +53,6 @@ func newCmdPhase(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(phases.NewCmdAddon())
 	cmd.AddCommand(phases.NewCmdBootstrapToken())
-	cmd.AddCommand(phases.NewCmdEtcd())
 	cmd.AddCommand(phases.NewCmdMarkMaster())
 	cmd.AddCommand(phases.NewCmdSelfhosting())
 	cmd.AddCommand(phases.NewCmdUploadConfig())

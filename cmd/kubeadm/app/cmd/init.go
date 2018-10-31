@@ -48,7 +48,6 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
@@ -168,6 +167,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeConfigPhase())
 	initRunner.AppendPhase(phases.NewControlPlanePhase())
+	initRunner.AppendPhase(phases.NewEtcdPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -433,14 +433,6 @@ func runInit(i *initData, out io.Writer) error {
 	i.cfg.CertificatesDir = certsDirToWriteTo
 
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
-
-	// Add etcd static pod spec only if external etcd is not configured
-	if i.cfg.Etcd.External == nil {
-		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
-		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
-			return errors.Wrap(err, "error creating local etcd static pod manifest file")
-		}
-	}
 
 	// If we're dry-running, print the generated manifests
 	if err := printFilesIfDryRunning(i.dryRun, manifestDir); err != nil {
