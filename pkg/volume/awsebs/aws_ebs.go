@@ -86,7 +86,7 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *awsElasticBlockStorePlugin) IsMigratedToCSI() bool {
-	return false
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 }
 
 func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
