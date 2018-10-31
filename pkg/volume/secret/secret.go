@@ -30,7 +30,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-// ProbeVolumePlugin is the entry point for plugin detection in a package.
+// ProbeVolumePlugins is the entry point for plugin detection in a package.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&secretPlugin{}}
 }
@@ -259,7 +259,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-// Note: this function is exported so that it can be called from the projection volume driver
+// MakePayload function is exported so that it can be called from the projection volume driver
 func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
@@ -281,9 +281,9 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 				if optional {
 					continue
 				}
-				err_msg := "references non-existent secret key"
-				glog.Errorf(err_msg)
-				return nil, fmt.Errorf(err_msg)
+				errMsg := "references non-existent secret key"
+				glog.Errorf(errMsg)
+				return nil, fmt.Errorf(errMsg)
 			}
 
 			fileProjection.Data = []byte(content)

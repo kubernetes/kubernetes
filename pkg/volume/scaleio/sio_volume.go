@@ -266,7 +266,7 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 	// setup volume attrributes
 	genName := v.generateName("k8svol", 11)
 	var oneGig int64 = 1024 * 1024 * 1024
-	var eightGig int64 = 8 * oneGig
+	eightGig := 8 * oneGig
 
 	capacity := v.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	volSizeBytes := capacity.Value()
@@ -393,7 +393,7 @@ func (v *sioVolume) setSioMgr() error {
 		}
 
 		// merge in Sdc Guid label value
-		if err := attachSdcGuid(v.plugin, configData); err != nil {
+		if err := attachSdcGUID(v.plugin, configData); err != nil {
 			glog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
@@ -432,7 +432,7 @@ func (v *sioVolume) resetSioMgr() error {
 		}
 
 		// merge in Sdc Guid label value
-		if err := attachSdcGuid(v.plugin, configData); err != nil {
+		if err := attachSdcGUID(v.plugin, configData); err != nil {
 			glog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}

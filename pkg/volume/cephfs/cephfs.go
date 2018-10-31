@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cephfsPlugin{nil}}
 }
@@ -144,7 +144,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			path:         path,
 			secret:       secret,
 			id:           id,
-			secret_file:  secretFile,
+			secretFile:   secretFile,
 			readonly:     readOnly,
 			mounter:      mounter,
 			plugin:       plugin,
@@ -182,16 +182,16 @@ func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.
 type cephfs struct {
-	volName     string
-	podUID      types.UID
-	mon         []string
-	path        string
-	id          string
-	secret      string
-	secret_file string
-	readonly    bool
-	mounter     mount.Interface
-	plugin      *cephfsPlugin
+	volName    string
+	podUID     types.UID
+	mon        []string
+	path       string
+	id         string
+	secret     string
+	secretFile string
+	readonly   bool
+	mounter    mount.Interface
+	plugin     *cephfsPlugin
 	volume.MetricsNil
 	mountOptions []string
 }
@@ -213,7 +213,7 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
-func (cephfsMounter *cephfsMounter) CanMount() error {
+func (cephfsVolume *cephfsMounter) CanMount() error {
 	return nil
 }
 
@@ -250,10 +250,10 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 		if err == nil {
 			// cephfs fuse mount succeeded.
 			return nil
-		} else {
-			// if cephfs fuse mount failed, fallback to kernel mount.
-			glog.V(2).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
 		}
+		// if cephfs fuse mount failed, fallback to kernel mount.
+		glog.V(2).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
+
 	}
 	glog.V(4).Info("CephFS kernel mount.")
 
@@ -298,19 +298,19 @@ func (cephfsVolume *cephfs) GetKeyringPath() string {
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	// cephfs mount option
-	ceph_opt := ""
+	cephOpt := ""
 	// override secretfile if secret is provided
 	if cephfsVolume.secret != "" {
-		ceph_opt = "name=" + cephfsVolume.id + ",secret=" + cephfsVolume.secret
+		cephOpt = "name=" + cephfsVolume.id + ",secret=" + cephfsVolume.secret
 	} else {
-		ceph_opt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secret_file
+		cephOpt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secretFile
 	}
 	// build option array
 	opt := []string{}
 	if cephfsVolume.readonly {
 		opt = append(opt, "ro")
 	}
-	opt = append(opt, ceph_opt)
+	opt = append(opt, cephOpt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
 	hosts := cephfsVolume.mon
@@ -331,8 +331,8 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	return nil
 }
 
-func (cephfsMounter *cephfsMounter) checkFuseMount() bool {
-	execute := cephfsMounter.plugin.host.GetExec(cephfsMounter.plugin.GetPluginName())
+func (cephfsVolume *cephfsMounter) checkFuseMount() bool {
+	execute := cephfsVolume.plugin.host.GetExec(cephfsVolume.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
 		if _, err := execute.Run("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph"); err == nil {
@@ -346,7 +346,7 @@ func (cephfsMounter *cephfsMounter) checkFuseMount() bool {
 
 func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	// cephfs keyring file
-	keyring_file := ""
+	keyringFile := ""
 	// override secretfile if secret is provided
 	if cephfsVolume.secret != "" {
 		// TODO: cephfs fuse currently doesn't support secret option,
@@ -380,10 +380,10 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 			return err
 		}
 
-		keyring_file = path.Join(keyringPath, fileName)
+		keyringFile = path.Join(keyringPath, fileName)
 
 	} else {
-		keyring_file = cephfsVolume.secret_file
+		keyringFile = cephfsVolume.secretFile
 	}
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
@@ -399,7 +399,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 
 	mountArgs := []string{}
 	mountArgs = append(mountArgs, "-k")
-	mountArgs = append(mountArgs, keyring_file)
+	mountArgs = append(mountArgs, keyringFile)
 	mountArgs = append(mountArgs, "-m")
 	mountArgs = append(mountArgs, src)
 	mountArgs = append(mountArgs, mountpoint)
@@ -423,7 +423,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	command := exec.Command("ceph-fuse", mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil || !(strings.Contains(string(output), "starting fuse")) {
-		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n", err, mountArgs, string(output))
+		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s", err, mountArgs, string(output))
 	}
 
 	return nil

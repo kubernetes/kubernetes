@@ -81,7 +81,7 @@ func (m *sioMgr) getClient() (sioInterface, error) {
 		client.spName = configs[confKey.storagePool]
 		client.sdcPath = configs[confKey.sdcRootPath]
 		client.provisionMode = configs[confKey.storageMode]
-		client.sdcGuid = configs[confKey.sdcGuid]
+		client.sdcGUID = configs[confKey.sdcGUID]
 
 		m.client = client
 
