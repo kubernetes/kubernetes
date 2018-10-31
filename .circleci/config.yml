@@ -6,7 +6,7 @@ jobs:
     working_directory: /go/src/k8s.io/kubernetes
     steps:
     - checkout
-    - run: make update
+    - run: hack/verify-generated-files.sh
     #- run: go build ./cmd/kubectl
   test:
     docker:
