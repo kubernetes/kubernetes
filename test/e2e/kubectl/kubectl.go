@@ -1063,7 +1063,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, label update
-			Description: When a Pod is running, update a Label using ‘kubectl label’ command. The label MUST be created in the Pod. A ‘kubectl get pod’ with -l option on the container MUST verify that the label can be read back. Use ‘kubectl label label-’ to remove the label. Kubetctl get pod’ with -l option SHOULD no list the deleted label as the label is removed.
+			Description: When a Pod is running, update a Label using ‘kubectl label’ command. The label MUST be created in the Pod. A ‘kubectl get pod’ with -l option on the container MUST verify that the label can be read back. Use ‘kubectl label label-’ to remove the label. ‘kubectl get pod’ with -l option SHOULD not list the deleted label as the label is removed.
 		*/
 		framework.ConformanceIt("should update the label on a resource ", func() {
 			labelName := "testing-label"
@@ -1145,10 +1145,10 @@ metadata:
 			Release : v1.9
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
-			Starting a Pod should have a log line indicating the server is running and ready to accept connections. 			   Also log command options MUST work as expected and described below.
+			Starting a Pod should have a log line indicating the server is running and ready to accept connections. Also log command options MUST work as expected and described below.
 				‘kubectl log -tail=1’ should generate a output of one line, the last line in the log.
 				‘kubectl --limit-bytes=1’ should generate a single byte output.
-				‘kubectl --tail=1 --timestamp should genrate one line with timestamp in RFC3339 format
+				‘kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
 				‘kubectl --since=1s’ should output logs that are only 1 second older from now
 				‘kubectl --since=24h’ should output logs that are only 1 day older from now
 		*/
@@ -1418,7 +1418,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, run deployment
-			Description: Command ‘kubectl run’ MUST create a job, with --generator=deployment, when a image name is specified in the run command. After the run command there SHOULD be a deployment that should exist with one container running the specified image. Also there SHOULD be a Pod that is controlled by this deployment, with a container running the specified image.
+			Description: Command ‘kubectl run’ MUST create a deployment, with --generator=deployment, when a image name is specified in the run command. After the run command there SHOULD be a deployment that should exist with one container running the specified image. Also there SHOULD be a Pod that is controlled by this deployment, with a container running the specified image.
 		*/
 		framework.ConformanceIt("should create a deployment from an image ", func() {
 			By("running the image " + nginxImage)
@@ -1463,7 +1463,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, run job
-			Description: Command ‘kubectl run’ MUST create a deployment, with --generator=job, when a image name is specified in the run command. After the run command there SHOULD be a job that should exist with one container running the specified image. Also there SHOULD be a restart policy on the job spec that SHOULD match the command line.
+			Description: Command ‘kubectl run’ MUST create a job, with --generator=job, when a image name is specified in the run command. After the run command there SHOULD be a job that should exist with one container running the specified image. Also there SHOULD be a restart policy on the job spec that SHOULD match the command line.
 		*/
 		framework.ConformanceIt("should create a job from an image when restart is OnFailure ", func() {
 			By("running the image " + nginxImage)
@@ -1668,7 +1668,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, proxy socket
-			Description: Start a proxy server on by running ‘kubectl proxy’ with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide atleast one version string
+			Description: Start a proxy server on by running ‘kubectl proxy’ with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
 		*/
 		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			By("Starting the proxy")
