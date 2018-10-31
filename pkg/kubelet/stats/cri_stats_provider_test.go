@@ -619,9 +619,13 @@ func checkEphemeralStorageStats(assert *assert.Assertions,
 
 func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkStats, expected *cadvisorapiv2.NetworkStats) {
 	assert.Equal(expected.Interfaces[0].RxBytes, *actual.RxBytes)
+	assert.Equal(expected.Interfaces[0].RxPackets, *actual.RxPackets)
 	assert.Equal(expected.Interfaces[0].RxErrors, *actual.RxErrors)
+	assert.Equal(expected.Interfaces[0].RxDropped, *actual.RxDropped)
 	assert.Equal(expected.Interfaces[0].TxBytes, *actual.TxBytes)
+	assert.Equal(expected.Interfaces[0].TxPackets, *actual.TxPackets)
 	assert.Equal(expected.Interfaces[0].TxErrors, *actual.TxErrors)
+	assert.Equal(expected.Interfaces[0].TxDropped, *actual.TxDropped)
 }
 
 func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {

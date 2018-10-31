@@ -48,9 +48,13 @@ const (
 	offsetMemRSSBytes
 	offsetMemWorkingSetBytes
 	offsetNetRxBytes
+	offsetNetRxPackets
 	offsetNetRxErrors
+	offsetNetRxDropped
 	offsetNetTxBytes
+	offsetNetTxPackets
 	offsetNetTxErrors
+	offsetNetTxDropped
 	offsetFsCapacity
 	offsetFsAvailable
 	offsetFsUsage
@@ -480,17 +484,25 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 		},
 		Network: &cadvisorapiv2.NetworkStats{
 			Interfaces: []cadvisorapiv1.InterfaceStats{{
-				Name:     "eth0",
-				RxBytes:  uint64(seed + offsetNetRxBytes),
-				RxErrors: uint64(seed + offsetNetRxErrors),
-				TxBytes:  uint64(seed + offsetNetTxBytes),
-				TxErrors: uint64(seed + offsetNetTxErrors),
+				Name:      "eth0",
+				RxBytes:   uint64(seed + offsetNetRxBytes),
+				RxPackets: uint64(seed + offsetNetRxPackets),
+				RxErrors:  uint64(seed + offsetNetRxErrors),
+				RxDropped: uint64(seed + offsetNetRxDropped),
+				TxBytes:   uint64(seed + offsetNetTxBytes),
+				TxPackets: uint64(seed + offsetNetTxPackets),
+				TxErrors:  uint64(seed + offsetNetTxErrors),
+				TxDropped: uint64(seed + offsetNetTxDropped),
 			}, {
-				Name:     "cbr0",
-				RxBytes:  100,
-				RxErrors: 100,
-				TxBytes:  100,
-				TxErrors: 100,
+				Name:      "cbr0",
+				RxBytes:   100,
+				RxPackets: 100,
+				RxErrors:  100,
+				RxDropped: 100,
+				TxBytes:   100,
+				TxPackets: 100,
+				TxErrors:  100,
+				TxDropped: 100,
 			}},
 		},
 		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
@@ -601,23 +613,35 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Net.Time")
 	assert.EqualValues(t, "eth0", stats.Name, "default interface name is not eth0")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.RxBytes, label+".Net.RxBytes")
+	assert.EqualValues(t, seed+offsetNetRxPackets, *stats.RxPackets, label+".Net.RxPackets")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.RxErrors, label+".Net.RxErrors")
+	assert.EqualValues(t, seed+offsetNetRxDropped, *stats.RxDropped, label+".Net.RxDropped")
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.TxBytes, label+".Net.TxBytes")
+	assert.EqualValues(t, seed+offsetNetTxPackets, *stats.TxPackets, label+".Net.TxPackets")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetTxDropped, *stats.TxDropped, label+".Net.TxDropped")
 
 	assert.EqualValues(t, 2, len(stats.Interfaces), "network interfaces should contain 2 elements")
 
 	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is ont eth0")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetRxPackets, *stats.Interfaces[0].RxPackets, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.Interfaces[0].RxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetRxDropped, *stats.Interfaces[0].RxDropped, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.Interfaces[0].TxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetTxPackets, *stats.Interfaces[0].TxPackets, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.Interfaces[0].TxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, seed+offsetNetTxDropped, *stats.Interfaces[0].TxDropped, label+".Net.TxErrors")
 
 	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is ont cbr0")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].RxPackets, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].RxDropped, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].TxPackets, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
+	assert.EqualValues(t, 100, *stats.Interfaces[1].TxDropped, label+".Net.TxErrors")
 
 }
 
