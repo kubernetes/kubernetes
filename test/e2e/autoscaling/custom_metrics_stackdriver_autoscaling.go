@@ -109,7 +109,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		initialReplicas := 2
 		// metric should cause scale down
 		metricValue := externalMetricValue
-		metricAverageTarget := 2 * metricValue
+		metricAverageTarget := (3 * metricValue) / 2
 		metricTargets := map[string]externalMetricTarget{
 			"target_average": {
 				value:     metricAverageTarget,
