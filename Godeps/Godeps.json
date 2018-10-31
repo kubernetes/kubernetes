@@ -2386,11 +2386,11 @@
 		},
 		{
 			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library",
-			"Rev": "d62704773030f6db982ef016b4fc1bf3b9ac32db"
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
 		},
 		{
 			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins",
-			"Rev": "d62704773030f6db982ef016b4fc1bf3b9ac32db"
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
 		},
 		{
 			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
@@ -4189,6 +4189,146 @@
 		{
 			"ImportPath": "vbom.ml/util/sortorder",
 			"Rev": "db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/api/core/v1",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/sets",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/github.com/gogo/protobuf/proto",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/github.com/gogo/protobuf/sortkeys",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/api/resource",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/apis/meta/v1",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/runtime",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/runtime/schema",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/types",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/intstr",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/gopkg.in/inf.v0",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/github.com/google/gofuzz",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/conversion",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/fields",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/labels",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/selection",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/runtime",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/watch",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/github.com/golang/glog",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/conversion/queryparams",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/errors",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/json",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/naming",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/third_party/forked/golang/reflect",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/validation",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/net",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/k8s.io/apimachinery/pkg/util/validation/field",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/net/http2",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/net/http2/hpack",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/net/idna",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/net/lex/httplex",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/text/secure/bidirule",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/text/unicode/norm",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/text/transform",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/vendor/golang.org/x/text/unicode/bidi",
+			"Rev": "6034b76fe4e6600984ded34ae97b53c909162fd0"
 		}
 	]
 }

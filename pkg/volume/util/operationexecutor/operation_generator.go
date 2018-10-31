@@ -434,7 +434,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// TODO(dyzz): This case can't distinguish between PV and In-line which is necessary because
 		// if it was PV it may have been migrated, but the same plugin with in-line may not have been.
 		// Suggestions welcome...
-		if csiMigration.IsMigratedByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if csiMigration.IsMigratableByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -1497,7 +1497,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 }
 
 func isMigrated(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
-	if csiMigration.IsPVMigrated(spec.PersistentVolume) || csiMigration.IsInlineMigrated(spec.Volume) {
+	if csiMigration.IsPVMigratable(spec.PersistentVolume) || csiMigration.IsInlineMigratable(spec.Volume) {
 		migratable, err := vpm.IsPluginMigratableBySpec(spec)
 		if err == nil && migratable {
 			return true
