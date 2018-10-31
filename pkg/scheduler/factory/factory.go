@@ -60,7 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	cachecomparer "k8s.io/kubernetes/pkg/scheduler/internal/cache/comparer"
+	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -398,7 +398,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	}
 
 	// Setup cache comparer
-	comparer := cachecomparer.New(
+	debugger := cachedebugger.New(
 		args.NodeInformer.Lister(),
 		args.PodInformer.Lister(),
 		c.schedulerCache,
@@ -415,7 +415,8 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 				c.podQueue.Close()
 				return
 			case <-ch:
-				comparer.Compare()
+				debugger.Comparer.Compare()
+				debugger.Dumper.DumpAll()
 			}
 		}
 	}()
