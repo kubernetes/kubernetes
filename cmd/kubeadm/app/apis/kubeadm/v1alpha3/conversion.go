@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"unsafe"
-
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -85,14 +83,20 @@ func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *C
 	}
 
 	out.APIServer.ExtraArgs = in.APIServerExtraArgs
-	out.APIServer.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
 	out.APIServer.CertSANs = in.APIServerCertSANs
+	if err := convertSlice_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(&in.APIServerExtraVolumes, &out.APIServer.ExtraVolumes, s); err != nil {
+		return err
+	}
 
 	out.ControllerManager.ExtraArgs = in.ControllerManagerExtraArgs
-	out.ControllerManager.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
+	if err := convertSlice_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(&in.ControllerManagerExtraVolumes, &out.ControllerManager.ExtraVolumes, s); err != nil {
+		return err
+	}
 
 	out.Scheduler.ExtraArgs = in.SchedulerExtraArgs
-	out.Scheduler.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
+	if err := convertSlice_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(&in.SchedulerExtraVolumes, &out.Scheduler.ExtraVolumes, s); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -103,14 +107,66 @@ func Convert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(in *k
 	}
 
 	out.APIServerExtraArgs = in.APIServer.ExtraArgs
-	out.APIServerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.APIServer.ExtraVolumes))
 	out.APIServerCertSANs = in.APIServer.CertSANs
+	if err := convertSlice_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(&in.APIServer.ExtraVolumes, &out.APIServerExtraVolumes, s); err != nil {
+		return err
+	}
 
 	out.ControllerManagerExtraArgs = in.ControllerManager.ExtraArgs
-	out.ControllerManagerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ControllerManager.ExtraVolumes))
+	if err := convertSlice_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(&in.ControllerManager.ExtraVolumes, &out.ControllerManagerExtraVolumes, s); err != nil {
+		return err
+	}
 
 	out.SchedulerExtraArgs = in.Scheduler.ExtraArgs
-	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.Scheduler.ExtraVolumes))
+	if err := convertSlice_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(&in.Scheduler.ExtraVolumes, &out.SchedulerExtraVolumes, s); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func Convert_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMount, out *kubeadm.HostPathMount, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(in, out, s); err != nil {
+		return err
+	}
+
+	out.ReadOnly = !in.Writable
+	return nil
+}
+
+func Convert_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(in *kubeadm.HostPathMount, out *HostPathMount, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(in, out, s); err != nil {
+		return err
+	}
+
+	out.Writable = !in.ReadOnly
+	return nil
+}
+
+func convertSlice_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(in *[]HostPathMount, out *[]kubeadm.HostPathMount, s conversion.Scope) error {
+	if *in != nil {
+		*out = make([]kubeadm.HostPathMount, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		*out = nil
+	}
+	return nil
+}
+
+func convertSlice_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(in *[]kubeadm.HostPathMount, out *[]HostPathMount, s conversion.Scope) error {
+	if *in != nil {
+		*out = make([]HostPathMount, len(*in))
+		for i := range *in {
+			if err := Convert_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		*out = nil
+	}
 	return nil
 }

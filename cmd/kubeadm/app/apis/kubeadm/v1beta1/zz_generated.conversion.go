@@ -590,7 +590,7 @@ func autoConvert_v1beta1_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMoun
 	out.Name = in.Name
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
-	out.Writable = in.Writable
+	out.ReadOnly = in.ReadOnly
 	out.PathType = corev1.HostPathType(in.PathType)
 	return nil
 }
@@ -604,7 +604,7 @@ func autoConvert_kubeadm_HostPathMount_To_v1beta1_HostPathMount(in *kubeadm.Host
 	out.Name = in.Name
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
-	out.Writable = in.Writable
+	out.ReadOnly = in.ReadOnly
 	out.PathType = corev1.HostPathType(in.PathType)
 	return nil
 }
