@@ -695,9 +695,10 @@ data:
           value: |
                  [[ toJson .ObjectMeta.Annotations ]]
         [[ end ]]
-        [[ range $k,$v := .ObjectMeta.Labels ]]
-        - name: ISTIO_META_[[ $k ]]
-          value: "[[ $v ]]"
+        [[ if .ObjectMeta.Labels ]]
+        - name: ISTIO_METAJSON_LABELS
+          value: |
+                 [[ toJson .ObjectMeta.Labels ]]
         [[ end ]]
         imagePullPolicy: IfNotPresent
         [[ if (ne (annotation .ObjectMeta `status.sidecar.istio.io/port`  0 ) "0") ]]
