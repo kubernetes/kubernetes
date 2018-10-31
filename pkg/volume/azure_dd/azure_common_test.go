@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -141,12 +141,12 @@ func TestIoHandler(t *testing.T) {
 func TestNormalizeStorageAccountType(t *testing.T) {
 	tests := []struct {
 		storageAccountType  string
-		expectedAccountType storage.SkuName
+		expectedAccountType compute.DiskStorageAccountTypes
 		expectError         bool
 	}{
 		{
 			storageAccountType:  "",
-			expectedAccountType: storage.StandardLRS,
+			expectedAccountType: compute.StandardLRS,
 			expectError:         false,
 		},
 		{
@@ -156,27 +156,22 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 		},
 		{
 			storageAccountType:  "Standard_LRS",
-			expectedAccountType: storage.StandardLRS,
+			expectedAccountType: compute.StandardLRS,
 			expectError:         false,
 		},
 		{
 			storageAccountType:  "Premium_LRS",
-			expectedAccountType: storage.PremiumLRS,
+			expectedAccountType: compute.PremiumLRS,
 			expectError:         false,
 		},
 		{
-			storageAccountType:  "Standard_GRS",
-			expectedAccountType: storage.StandardGRS,
+			storageAccountType:  "StandardSSD_LRS",
+			expectedAccountType: compute.StandardSSDLRS,
 			expectError:         false,
 		},
 		{
-			storageAccountType:  "Standard_RAGRS",
-			expectedAccountType: storage.StandardRAGRS,
-			expectError:         false,
-		},
-		{
-			storageAccountType:  "Standard_ZRS",
-			expectedAccountType: storage.StandardZRS,
+			storageAccountType:  "UltraSSD_LRS",
+			expectedAccountType: compute.UltraSSDLRS,
 			expectError:         false,
 		},
 	}
