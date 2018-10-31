@@ -23,7 +23,8 @@ import (
 
 var (
 	inTreePlugins = map[string]plugins.InTreePlugin{
-		plugins.GCEPDDriverName: &plugins.GCEPD{},
+		plugins.GCEPDDriverName:  &plugins.GCEPD{},
+		plugins.AWSEBSDriverName: &plugins.AWSEBS{},
 	}
 )
 
@@ -60,9 +61,9 @@ func TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, erro
 	return nil, fmt.Errorf("could not find in-tree plugin translation logic for %s", copiedPV.Spec.CSI.Driver)
 }
 
-// IsMigratedByName tests whether there is Migration logic for the in-tree plugin
+// IsMigratableByName tests whether there is Migration logic for the in-tree plugin
 // for the given `pluginName`
-func IsMigratedByName(pluginName string) bool {
+func IsMigratableByName(pluginName string) bool {
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.GetInTreePluginName() == pluginName {
 			return true
@@ -71,8 +72,17 @@ func IsMigratedByName(pluginName string) bool {
 	return false
 }
 
-// IsPVMigrated tests whether there is Migration logic for the given Persistent Volume
-func IsPVMigrated(pv *v1.PersistentVolume) bool {
+func GetCSINameFromIntreeName(pluginName string) (string, error) {
+	for csiDriverName, curPlugin := range inTreePlugins {
+		if curPlugin.GetInTreePluginName() == pluginName {
+			return csiDriverName, nil
+		}
+	}
+	return "", fmt.Errorf("Could not find CSI Driver name for plugin %v", pluginName)
+}
+
+// IsPVMigratable tests whether there is Migration logic for the given Persistent Volume
+func IsPVMigratable(pv *v1.PersistentVolume) bool {
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.CanSupport(pv) {
 			return true
@@ -81,7 +91,7 @@ func IsPVMigrated(pv *v1.PersistentVolume) bool {
 	return false
 }
 
-// IsInlineMigrated tests whether there is Migration logic for the given Inline Volume
-func IsInlineMigrated(vol *v1.Volume) bool {
+// IsInlineMigratable tests whether there is Migration logic for the given Inline Volume
+func IsInlineMigratable(vol *v1.Volume) bool {
 	return false
 }

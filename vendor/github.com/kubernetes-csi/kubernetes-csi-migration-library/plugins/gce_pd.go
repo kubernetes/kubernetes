@@ -51,12 +51,12 @@ func (g *GCEPD) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentV
 	var volID string
 
 	if pv == nil || pv.Spec.GCEPersistentDisk == nil {
-		return nil, fmt.Errorf("GCE Persistent Disk source not defined on pv")
+		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
 	zonesLabel := pv.Labels[LabelZoneFailureDomain]
 	zones := strings.Split(zonesLabel, LabelMultiZoneDelimiter)
-	if len(zones) == 1 {
+	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, zones[0], pv.Spec.GCEPersistentDisk.PDName)
 	} else if len(zones) > 1 {
@@ -93,7 +93,7 @@ func (g *GCEPD) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentV
 //`inTreePlugin`, if that translation logic has been implemented
 func (g *GCEPD) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.CSI == nil {
-		return nil, fmt.Errorf("CSI source not defined on pv")
+		return nil, fmt.Errorf("pv is nil or CSI source not defined on pv")
 	}
 	csiSource := pv.Spec.CSI
 
