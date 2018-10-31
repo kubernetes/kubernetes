@@ -6,7 +6,8 @@ jobs:
     working_directory: /go/src/k8s.io/kubernetes
     steps:
     - checkout
-    - run: go build ./cmd/kubectl
+    - run: make update
+    #- run: go build ./cmd/kubectl
   test:
     docker:
     - image: circleci/golang:1.11.1
@@ -18,4 +19,4 @@ workflows:
   workflow:
     jobs:
     - build
-    - test
+   # - test
