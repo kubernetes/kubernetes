@@ -355,9 +355,8 @@ func (m *FakeMetadata) GetMetadata(key string) (string, error) {
 		}
 
 		return "", nil
-	} else {
-		return "", nil
 	}
+	return "", nil
 }
 
 // FakeELB is a fake ELB client used for testing

@@ -504,8 +504,8 @@ func ExpandPathsToKustomizationVisitors(mapper *mapper, paths string, recursive 
 				return nil
 			}
 		}
-        if foundKust {
-        	return nil
+		if foundKust {
+			return nil
 		} else {
 			// Don't check extension if the filepath was passed explicitly
 			if path != paths && ignoreFile(path, extensions) {
