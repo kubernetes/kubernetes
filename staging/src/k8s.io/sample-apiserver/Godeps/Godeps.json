@@ -36,39 +36,39 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/auth/authpb",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/mvcc/mvccpb",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
+			"Rev": "27fc7e2296f506182f58ce846e48f36b34fe6842"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
-			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
+			"Rev": "39ca1b05acc7ad1220e09f133283b8859a8b71ab"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
