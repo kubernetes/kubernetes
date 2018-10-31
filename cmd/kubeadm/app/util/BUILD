@@ -17,6 +17,7 @@ go_library(
         "endpoint.go",
         "error.go",
         "marshal.go",
+        "paths.go",
         "template.go",
         "version.go",
     ],
@@ -50,6 +51,7 @@ go_test(
         "endpoint_test.go",
         "error_test.go",
         "marshal_test.go",
+        "paths_test.go",
         "template_test.go",
         "version_test.go",
     ],
@@ -64,6 +66,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

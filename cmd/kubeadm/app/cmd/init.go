@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,36 +127,7 @@ type initData struct {
 	dryRunDir             string
 	externalCA            bool
 	client                clientset.Interface
-	dirPaths              *dirPaths
-}
-
-// dirPaths stores all the directory paths
-type dirPaths struct {
-	certificatesDir string
-	kubernetesDir   string
-	manifestDir     string
-	kubeletDir      string
-}
-
-// initDirs initializes all the directory paths
-func initDirs(dryRun bool, certsDir string) (*dirPaths, error) {
-	if dryRun {
-		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create a temporary directory: %v", err)
-		}
-		// Use the same temp dir for all
-		return &dirPaths{
-			dryRunDir, dryRunDir, dryRunDir, dryRunDir,
-		}, nil
-	}
-
-	return &dirPaths{
-		certificatesDir: certsDir,
-		kubernetesDir:   kubeadmconstants.KubernetesDir,
-		manifestDir:     kubeadmconstants.GetStaticPodDirectory(),
-		kubeletDir:      kubeadmconstants.KubeletRunDirectory,
-	}, nil
+	paths                 *kubeadmutil.Paths
 }
 
 // NewCmdInit returns "kubeadm init" command.
@@ -334,7 +304,7 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		return initData{}, err
 	}
 
-	dirPaths, err := initDirs(options.dryRun, cfg.CertificatesDir)
+	paths, err := kubeadmutil.InitPaths(options.dryRun, cfg.CertificatesDir)
 	if err != nil {
 		return initData{}, err
 	}
@@ -343,10 +313,10 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 	externalCA, _ := certsphase.UsingExternalCA(cfg)
 
 	return initData{
-		cfg:                   cfg,
-		skipTokenPrint:        options.skipTokenPrint,
-		dryRun:                options.dryRun,
-		dirPaths:              dirPaths,
+		cfg:            cfg,
+		skipTokenPrint: options.skipTokenPrint,
+		dryRun:         options.dryRun,
+		paths:          paths,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		externalCA:            externalCA,
 	}, nil
@@ -404,7 +374,7 @@ func (d initData) Tokens() []string {
 
 // runInit executes master node provisioning
 func runInit(i *initData, out io.Writer) error {
-	i.cfg.CertificatesDir = i.dirPaths.certificatesDir
+	i.cfg.CertificatesDir = i.paths.CertificateDir()
 
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
@@ -416,12 +386,12 @@ func runInit(i *initData, out io.Writer) error {
 	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 	// as we handle that ourselves in the markmaster phase
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, i.dirPaths.kubeletDir); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, i.paths.KubeletDir()); err != nil {
 		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
 	}
 
 	// Write the kubelet configuration file to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.ComponentConfigs.Kubelet, i.dirPaths.kubeletDir); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.ComponentConfigs.Kubelet, i.paths.KubeletDir()); err != nil {
 		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
@@ -431,18 +401,18 @@ func runInit(i *initData, out io.Writer) error {
 		kubeletphase.TryStartKubelet()
 	}
 
-	adminKubeConfigPath := filepath.Join(i.dirPaths.kubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
+	adminKubeConfigPath := filepath.Join(i.paths.KubernetesDir(), kubeadmconstants.AdminKubeConfigFileName)
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
-		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(i.dirPaths.manifestDir, i.cfg); err != nil {
+		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(i.paths.ManifestDir(), i.cfg); err != nil {
 			return errors.Wrap(err, "error creating local etcd static pod manifest file")
 		}
 	}
 
 	// If we're dry-running, print the generated manifests
-	if err := printFilesIfDryRunning(i.dryRun, i.dirPaths.manifestDir); err != nil {
+	if err := printFilesIfDryRunning(i.dryRun, i.paths.ManifestDir()); err != nil {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
@@ -457,7 +427,7 @@ func runInit(i *initData, out io.Writer) error {
 	glog.V(1).Infof("[init] waiting for the API server to be healthy")
 	waiter := getWaiter(i, client)
 
-	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", i.dirPaths.manifestDir)
+	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", i.paths.ManifestDir())
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
@@ -567,7 +537,7 @@ func runInit(i *initData, out io.Writer) error {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] creating self-hosted control plane")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(i.dirPaths.manifestDir, i.dirPaths.kubernetesDir, i.cfg, client, waiter, i.dryRun); err != nil {
+		if err := selfhostingphase.CreateSelfHostedControlPlane(i.paths.ManifestDir(), i.paths.KubernetesDir(), i.cfg, client, waiter, i.dryRun); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
 	}
