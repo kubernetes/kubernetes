@@ -25,7 +25,7 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
-            "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
+            "//vendor/github.com/Microsoft/hcsshim:go_default_library",
         ],
         "//conditions:default": [],
     }),
