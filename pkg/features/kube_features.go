@@ -399,6 +399,13 @@ const (
 	//
 	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
 	CSIMigrationGCE utilfeature.Feature = "CSIMigrationGCE"
+
+	// owner: @leakingtapan
+	// alpha: v1.13
+	//
+	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
+	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
+
 )
 
 func init() {
@@ -453,6 +460,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
 	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
