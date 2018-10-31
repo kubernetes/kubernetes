@@ -697,6 +697,11 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
 func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore if not Cinder.
+	if pv.Spec.Cinder == nil {
+		return nil, nil
+	}
+
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
 		return nil, nil
