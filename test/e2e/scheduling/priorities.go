@@ -275,15 +275,19 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		nodeName := lastNode.Name
 		nodeOriginalMemory, found := lastNode.Status.Allocatable[v1.ResourceMemory]
 		nodeOriginalCPU, found := lastNode.Status.Allocatable[v1.ResourceCPU]
+		nodeOriginalCPUCapacity, found := lastNode.Status.Capacity[v1.ResourceCPU]
+		nodeOriginalMemoryCapacity, found := lastNode.Status.Capacity[v1.ResourceMemory]
 		Expect(found).To(Equal(true))
 		nodeOriginalMemoryVal := nodeOriginalMemory.Value()
 		nodeOriginalCPUVal := nodeOriginalCPU.MilliValue()
-		err := updateNodeAllocatable(cs, nodeName, int64(10737418240), int64(12000))
+		nodeOriginalMemoryCapacityVal := nodeOriginalMemoryCapacity.Value()
+		nodeOriginalCPUCapacityVal := nodeOriginalCPUCapacity.MilliValue()
+		err := updateNodeResources(cs, nodeName, int64(10737418240), int64(12000), int64(10737418240), int64(12000))
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			// Resize the node back to its original allocatable values.
-			if err := updateNodeAllocatable(cs, nodeName, nodeOriginalMemoryVal, nodeOriginalCPUVal); err != nil {
-				framework.Logf("Failed to revert node memory with %v", err)
+			if err := updateNodeResources(cs, nodeName, nodeOriginalMemoryVal, nodeOriginalCPUVal, nodeOriginalMemoryCapacityVal, nodeOriginalCPUCapacityVal); err != nil {
+				framework.Logf("Failed to revert node resources with %v", err)
 			}
 			// Reset the node list with its old entry.
 			nodeList.Items[len(nodeList.Items)-1] = lastNode
@@ -458,15 +462,17 @@ func addRandomTaitToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 	return &testTaint
 }
 
-// updateNodeAllocatable updates the allocatable values of given node with the given values.
-func updateNodeAllocatable(c clientset.Interface, nodeName string, memory, cpu int64) error {
+// updateNodeResources updates the resource of given node with the given values.
+func updateNodeResources(c clientset.Interface, nodeName string, memoryAllocatable, cpuAllocatable, memoryCapacity, cpuCapacity int64) error {
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	if err != nil {
 		return err
 	}
-	node.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(memory, resource.BinarySI)
-	node.Status.Allocatable[v1.ResourceCPU] = *resource.NewMilliQuantity(cpu, resource.DecimalSI)
+	node.Status.Capacity[v1.ResourceMemory] = *resource.NewQuantity(memoryCapacity, resource.BinarySI)
+	node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(cpuCapacity, resource.DecimalSI)
+	node.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(memoryAllocatable, resource.BinarySI)
+	node.Status.Allocatable[v1.ResourceCPU] = *resource.NewMilliQuantity(cpuAllocatable, resource.DecimalSI)
 	_, err = c.CoreV1().Nodes().UpdateStatus(node)
 	return err
 }
