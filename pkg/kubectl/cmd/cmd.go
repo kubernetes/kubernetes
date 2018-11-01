@@ -272,6 +272,10 @@ __custom_func() {
             __kubectl_config_get_clusters
             return
             ;;
+        kubectl_config_delete-credentials)
+            __kubectl_config_get_users
+            return
+            ;;
         kubectl_cp)
             __kubectl_cp
             return
