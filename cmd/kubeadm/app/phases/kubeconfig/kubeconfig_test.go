@@ -249,7 +249,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			}
 		}
 
-		// Writes the KubeConfig file to disk
+		// Writes the kubeconfig file to disk
 		err := createKubeConfigFileIfNotExists(tmpdir, "test.conf", test.kubeConfig)
 		if test.expectedError && err == nil {
 			t.Errorf("createKubeConfigFileIfNotExists didn't failed when expected to fail")
@@ -291,22 +291,6 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 				kubeadmconstants.ControllerManagerKubeConfigFileName,
 				kubeadmconstants.SchedulerKubeConfigFileName,
 			},
-		},
-		{ // Test CreateAdminKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateAdminKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.AdminKubeConfigFileName},
-		},
-		{ // Test CreateKubeletKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateKubeletKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.KubeletKubeConfigFileName},
-		},
-		{ // Test CreateControllerManagerKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateControllerManagerKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.ControllerManagerKubeConfigFileName},
-		},
-		{ // Test createKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateSchedulerKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.SchedulerKubeConfigFileName},
 		},
 	}
 

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -38,12 +39,12 @@ import (
 func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
+		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
 
 	cert, err := certutil.NewSelfSignedCACert(*config, key)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create self-signed certificate [%v]", err)
+		return nil, nil, errors.Wrap(err, "unable to create self-signed certificate")
 	}
 
 	return cert, key, nil
@@ -53,12 +54,12 @@ func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.P
 func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
+		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
 
 	cert, err := certutil.NewSignedCert(*config, key, caCert, caKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to sign certificate [%v]", err)
+		return nil, nil, errors.Wrap(err, "unable to sign certificate")
 	}
 
 	return cert, key, nil
@@ -86,12 +87,12 @@ func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *r
 // WriteCert stores the given certificate at the given location
 func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	if cert == nil {
-		return fmt.Errorf("certificate cannot be nil when writing to file")
+		return errors.New("certificate cannot be nil when writing to file")
 	}
 
 	certificatePath := pathForCert(pkiPath, name)
 	if err := certutil.WriteCert(certificatePath, certutil.EncodeCertPEM(cert)); err != nil {
-		return fmt.Errorf("unable to write certificate to file %q: [%v]", certificatePath, err)
+		return errors.Wrapf(err, "unable to write certificate to file %s", certificatePath)
 	}
 
 	return nil
@@ -100,12 +101,12 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 // WriteKey stores the given key at the given location
 func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	if key == nil {
-		return fmt.Errorf("private key cannot be nil when writing to file")
+		return errors.New("private key cannot be nil when writing to file")
 	}
 
 	privateKeyPath := pathForKey(pkiPath, name)
 	if err := certutil.WriteKey(privateKeyPath, certutil.EncodePrivateKeyPEM(key)); err != nil {
-		return fmt.Errorf("unable to write private key to file %q: [%v]", privateKeyPath, err)
+		return errors.Wrapf(err, "unable to write private key to file %s", privateKeyPath)
 	}
 
 	return nil
@@ -114,7 +115,7 @@ func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 // WritePublicKey stores the given public key at the given location
 func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	if key == nil {
-		return fmt.Errorf("public key cannot be nil when writing to file")
+		return errors.New("public key cannot be nil when writing to file")
 	}
 
 	publicKeyBytes, err := certutil.EncodePublicKeyPEM(key)
@@ -123,7 +124,7 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	}
 	publicKeyPath := pathForPublicKey(pkiPath, name)
 	if err := certutil.WriteKey(publicKeyPath, publicKeyBytes); err != nil {
-		return fmt.Errorf("unable to write public key to file %q: [%v]", publicKeyPath, err)
+		return errors.Wrapf(err, "unable to write public key to file %s", publicKeyPath)
 	}
 
 	return nil
@@ -165,7 +166,7 @@ func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
 
 	certs, err := certutil.CertsFromFile(certificatePath)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't load the certificate file %s: %v", certificatePath, err)
+		return nil, errors.Wrapf(err, "couldn't load the certificate file %s", certificatePath)
 	}
 
 	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
@@ -175,10 +176,10 @@ func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
 	// Check so that the certificate is valid now
 	now := time.Now()
 	if now.Before(cert.NotBefore) {
-		return nil, fmt.Errorf("the certificate is not valid yet")
+		return nil, errors.New("the certificate is not valid yet")
 	}
 	if now.After(cert.NotAfter) {
-		return nil, fmt.Errorf("the certificate has expired")
+		return nil, errors.New("the certificate has expired")
 	}
 
 	return cert, nil
@@ -191,7 +192,7 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	// Parse the private key from a file
 	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
+		return nil, errors.Wrapf(err, "couldn't load the private key file %s", privateKeyPath)
 	}
 
 	// Allow RSA format only
@@ -200,7 +201,7 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	case *rsa.PrivateKey:
 		key = k
 	default:
-		return nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+		return nil, errors.Wrapf(err, "the private key file %s isn't in RSA format", privateKeyPath)
 	}
 
 	return key, nil
@@ -213,7 +214,7 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	// Parse the private key from a file
 	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
+		return nil, nil, errors.Wrapf(err, "couldn't load the private key file %s", privateKeyPath)
 	}
 
 	publicKeyPath := pathForPublicKey(pkiPath, name)
@@ -221,13 +222,13 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	// Parse the public key from a file
 	pubKeys, err := certutil.PublicKeysFromFile(publicKeyPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't load the public key file %s: %v", publicKeyPath, err)
+		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
 	}
 
 	// Allow RSA format only
 	k, ok := privKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+		return nil, nil, errors.Wrapf(err, "the private key file %s isn't in RSA format", privateKeyPath)
 	}
 
 	p := pubKeys[0].(*rsa.PublicKey)
@@ -257,18 +258,19 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 	// advertise address
 	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, fmt.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.APIEndpoint.AdvertiseAddress)
+		return nil, errors.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
+			cfg.APIEndpoint.AdvertiseAddress)
 	}
 
 	// internal IP address for the API server
 	_, svcSubnet, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
+		return nil, errors.Wrapf(err, "error parsing CIDR %q", cfg.Networking.ServiceSubnet)
 	}
 
 	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get first IP address from the given CIDR (%s): %v", svcSubnet.String(), err)
+		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
 	}
 
 	// create AltNames with defaults DNSNames/IPs
@@ -295,7 +297,7 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 				altNames.DNSNames = append(altNames.DNSNames, host)
 			}
 		} else {
-			return nil, fmt.Errorf("error parsing cluster controlPlaneEndpoint %q: %s", cfg.ControlPlaneEndpoint, err)
+			return nil, errors.Wrapf(err, "error parsing cluster controlPlaneEndpoint %q", cfg.ControlPlaneEndpoint)
 		}
 	}
 
@@ -334,7 +336,8 @@ func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames,
 	// advertise address
 	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, fmt.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.APIEndpoint.AdvertiseAddress)
+		return nil, errors.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
+			cfg.APIEndpoint.AdvertiseAddress)
 	}
 
 	// create AltNames with defaults DNSNames/IPs

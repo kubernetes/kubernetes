@@ -3,12 +3,14 @@ approvers:
 - luxas
 - wlan0
 - andrewsykim
+- sttts
 reviewers:
 - thockin
 - luxas
 - wlan0
 - andrewsykim
 - stewart-yu
+- sttts
 labels:
 - sig/api-machinery
 - sig/cloud-provider

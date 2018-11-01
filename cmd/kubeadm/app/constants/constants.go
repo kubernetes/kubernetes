@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// KubernetesDir is the directory kubernetes owns for storing various configuration files
+// KubernetesDir is the directory Kubernetes owns for storing various configuration files
 // This semi-constant MUST NOT be modified during runtime. It's a variable solely for use in unit testing.
 var KubernetesDir = "/etc/kubernetes"
 
@@ -135,18 +135,18 @@ const (
 	// FrontProxyClientCertCommonName defines front proxy certificate common name
 	FrontProxyClientCertCommonName = "front-proxy-client" //used as subject.commonname attribute (CN)
 
-	// AdminKubeConfigFileName defines name for the KubeConfig aimed to be used by the superuser/admin of the cluster
+	// AdminKubeConfigFileName defines name for the kubeconfig aimed to be used by the superuser/admin of the cluster
 	AdminKubeConfigFileName = "admin.conf"
-	// KubeletBootstrapKubeConfigFileName defines the file name for the KubeConfig that the kubelet will use to do
+	// KubeletBootstrapKubeConfigFileName defines the file name for the kubeconfig that the kubelet will use to do
 	// the TLS bootstrap to get itself an unique credential
 	KubeletBootstrapKubeConfigFileName = "bootstrap-kubelet.conf"
 
-	// KubeletKubeConfigFileName defines the file name for the KubeConfig that the master kubelet will use for talking
+	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the master kubelet will use for talking
 	// to the API server
 	KubeletKubeConfigFileName = "kubelet.conf"
-	// ControllerManagerKubeConfigFileName defines the file name for the controller manager's KubeConfig file
+	// ControllerManagerKubeConfigFileName defines the file name for the controller manager's kubeconfig file
 	ControllerManagerKubeConfigFileName = "controller-manager.conf"
-	// SchedulerKubeConfigFileName defines the file name for the scheduler's KubeConfig file
+	// SchedulerKubeConfigFileName defines the file name for the scheduler's kubeconfig file
 	SchedulerKubeConfigFileName = "scheduler.conf"
 
 	// Some well-known users and groups in the core Kubernetes authorization system
@@ -356,7 +356,7 @@ var (
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.11.0")
 
-	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
+	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		10: "3.1.12",
 		11: "3.2.18",
@@ -364,7 +364,7 @@ var (
 	}
 )
 
-// EtcdSupportedVersion returns officially supported version of etcd for a specific kubernetes release
+// EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release
 // if passed version is not listed, the function returns nil and an error
 func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 	kubernetesVersion, err := version.ParseSemantic(versionString)
@@ -379,7 +379,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, fmt.Errorf("Unsupported or unknown kubernetes version(%v)", kubernetesVersion)
+	return nil, fmt.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

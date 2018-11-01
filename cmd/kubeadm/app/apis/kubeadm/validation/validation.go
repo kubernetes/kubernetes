@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -122,13 +123,8 @@ func ValidateDiscovery(d *kubeadm.Discovery, fldPath *field.Path) field.ErrorLis
 func ValidateDiscoveryBootstrapToken(b *kubeadm.BootstrapTokenDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(b.APIServerEndpoints) < 1 {
-		allErrs = append(allErrs, field.Required(fldPath, "APIServerEndpoints not set"))
-	}
-
-	// TODO remove once we support multiple api servers
-	if len(b.APIServerEndpoints) > 1 {
-		fmt.Println("[validation] WARNING: kubeadm doesn't fully support multiple API Servers yet")
+	if len(b.APIServerEndpoint) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "APIServerEndpoint is not set"))
 	}
 
 	if len(b.CACertHashes) == 0 && !b.UnsafeSkipCAVerification {
@@ -136,7 +132,7 @@ func ValidateDiscoveryBootstrapToken(b *kubeadm.BootstrapTokenDiscovery, fldPath
 	}
 
 	allErrs = append(allErrs, ValidateToken(b.Token, fldPath.Child("token"))...)
-	allErrs = append(allErrs, ValidateDiscoveryTokenAPIServer(b.APIServerEndpoints, fldPath.Child("apiServerEndpoints"))...)
+	allErrs = append(allErrs, ValidateDiscoveryTokenAPIServer(b.APIServerEndpoint, fldPath.Child("apiServerEndpoints"))...)
 
 	return allErrs
 }
@@ -151,13 +147,11 @@ func ValidateDiscoveryFile(f *kubeadm.FileDiscovery, fldPath *field.Path) field.
 }
 
 // ValidateDiscoveryTokenAPIServer validates discovery token for API server
-func ValidateDiscoveryTokenAPIServer(apiServers []string, fldPath *field.Path) field.ErrorList {
+func ValidateDiscoveryTokenAPIServer(apiServer string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, m := range apiServers {
-		_, _, err := net.SplitHostPort(m)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, m, err.Error()))
-		}
+	_, _, err := net.SplitHostPort(apiServer)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, apiServer, err.Error()))
 	}
 	return allErrs
 }
@@ -398,7 +392,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	})
 
 	if len(mixedInvalidFlags) != 0 {
-		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
+		return errors.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }

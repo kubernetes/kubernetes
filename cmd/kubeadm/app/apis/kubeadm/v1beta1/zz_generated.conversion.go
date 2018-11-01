@@ -288,7 +288,7 @@ func Convert_kubeadm_BootstrapToken_To_v1beta1_BootstrapToken(in *kubeadm.Bootst
 
 func autoConvert_v1beta1_BootstrapTokenDiscovery_To_kubeadm_BootstrapTokenDiscovery(in *BootstrapTokenDiscovery, out *kubeadm.BootstrapTokenDiscovery, s conversion.Scope) error {
 	out.Token = in.Token
-	out.APIServerEndpoints = *(*[]string)(unsafe.Pointer(&in.APIServerEndpoints))
+	out.APIServerEndpoint = in.APIServerEndpoint
 	out.CACertHashes = *(*[]string)(unsafe.Pointer(&in.CACertHashes))
 	out.UnsafeSkipCAVerification = in.UnsafeSkipCAVerification
 	return nil
@@ -301,7 +301,7 @@ func Convert_v1beta1_BootstrapTokenDiscovery_To_kubeadm_BootstrapTokenDiscovery(
 
 func autoConvert_kubeadm_BootstrapTokenDiscovery_To_v1beta1_BootstrapTokenDiscovery(in *kubeadm.BootstrapTokenDiscovery, out *BootstrapTokenDiscovery, s conversion.Scope) error {
 	out.Token = in.Token
-	out.APIServerEndpoints = *(*[]string)(unsafe.Pointer(&in.APIServerEndpoints))
+	out.APIServerEndpoint = in.APIServerEndpoint
 	out.CACertHashes = *(*[]string)(unsafe.Pointer(&in.CACertHashes))
 	out.UnsafeSkipCAVerification = in.UnsafeSkipCAVerification
 	return nil

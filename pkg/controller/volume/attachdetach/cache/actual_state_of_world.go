@@ -559,6 +559,7 @@ func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
 				attachedVolumes = append(
 					attachedVolumes,
 					getAttachedVolume(&volumeObj, &nodeObj))
+				break
 			}
 		}
 	}

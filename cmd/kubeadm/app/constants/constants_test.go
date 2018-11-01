@@ -151,7 +151,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		{
 			kubernetesVersion: "1.99.0",
 			expectedVersion:   nil,
-			expectedError:     fmt.Errorf("Unsupported or unknown kubernetes version(1.99.0)"),
+			expectedError:     fmt.Errorf("Unsupported or unknown Kubernetes version(1.99.0)"),
 		},
 		{
 			kubernetesVersion: "1.10.0",

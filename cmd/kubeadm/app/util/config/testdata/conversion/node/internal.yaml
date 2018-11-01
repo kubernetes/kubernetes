@@ -6,8 +6,7 @@ ClusterName: kubernetes
 ControlPlane: false
 Discovery:
   BootstrapToken:
-    APIServerEndpoints:
-    - kube-apiserver:6443
+    APIServerEndpoint: kube-apiserver:6443
     CACertHashes: null
     Token: abcdef.0123456789abcdef
     UnsafeSkipCAVerification: true

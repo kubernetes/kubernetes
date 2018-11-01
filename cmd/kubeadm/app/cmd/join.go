@@ -84,7 +84,7 @@ var (
 		* Certificate signing request was sent to apiserver and approval was received.
 		* The Kubelet was informed of the new secure connection details.
 		* Master label and taint were applied to the new node.
-		* The kubernetes control plane instances scaled up.
+		* The Kubernetes control plane instances scaled up.
 		{{.etcdMessage}}
 
 		To start administering your cluster from this node, you need to run the following as a regular user:
@@ -177,9 +177,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 				cfg.Discovery.File = fd
 			} else {
 				cfg.Discovery.BootstrapToken = btd
-				cfg.Discovery.BootstrapToken.APIServerEndpoints = args
 				if len(cfg.Discovery.BootstrapToken.Token) == 0 {
 					cfg.Discovery.BootstrapToken.Token = token
+				}
+				if len(args) > 0 {
+					if len(cfgPath) == 0 && len(args) > 1 {
+						glog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
+					}
+					cfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 				}
 			}
 
@@ -319,7 +324,7 @@ func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ig
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a KubeConfig
+	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a kubeconfig
 	// file that may be used for the TLS Bootstrapping process the kubelet performs using the Certificates API.
 	glog.V(1).Infoln("[join] discovering cluster-info")
 	tlsBootstrapCfg, err := discovery.For(j.cfg)
@@ -331,7 +336,7 @@ func (j *Join) Run(out io.Writer) error {
 	var initConfiguration *kubeadmapi.InitConfiguration
 	if j.cfg.ControlPlane == true {
 		// Retrives the kubeadm configuration used during kubeadm init
-		glog.V(1).Infoln("[join] retrieving KubeConfig objects")
+		glog.V(1).Infoln("[join] retrieving kubeconfig objects")
 		initConfiguration, err = j.FetchInitConfiguration(tlsBootstrapCfg)
 		if err != nil {
 			return err
@@ -359,7 +364,7 @@ func (j *Join) Run(out io.Writer) error {
 		preflight.RunInitMasterChecks(utilsexec.New(), initConfiguration, j.ignorePreflightErrors)
 
 		// Prepares the node for hosting a new control plane instance by writing necessary
-		// KubeConfig files, and static pod manifests
+		// kubeconfig files, and static pod manifests
 		if err = j.PrepareForHostingControlPlane(initConfiguration); err != nil {
 			return err
 		}
@@ -476,7 +481,7 @@ func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitC
 
 		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 		if err != nil {
-			return errors.Wrap(err, "couldn't create kubernetes client")
+			return errors.Wrap(err, "couldn't create Kubernetes client")
 		}
 
 		if err := etcdphase.CheckLocalEtcdClusterStatus(client, initConfiguration); err != nil {
@@ -514,7 +519,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 
 	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
 	if err != nil {
-		return fmt.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
+		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
 	}
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
@@ -540,7 +545,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
-	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf KubeConfig file. If this process
+	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
 	// times out, display a somewhat user-friendly message.
 	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
 	if err := waitForKubeletAndFunc(waiter, waitForTLSBootstrappedClient); err != nil {
@@ -575,7 +580,7 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 
 	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create kubernetes client")
+		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
 
 	// in case of local etcd
@@ -597,7 +602,7 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 
 	glog.V(1).Info("[join] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration: %v")
+		return errors.Wrap(err, "error uploading configuration")
 	}
 
 	glog.V(1).Info("[join] marking the master with right label")

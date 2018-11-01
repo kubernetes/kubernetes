@@ -370,12 +370,18 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.D
 }
 
 func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration) {
+	rc.EnsureDesiredReplicasInRange(desiredReplicas, desiredReplicas, duration)
+}
+
+func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, maxDesiredReplicas int, duration time.Duration) {
 	interval := 10 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
 		replicas := rc.GetReplicas()
-		framework.Logf("expecting there to be %d replicas (are: %d)", desiredReplicas, replicas)
-		if replicas != desiredReplicas {
-			return false, fmt.Errorf("number of replicas changed unexpectedly")
+		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
+		if replicas < minDesiredReplicas {
+			return false, fmt.Errorf("number of replicas below target")
+		} else if replicas > maxDesiredReplicas {
+			return false, fmt.Errorf("number of replicas above target")
 		} else {
 			return false, nil // Expected number of replicas found. Continue polling until timeout.
 		}

@@ -48,9 +48,7 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
@@ -59,7 +57,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	auditutil "k8s.io/kubernetes/cmd/kubeadm/app/util/audit"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -130,6 +127,7 @@ type initData struct {
 	ignorePreflightErrors sets.String
 	certificatesDir       string
 	dryRunDir             string
+	externalCA            bool
 	client                clientset.Interface
 }
 
@@ -146,7 +144,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			data := c.(initData)
-			fmt.Printf("[init] using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
+			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
 			err = initRunner.Run()
 			kubeadmutil.CheckErr(err)
@@ -166,8 +164,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
-	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeletStartPhase())
+	initRunner.AppendPhase(phases.NewCertsPhase())
+	initRunner.AppendPhase(phases.NewKubeConfigPhase())
+	initRunner.AppendPhase(phases.NewControlPlanePhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -313,6 +313,9 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		}
 	}
 
+	// Checks if an external CA is provided by the user.
+	externalCA, _ := certsphase.UsingExternalCA(cfg)
+
 	return initData{
 		cfg:                   cfg,
 		certificatesDir:       cfg.CertificatesDir,
@@ -320,6 +323,7 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		dryRun:                options.dryRun,
 		dryRunDir:             dryRunDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
+		externalCA:            externalCA,
 	}, nil
 }
 
@@ -356,7 +360,7 @@ func (d initData) CertificateDir() string {
 	return d.certificatesDir
 }
 
-// KubeConfigDir returns the path of the kubernetes configuration folder or the temporary folder path in case of DryRun.
+// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
 func (d initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -364,7 +368,7 @@ func (d initData) KubeConfigDir() string {
 	return kubeadmconstants.KubernetesDir
 }
 
-// KubeConfigDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
 func (d initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -378,6 +382,11 @@ func (d initData) KubeletDir() string {
 		return d.dryRunDir
 	}
 	return kubeadmconstants.KubeletRunDirectory
+}
+
+// ExternalCA returns true if an external CA is provided by the user.
+func (d initData) ExternalCA() bool {
+	return d.externalCA
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
@@ -415,7 +424,6 @@ func runInit(i *initData, out io.Writer) error {
 
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
-	realCertsDir := i.cfg.CertificatesDir
 	certsDirToWriteTo, kubeConfigDir, manifestDir, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
 		return errors.Wrap(err, "error getting directories to use")
@@ -426,43 +434,6 @@ func runInit(i *initData, out io.Writer) error {
 
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
 
-	if res, _ := certsphase.UsingExternalCA(i.cfg); !res {
-
-		// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-		glog.V(2).Infof("[init] generating kubeconfig files")
-		if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg); err != nil {
-			return err
-		}
-
-	} else {
-		fmt.Println("[externalca] the file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated")
-	}
-
-	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
-		// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
-		if i.cfg.AuditPolicyConfiguration.Path != "" {
-			// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
-			if _, err := os.Stat(i.cfg.AuditPolicyConfiguration.Path); err != nil {
-				return fmt.Errorf("error getting file info for audit policy file %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
-			}
-		} else {
-			i.cfg.AuditPolicyConfiguration.Path = filepath.Join(kubeConfigDir, kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
-			if err := auditutil.CreateDefaultAuditLogPolicy(i.cfg.AuditPolicyConfiguration.Path); err != nil {
-				return fmt.Errorf("error creating default audit policy %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
-			}
-		}
-	}
-
-	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests
-	// This is needed for writing the right kind of manifests
-	i.cfg.CertificatesDir = realCertsDir
-
-	// PHASE 3: Bootstrap the control plane
-	glog.V(1).Infof("[init] bootstraping the control plane")
-	glog.V(1).Infof("[init] creating static pod manifest")
-	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
-		return errors.Wrap(err, "error creating init static pod manifest files")
-	}
 	// Add etcd static pod spec only if external etcd is not configured
 	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
@@ -471,15 +442,12 @@ func runInit(i *initData, out io.Writer) error {
 		}
 	}
 
-	// Revert the earlier CertificatesDir assignment to the directory that can be written to
-	i.cfg.CertificatesDir = certsDirToWriteTo
-
 	// If we're dry-running, print the generated manifests
 	if err := printFilesIfDryRunning(i.dryRun, manifestDir); err != nil {
 		return errors.Wrap(err, "error printing files on dryrun")
 	}
 
-	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
+	// Create a Kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	glog.V(1).Infof("creating Kubernetes client")
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {
@@ -565,7 +533,7 @@ func runInit(i *initData, out io.Writer) error {
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	glog.V(1).Infof("[init] creating RBAC rules to automatic approval of CSRs automatically")
 	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return errors.Wrap(err, "error auto-approving node bootstrap tokens: %v")
+		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically

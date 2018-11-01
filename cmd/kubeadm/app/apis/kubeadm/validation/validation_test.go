@@ -692,7 +692,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 		expected bool
 	}{
 		{
-			"invalid: .APIServerEndpoints not set",
+			"invalid: .APIServerEndpoint not set",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token: "abcdef.1234567890123456",
 			},
@@ -702,25 +702,16 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 			"invalid: using token-based discovery without .BootstrapToken.CACertHashes and .BootstrapToken.UnsafeSkipCAVerification",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443"},
+				APIServerEndpoint:        "192.168.122.100:6443",
 				UnsafeSkipCAVerification: false,
 			},
 			false,
 		},
 		{
-			"WARNING: kubeadm doesn't fully support multiple API Servers yet",
-			&kubeadm.BootstrapTokenDiscovery{
-				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443", "192.168.122.88:6443"},
-				UnsafeSkipCAVerification: true,
-			},
-			true,
-		},
-		{
 			"valid: using token-based discovery with .BootstrapToken.CACertHashes",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443"},
+				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 				UnsafeSkipCAVerification: false,
 			},
@@ -730,7 +721,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 			"valid: using token-based discovery with .BootstrapToken.CACertHashe but skip ca verification",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443"},
+				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 				UnsafeSkipCAVerification: true,
 			},
@@ -753,20 +744,20 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 
 func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
 	var tests = []struct {
-		apiServerEndpoints []string
-		expected           bool
+		apiServerEndpoint string
+		expected          bool
 	}{
 		{
-			[]string{"192.168.122.100"},
+			"192.168.122.100",
 			false,
 		},
 		{
-			[]string{"192.168.122.100:6443"},
+			"192.168.122.100:6443",
 			true,
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateDiscoveryTokenAPIServer(rt.apiServerEndpoints, nil)
+		actual := ValidateDiscoveryTokenAPIServer(rt.apiServerEndpoint, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"failed ValidateDiscoveryTokenAPIServer:\n\texpected: %t\n\t  actual: %t",

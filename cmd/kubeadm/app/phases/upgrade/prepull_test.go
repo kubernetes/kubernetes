@@ -17,9 +17,10 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	//"k8s.io/apimachinery/pkg/util/version"
@@ -34,7 +35,7 @@ func NewFailedCreatePrepuller() Prepuller {
 
 func (p *failedCreatePrepuller) CreateFunc(component string) error {
 	if component == "kube-controller-manager" {
-		return fmt.Errorf("boo")
+		return errors.New("boo")
 	}
 	return nil
 }
@@ -79,7 +80,7 @@ func (p *failedDeletePrepuller) WaitFunc(component string) {}
 
 func (p *failedDeletePrepuller) DeleteFunc(component string) error {
 	if component == "kube-scheduler" {
-		return fmt.Errorf("boo")
+		return errors.New("boo")
 	}
 	return nil
 }

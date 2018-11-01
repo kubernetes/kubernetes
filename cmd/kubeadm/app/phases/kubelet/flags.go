@@ -24,6 +24,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -123,10 +125,10 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", kubeletDir, err)
+		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
 	}
 	if err := ioutil.WriteFile(kubeletEnvFilePath, b, 0644); err != nil {
-		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", kubeletEnvFilePath, err)
+		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", kubeletEnvFilePath)
 	}
 	return nil
 }

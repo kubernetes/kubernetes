@@ -301,10 +301,8 @@ type BootstrapTokenDiscovery struct {
 	// fetched from the master.
 	Token string `json:"token"`
 
-	// APIServerEndpoints is a set of IPs or domain names to API servers from which info
-	// will be fetched. Currently we only pay attention to one API server but
-	// hope to support >1 in the future.
-	APIServerEndpoints []string `json:"apiServerEndpoints,omitempty"`
+	// APIServerEndpoint is an IP or domain name to the API server from which info will be fetched.
+	APIServerEndpoint string `json:"apiServerEndpoint,omitempty"`
 
 	// CACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery

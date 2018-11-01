@@ -50,27 +50,52 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		return generate.MakeLabels(t.Spec.Selector), nil
 
 	case *extensionsv1beta1.Deployment:
-		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
-		// operator, DoubleEquals operator and In operator with only one element in the set.
-		if len(t.Spec.Selector.MatchExpressions) > 0 {
-			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
+		// "extensions" deployments use pod template labels if selector is not set.
+		var labels map[string]string
+		if t.Spec.Selector != nil {
+			// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
+			// operator, DoubleEquals operator and In operator with only one element in the set.
+			if len(t.Spec.Selector.MatchExpressions) > 0 {
+				return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
+			}
+			labels = t.Spec.Selector.MatchLabels
+		} else {
+			labels = t.Spec.Template.Labels
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		if len(labels) == 0 {
+			return "", fmt.Errorf("the deployment has no labels or selectors and cannot be exposed")
+		}
+		return generate.MakeLabels(labels), nil
+
 	case *appsv1.Deployment:
+		// "apps" deployments must have the selector set.
+		if t.Spec.Selector == nil || len(t.Spec.Selector.MatchLabels) == 0 {
+			return "", fmt.Errorf("invalid deployment: no selectors, therefore cannot be exposed")
+		}
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
 		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+
 	case *appsv1beta2.Deployment:
+		// "apps" deployments must have the selector set.
+		if t.Spec.Selector == nil || len(t.Spec.Selector.MatchLabels) == 0 {
+			return "", fmt.Errorf("invalid deployment: no selectors, therefore cannot be exposed")
+		}
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
 		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+
 	case *appsv1beta1.Deployment:
+		// "apps" deployments must have the selector set.
+		if t.Spec.Selector == nil || len(t.Spec.Selector.MatchLabels) == 0 {
+			return "", fmt.Errorf("invalid deployment: no selectors, therefore cannot be exposed")
+		}
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
@@ -79,20 +104,40 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
 
 	case *extensionsv1beta1.ReplicaSet:
-		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
-		// operator, DoubleEquals operator and In operator with only one element in the set.
-		if len(t.Spec.Selector.MatchExpressions) > 0 {
-			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
+		// "extensions" replicasets use pod template labels if selector is not set.
+		var labels map[string]string
+		if t.Spec.Selector != nil {
+			// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
+			// operator, DoubleEquals operator and In operator with only one element in the set.
+			if len(t.Spec.Selector.MatchExpressions) > 0 {
+				return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
+			}
+			labels = t.Spec.Selector.MatchLabels
+		} else {
+			labels = t.Spec.Template.Labels
 		}
-		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		if len(labels) == 0 {
+			return "", fmt.Errorf("the replica set has no labels or selectors and cannot be exposed")
+		}
+		return generate.MakeLabels(labels), nil
+
 	case *appsv1.ReplicaSet:
+		// "apps" replicasets must have the selector set.
+		if t.Spec.Selector == nil || len(t.Spec.Selector.MatchLabels) == 0 {
+			return "", fmt.Errorf("invalid replicaset: no selectors, therefore cannot be exposed")
+		}
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
 		return generate.MakeLabels(t.Spec.Selector.MatchLabels), nil
+
 	case *appsv1beta2.ReplicaSet:
+		// "apps" replicasets must have the selector set.
+		if t.Spec.Selector == nil || len(t.Spec.Selector.MatchLabels) == 0 {
+			return "", fmt.Errorf("invalid replicaset: no selectors, therefore cannot be exposed")
+		}
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
@@ -103,4 +148,5 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 	default:
 		return "", fmt.Errorf("cannot extract pod selector from %T", object)
 	}
+
 }

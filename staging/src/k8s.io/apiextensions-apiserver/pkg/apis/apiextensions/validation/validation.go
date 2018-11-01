@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"reflect"
 	"strings"
 
@@ -110,13 +111,7 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, "should be a domain with at least one dot"))
 	}
 
-	switch spec.Scope {
-	case "":
-		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
-	case apiextensions.ClusterScoped, apiextensions.NamespaceScoped:
-	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), spec.Scope, []string{string(apiextensions.ClusterScoped), string(apiextensions.NamespaceScoped)}))
-	}
+	allErrs = append(allErrs, validateEnumStrings(fldPath.Child("scope"), string(spec.Scope), []string{string(apiextensions.ClusterScoped), string(apiextensions.NamespaceScoped)}, true)...)
 
 	storageFlagCount := 0
 	versionsMap := map[string]bool{}
@@ -187,6 +182,54 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		}
 	}
 
+	allErrs = append(allErrs, ValidateCustomResourceConversion(spec.Conversion, fldPath.Child("conversion"))...)
+
+	return allErrs
+}
+
+func validateEnumStrings(fldPath *field.Path, value string, accepted []string, required bool) field.ErrorList {
+	if value == "" {
+		if required {
+			return field.ErrorList{field.Required(fldPath, "")}
+		}
+		return field.ErrorList{}
+	}
+	for _, a := range accepted {
+		if a == value {
+			return field.ErrorList{}
+		}
+	}
+	return field.ErrorList{field.NotSupported(fldPath, value, accepted)}
+}
+
+// ValidateCustomResourceConversion statically validates
+func ValidateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if conversion == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateEnumStrings(fldPath.Child("strategy"), string(conversion.Strategy), []string{string(apiextensions.NoneConverter), string(apiextensions.WebhookConverter)}, true)...)
+	if conversion.Strategy == apiextensions.WebhookConverter {
+		if conversion.WebhookClientConfig == nil {
+			if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) {
+				allErrs = append(allErrs, field.Required(fldPath.Child("webhookClientConfig"), "required when strategy is set to Webhook"))
+			} else {
+				allErrs = append(allErrs, field.Required(fldPath.Child("webhookClientConfig"), "required when strategy is set to Webhook, but not allowed because the CustomResourceWebhookConversion feature is disabled"))
+			}
+		} else {
+			cc := conversion.WebhookClientConfig
+			switch {
+			case (cc.URL == nil) == (cc.Service == nil):
+				allErrs = append(allErrs, field.Required(fldPath.Child("webhookClientConfig"), "exactly one of url or service is required"))
+			case cc.URL != nil:
+				allErrs = append(allErrs, webhook.ValidateWebhookURL(fldPath.Child("webhookClientConfig").Child("url"), *cc.URL, true)...)
+			case cc.Service != nil:
+				allErrs = append(allErrs, webhook.ValidateWebhookService(fldPath.Child("webhookClientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path)...)
+			}
+		}
+	} else if conversion.WebhookClientConfig != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("webhookClientConfig"), "should not be set when strategy is not set to Webhook"))
+	}
 	return allErrs
 }
 

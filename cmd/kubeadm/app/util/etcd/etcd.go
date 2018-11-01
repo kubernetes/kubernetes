@@ -117,7 +117,7 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 func NewFromStaticPod(endpoints []string, manifestDir string, certificatesDir string) (*Client, error) {
 	hasTLS, err := PodManifestsHaveTLS(manifestDir)
 	if err != nil {
-		return nil, fmt.Errorf("could not read manifests from: %s, error: %v", manifestDir, err)
+		return nil, errors.Wrapf(err, "could not read manifests from: %s, error", manifestDir)
 	}
 	if hasTLS {
 		return New(
@@ -243,7 +243,7 @@ func (c Client) GetVersion() (string, error) {
 	}
 	for _, v := range versions {
 		if clusterVersion != "" && clusterVersion != v {
-			return "", fmt.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
+			return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
 		}
 		clusterVersion = v
 	}

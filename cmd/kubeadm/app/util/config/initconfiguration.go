@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,7 +73,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 
 		tokenStr, err := bootstraputil.GenerateBootstrapToken()
 		if err != nil {
-			return fmt.Errorf("couldn't generate random token: %v", err)
+			return errors.Wrap(err, "couldn't generate random token")
 		}
 		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
 		if err != nil {
@@ -105,7 +106,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	// validate cfg.API.AdvertiseAddress.
 	addressIP := net.ParseIP(cfg.AdvertiseAddress)
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
-		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
+		return errors.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
 	// This is the same logic as the API Server uses, except that if no interface is found the address is set to 0.0.0.0, which is invalid and cannot be used
 	// for bootstrapping a cluster.
@@ -168,7 +169,7 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+			return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 		}
 		internalcfg, err = BytesToInternalConfig(b)
 		if err != nil {
@@ -249,7 +250,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the YAML documents
 	if initcfg == nil && clustercfg == nil {
-		return nil, fmt.Errorf("no InitConfiguration or ClusterConfiguration kind was found in the YAML file")
+		return nil, errors.New("no InitConfiguration or ClusterConfiguration kind was found in the YAML file")
 	}
 
 	// If InitConfiguration wasn't given, default it by creating an external struct instance, default it and convert into the internal type
@@ -270,7 +271,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 		registration, found := componentconfigs.Known[kind]
 		if found {
 			if ok := registration.SetToInternalConfig(obj, &initcfg.ClusterConfiguration); !ok {
-				return nil, fmt.Errorf("couldn't save componentconfig value for kind %q", string(kind))
+				return nil, errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 			}
 		} else {
 			// This should never happen in practice
@@ -334,7 +335,7 @@ func MarshalClusterConfigurationToBytes(clustercfg *kubeadmapi.ClusterConfigurat
 		defaultedobj, ok := registration.GetFromInternalConfig(defaultedcfg)
 		// Invalid: The caller asked to not print the componentconfigs if defaulted, but defaultComponentConfigs() wasn't able to create default objects to use for reference
 		if !ok {
-			return []byte{}, fmt.Errorf("couldn't create a default componentconfig object")
+			return []byte{}, errors.New("couldn't create a default componentconfig object")
 		}
 
 		// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
