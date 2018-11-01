@@ -44,38 +44,49 @@ import (
 var alwaysReady = func() bool { return true }
 var neverReady = func() bool { return false }
 var emptyNodeName string
+var triggerTime = time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
+var triggerTimeString = triggerTime.Format(time.RFC3339Nano)
+var oldTriggerTimeString = triggerTime.Add(-time.Hour).Format(time.RFC3339Nano)
 
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
 	for i := 0; i < nPods+nNotReady; i++ {
-		p := &v1.Pod{
-			TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      fmt.Sprintf("pod%d", i),
-				Labels:    map[string]string{"foo": "bar"},
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{{Ports: []v1.ContainerPort{}}},
-			},
-			Status: v1.PodStatus{
-				PodIP: fmt.Sprintf("1.2.3.%d", 4+i),
-				Conditions: []v1.PodCondition{
-					{
-						Type:   v1.PodReady,
-						Status: v1.ConditionTrue,
-					},
+		addPod(store, namespace, i, nPorts, /*ready=*/ i < nPods, /*lastTransitionTime=*/ nil)
+	}
+}
+
+func addPod(store cache.Store, namespace string, podId int, nPorts int, ready bool,
+		lastTransitionTime *time.Time) {
+	p := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("pod%d", podId),
+			Labels:    map[string]string{"foo": "bar"},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Ports: []v1.ContainerPort{}}},
+		},
+		Status: v1.PodStatus{
+			PodIP: fmt.Sprintf("1.2.3.%d", 4+podId),
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
 				},
 			},
-		}
-		if i >= nPods {
-			p.Status.Conditions[0].Status = v1.ConditionFalse
-		}
-		for j := 0; j < nPorts; j++ {
-			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
-				v1.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: int32(8080 + j)})
-		}
-		store.Add(p)
+		},
 	}
+	if !ready {
+		p.Status.Conditions[0].Status = v1.ConditionFalse
+	}
+	for j := 0; j < nPorts; j++ {
+		p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
+			v1.ContainerPort{Name: fmt.Sprintf("port%d", podId), ContainerPort: int32(8080 + j)})
+	}
+	if lastTransitionTime != nil {
+		p.Status.Conditions[0].LastTransitionTime = metav1.Time{Time: *lastTransitionTime}
+	}
+	store.Add(p)
 }
 
 func addNotReadyPodsWithSpecifiedRestartPolicyAndPhase(store cache.Store, namespace string, nPods int, nPorts int, restartPolicy v1.RestartPolicy, podPhase v1.PodPhase) {
@@ -1174,4 +1185,95 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
 		}
 	}
+}
+
+func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
+		}},
+	})
+	addPod(endpoints.podStore, ns, /*podId=*/ 0, /*nPorts=*/ 1, true, &triggerTime)
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+
+	endpointsHandler.ValidateRequestCount(t, 1)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Annotations: map[string]string {
+				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
+			},
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}
+
+func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Annotations: map[string]string {
+				v1.EndpointsLastChangeTriggerTime: oldTriggerTimeString,
+			},
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
+		}},
+	})
+	addPod(endpoints.podStore, ns, /*podId=*/ 0, /*nPorts=*/ 1, true, &triggerTime)
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+
+	endpointsHandler.ValidateRequestCount(t, 1)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Annotations: map[string]string {
+				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
+			},
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }

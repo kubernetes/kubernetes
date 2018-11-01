@@ -101,6 +101,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	e.triggerTimeTracker = newTriggerTimeTracker()
+
 	return e
 }
 
@@ -138,6 +140,9 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// Trigger time tracker to compute the EndpointsLastChangeTriggerTime annotation.
+	triggerTimeTracker *triggerTimeTracker
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -192,8 +197,16 @@ func (e *EndpointController) addPod(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
 	}
+
 	for key := range services {
 		e.queue.Add(key)
+	}
+
+
+	if triggerTime := getPodLastTransitionTime(pod); triggerTime != nil {
+		for key := range services {
+			e.triggerTimeTracker.observe(key, *triggerTime)
+		}
 	}
 }
 
@@ -295,6 +308,13 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 
 	for key := range services {
 		e.queue.Add(key)
+	}
+
+	oldTriggerTime, triggerTime  := getPodLastTransitionTime(newPod), getPodLastTransitionTime(newPod)
+	if triggerTime != nil && (oldTriggerTime == nil || triggerTime.After(*oldTriggerTime)) {
+		for key := range services {
+			e.triggerTimeTracker.observe(key, *triggerTime)
+		}
 	}
 }
 
@@ -409,12 +429,15 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	klog.V(5).Infof("About to update endpoints for service %q", key)
+
+	e.triggerTimeTracker.startListing(key)
 	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
 		// basically impossible to get this error.
 		return err
 	}
+	lastTriggerChangeTime := e.triggerTimeTracker.stopListingAndReset(key, getPodTriggerTimes(pods))
 
 	// If the user specified the older (deprecated) annotation, we have to respect it.
 	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses
@@ -505,6 +528,10 @@ func (e *EndpointController) syncService(key string) error {
 	if newEndpoints.Annotations == nil {
 		newEndpoints.Annotations = make(map[string]string)
 	}
+	if lastTriggerChangeTime != nil {
+		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
+				lastTriggerChangeTime.Format(time.RFC3339Nano)
+	}
 
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
@@ -591,4 +618,31 @@ func shouldPodBeInEndpoints(pod *v1.Pod) bool {
 	default:
 		return true
 	}
+}
+
+// Computes the last-transition-time for the given pod, defined as max lastTransitionTime over
+// all pod-conditions.
+func getPodLastTransitionTime(pod *v1.Pod) (*time.Time) {
+	var lastTransitionTime time.Time
+	for _, condition := range pod.Status.Conditions {
+		val := condition.LastTransitionTime.Time
+		if lastTransitionTime.Before(val) {
+			lastTransitionTime = val
+		}
+	}
+	if lastTransitionTime.IsZero() {
+		return nil
+	}
+	return &lastTransitionTime
+}
+
+func getPodTriggerTimes(pods []*v1.Pod) []time.Time {
+  times := make([]time.Time, 0, len(pods))
+  for _, pod := range pods {
+  	podLastTransitionTime := getPodLastTransitionTime(pod)
+  	if podLastTransitionTime != nil {
+			times = append(times, *podLastTransitionTime)
+		}
+	}
+  return times;
 }

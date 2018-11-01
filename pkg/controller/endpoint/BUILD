@@ -11,6 +11,8 @@ go_library(
     srcs = [
         "doc.go",
         "endpoints_controller.go",
+        "metrics.go",
+        "trigger_time_tracker.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     deps = [
@@ -34,12 +36,16 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["endpoints_controller_test.go"],
+    srcs = [
+        "endpoints_controller_test.go",
+        "trigger_time_tracker_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",
@@ -58,6 +64,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/github.com/prometheus/client_model/go:go_default_library",
     ],
 )
 
