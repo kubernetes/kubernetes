@@ -86,7 +86,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(componentConfig.Generic),
 		KubeCloudShared: cmoptions.NewKubeCloudSharedOptions(componentConfig.KubeCloudShared),
 		ServiceController: &cmoptions.ServiceControllerOptions{
-			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
+			ServiceControllerConfiguration: componentConfig.ServiceController,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{

@@ -44,3 +44,11 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 	}
 	return allErrs
 }
+
+// ValidateDebuggingConfiguration ensures validation of the DebuggingConfiguration struct.
+func ValidateDebuggingConfiguration(cc *config.DebuggingConfiguration) field.ErrorList {
+
+	allErrs := field.ErrorList{}
+	//TODO: add validate
+	return allErrs
+}

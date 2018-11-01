@@ -22,14 +22,8 @@ import (
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
 
-// DebuggingOptions holds the Debugging options.
-type DebuggingOptions struct {
-	EnableProfiling           bool
-	EnableContentionProfiling bool
-}
-
-// AddFlags adds flags related to debugging for controller manager to the specified FlagSet.
-func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
+// AddDebuggingConfigurationFlags adds flags related to debugging for controller manager to the specified FlagSet.
+func AddDebuggingConfigurationFlags(o *apiserverconfig.DebuggingConfiguration, fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
@@ -38,26 +32,4 @@ func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
 		"Enable lock contention profiling, if profiling is enabled")
-}
-
-// ApplyTo fills up Debugging config with options.
-func (o *DebuggingOptions) ApplyTo(cfg *apiserverconfig.DebuggingConfiguration) error {
-	if o == nil {
-		return nil
-	}
-
-	cfg.EnableProfiling = o.EnableProfiling
-	cfg.EnableContentionProfiling = o.EnableContentionProfiling
-
-	return nil
-}
-
-// Validate checks validation of DebuggingOptions.
-func (o *DebuggingOptions) Validate() []error {
-	if o == nil {
-		return nil
-	}
-
-	errs := []error{}
-	return errs
 }

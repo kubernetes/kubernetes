@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	"k8s.io/apiserver/pkg/apis/config/validation"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -31,14 +30,7 @@ import (
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.
 type GenericControllerManagerConfigurationOptions struct {
-	Port                    int32
-	Address                 string
-	MinResyncPeriod         metav1.Duration
-	ClientConnection        apimachineryconfig.ClientConnectionConfiguration
-	ControllerStartInterval metav1.Duration
-	LeaderElection          apiserverconfig.LeaderElectionConfiguration
-	Debugging               *DebuggingOptions
-	Controllers             []string
+	kubectrlmgrconfig.GenericControllerManagerConfiguration
 }
 
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
@@ -46,15 +38,16 @@ type GenericControllerManagerConfigurationOptions struct {
 // be made here. Any individual changes should be made in that controller.
 func NewGenericControllerManagerConfigurationOptions(cfg kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
-		Port:                    cfg.Port,
-		Address:                 cfg.Address,
-		MinResyncPeriod:         cfg.MinResyncPeriod,
-		ClientConnection:        cfg.ClientConnection,
-		ControllerStartInterval: cfg.ControllerStartInterval,
-		LeaderElection:          cfg.LeaderElection,
-		Debugging:               &DebuggingOptions{},
-		Controllers:             cfg.Controllers,
-	}
+		kubectrlmgrconfig.GenericControllerManagerConfiguration{
+			Port:                    cfg.Port,
+			Address:                 cfg.Address,
+			MinResyncPeriod:         cfg.MinResyncPeriod,
+			ClientConnection:        cfg.ClientConnection,
+			ControllerStartInterval: cfg.ControllerStartInterval,
+			LeaderElection:          cfg.LeaderElection,
+			Debugging:               apiserverconfig.DebuggingConfiguration{},
+			Controllers:             cfg.Controllers,
+		}}
 
 	return o
 }
@@ -65,7 +58,6 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverfl
 		return
 	}
 
-	o.Debugging.AddFlags(fss.FlagSet("debugging"))
 	genericfs := fss.FlagSet("generic")
 	genericfs.DurationVar(&o.MinResyncPeriod.Duration, "min-resync-period", o.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
 	genericfs.StringVar(&o.ClientConnection.ContentType, "kube-api-content-type", o.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
@@ -79,16 +71,13 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverfl
 		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
 
 	leaderelectionconfig.BindFlags(&o.LeaderElection, genericfs)
+	AddDebuggingConfigurationFlags(&o.Debugging, fss.FlagSet("debugging"))
 }
 
 // ApplyTo fills up generic config with options.
 func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) error {
 	if o == nil {
 		return nil
-	}
-
-	if err := o.Debugging.ApplyTo(&cfg.Debugging); err != nil {
-		return err
 	}
 
 	cfg.Port = o.Port
@@ -98,6 +87,7 @@ func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *kubectrlmgrc
 	cfg.ControllerStartInterval = o.ControllerStartInterval
 	cfg.LeaderElection = o.LeaderElection
 	cfg.Controllers = o.Controllers
+	cfg.Debugging = o.Debugging
 
 	return nil
 }
@@ -109,7 +99,9 @@ func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers [
 	}
 
 	errs := []error{}
-	errs = append(errs, o.Debugging.Validate()...)
+	if err := validation.ValidateDebuggingConfiguration(&o.Debugging).ToAggregate(); err != nil {
+		errs = append(errs, err.Errors()...)
+	}
 
 	allControllersSet := sets.NewString(allControllers...)
 	for _, controller := range o.Controllers {

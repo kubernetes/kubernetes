@@ -19,25 +19,13 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
 // and cloud-controller-manager.
 type KubeCloudSharedOptions struct {
-	CloudProvider                *CloudProviderOptions
-	ExternalCloudVolumePlugin    string
-	UseServiceAccountCredentials bool
-	AllowUntaggedCloud           bool
-	RouteReconciliationPeriod    metav1.Duration
-	NodeMonitorPeriod            metav1.Duration
-	ClusterName                  string
-	ClusterCIDR                  string
-	AllocateNodeCIDRs            bool
-	CIDRAllocatorType            string
-	ConfigureCloudRoutes         bool
-	NodeSyncPeriod               metav1.Duration
+	kubectrlmgrconfig.KubeCloudSharedConfiguration
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
@@ -45,14 +33,15 @@ type KubeCloudSharedOptions struct {
 // be made here. Any individual changes should be made in that controller.
 func NewKubeCloudSharedOptions(cfg kubectrlmgrconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
-		CloudProvider:                &CloudProviderOptions{},
-		ExternalCloudVolumePlugin:    cfg.ExternalCloudVolumePlugin,
-		UseServiceAccountCredentials: cfg.UseServiceAccountCredentials,
-		RouteReconciliationPeriod:    cfg.RouteReconciliationPeriod,
-		NodeMonitorPeriod:            cfg.NodeMonitorPeriod,
-		ClusterName:                  cfg.ClusterName,
-		ConfigureCloudRoutes:         cfg.ConfigureCloudRoutes,
-	}
+		kubectrlmgrconfig.KubeCloudSharedConfiguration{
+			CloudProvider:                kubectrlmgrconfig.CloudProviderConfiguration{},
+			ExternalCloudVolumePlugin:    cfg.ExternalCloudVolumePlugin,
+			UseServiceAccountCredentials: cfg.UseServiceAccountCredentials,
+			RouteReconciliationPeriod:    cfg.RouteReconciliationPeriod,
+			NodeMonitorPeriod:            cfg.NodeMonitorPeriod,
+			ClusterName:                  cfg.ClusterName,
+			ConfigureCloudRoutes:         cfg.ConfigureCloudRoutes,
+		}}
 
 	return o
 }
@@ -63,7 +52,6 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	o.CloudProvider.AddFlags(fs)
 	fs.StringVar(&o.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
 	fs.BoolVar(&o.UseServiceAccountCredentials, "use-service-account-credentials", o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
 	fs.BoolVar(&o.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
@@ -81,6 +69,8 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+
 		"route-reconciliation-period for cloud provider's route configuration settings.")
 	fs.MarkDeprecated("node-sync-period", "This flag is currently no-op and will be deleted.")
+
+	AddCloudProviderConfigurationFlags(&o.CloudProvider, fs)
 }
 
 // ApplyTo fills up KubeCloudShared config with options.
@@ -89,9 +79,7 @@ func (o *KubeCloudSharedOptions) ApplyTo(cfg *kubectrlmgrconfig.KubeCloudSharedC
 		return nil
 	}
 
-	if err := o.CloudProvider.ApplyTo(&cfg.CloudProvider); err != nil {
-		return err
-	}
+	cfg.CloudProvider = o.CloudProvider
 	cfg.ExternalCloudVolumePlugin = o.ExternalCloudVolumePlugin
 	cfg.UseServiceAccountCredentials = o.UseServiceAccountCredentials
 	cfg.AllowUntaggedCloud = o.AllowUntaggedCloud
@@ -114,7 +102,7 @@ func (o *KubeCloudSharedOptions) Validate() []error {
 	}
 
 	errs := []error{}
-	errs = append(errs, o.CloudProvider.Validate()...)
+	errs = append(errs, ValidateCloudProviderConfiguration(&o.CloudProvider)...)
 
 	return errs
 }
