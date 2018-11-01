@@ -29,6 +29,11 @@ const (
 	RootfsDeviceKey = "rootfs"
 
 	BlkioSubsystemName = "blkio"
+
+	DeviceWeightMin = 10
+	DeviceWeightMax = 1000
+	DeviceBPSMin    = 1000
+	DeviceIOPSMin   = 5
 )
 
 // Value resource.Quantity  `json:"value"`
@@ -82,10 +87,17 @@ func getBlkioThrottleDevice(d *deviceValue, rootfsDevice string) (t configs.Thro
 
 func getBlkioResource(b *Blkio, rootfsDevice string) (blkioResource configs.Resources, err error) {
 	blkioResource.BlkioWeight = b.Weight
+	if b.Weight < DeviceWeightMin || b.Weight > DeviceWeightMax {
+		return blkioResource, fmt.Errorf("blkio.weight:%d is out of rage. Currently allowed range of weights is from %d to %d.", b.Weight, DeviceWeightMin, DeviceWeightMax)
+	}
+
 	for _, w := range b.WeightDevice {
 		d, err := getBlkioWeightDevice(&w, rootfsDevice)
 		if err != nil {
 			return blkioResource, err
+		}
+		if d.Weight < DeviceWeightMin || d.Weight > DeviceWeightMax {
+			return blkioResource, fmt.Errorf("blkio.weight_device:%d is out of rage. Currently allowed range of weights is from %d to %d.", d.Weight, DeviceWeightMin, DeviceWeightMax)
 		}
 		blkioResource.BlkioWeightDevice = append(blkioResource.BlkioWeightDevice, &d)
 	}
@@ -94,12 +106,18 @@ func getBlkioResource(b *Blkio, rootfsDevice string) (blkioResource configs.Reso
 		if err != nil {
 			return blkioResource, err
 		}
+		if t.Rate < DeviceBPSMin {
+			return blkioResource, fmt.Errorf("blkio.device_read_bps:%d is out of rage. The Rate must be greater than %d.", t.Rate, DeviceBPSMin)
+		}
 		blkioResource.BlkioThrottleReadBpsDevice = append(blkioResource.BlkioThrottleReadBpsDevice, &t)
 	}
 	for _, w := range b.DeviceWriteBps {
 		t, err := getBlkioThrottleDevice(&w, rootfsDevice)
 		if err != nil {
 			return blkioResource, err
+		}
+		if t.Rate < DeviceBPSMin {
+			return blkioResource, fmt.Errorf("blkio.device_write_bps:%d is out of rage. The Rate must be greater than %d.", t.Rate, DeviceBPSMin)
 		}
 		blkioResource.BlkioThrottleWriteBpsDevice = append(blkioResource.BlkioThrottleWriteBpsDevice, &t)
 	}
@@ -108,12 +126,18 @@ func getBlkioResource(b *Blkio, rootfsDevice string) (blkioResource configs.Reso
 		if err != nil {
 			return blkioResource, err
 		}
+		if t.Rate < DeviceIOPSMin {
+			return blkioResource, fmt.Errorf("blkio.device_read_iops:%d is out of rage. The Rate must be greater than %d.", t.Rate, DeviceIOPSMin)
+		}
 		blkioResource.BlkioThrottleReadIOPSDevice = append(blkioResource.BlkioThrottleReadIOPSDevice, &t)
 	}
 	for _, w := range b.DeviceWriteIOps {
 		t, err := getBlkioThrottleDevice(&w, rootfsDevice)
 		if err != nil {
 			return blkioResource, err
+		}
+		if t.Rate < DeviceIOPSMin {
+			return blkioResource, fmt.Errorf("blkio.device_write_iops:%d is out of rage. The Rate must be greater than %d.", t.Rate, DeviceIOPSMin)
 		}
 		blkioResource.BlkioThrottleWriteIOPSDevice = append(blkioResource.BlkioThrottleWriteIOPSDevice, &t)
 	}
