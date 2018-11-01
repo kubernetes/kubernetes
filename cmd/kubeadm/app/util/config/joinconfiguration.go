@@ -45,7 +45,11 @@ func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 	return nil
 }
 
-// JoinConfigFileAndDefaultsToInternalConfig
+// JoinConfigFileAndDefaultsToInternalConfig takes a path to a config file and a versioned configuration that can serve as the default config
+// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
+// Then the external, versioned configuration is defaulted and converted to the internal type.
+// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
+// Lastly, the internal config is validated and returned.
 func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
 
