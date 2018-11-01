@@ -138,8 +138,7 @@ func NewAuditOptions() *AuditOptions {
 				BatchConfig: defaultWebhookBatchConfig(),
 			},
 			TruncateOptions: NewAuditTruncateOptions(),
-			// TODO(audit): use v1 API in release 1.13
-			GroupVersionString: "audit.k8s.io/v1beta1",
+			GroupVersionString: "audit.k8s.io/v1",
 		},
 		LogOptions: AuditLogOptions{
 			Format: pluginlog.FormatJson,
@@ -148,8 +147,7 @@ func NewAuditOptions() *AuditOptions {
 				BatchConfig: defaultLogBatchConfig(),
 			},
 			TruncateOptions: NewAuditTruncateOptions(),
-			// TODO(audit): use v1 API in release 1.13
-			GroupVersionString: "audit.k8s.io/v1beta1",
+			GroupVersionString: "audit.k8s.io/v1",
 		},
 	}
 }
