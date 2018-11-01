@@ -51,8 +51,11 @@ const (
 	// is expected to fail.
 	ExpectProvisionFailureKey = "expect-provision-failure"
 	// The node is marked as uncertain. The attach operation will fail and return timeout error
-	// but the operation is actually succeeded.
+	// for the first attach call. The following call will return sucesssfully.
 	UncertainAttachNode = "uncertain-attach-node"
+	// The node is marked as timeout. The attach operation will always fail and return timeout error
+	// but the operation is actually succeeded.
+	TimeoutAttachNode = "timeout-attach-node"
 	// The node is marked as multi-attach which means it is allowed to attach the volume to multiple nodes.
 	MultiAttachNode = "multi-attach-node"
 )
@@ -753,7 +756,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	volumeNode, exist := fv.VolumesAttached[volumeName]
 	if exist {
 		if nodeName == UncertainAttachNode {
-			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+			return "/dev/vdb-test", nil
 		}
 		if volumeNode == nodeName || volumeNode == MultiAttachNode || nodeName == MultiAttachNode {
 			return "/dev/vdb-test", nil
@@ -762,7 +765,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	}
 
 	fv.VolumesAttached[volumeName] = nodeName
-	if nodeName == UncertainAttachNode {
+	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
 		return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
 	}
 	return "/dev/vdb-test", nil
