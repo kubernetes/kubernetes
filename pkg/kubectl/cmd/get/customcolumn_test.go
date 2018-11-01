@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package get
 
 import (
 	"bytes"
@@ -22,12 +22,15 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/kubectl/util/printers"
 )
+
+// UniversalDecoder call must specify parameter versions; otherwise it will decode to internal versions.
+var decoder = scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 func TestMassageJSONPath(t *testing.T) {
 	tests := []struct {
@@ -115,7 +118,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			printer, err := NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
+			printer, err := NewCustomColumnsPrinterFromSpec(test.spec, decoder, test.noHeaders)
 			if test.expectErr {
 				if err == nil {
 					t.Errorf("[%s] unexpected non-error", test.name)
@@ -129,7 +132,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 			if test.noHeaders {
 				buffer := &bytes.Buffer{}
 
-				printer.PrintObj(&api.Pod{}, buffer)
+				printer.PrintObj(&corev1.Pod{}, buffer)
 				if err != nil {
 					t.Fatalf("An error occurred printing Pod: %#v", err)
 				}
@@ -219,7 +222,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reader := bytes.NewBufferString(test.spec)
-			printer, err := NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
+			printer, err := NewCustomColumnsPrinterFromTemplate(reader, decoder)
 			if test.expectErr {
 				if err == nil {
 					t.Errorf("[%s] unexpected non-error", test.name)
@@ -251,7 +254,7 @@ func TestColumnPrint(t *testing.T) {
 					FieldSpec: "{.metadata.name}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			obj: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			expectedOutput: `NAME
 foo
 `,
@@ -263,8 +266,8 @@ foo
 					FieldSpec: "{.metadata.name}",
 				},
 			},
-			obj: &v1.PodList{
-				Items: []v1.Pod{
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
 					{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 					{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 				},
@@ -285,7 +288,7 @@ bar
 					FieldSpec: "{.apiVersion}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
+			obj: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
 			expectedOutput: `NAME   API_VERSION
 foo    baz
 `,
@@ -305,7 +308,7 @@ foo    baz
 					FieldSpec: "{.notFound}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
+			obj: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
 			expectedOutput: `NAME   API_VERSION   NOT_FOUND
 foo    baz           <none>
 `,
@@ -316,7 +319,7 @@ foo    baz           <none>
 		t.Run(test.expectedOutput, func(t *testing.T) {
 			printer := &CustomColumnsPrinter{
 				Columns: test.columns,
-				Decoder: legacyscheme.Codecs.UniversalDecoder(),
+				Decoder: decoder,
 			}
 			buffer := &bytes.Buffer{}
 			if err := printer.PrintObj(test.obj, buffer); err != nil {
@@ -345,7 +348,7 @@ func TestIndividualPrintObjOnExistingTabWriter(t *testing.T) {
 			FieldSpec: "{.metadata.labels.label2}",
 		},
 	}
-	objects := []*v1.Pod{
+	objects := []*corev1.Pod{
 		{ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"label1": "foo", "label2": "foo"}}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{"label1": "bar", "label2": "bar"}}},
 	}
@@ -355,10 +358,10 @@ bar    bar                bar
 `
 
 	buffer := &bytes.Buffer{}
-	tabWriter := GetNewTabWriter(buffer)
+	tabWriter := printers.GetNewTabWriter(buffer)
 	printer := &CustomColumnsPrinter{
 		Columns: columns,
-		Decoder: legacyscheme.Codecs.UniversalDecoder(),
+		Decoder: decoder,
 	}
 	for _, obj := range objects {
 		if err := printer.PrintObj(obj, tabWriter); err != nil {

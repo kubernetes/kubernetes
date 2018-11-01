@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package get
 
 import (
 	"bytes"
@@ -24,13 +24,13 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
-	testObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	testObject := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	customColumnsFile, err := ioutil.TempFile("", "printers_jsonpath_flags")
 	if err != nil {

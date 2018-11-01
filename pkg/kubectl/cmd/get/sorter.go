@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package get
 
 import (
 	"fmt"
@@ -24,15 +24,15 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/kubernetes/pkg/printers"
 
 	"vbom.ml/util/sortorder"
 )
@@ -71,7 +71,7 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	}
 
 	switch list := obj.(type) {
-	case *v1.List:
+	case *corev1.List:
 		outputList := make([]runtime.RawExtension, len(objs))
 		for ix := range objs {
 			outputList[ix] = list.Items[sorter.OriginalPosition(ix)]
@@ -96,7 +96,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 		}
 	}
 
-	field, err := printers.RelaxedJSONPathExpression(fieldInput)
+	field, err := RelaxedJSONPathExpression(fieldInput)
 	if err != nil {
 		return nil, err
 	}
