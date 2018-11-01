@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	knownResizeConditions map[v1.PersistentVolumeClaimConditionType]bool = map[v1.PersistentVolumeClaimConditionType]bool{
+	knownResizeConditions = map[v1.PersistentVolumeClaimConditionType]bool{
 		v1.PersistentVolumeClaimFileSystemResizePending: true,
 		v1.PersistentVolumeClaimResizing:                true,
 	}
