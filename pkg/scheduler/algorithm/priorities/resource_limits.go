@@ -27,10 +27,18 @@ import (
 )
 
 // ResourceLimitsPriorityMap is a priority function that increases score of input node by 1 if the node satisfies
-// input pod's resource limits. In detail, this priority function works as follows: If a node does not publish its
-// allocatable resources (cpu and memory both), the node score is not affected. If a pod does not specify
-// its cpu and memory limits both, the node score is not affected. If one or both of cpu and memory limits
-// of the pod are satisfied, the node is assigned a score of 1.
+// input pod's resource limits. In detail, this priority function works as follows:
+//
+// If a node does not publish its allocatable resources, the node
+// score is not affected.
+//
+// If a pod specifies neither cpu or memory limits, the node score is
+// not affected.
+//
+// If either the cpu limit or the memory limit of the pod are set and
+// are satisfied by the corresponding node allocatable resource, the
+// node is assigned a score of 1.
+//
 // Rationale of choosing the lowest score of 1 is that this is mainly selected to break ties between nodes that have
 // same scores assigned by one of least and most requested priority functions.
 func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
