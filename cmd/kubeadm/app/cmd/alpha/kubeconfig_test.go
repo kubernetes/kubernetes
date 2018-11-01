@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package phases
+package alpha
 
 import (
 	"bytes"
@@ -22,31 +22,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
-
-func TestKubeConfigCSubCommandsHasFlags(t *testing.T) {
-	cmd := NewCmdUserKubeConfig(nil, "", phaseTestK8sVersion)
-
-	flags := []string{
-		"cert-dir",
-		"apiserver-advertise-address",
-		"apiserver-bind-port",
-		"kubeconfig-dir",
-		"token",
-		"client-name",
-	}
-
-	cmdtestutil.AssertSubCommandHasFlags(t, []*cobra.Command{cmd}, "user", flags...)
-}
-
-const phaseTestK8sVersion = "v1.11.0"
 
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 
@@ -56,8 +37,6 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 
 	// Adds a pki folder with a ca cert to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
-
-	outputdir := tmpdir
 
 	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
@@ -70,7 +49,6 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		"--apiserver-bind-port=1234",
 		"--client-name=myUser",
 		fmt.Sprintf("--cert-dir=%s", pkidir),
-		fmt.Sprintf("--kubeconfig-dir=%s", outputdir),
 	}
 
 	var tests = []struct {
@@ -94,11 +72,14 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		buf := new(bytes.Buffer)
 
 		// Get subcommands working in the temporary directory
-		cmd := NewCmdUserKubeConfig(buf, tmpdir, phaseTestK8sVersion)
+		cmd := newCmdUserKubeConfig(buf)
 
 		// Execute the subcommand
 		allFlags := append(commonFlags, test.additionalFlags...)
-		cmdtestutil.RunSubCommand(t, []*cobra.Command{cmd}, test.command, allFlags...)
+		cmd.SetArgs(allFlags)
+		if err := cmd.Execute(); err != nil {
+			t.Fatal("Could not execute subcommand")
+		}
 
 		// reads kubeconfig written to stdout
 		config, err := clientcmd.Load(buf.Bytes())

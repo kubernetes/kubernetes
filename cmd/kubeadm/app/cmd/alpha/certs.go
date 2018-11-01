@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package renew
+package alpha
 
 import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -46,8 +45,20 @@ var (
 `)
 )
 
-// NewCmdCertsRenewal creates a new `cert renew` command.
-func NewCmdCertsRenewal() *cobra.Command {
+// newCmdCertsUtility returns main command for certs phase
+func newCmdCertsUtility() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "certs",
+		Aliases: []string{"certificates"},
+		Short:   "Commands related to handling kubernetes certificates",
+	}
+
+	cmd.AddCommand(newCmdCertsRenewal())
+	return cmd
+}
+
+// newCmdCertsRenewal creates a new `cert renew` command.
+func newCmdCertsRenewal() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
 		Short: "Renews certificates for a Kubernetes cluster",

@@ -25,6 +25,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/cmd/alpha:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases:go_default_library",
         "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
@@ -131,6 +132,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/kubeadm/app/cmd/alpha:all-srcs",
         "//cmd/kubeadm/app/cmd/options:all-srcs",
         "//cmd/kubeadm/app/cmd/phases:all-srcs",
         "//cmd/kubeadm/app/cmd/upgrade:all-srcs",

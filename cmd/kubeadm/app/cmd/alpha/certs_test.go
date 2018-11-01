@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package renew
+package alpha
 
 import (
 	"crypto/rand"
@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -58,7 +57,7 @@ func TestCommandsGenerated(t *testing.T) {
 		"renew etcd-healthcheck-client",
 	}
 
-	renewCmd := NewCmdCertsRenewal()
+	renewCmd := newCmdCertsRenewal()
 
 	fakeRoot := &cobra.Command{}
 	fakeRoot.AddCommand(renewCmd)

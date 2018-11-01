@@ -268,7 +268,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded: %v")
+		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
 	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
@@ -295,7 +295,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
+		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
 	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
