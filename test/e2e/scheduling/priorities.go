@@ -208,7 +208,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	})
 
 	It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
-
 		// make the nodes have balanced cpu,mem usage ratio
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
