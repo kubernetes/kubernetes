@@ -503,6 +503,7 @@ func ExpandPathsToKustomizationVisitors(mapper *mapper, paths string, recursive 
 				foundKust = true
 				return nil
 			}
+			return nil
 		}
 		if foundKust {
 			return nil

@@ -196,32 +196,33 @@ func (b *Builder) AddError(err error) *Builder {
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
 func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *FilenameOptions) *Builder {
-	recursive := filenameOptions.Recursive
-	paths := filenameOptions.Filenames
-	for _, s := range paths {
-		switch {
-		case s == "-":
-			b.Stdin()
-		case strings.Index(s, "http://") == 0 || strings.Index(s, "https://") == 0:
-			url, err := url.Parse(s)
-			if err != nil {
-				b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
-				continue
-			}
-			b.URL(defaultHttpGetAttempts, url)
-		default:
-			if !recursive {
-				b.singleItemImplied = true
-			}
-			b.Path(recursive, s)
-		}
-	}
-
-	if enforceNamespace {
-		b.RequireNamespace()
-	}
-
-	return b
+	//recursive := filenameOptions.Recursive
+	//paths := filenameOptions.Filenames
+	//for _, s := range paths {
+	//	switch {
+	//	case s == "-":
+	//		b.Stdin()
+	//	case strings.Index(s, "http://") == 0 || strings.Index(s, "https://") == 0:
+	//		url, err := url.Parse(s)
+	//		if err != nil {
+	//			b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
+	//			continue
+	//		}
+	//		b.URL(defaultHttpGetAttempts, url)
+	//	default:
+	//		if !recursive {
+	//			b.singleItemImplied = true
+	//		}
+	//		b.Path(recursive, s)
+	//	}
+	//}
+	//
+	//if enforceNamespace {
+	//	b.RequireNamespace()
+	//}
+	//
+	//return b
+	return b.FilenameParamWithKustomization(enforceNamespace, filenameOptions)
 }
 
 func (b *Builder) FilenameParamWithKustomization(enforceNamespace bool, filenameOptions *FilenameOptions) *Builder {
