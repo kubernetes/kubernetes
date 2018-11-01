@@ -271,12 +271,9 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) bool {
 
 	for i, e := range ev {
 		evIndex = i
-		// Per the audit.Backend interface these events are reused after being
-		// sent to the Sink. Deep copy and send the copy to the queue.
-		event := e.DeepCopy()
 
 		select {
-		case b.buffer <- event:
+		case b.buffer <- e:
 		default:
 			sendErr = fmt.Errorf("audit buffer queue blocked")
 			return true

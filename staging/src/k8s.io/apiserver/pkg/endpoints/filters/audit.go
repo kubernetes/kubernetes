@@ -153,6 +153,9 @@ func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []au
 	} else {
 		ev.StageTimestamp = metav1.NewMicroTime(time.Now())
 	}
+	// Make deep copy of event before sending to the sink, so that as it can be processed concurrently as
+	// the request passes through its stages
+	e := ev.DeepCopy()
 	audit.ObserveEvent()
 	return sink.ProcessEvents(ev)
 }
