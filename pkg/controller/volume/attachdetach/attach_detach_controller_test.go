@@ -278,7 +278,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		var detachedVolumesNum int = 0
 
 		time.Sleep(time.Second * 1) // Wait for a second
-		for _, volumeList := range testPlugin.GetAllVolumes() {
+		for _, volumeList := range testPlugin.GetAttachedVolumes() {
 			attachedVolumesNum += len(volumeList)
 		}
 		for _, volumeList := range testPlugin.GetDetachedVolumes() {

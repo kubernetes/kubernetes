@@ -322,12 +322,12 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 					klog.Errorf("AttachVolume.MarkVolumeAsAttached failed to fix dangling volume error for volume %q with %s", volumeToAttach.VolumeName, addErr)
 				}
 
-			}
-			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsUncertain(
-				v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
-			if addVolumeNodeErr != nil {
-				// On failure, return error. Caller will log and retry.
-				return volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsUncertain failed", addVolumeNodeErr)
+			} else {
+				addErr := actualStateOfWorld.MarkVolumeAsUncertain(
+					v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+				if addErr != nil {
+					klog.Errorf("AttachVolume.MarkVolumeAsUncertain fail to add the volume %q to actual state with %s", volumeToAttach.VolumeName, addErr)
+				}
 			}
 			// On failure, return error. Caller will log and retry.
 			return volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)

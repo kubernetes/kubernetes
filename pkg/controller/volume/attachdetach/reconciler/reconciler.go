@@ -175,7 +175,7 @@ func (rc *reconciler) reconcile() {
 	// pods that are rescheduled to a different node are detached first.
 
 	// Ensure volumes that should be detached are detached.
-	for _, attachedVolume := range rc.actualStateOfWorld.GetAllVolumes() {
+	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
 		if !rc.desiredStateOfWorld.VolumeExists(
 			attachedVolume.VolumeName, attachedVolume.NodeName) {
 			// Don't even try to start an operation if there is already one running
@@ -183,7 +183,7 @@ func (rc *reconciler) reconcile() {
 			// may pass while at the same time the volume leaves the pending state, resulting in
 			// double detach attempts
 			if rc.attacherDetacher.IsOperationPending(attachedVolume.VolumeName, "") {
-				klog.V(5).Infof("Operation for volume %q is already running. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+				klog.V(10).Infof("Operation for volume %q is already running. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 				continue
 			}
 
@@ -269,7 +269,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 		}
 
 		if rc.isMultiAttachForbidden(volumeToAttach.VolumeSpec) {
-			nodes := rc.actualStateOfWorld.GetNodesForVolume(volumeToAttach.VolumeName)
+			nodes := rc.actualStateOfWorld.GetNodesForAttachedVolume(volumeToAttach.VolumeName)
 			if len(nodes) > 0 {
 				if !volumeToAttach.MultiAttachErrorReported {
 					rc.reportMultiAttachError(volumeToAttach, nodes)
