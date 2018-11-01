@@ -12,7 +12,7 @@ go_library(
         "doc.go",
         "host_path.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/host_path",
+    importpath = "k8s.io/kubernetes/pkg/volume/hostpath",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

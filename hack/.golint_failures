@@ -344,7 +344,6 @@ pkg/volume/azure_file
 pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
-pkg/volume/host_path
 pkg/volume/iscsi
 pkg/volume/nfs
 pkg/volume/photon_pd
