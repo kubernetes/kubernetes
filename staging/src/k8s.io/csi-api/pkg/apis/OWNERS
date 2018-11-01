@@ -5,6 +5,6 @@ approvers:
 - api-approvers
 reviewers:
 - api-reviewers
+- sig-storage-reviewers
 labels:
-- sig/architecture
 - kind/api-change
