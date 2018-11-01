@@ -1219,10 +1219,6 @@ func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTer
 		if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(podAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, podAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
 	}
 	return terms
 }
@@ -1233,10 +1229,6 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
 	}
 	return terms
 }
