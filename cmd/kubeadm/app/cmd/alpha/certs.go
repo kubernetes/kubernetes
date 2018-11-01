@@ -89,14 +89,20 @@ func getRenewSubCommands() []*cobra.Command {
 	kubeadmutil.CheckErr(err)
 
 	cmdList := []*cobra.Command{}
-	allCmds := []func() error{}
+	funcList := []func(){}
 
 	for caCert, certs := range certTree {
 		// Don't offer to renew CAs; would cause serious consequences
 		for _, cert := range certs {
-			cmd := makeCommandForRenew(cert, caCert, cfg)
+			// get the cobra.Command skeleton for this command
+			cmd := generateRenewalCommand(cert, cfg)
+			// get the implementation of renewing this certificate
+			renewalFunc := generateRenewalFunction(cert, caCert, cfg)
+			// install the implementation into the command
+			cmd.Run = func(*cobra.Command, []string) { renewalFunc() }
 			cmdList = append(cmdList, cmd)
-			allCmds = append(allCmds, cmd.Execute)
+			// Collect renewal functions for `renew all`
+			funcList = append(funcList, renewalFunc)
 		}
 	}
 
@@ -105,9 +111,8 @@ func getRenewSubCommands() []*cobra.Command {
 		Short: "renew all available certificates",
 		Long:  allLongDesc,
 		Run: func(*cobra.Command, []string) {
-			for _, cmd := range allCmds {
-				err := cmd()
-				kubeadmutil.CheckErr(err)
+			for _, f := range funcList {
+				f()
 			}
 		},
 	}
@@ -124,28 +129,26 @@ func addFlags(cmd *cobra.Command, cfg *renewConfig) {
 	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
-// generateCertCommand takes mostly strings instead of structs to avoid using structs in a for loop
-func generateCertCommand(name, longName, baseName, caCertBaseName string, cfg *renewConfig) *cobra.Command {
-	return &cobra.Command{
-		Use:   name,
-		Short: fmt.Sprintf("Generates the %s", longName),
-		Long:  fmt.Sprintf(genericLongDesc, longName, baseName),
-		Run: func(cmd *cobra.Command, args []string) {
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
-			kubeadmutil.CheckErr(err)
-			renewer, err := getRenewer(cfg, caCertBaseName)
-			kubeadmutil.CheckErr(err)
+func generateRenewalFunction(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfg *renewConfig) func() {
+	return func() {
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
+		kubeadmutil.CheckErr(err)
+		renewer, err := getRenewer(cfg, caCert.BaseName)
+		kubeadmutil.CheckErr(err)
 
-			err = renewal.RenewExistingCert(internalcfg.CertificatesDir, baseName, renewer)
-			kubeadmutil.CheckErr(err)
-		},
+		err = renewal.RenewExistingCert(internalcfg.CertificatesDir, cert.BaseName, renewer)
+		kubeadmutil.CheckErr(err)
 	}
 }
 
-func makeCommandForRenew(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfg *renewConfig) *cobra.Command {
-	certCmd := generateCertCommand(cert.Name, cert.LongName, cert.BaseName, caCert.BaseName, cfg)
-	addFlags(certCmd, cfg)
-	return certCmd
+func generateRenewalCommand(cert *certsphase.KubeadmCert, cfg *renewConfig) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   cert.Name,
+		Short: fmt.Sprintf("Generates the %s", cert.LongName),
+		Long:  fmt.Sprintf(genericLongDesc, cert.LongName, cert.BaseName),
+	}
+	addFlags(cmd, cfg)
+	return cmd
 }
 
 func getRenewer(cfg *renewConfig, caCertBaseName string) (renewal.Interface, error) {
