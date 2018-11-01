@@ -114,7 +114,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (printers.Resour
 // flags related to template printing to it
 func (f *GoTemplatePrintFlags) AddFlags(c *cobra.Command) {
 	if f.TemplateArgument != nil {
-		c.Flags().StringVar(f.TemplateArgument, "template", *f.TemplateArgument, "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
+		c.Flags().StringVar(f.TemplateArgument, "template", *f.TemplateArgument, "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is [golang templates](http://golang.org/pkg/text/template/#pkg-overview).")
 		c.MarkFlagFilename("template")
 	}
 	if f.AllowMissingKeys != nil {
