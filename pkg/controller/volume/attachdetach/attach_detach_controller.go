@@ -631,13 +631,8 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
 	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
-<<<<<<< HEAD
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
-=======
-	klog.V(4).Infof("processVolumesInUse for node %q", nodeName)
-	for _, attachedVolume := range adc.actualStateOfWorld.GetAllVolumesForNode(nodeName) {
->>>>>>> Handle failed attach operation leave uncertain volume attach state
 		mounted := false
 		for _, volumeInUse := range volumesInUse {
 			if attachedVolume.VolumeName == volumeInUse {

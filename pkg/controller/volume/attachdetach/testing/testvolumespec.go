@@ -328,7 +328,7 @@ func (plugin *TestPlugin) GetErrorEncountered() bool {
 	return plugin.ErrorEncountered
 }
 
-func (plugin *TestPlugin) GetAllVolumes() map[string][]string {
+func (plugin *TestPlugin) GetAttachedVolumes() map[string][]string {
 	plugin.pluginLock.RLock()
 	defer plugin.pluginLock.RUnlock()
 	ret := make(map[string][]string)

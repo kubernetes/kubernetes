@@ -497,7 +497,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
 	waitForAttachedToNodesCount(t, 1 /* expectedNodeCount */, generatedVolumeName, asw)
 
-	nodesForVolume := asw.GetNodesForVolume(generatedVolumeName)
+	nodesForVolume := asw.GetNodesForAttachedVolume(generatedVolumeName)
 
 	// check if multiattach is marked
 	// at least one volume+node should be marked with multiattach error
@@ -576,10 +576,11 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 
+	time.Sleep(1 * time.Second)
 	// Volume is added to asw. Because attach operation fails, volume should not reported as attached to the node.
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
-	veriryVolumeAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
-	veriryVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
+	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
 	// Without this, the delete operation will be delayed due to mounted status
@@ -595,7 +596,73 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
-	veriryVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
+
+}
+
+// Creates a volume with accessMode ReadWriteOnce
+// First create a pod which will try to attach the volume to the a node named "timeout-node". The attach call for this node will
+// fail for timeout, but the volume will be actually attached to the node after the call.
+// Secondly, delete the this pod.
+// Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
+func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
+		fakeHandler))
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+	podName1 := "pod-uid1"
+	podName2 := "pod-uid2"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	nodeName1 := k8stypes.NodeName(volumetesting.TimeoutAttachNode)
+	nodeName2 := k8stypes.NodeName("node-name2")
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Add the pod in which the volume is attached to the timeout node
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+
+	// Volume is added to asw. Because attach operation fails, volume should not reported as attached to the node.
+	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
+	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
+
+	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
+	// Without this, the delete operation will be delayed due to mounted status
+	asw.SetVolumeMountedByNode(generatedVolumeName, nodeName1, false /* mounted */)
+
+	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+
+	waitForVolumeRemovedFromNode(t, generatedVolumeName, nodeName1, asw)
+
+	// Add a second pod which tries to attach the volume to a different node.
+	generatedVolumeName, podAddErr = dsw.AddPod(types.UniquePodName(podName2), controllervolumetesting.NewPod(podName2, podName2), volumeSpec, nodeName2)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
 
 }
 
@@ -935,7 +1002,7 @@ func waitForAttachedToNodesCount(
 	err := retryWithExponentialBackOff(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
-			count := len(asw.GetNodesForVolume(volumeName))
+			count := len(asw.GetNodesForAttachedVolume(volumeName))
 			if count == expectedNodeCount {
 				return true, nil
 			}
@@ -950,7 +1017,7 @@ func waitForAttachedToNodesCount(
 	)
 
 	if err != nil {
-		count := len(asw.GetNodesForVolume(volumeName))
+		count := len(asw.GetNodesForAttachedVolume(volumeName))
 		t.Fatalf(
 			"Wrong number of nodes having <%v> attached. Expected: <%v> Actual: <%v>",
 			volumeName,
@@ -1010,7 +1077,7 @@ func waitForVolumeAddedToNode(
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
-			volumes := asw.GetAllVolumes()
+			volumes := asw.GetAttachedVolumes()
 			for _, volume := range volumes {
 				if volume.VolumeName == volumeName && volume.NodeName == nodeName {
 					return true, nil
@@ -1042,7 +1109,7 @@ func waitForVolumeRemovedFromNode(
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
-			volumes := asw.GetAllVolumes()
+			volumes := asw.GetAttachedVolumes()
 			exist := false
 			for _, volume := range volumes {
 				if volume.VolumeName == volumeName && volume.NodeName == nodeName {
@@ -1070,7 +1137,7 @@ func waitForVolumeRemovedFromNode(
 	}
 }
 
-func veriryVolumeAttachedToNode(
+func verifyVolumeAttachedToNode(
 	t *testing.T,
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName,
@@ -1089,7 +1156,7 @@ func veriryVolumeAttachedToNode(
 
 }
 
-func veriryVolumeReportedAsAttachedToNode(
+func verifyVolumeReportedAsAttachedToNode(
 	t *testing.T,
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName,
