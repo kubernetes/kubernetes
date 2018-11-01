@@ -171,6 +171,8 @@ const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
 const sysctlForward = "net/ipv4/ip_forward"
+const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
+const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
@@ -324,6 +326,20 @@ func NewProxier(ipt utiliptables.Interface,
 	if val, _ := sysctl.GetSysctl(sysctlForward); val != 1 {
 		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
+		}
+	}
+
+	// Set the arp_ignore sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
+		if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
+		}
+	}
+
+	// Set the arp_announce sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
+		if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
 		}
 	}
 
