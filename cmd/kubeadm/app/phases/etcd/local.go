@@ -46,7 +46,6 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.In
 	if cfg.ClusterConfiguration.Etcd.External != nil {
 		return errors.New("etcd static pod manifest cannot be generated for cluster using external etcd")
 	}
-	glog.V(1).Infoln("creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec
 	emptyInitialCluster := []etcdutil.Member{}
 	spec := GetEtcdPodSpec(cfg, emptyInitialCluster)
@@ -55,7 +54,7 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.In
 		return err
 	}
 
-	fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd instance to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	glog.V(1).Infof("[etcd] wrote Static Pod manifest for a local etcd instance to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
 	return nil
 }
 
