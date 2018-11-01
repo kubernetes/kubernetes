@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	logpolicy "k8s.io/kubernetes/pkg/kubelet/log/policy"
 )
 
 const (
@@ -156,6 +157,7 @@ func NewVolumeManager(
 	mounter mount.Interface,
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
+	logStatusProvider logpolicy.LogStatusProvider,
 	checkNodeCapabilitiesBeforeMount bool,
 	keepTerminatedPodVolumes bool) VolumeManager {
 
@@ -181,6 +183,7 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		kubeContainerRuntime,
+		logStatusProvider,
 		keepTerminatedPodVolumes)
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,

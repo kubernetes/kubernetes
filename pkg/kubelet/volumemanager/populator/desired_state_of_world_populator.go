@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	logpolicy "k8s.io/kubernetes/pkg/kubelet/log/policy"
 )
 
 // DesiredStateOfWorldPopulator periodically loops through the list of active
@@ -85,6 +86,7 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
+	logStatusProvider logpolicy.LogStatusProvider,
 	keepTerminatedPodVolumes bool) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
@@ -100,6 +102,7 @@ func NewDesiredStateOfWorldPopulator(
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
+		logStatusProvider:        logStatusProvider,
 	}
 }
 
@@ -117,6 +120,7 @@ type desiredStateOfWorldPopulator struct {
 	keepTerminatedPodVolumes  bool
 	hasAddedPods              bool
 	hasAddedPodsLock          sync.RWMutex
+	logStatusProvider         logpolicy.LogStatusProvider
 }
 
 type processedPods struct {
@@ -202,6 +206,9 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		if podExists {
 			// Skip running pods
 			if !dswp.isPodTerminated(pod) {
+				continue
+			}
+			if !dswp.logStatusProvider.IsCollectFinished(pod.UID) {
 				continue
 			}
 			if dswp.keepTerminatedPodVolumes {

@@ -316,6 +316,7 @@ func newTestKubeletWithImageList(
 		kubelet.mounter,
 		kubelet.getPodsDir(),
 		kubelet.recorder,
+		kubelet.logPluginManager,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false /* keepTerminatedPodVolumes */)
 
