@@ -47,7 +47,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	cpuScore := computeScore(podLimits.MilliCPU, allocatableResources.MilliCPU)
 	memScore := computeScore(podLimits.Memory, allocatableResources.Memory)
 
-	score := int(0)
+	score := 0
 	if cpuScore == 1 || memScore == 1 {
 		score = 1
 	}
@@ -72,7 +72,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 
 // computeScore returns 1 if limit value is less than or equal to allocatable
 // value, otherwise it returns 0.
-func computeScore(limit, allocatable int64) int64 {
+func computeScore(limit, allocatable int64) int {
 	if limit != 0 && allocatable != 0 && limit <= allocatable {
 		return 1
 	}
