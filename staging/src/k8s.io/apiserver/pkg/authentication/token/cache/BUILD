@@ -17,7 +17,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
     ],
 )
@@ -35,7 +34,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/cache:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
     ],
 )
 
