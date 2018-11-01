@@ -129,39 +129,18 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 	}
 }
 
-type sourceScript struct {
-	path       string
-	sourceOnly bool
-}
-
 // Creates source script string for sourcing bash scripts, in order passed.
-func makeSource(scripts []sourceScript) string {
+func makeSource(scripts []string) string {
 	out := ""
 	for _, s := range scripts {
-		out += fmt.Sprintf("source %s", s.path)
-		if s.sourceOnly {
-			out += " --source-only"
-		}
-		out += " ; "
+		out += fmt.Sprintf("source %s ; ", s)
 	}
 	return out
 }
 
 func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
 	c.mustCreateEnv(envTemplate, env)
-	args := makeSource([]sourceScript{
-		{
-			path: c.envScriptPath,
-		},
-		{
-			path:       configureHelperScriptName,
-			sourceOnly: true,
-		},
-		{
-			path:       configureKubeAPIServerScriptName,
-			sourceOnly: true,
-		},
-	})
+	args := makeSource([]string{c.envScriptPath, configureHelperScriptName, configureKubeAPIServerScriptName})
 	args += fmt.Sprintf(" %s", c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
