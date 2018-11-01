@@ -18,17 +18,11 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +31,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
-	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 )
 
@@ -351,189 +344,4 @@ func TestRunDeleteToken(t *testing.T) {
 	if err = RunDeleteToken(&buf, client, "invalid-token"); err == nil {
 		t.Errorf("RunDeleteToken() succeeded for an invalid token: %v", err)
 	}
-}
-
-var httpTestItr uint32
-var httpSentResponse uint32 = 1
-
-func TestRunListTokens(t *testing.T) {
-	var err error
-	var bufOut, bufErr bytes.Buffer
-
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
-	if err != nil {
-		t.Errorf("Unable to create temporary directory: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	fullPath := filepath.Join(tmpDir, "test-config-file")
-
-	f, err := os.Create(fullPath)
-	if err != nil {
-		t.Errorf("Unable to create test file %q: %v", fullPath, err)
-	}
-	defer f.Close()
-
-	// test config without secrets; should fail
-	if _, err = f.WriteString(testConfigToken); err != nil {
-		t.Errorf("Unable to write test file %q: %v", fullPath, err)
-	}
-
-	client, err := getClientset(fullPath, true)
-	if err != nil {
-		t.Errorf("Unable to run getClientset() for test file %q: %v", fullPath, err)
-	}
-
-	if err = RunListTokens(&bufOut, &bufErr, client); err == nil {
-		t.Errorf("RunListTokens() did not fail for a config without secrets: %v", err)
-	}
-
-	// test config without secrets but use a dummy API server that returns secrets
-	portString := "9008"
-	http.HandleFunc("/", httpHandler)
-	httpServer := &http.Server{Addr: "localhost:" + portString}
-	go func() {
-		err := httpServer.ListenAndServe()
-		if err != nil {
-			t.Errorf("Failed to start dummy API server: localhost:%s", portString)
-		}
-	}()
-
-	fmt.Printf("dummy API server listening on localhost:%s\n", portString)
-	testConfigTokenOpenPort := strings.Replace(testConfigToken, "server: localhost:8000", "server: localhost:"+portString, -1)
-
-	if _, err = f.WriteString(testConfigTokenOpenPort); err != nil {
-		t.Errorf("Unable to write test file %q: %v", fullPath, err)
-	}
-
-	client, err = getClientset(fullPath, true)
-	if err != nil {
-		t.Errorf("Unable to run getClientset() for test file %q: %v", fullPath, err)
-	}
-
-	// the order of these tests should match the case check
-	// for httpTestItr in httpHandler
-	testCases := []struct {
-		name          string
-		expectedError bool
-	}{
-		{
-			name:          "token-id not defined",
-			expectedError: true,
-		},
-		{
-			name:          "secret name not formatted correctly",
-			expectedError: true,
-		},
-		{
-			name:          "token-secret not defined",
-			expectedError: true,
-		},
-		{
-			name:          "token expiration not formatted correctly",
-			expectedError: true,
-		},
-		{
-			name:          "token expiration formatted correctly",
-			expectedError: false,
-		},
-		{
-			name:          "token usage constant not true",
-			expectedError: false,
-		},
-		{
-			name:          "token usage constant set to true",
-			expectedError: false,
-		},
-	}
-	for _, tc := range testCases {
-		bufErr.Reset()
-		atomic.StoreUint32(&httpSentResponse, 0)
-		fmt.Printf("Running HTTP test case (%d) %q\n", atomic.LoadUint32(&httpTestItr), tc.name)
-		// should always return nil here if a valid list of secrets if fetched
-		err := RunListTokens(&bufOut, &bufErr, client)
-		if err != nil {
-			t.Errorf("HTTP test case %d: Was unable to fetch a list of secrets", atomic.LoadUint32(&httpTestItr))
-		}
-		// wait for a response from the dummy HTTP server
-		timeSpent := 0 * time.Millisecond
-		timeToSleep := 50 * time.Millisecond
-		timeMax := 2000 * time.Millisecond
-		for {
-			if atomic.LoadUint32(&httpSentResponse) == 1 {
-				break
-			}
-			if timeSpent >= timeMax {
-				t.Errorf("HTTP test case %d: The server did not respond within %d ms", atomic.LoadUint32(&httpTestItr), timeMax)
-			}
-			timeSpent += timeToSleep
-			time.Sleep(timeToSleep)
-		}
-		// check if an error is written in the error buffer
-		hasError := bufErr.Len() != 0
-		if hasError != tc.expectedError {
-			t.Errorf("HTTP test case %d: RunListTokens expected error: %v, saw: %v; %v", atomic.LoadUint32(&httpTestItr), tc.expectedError, hasError, bufErr.String())
-		}
-	}
-}
-
-// only one of these should run at a time in a goroutine
-func httpHandler(w http.ResponseWriter, r *http.Request) {
-	tokenID := []byte("07401b")
-	tokenSecret := []byte("f395accd246ae52d")
-	tokenExpire := []byte("2012-11-01T22:08:41+00:00")
-	badValue := "bad-value"
-	name := bootstrapapi.BootstrapTokenSecretPrefix + string(tokenID)
-	tokenUsageKey := bootstrapapi.BootstrapTokenUsagePrefix + "test"
-
-	secret := v1.Secret{}
-	secret.Type = bootstrapapi.SecretTypeBootstrapToken
-	secret.TypeMeta = metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"}
-	secret.Data = map[string][]byte{}
-
-	switch atomic.LoadUint32(&httpTestItr) {
-	case 0:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = []byte("")
-	case 1:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = tokenID
-		secret.ObjectMeta = metav1.ObjectMeta{Name: badValue}
-	case 2:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = tokenID
-		secret.Data[bootstrapapi.BootstrapTokenSecretKey] = []byte("")
-		secret.ObjectMeta = metav1.ObjectMeta{Name: name}
-	case 3:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = tokenID
-		secret.Data[bootstrapapi.BootstrapTokenSecretKey] = tokenSecret
-		secret.Data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(badValue)
-		secret.ObjectMeta = metav1.ObjectMeta{Name: name}
-	case 4:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = tokenID
-		secret.Data[bootstrapapi.BootstrapTokenSecretKey] = tokenSecret
-		secret.Data[bootstrapapi.BootstrapTokenExpirationKey] = tokenExpire
-		secret.ObjectMeta = metav1.ObjectMeta{Name: name}
-	case 5:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = tokenID
-		secret.Data[bootstrapapi.BootstrapTokenSecretKey] = tokenSecret
-		secret.Data[bootstrapapi.BootstrapTokenExpirationKey] = tokenExpire
-		secret.Data[tokenUsageKey] = []byte("false")
-		secret.ObjectMeta = metav1.ObjectMeta{Name: name}
-	case 6:
-		secret.Data[bootstrapapi.BootstrapTokenIDKey] = tokenID
-		secret.Data[bootstrapapi.BootstrapTokenSecretKey] = tokenSecret
-		secret.Data[bootstrapapi.BootstrapTokenExpirationKey] = tokenExpire
-		secret.Data[tokenUsageKey] = []byte("true")
-		secret.ObjectMeta = metav1.ObjectMeta{Name: name}
-	}
-
-	secretList := v1.SecretList{}
-	secretList.Items = []v1.Secret{secret}
-	secretList.TypeMeta = metav1.TypeMeta{APIVersion: "v1", Kind: "SecretList"}
-
-	output, err := json.Marshal(secretList)
-	if err == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write([]byte(output))
-	}
-	atomic.AddUint32(&httpTestItr, 1)
-	atomic.StoreUint32(&httpSentResponse, 1)
 }
