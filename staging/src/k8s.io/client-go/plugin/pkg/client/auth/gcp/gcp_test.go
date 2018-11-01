@@ -117,27 +117,15 @@ func TestHelperProcess(t *testing.T) {
 	os.Exit(0)
 }
 
-func Test_isCmdTokenSource(t *testing.T) {
-	c1 := map[string]string{"cmd-path": "foo"}
-	if v := isCmdTokenSource(c1); !v {
-		t.Fatalf("cmd-path present in config (%+v), but got %v", c1, v)
-	}
-
-	c2 := map[string]string{"cmd-args": "foo bar"}
-	if v := isCmdTokenSource(c2); v {
-		t.Fatalf("cmd-path not present in config (%+v), but got %v", c2, v)
-	}
-}
-
 func Test_tokenSource_cmd(t *testing.T) {
-	if _, err := tokenSource(true, map[string]string{}); err == nil {
+	if _, err := tokenSource(map[string]string{}); err == nil {
 		t.Fatalf("expected error, cmd-args not present in config")
 	}
 
 	c := map[string]string{
 		"cmd-path": "foo",
 		"cmd-args": "bar"}
-	ts, err := tokenSource(true, c)
+	ts, err := tokenSource(c)
 	if err != nil {
 		t.Fatalf("failed to return cmd token source: %+v", err)
 	}
@@ -153,7 +141,7 @@ func Test_tokenSource_cmdCannotBeUsedWithScopes(t *testing.T) {
 	c := map[string]string{
 		"cmd-path": "foo",
 		"scopes":   "A,B"}
-	if _, err := tokenSource(true, c); err == nil {
+	if _, err := tokenSource(c); err == nil {
 		t.Fatal("expected error when scopes is used with cmd-path")
 	}
 }
@@ -169,7 +157,7 @@ func Test_tokenSource_applicationDefaultCredentials_fails(t *testing.T) {
 
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", fakeTokenFile.Name())
 	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if _, err := tokenSource(false, map[string]string{}); err == nil {
+	if _, err := tokenSource(map[string]string{}); err == nil {
 		t.Fatalf("expected error because specified ADC token file is not a JSON")
 	}
 }
@@ -187,7 +175,7 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", fakeTokenFile.Name())
 	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
-	ts, err := tokenSource(false, map[string]string{})
+	ts, err := tokenSource(map[string]string{})
 	if err != nil {
 		t.Fatalf("failed to get a token source: %+v", err)
 	}
@@ -207,7 +195,7 @@ func Test_tokenSource_credentialsFile(t *testing.T) {
 		t.Fatalf("failed to write to fake token file: %+v", err)
 	}
 
-	ts, err := tokenSource(false, map[string]string{"credentials-file": fakeTokenFile.Name()})
+	ts, err := tokenSource(map[string]string{"credentials-file": fakeTokenFile.Name()})
 	if err != nil {
 		t.Fatalf("failed to get a token source: %+v", err)
 	}
@@ -218,7 +206,7 @@ func Test_tokenSource_credentialsFile(t *testing.T) {
 
 func Test_tokenSource_credentialsFileEnsureAbsolutePath(t *testing.T) {
 	expected := fmt.Errorf("only absolute path to credentials-file accepted ./foo/bar.json is relative")
-	ts, err := tokenSource(false, map[string]string{"credentials-file": "./foo/bar.json"})
+	ts, err := tokenSource(map[string]string{"credentials-file": "./foo/bar.json"})
 	if !errEquiv(err, expected) {
 		t.Errorf("tokenSource() error: got %v, want %v", err, expected)
 	}
@@ -350,16 +338,6 @@ func TestCmdTokenSource(t *testing.T) {
 			nil,
 			nil,
 			fmt.Errorf("error parsing expiry-key %q", "{.expiry}"),
-		},
-		{
-			"missing credentials-file",
-			map[string]string{
-				"cmd-path":         "/default/no/args",
-				"credentials-file": "path/to/service/account.json",
-			},
-			nil,
-			fmt.Errorf("credentials-file can only be used when kubectl is using a gcp service account key"),
-			nil,
 		},
 		{
 			"invalid expiry timestamp",

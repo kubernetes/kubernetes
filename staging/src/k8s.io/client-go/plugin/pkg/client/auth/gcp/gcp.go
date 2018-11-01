@@ -125,7 +125,7 @@ type gcpAuthProvider struct {
 }
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	ts, err := tokenSource(isCmdTokenSource(gcpConfig), gcpConfig)
+	ts, err := tokenSource(gcpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -136,23 +136,14 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 	return &gcpAuthProvider{cts, persister}, nil
 }
 
-func isCmdTokenSource(gcpConfig map[string]string) bool {
-	_, ok := gcpConfig["cmd-path"]
-	return ok
-}
-
-func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, error) {
+func tokenSource(gcpConfig map[string]string) (oauth2.TokenSource, error) {
 	// Command-based token source
-	if isCmd {
-		cmd := gcpConfig["cmd-path"]
+	if cmd, ok := gcpConfig["cmd-path"]; ok {
 		if len(cmd) == 0 {
 			return nil, fmt.Errorf("missing access token cmd")
 		}
 		if gcpConfig["scopes"] != "" {
 			return nil, fmt.Errorf("scopes can only be used when kubectl is using a gcp service account key")
-		}
-		if gcpConfig["credentials-file"] != "" {
-			return nil, fmt.Errorf("credentials-file can only be used when kubectl is using a gcp service account key")
 		}
 		var args []string
 		if cmdArgs, ok := gcpConfig["cmd-args"]; ok {
