@@ -71,4 +71,9 @@ func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec)
 			{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
 		}
 	}
+	if obj.Conversion == nil {
+		obj.Conversion = &CustomResourceConversion{
+			Strategy: NoneConverter,
+		}
+	}
 }

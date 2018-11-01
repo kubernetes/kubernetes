@@ -61,6 +61,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
 				}
 			}
+			if obj.Conversion == nil {
+				obj.Conversion = &apiextensions.CustomResourceConversion{
+					Strategy: apiextensions.NoneConverter,
+				}
+			}
 		},
 		func(obj *apiextensions.CustomResourceDefinition, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
