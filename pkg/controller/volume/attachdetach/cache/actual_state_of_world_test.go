@@ -52,7 +52,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNode(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -87,7 +87,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("%q/%q volume/node combo does exist, it should not.", generatedVolumeName, nodeName)
 	}
 
-	allVolumes := asw.GetAllVolumes()
+	allVolumes := asw.GetAttachedVolumes()
 	if len(allVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(allVolumes))
 	}
@@ -99,7 +99,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q exist> Expect: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 
-	volumesForNode := asw.GetAllVolumesForNode(nodeName)
+	volumesForNode := asw.GetAttachedVolumesForNode(nodeName)
 	if len(volumesForNode) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(volumesForNode))
 	}
@@ -111,7 +111,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q exist> Expect: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 
-	nodes := asw.GetNodesForVolume(volumeName)
+	nodes := asw.GetNodesForAttachedVolume(volumeName)
 	if len(nodes) > 0 {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Expect no nodes returned.")
 	}
@@ -136,14 +136,14 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("%q/%q combo does not exist, it should.", generatedVolumeName, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 
-	nodes = asw.GetNodesForVolume(volumeName)
+	nodes = asw.GetNodesForAttachedVolume(volumeName)
 	if len(nodes) != 1 {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Expect one node returned.")
 	}
@@ -206,14 +206,14 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 		t.Fatalf("%q/%q combo does not exist, it should.", generatedVolumeName, node2Name)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 2 {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
 	}
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 
-	volumesForNode := asw.GetAllVolumesForNode(node2Name)
+	volumesForNode := asw.GetAttachedVolumesForNode(node2Name)
 	if len(volumesForNode) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(volumesForNode))
 	}
@@ -225,7 +225,7 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached failed. Actual: <node %q does not exist> Expect: <node does exist in the reportedAsAttached map", node2Name)
 	}
 
-	nodes := asw.GetNodesForVolume(volumeName)
+	nodes := asw.GetNodesForAttachedVolume(volumeName)
 	if len(nodes) != 1 {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Expect one node returned.")
 	}
@@ -278,7 +278,7 @@ func Test_AddVolumeNode_Positive_ExistingVolumeNewNode(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, node2Name)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 2 {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
 	}
@@ -322,7 +322,7 @@ func Test_AddVolumeNode_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -355,7 +355,7 @@ func Test_DeleteVolumeNode_Positive_VolumeExistsNodeExists(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo exists, it should not.", generatedVolumeName, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 0 {
 		t.Fatalf("len(attachedVolumes) Expected: <0> Actual: <%v>", len(attachedVolumes))
 	}
@@ -379,7 +379,7 @@ func Test_DeleteVolumeNode_Positive_VolumeDoesntExistNodeDoesntExist(t *testing.
 		t.Fatalf("%q/%q volume/node combo exists, it should not.", volumeName, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 0 {
 		t.Fatalf("len(attachedVolumes) Expected: <0> Actual: <%v>", len(attachedVolumes))
 	}
@@ -427,7 +427,7 @@ func Test_DeleteVolumeNode_Positive_TwoNodesOneDeleted(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, node2Name)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -459,7 +459,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -492,7 +492,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeDoesntExist(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo exists, it should not.", generatedVolumeName, node2Name)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -517,13 +517,13 @@ func Test_VolumeNodeExists_Positive_VolumeAndNodeDontExist(t *testing.T) {
 		t.Fatalf("%q/%q volume/node combo exists, it should not.", volumeName, nodeName)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 0 {
 		t.Fatalf("len(attachedVolumes) Expected: <0> Actual: <%v>", len(attachedVolumes))
 	}
 }
 
-// Calls GetAllVolumes() on empty data struct.
+// Calls GetAttachedVolumes() on empty data struct.
 // Verifies no volume/node entries are returned.
 func Test_GetAttachedVolumes_Positive_NoVolumesOrNodes(t *testing.T) {
 	// Arrange
@@ -531,7 +531,7 @@ func Test_GetAttachedVolumes_Positive_NoVolumesOrNodes(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 
 	// Act
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 
 	// Assert
 	if len(attachedVolumes) != 0 {
@@ -540,7 +540,7 @@ func Test_GetAttachedVolumes_Positive_NoVolumesOrNodes(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls GetAllVolumes() to get list of entries.
+// Calls GetAttachedVolumes() to get list of entries.
 // Verifies one volume/node entry is returned.
 func Test_GetAttachedVolumes_Positive_OneVolumeOneNode(t *testing.T) {
 	// Arrange
@@ -556,7 +556,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeOneNode(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 
 	// Assert
 	if len(attachedVolumes) != 1 {
@@ -567,7 +567,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeOneNode(t *testing.T) {
 }
 
 // Populates data struct with two volume/node entries (different node and volume).
-// Calls GetAllVolumes() to get list of entries.
+// Calls GetAttachedVolumes() to get list of entries.
 // Verifies both volume/node entries are returned.
 func Test_GetAttachedVolumes_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	// Arrange
@@ -590,7 +590,7 @@ func Test_GetAttachedVolumes_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 
 	// Assert
 	if len(attachedVolumes) != 2 {
@@ -602,7 +602,7 @@ func Test_GetAttachedVolumes_Positive_TwoVolumeTwoNodes(t *testing.T) {
 }
 
 // Populates data struct with two volume/node entries (same volume different node).
-// Calls GetAllVolumes() to get list of entries.
+// Calls GetAttachedVolumes() to get list of entries.
 // Verifies both volume/node entries are returned.
 func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 	// Arrange
@@ -638,7 +638,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 
 	// Assert
 	if len(attachedVolumes) != 2 {
@@ -667,7 +667,7 @@ func Test_SetVolumeMountedByNode_Positive_Set(t *testing.T) {
 	// Act: do not mark -- test default value
 
 	// Assert
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -703,7 +703,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -727,7 +727,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -742,7 +742,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 		t.Fatalf("SetVolumeMountedByNode failed. Expected <no error> Actual: <%v>", setVolumeMountedErr)
 	}
 
-	attachedVolumes = asw.GetAllVolumes()
+	attachedVolumes = asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -783,7 +783,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotRes
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -815,7 +815,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 	if err != nil {
 		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
-	expectedDetachRequestedTime := asw.GetAllVolumes()[0].DetachRequestedTime
+	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
 
 	// Act
 	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
@@ -829,7 +829,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
 	}
 
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -858,7 +858,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Set(t *testing.T) {
 	// Act: do not mark -- test default value
 
 	// Assert
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -893,7 +893,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Marked(t *testing.T) {
 	}
 
 	// Assert
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -936,7 +936,7 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 	}
 
 	// Assert
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -980,7 +980,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumeMou
 	}
 
 	// Assert
-	attachedVolumes := asw.GetAllVolumes()
+	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
@@ -1144,14 +1144,14 @@ func Test_SetDetachRequestTime_Positive(t *testing.T) {
 	}
 }
 
-func Test_GetAllVolumesForNode_Positive_NoVolumesOrNodes(t *testing.T) {
+func Test_GetAttachedVolumesForNode_Positive_NoVolumesOrNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	node := types.NodeName("random")
 
 	// Act
-	attachedVolumes := asw.GetAllVolumesForNode(node)
+	attachedVolumes := asw.GetAttachedVolumesForNode(node)
 
 	// Assert
 	if len(attachedVolumes) != 0 {
@@ -1159,7 +1159,7 @@ func Test_GetAllVolumesForNode_Positive_NoVolumesOrNodes(t *testing.T) {
 	}
 }
 
-func Test_GetAllVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
+func Test_GetAttachedVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -1173,7 +1173,7 @@ func Test_GetAllVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumesForNode(nodeName)
+	attachedVolumes := asw.GetAttachedVolumesForNode(nodeName)
 
 	// Assert
 	if len(attachedVolumes) != 1 {
@@ -1183,7 +1183,7 @@ func Test_GetAllVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
-func Test_GetAllVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
+func Test_GetAttachedVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -1204,7 +1204,7 @@ func Test_GetAllVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumesForNode(node2Name)
+	attachedVolumes := asw.GetAttachedVolumesForNode(node2Name)
 
 	// Assert
 	if len(attachedVolumes) != 1 {
@@ -1214,7 +1214,7 @@ func Test_GetAllVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volume2Name), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
-func Test_GetAllVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
+func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -1248,7 +1248,7 @@ func Test_GetAllVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumesForNode(node1Name)
+	attachedVolumes := asw.GetAttachedVolumesForNode(node1Name)
 
 	// Assert
 	if len(attachedVolumes) != 1 {
@@ -1293,7 +1293,7 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAllVolumesForNode(node2Name)
+	attachedVolumes := asw.GetAttachedVolumesForNode(node2Name)
 
 	// Assert
 	if len(attachedVolumes) != 1 {
