@@ -548,7 +548,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
 	// times out, display a somewhat user-friendly message.
 	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
-	if err := waitForKubeletAndFunc(waiter, waitForTLSBootstrappedClient); err != nil {
+	if err := waiter.WaitForKubeletAndFunc(waitForTLSBootstrappedClient); err != nil {
 		fmt.Printf(kubeadmJoinFailMsg, err)
 		return err
 	}
