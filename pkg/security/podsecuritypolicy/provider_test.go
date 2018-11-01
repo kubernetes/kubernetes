@@ -542,6 +542,17 @@ func TestValidateContainerFailures(t *testing.T) {
 	failSeccompPodString := "foo"
 	failSeccompPod.Spec.Containers[0].SecurityContext.SeccompProfile = &failSeccompPodString
 
+	failSeccompPodInheritPodAnnotation := defaultPod()
+	failSeccompPodInheritPodAnnotation.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
+	}
+
+	// TODO: add case for both annotations and fields
+	failSeccompPodAnnotation := defaultPod()
+	failSeccompPodAnnotation.Annotations = map[string]string{
+		api.SeccompContainerAnnotationKeyPrefix + failSeccompPod.Spec.Containers[0].Name: "foo",
+	}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *policy.PodSecurityPolicy
@@ -599,6 +610,16 @@ func TestValidateContainerFailures(t *testing.T) {
 		},
 		"failSeccompContainerSpec": {
 			pod:           failSeccompPod,
+			psp:           defaultPSP(),
+			expectedError: "Forbidden: seccomp must not be set",
+		},
+		"failSeccompContainerAnnotation": {
+			pod:           failSeccompPodAnnotation,
+			psp:           defaultPSP(),
+			expectedError: "Forbidden: seccomp must not be set",
+		},
+		"failSeccompContainerPodAnnotation": {
+			pod:           failSeccompPodInheritPodAnnotation,
 			psp:           defaultPSP(),
 			expectedError: "Forbidden: seccomp must not be set",
 		},
@@ -791,13 +812,21 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 
 	seccompFooProfile := "foo"
 	seccompPSP := defaultPSP()
+	seccompPSPAnnotations := defaultPSP()
+	// FIXME: how to test both Annotations and Fields?
 	seccompPSP.Spec.AllowedSeccompProfiles = []string{seccompFooProfile}
+
+	seccompPSPAnnotations.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "foo",
+	}
 
 	seccompPod := defaultPod()
 	seccompPod.Spec.SecurityContext.SeccompProfile = &seccompFooProfile
 
-	seccompPodContainer := defaultPod()
-	seccompPodContainer.Spec.Containers[0].SecurityContext.SeccompProfile = &seccompFooProfile
+	seccompPodAnnotations := defaultPod()
+	seccompPodAnnotations.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
+	}
 
 	flexVolumePod := defaultPod()
 	flexVolumePod.Spec.Volumes = []api.Volume{
@@ -873,10 +902,6 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		},
 		"pass seccomp validating PSP - pod seccomp profile": {
 			pod: seccompPod,
-			psp: seccompPSP,
-		},
-		"pass seccomp validating PSP - container seccomp profile": {
-			pod: seccompPodContainer,
 			psp: seccompPSP,
 		},
 		"flex volume driver in a whitelist (all volumes are allowed)": {
@@ -992,12 +1017,28 @@ func TestValidateContainerSuccess(t *testing.T) {
 	seccompPSP := defaultPSP()
 	seccompPSP.Spec.AllowedSeccompProfiles = []string{"foo"}
 
+	// FIXME: add cross-spec/annotations tests
+	seccompAnnotationsPSP := defaultPSP()
+	seccompAnnotationsPSP.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "foo",
+	}
+
 	seccompFooProfile := "foo"
 	seccompPod := defaultPod()
 	seccompPod.Spec.Containers[0].SecurityContext.SeccompProfile = &seccompFooProfile
 
+	seccompAnnotationsPod := defaultPod()
+	seccompAnnotationsPod.Annotations = map[string]string{
+		api.SeccompContainerAnnotationKeyPrefix + seccompPod.Spec.Containers[0].Name: "foo",
+	}
+
 	seccompPodInherit := defaultPod()
 	seccompPodInherit.Spec.SecurityContext.SeccompProfile = &seccompFooProfile
+
+	seccompAnnotationsPodInherit := defaultPod()
+	seccompAnnotationsPodInherit.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
+	}
 
 	successCases := map[string]struct {
 		pod *api.Pod
@@ -1047,13 +1088,21 @@ func TestValidateContainerSuccess(t *testing.T) {
 			pod: readOnlyRootFSPodTrue,
 			psp: defaultPSP(),
 		},
-		"pass seccomp container annotation": {
+		"pass seccomp container field": {
 			pod: seccompPod,
 			psp: seccompPSP,
 		},
-		"pass seccomp inherit pod annotation": {
+		"pass seccomp inherit pod field": {
 			pod: seccompPodInherit,
 			psp: seccompPSP,
+		},
+		"pass seccomp container annotation": {
+			pod: seccompAnnotationsPod,
+			psp: seccompAnnotationsPSP,
+		},
+		"pass seccomp inherit pod annotation": {
+			pod: seccompAnnotationsPodInherit,
+			psp: seccompAnnotationsPSP,
 		},
 	}
 

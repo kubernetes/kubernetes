@@ -36,8 +36,12 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		}
 	}
 
-	// set SeccompProfile
-	synthesized.SeccompProfile = m.convertSeccompLocalPath(effectiveSc.SeccompProfile)
+	// set SeccompProfile, prefer field to annotations
+	if p := effectiveSc.SeccompProfile; p != nil {
+		synthesized.SeccompProfile = m.convertSeccompLocalPath(p)
+	} else {
+		synthesized.SeccompProfile = m.getSeccompProfileFromAnnotations(pod.Annotations, container.Name)
+	}
 
 	// set ApparmorProfile.
 	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)

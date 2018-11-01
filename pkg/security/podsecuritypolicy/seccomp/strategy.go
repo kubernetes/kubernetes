@@ -20,19 +20,29 @@ import (
 	"fmt"
 	"strings"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// SeccompAllowAny is the wildcard used to allow any profile.
-const SeccompAllowAny = "*"
+const (
+	// SeccompAllowAny is the wildcard used to allow any profile.
+	SeccompAllowAny = "*"
+	// The annotation key specifying the default seccomp profile.
+	DefaultProfileAnnotationKey = "seccomp.security.alpha.kubernetes.io/defaultProfileName"
+	// The annotation key specifying the allowed seccomp profiles.
+	AllowedProfilesAnnotationKey = "seccomp.security.alpha.kubernetes.io/allowedProfileNames"
+)
 
 // SeccompStrategy defines the interface for all seccomp constraint strategies.
 type SeccompStrategy interface {
 	// Generate returns a profile based on constraint rules.
 	Generate(pod *api.Pod, container *api.Container) (*string, error)
 	// Validate ensures that the specified values fall within the range of the strategy.
-	Validate(fieldPath *field.Path, profile *string) field.ErrorList
+	ValidatePod(pod *api.Pod, podSCPath *field.Path) field.ErrorList
+	// Validate ensures that the specified values fall within the range of the strategy.
+	ValidateContainer(pod *api.Pod, container *api.Container, contSCPath *field.Path) field.ErrorList
+	validate(fieldPath *field.Path, profile *string) field.ErrorList
 }
 
 type seccompStrategy struct {
@@ -46,8 +56,30 @@ type seccompStrategy struct {
 
 var _ SeccompStrategy = &seccompStrategy{}
 
-// NewSeccompStrategy creates a new strategy that enforces seccomp profile constraints.
-func NewSeccompStrategy(defaultSeccompProfile *string, allowedSeccompProfiles []string) SeccompStrategy {
+// NewSeccompStrategy takes psp, extracts default and allowed profiles from either its fields
+// or annotations (fields have higher priority), and returns a new SeccompStrategy
+func NewSeccompStrategy(psp *policy.PodSecurityPolicy) SeccompStrategy {
+	defaultProfile := psp.Spec.DefaultSeccompProfile
+	allowedProfiles := psp.Spec.AllowedSeccompProfiles
+
+	// prioritize field values, but set to annotation ones if fields are unset
+	if defaultProfile == nil {
+		if p, found := psp.Annotations[DefaultProfileAnnotationKey]; found {
+			defaultProfile = &p
+		}
+	}
+
+	if allowedProfiles == nil {
+		if profilesAnnotation, found := psp.Annotations[AllowedProfilesAnnotationKey]; found {
+			allowedProfiles = strings.Split(profilesAnnotation, ",")
+		}
+	}
+
+	return newSeccompStrategy(defaultProfile, allowedProfiles)
+}
+
+// newSeccompStrategy creates a new strategy that enforces seccomp profile constraints
+func newSeccompStrategy(defaultSeccompProfile *string, allowedSeccompProfiles []string) SeccompStrategy {
 	var allowedProfiles = make(map[string]bool, len(allowedSeccompProfiles))
 	allowAnyProfile := false
 	for _, profile := range allowedSeccompProfiles {
@@ -60,7 +92,7 @@ func NewSeccompStrategy(defaultSeccompProfile *string, allowedSeccompProfiles []
 	return &seccompStrategy{
 		defaultProfile:        defaultSeccompProfile,
 		allowedProfiles:       allowedProfiles,
-		allowedProfilesString: strings.Join(allowedSeccompProfiles, ", "),
+		allowedProfilesString: strings.Join(allowedSeccompProfiles, ","),
 		allowAnyProfile:       allowAnyProfile,
 	}
 }
@@ -68,23 +100,37 @@ func NewSeccompStrategy(defaultSeccompProfile *string, allowedSeccompProfiles []
 // Generate returns a profile from either container or pod if already set, otherwise
 // it returns a profile based on the defaultProfile from the given strategy
 func (s *seccompStrategy) Generate(pod *api.Pod, container *api.Container) (*string, error) {
-	if container != nil && container.SecurityContext != nil {
-		if p := container.SecurityContext.SeccompProfile; p != nil {
+	if container != nil {
+		if p, _ := getContainerSeccompProfile(pod, container.Name, container.SecurityContext, nil); p != nil {
 			return p, nil
 		}
 	}
 
 	if pod != nil && pod.Spec.SecurityContext != nil {
-		if p := pod.Spec.SecurityContext.SeccompProfile; p != nil {
+		if p, _ := getPodSeccompProfile(pod, nil); p != nil {
 			return p, nil
 		}
 	}
 	return s.defaultProfile, nil
 }
 
-// Validate ensures that the specified seccomp profile name falls
+// ValidatePod ensures that the specified values on the pod fall within the range
+// of the strategy.
+func (s *seccompStrategy) ValidatePod(pod *api.Pod, podSCPath *field.Path) field.ErrorList {
+	podProfile, podSCPath := getPodSeccompProfile(pod, podSCPath)
+	return s.validate(podSCPath, podProfile)
+}
+
+// ValidateContainer ensures that the specified values on the container fall within
+// the range of the strategy.
+func (s *seccompStrategy) ValidateContainer(pod *api.Pod, container *api.Container, contSCPath *field.Path) field.ErrorList {
+	containerProfile, foundField := getContainerSeccompProfile(pod, container.Name, container.SecurityContext, contSCPath)
+	return s.validate(foundField, containerProfile)
+}
+
+// validate ensures that the specified seccomp profile name falls
 // within the range of the strategy.
-func (s *seccompStrategy) Validate(fieldPath *field.Path, profile *string) field.ErrorList {
+func (s *seccompStrategy) validate(fieldPath *field.Path, profile *string) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if !s.allowAnyProfile && len(s.allowedProfiles) == 0 && profile != nil {
@@ -106,12 +152,12 @@ func (s *seccompStrategy) Validate(fieldPath *field.Path, profile *string) field
 
 // profileAllowed checks if profile is in allowedProfiles or if allowedProfiles
 // contains the wildcard.
-func (s *seccompStrategy) profileAllowed(podProfile *string) bool {
+func (s *seccompStrategy) profileAllowed(profile *string) bool {
 	if s.allowAnyProfile {
 		return true
 	}
 
-	if podProfile == nil {
+	if profile == nil {
 		// for backwards compatibility and PSPs without a defined list of allowed profiles.
 		// If a PSP does not have allowedProfiles set then we should allow an empty profile.
 		// This will mean that the runtime default is used.
@@ -121,5 +167,33 @@ func (s *seccompStrategy) profileAllowed(podProfile *string) bool {
 		return false
 	}
 
-	return s.allowedProfiles[*podProfile]
+	return s.allowedProfiles[*profile]
+}
+
+func getPodSeccompProfile(pod *api.Pod, scPath *field.Path) (*string, *field.Path) {
+	if sc := pod.Spec.SecurityContext; sc != nil && sc.SeccompProfile != nil {
+		return sc.SeccompProfile, scPath
+	}
+
+	if p, found := pod.Annotations[api.SeccompPodAnnotationKey]; found {
+		return &p, field.NewPath("pod", "metadata", "annotations").Key(api.SeccompPodAnnotationKey)
+	}
+
+	return nil, nil
+}
+
+func getContainerSeccompProfile(pod *api.Pod, containerName string, containerSC *api.SecurityContext, contSCPath *field.Path) (*string, *field.Path) {
+	if containerSC != nil && containerSC.SeccompProfile != nil {
+		return containerSC.SeccompProfile, contSCPath
+	}
+
+	if p, found := pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+containerName]; found {
+		return &p, field.NewPath("pod", "metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix + containerName)
+	}
+
+	if podProfile, foundField := getPodSeccompProfile(pod, field.NewPath("pod", "spec", "securityContext", "seccompProfile")); podProfile != nil {
+		return podProfile, foundField
+	}
+
+	return nil, nil
 }

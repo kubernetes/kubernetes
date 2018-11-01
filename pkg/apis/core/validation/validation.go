@@ -127,6 +127,7 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
 	}
 
+	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, spec, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
 	return allErrs
@@ -176,6 +177,7 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add mirror pod annotation"))
 		}
 	}
+	// FIXME: this will need some specific check for seccomp
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath)...)
 	return allErrs
 }
@@ -3358,6 +3360,34 @@ func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
 }
 
+// ValidateSeccompPodAnnotations tests that should there be any seccomp-related annotations
+// these are all valid seccomp profile names
+// DEPRECATED - seccomp fields should be used instead
+func ValidateSeccompPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if p, exists := annotations[core.SeccompPodAnnotationKey]; exists {
+		if spec.SecurityContext.SeccompProfile != nil && p != *spec.SecurityContext.SeccompProfile {
+			allErrs = append(allErrs, field.Invalid(fldPath, p, "The pod's seccomp annotation does not match the value set at its securityContext.seccompProfile"))
+		}
+		allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(core.SeccompPodAnnotationKey))...)
+	}
+	for k, p := range annotations {
+		if strings.HasPrefix(k, core.SeccompContainerAnnotationKeyPrefix) {
+			allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(k))...)
+
+			// if container with such name exists, verify its seccomp profile if set
+			containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
+			if container := podSpecGetContainer(spec, containerName); container != nil {
+				if cprof := container.SecurityContext.SeccompProfile; cprof != nil && *cprof != p {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child(k), p, "The pod's seccomp annotation for a container does not match the securityContext.seccompProfile value of this container"))
+				}
+			}
+		}
+	}
+
+	return allErrs
+}
+
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k, p := range annotations {
@@ -3370,7 +3400,7 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 			continue
 		}
 		containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
-		if !podSpecHasContainer(spec, containerName) {
+		if podSpecGetContainer(spec, containerName) == nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), containerName, "container not found"))
 		}
 
@@ -3382,18 +3412,18 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 	return allErrs
 }
 
-func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
-	for _, c := range spec.InitContainers {
+func podSpecGetContainer(spec *core.PodSpec, containerName string) *core.Container {
+	for i, c := range spec.InitContainers {
 		if c.Name == containerName {
-			return true
+			return &spec.InitContainers[i]
 		}
 	}
-	for _, c := range spec.Containers {
+	for i, c := range spec.Containers {
 		if c.Name == containerName {
-			return true
+			return &spec.Containers[i]
 		}
 	}
-	return false
+	return nil
 }
 
 const (
@@ -3477,6 +3507,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			}
 		}
 
+		// NOTE: since seccomp annotations deprecation is a lenghty process, seccomp spec and annotation equality (if both set) is checked at annotations validation
 		if securityContext.SeccompProfile != nil {
 			allErrs = append(allErrs, ValidateSeccompProfile(*securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		}
@@ -5277,6 +5308,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 		}
 	}
 
+	// NOTE: since seccomp annotations deprecation is a lenghty process, seccomp spec and annotation equality (if both set) is checked at annotations validation
 	if sc.SeccompProfile != nil {
 		allErrs = append(allErrs, ValidateSeccompProfile(*sc.SeccompProfile, fldPath)...)
 	}

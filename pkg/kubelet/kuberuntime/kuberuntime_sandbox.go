@@ -186,6 +186,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		}
 		if sc.SeccompProfile != nil {
 			lc.SecurityContext.SeccompProfile = *sc.SeccompProfile
+		} else {
+			lc.SecurityContext.SeccompProfile = m.getSeccompProfileFromAnnotations(pod.Annotations, "")
 		}
 	}
 

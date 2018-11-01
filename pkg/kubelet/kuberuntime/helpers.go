@@ -192,6 +192,34 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
+// getSeccompProfileFromAnnotations gets seccomp profile from annotations.
+// It gets pod's profile if containerName is empty.
+// DEPRECATED: remove when seccomp annotations go away
+func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
+	// try the pod profile.
+	profile, profileOK := annotations[v1.SeccompPodAnnotationKey]
+	if containerName != "" {
+		// try the container profile.
+		cProfile, cProfileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]
+		if cProfileOK {
+			profile = cProfile
+			profileOK = cProfileOK
+		}
+	}
+
+	if !profileOK {
+		return ""
+	}
+
+	if strings.HasPrefix(profile, "localhost/") {
+		name := strings.TrimPrefix(profile, "localhost/")
+		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
+		return "localhost/" + fname
+	}
+
+	return profile
+}
+
 // convertSeccompLocalPath converts the seccomp profile to the system-specific
 // path in case the profile is prefixed by "localhost/"
 func (m *kubeGenericRuntimeManager) convertSeccompLocalPath(profile *string) string {

@@ -102,6 +102,7 @@ func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&psp.ObjectMeta, false, ValidatePodSecurityPolicyName, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(psp.Annotations, field.NewPath("metadata").Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validatePodSecurityPolicySeccompAnnotationsSpecEqual(psp.Annotations, &psp.Spec)...)
 	return allErrs
 }
 
@@ -127,6 +128,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
 
+	// NOTE: since seccomp annotations deprecation is a lenghty process, seccomp spec and annotation equality (if both set) is checked at PSP level
 	if p := spec.DefaultSeccompProfile; p != nil {
 		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(*p, fldPath)...)
 	}
@@ -155,6 +157,19 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 			if err := apparmor.ValidateProfileFormat(p); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.AllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
+		}
+	}
+
+	// NOTE: since seccomp annotations deprecation is a lenghty process, seccomp spec and annotation equality (if both set) is checked at PSP level
+	if p := annotations[seccomp.DefaultProfileAnnotationKey]; p != "" {
+		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.DefaultProfileAnnotationKey))...)
+	}
+	if allowed := annotations[seccomp.AllowedProfilesAnnotationKey]; allowed != "" {
+		for _, p := range strings.Split(allowed, ",") {
+			if p == seccomp.SeccompAllowAny {
+				continue
+			}
+			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.AllowedProfilesAnnotationKey))...)
 		}
 	}
 	return allErrs
@@ -465,7 +480,45 @@ func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(new.Annotations, field.NewPath("metadata").Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validatePodSecurityPolicySeccompAnnotationsSpecEqual(new.Annotations, &new.Spec)...)
 	return allErrs
+}
+
+func validatePodSecurityPolicySeccompAnnotationsSpecEqual(annotations map[string]string, spec *policy.PodSecurityPolicySpec) field.ErrorList {
+	var allErrs field.ErrorList
+	const errMsg = "PSP default seccomp profile annotation does not match its defaultSeccompProfile field"
+
+	if annotationsDefault, found := annotations[seccomp.DefaultProfileAnnotationKey]; found {
+		if spec.DefaultSeccompProfile != nil && *spec.DefaultSeccompProfile != annotationsDefault {
+			// FIXME: add correct paths
+			allErrs = append(allErrs, field.Invalid(nil, spec.DefaultSeccompProfile, errMsg))
+		}
+	}
+
+	if annotationsAllowed, found := annotations[seccomp.AllowedProfilesAnnotationKey]; found {
+		allowedProfiles := strings.Split(annotationsAllowed, ",")
+		if !compareSeccompSlices(allowedProfiles, spec.AllowedSeccompProfiles) {
+			// FIXME: add correct paths
+			allErrs = append(allErrs, field.Invalid(nil, spec.AllowedSeccompProfiles, errMsg))
+		}
+	}
+
+	return allErrs
+}
+
+func compareSeccompSlices(s1 []string, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	// TODO: should we care about the order?
+	for i, p := range s1 {
+		if p != s2[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // hasCap checks for needle in haystack.

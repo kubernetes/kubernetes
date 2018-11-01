@@ -159,7 +159,7 @@ func createAppArmorStrategy(psp *policy.PodSecurityPolicy) (apparmor.Strategy, e
 
 // createSeccompStrategy creates a new seccomp strategy.
 func createSeccompStrategy(psp *policy.PodSecurityPolicy) (seccomp.SeccompStrategy, error) {
-	return seccomp.NewSeccompStrategy(psp.Spec.DefaultSeccompProfile, psp.Spec.AllowedSeccompProfiles), nil
+	return seccomp.NewSeccompStrategy(psp), nil
 }
 
 // createFSGroupStrategy creates a new fsgroup strategy
