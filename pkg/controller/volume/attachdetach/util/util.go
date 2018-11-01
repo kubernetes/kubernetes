@@ -65,7 +65,8 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 				pvcSource.ClaimName,
 				err)
 		}
-
+		// Populating PodNamespace field of Volume.Spec with the namespace value passed as an argument to CreateVolumeSpec
+		volumeSpec.PodNamespace = podNamespace
 		glog.V(10).Infof(
 			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
 			volumeSpec.Name(),
