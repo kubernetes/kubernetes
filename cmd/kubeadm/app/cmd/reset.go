@@ -162,7 +162,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 		glog.Errorf("[reset] failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
 	}
 
-	glog.V(1).Info("[reset] removing kubernetes-managed containers")
+	glog.V(1).Info("[reset] removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
 		glog.Errorf("[reset] failed to remove containers: %+v", err)
 	}

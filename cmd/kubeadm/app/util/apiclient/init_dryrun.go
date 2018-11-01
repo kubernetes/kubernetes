@@ -80,7 +80,7 @@ func (idr *InitDryRunGetter) HandleListAction(action core.ListAction) (bool, run
 }
 
 // handleKubernetesService returns a faked Kubernetes service in order to be able to continue running kubeadm init.
-// The kube-dns addon code GETs the kubernetes service in order to extract the service subnet
+// The kube-dns addon code GETs the Kubernetes service in order to extract the service subnet
 func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (bool, runtime.Object, error) {
 	if action.GetName() != "kubernetes" || action.GetNamespace() != metav1.NamespaceDefault || action.GetResource().Resource != "services" {
 		// We can't handle this event

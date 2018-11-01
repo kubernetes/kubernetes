@@ -360,7 +360,7 @@ func (d initData) CertificateDir() string {
 	return d.certificatesDir
 }
 
-// KubeConfigDir returns the path of the kubernetes configuration folder or the temporary folder path in case of DryRun.
+// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
 func (d initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -368,7 +368,7 @@ func (d initData) KubeConfigDir() string {
 	return kubeadmconstants.KubernetesDir
 }
 
-// KubeConfigDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
 func (d initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
@@ -447,7 +447,7 @@ func runInit(i *initData, out io.Writer) error {
 		return errors.Wrap(err, "error printing files on dryrun")
 	}
 
-	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
+	// Create a Kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	glog.V(1).Infof("creating Kubernetes client")
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {

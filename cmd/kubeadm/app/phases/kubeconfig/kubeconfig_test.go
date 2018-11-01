@@ -249,7 +249,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			}
 		}
 
-		// Writes the KubeConfig file to disk
+		// Writes the kubeconfig file to disk
 		err := createKubeConfigFileIfNotExists(tmpdir, "test.conf", test.kubeConfig)
 		if test.expectedError && err == nil {
 			t.Errorf("createKubeConfigFileIfNotExists didn't failed when expected to fail")

@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
+	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's kubeconfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 

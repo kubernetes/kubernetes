@@ -32,7 +32,7 @@ import (
 // TokenUser defines token user
 const TokenUser = "tls-bootstrap-token-user"
 
-// For returns a KubeConfig object that can be used for doing the TLS Bootstrap with the right credentials
+// For returns a kubeconfig object that can be used for doing the TLS Bootstrap with the right credentials
 // Also, before returning anything, it makes sure it can trust the API Server
 func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// TODO: Print summary info about the CA certificate, along with the checksum signature
