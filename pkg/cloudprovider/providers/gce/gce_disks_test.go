@@ -35,15 +35,15 @@ import (
 
 func TestCreateDisk_Basic(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       []string{"zone1"},
-		projectID:          gceProjectId,
+		projectID:          gceProjectID,
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
@@ -57,7 +57,7 @@ func TestCreateDisk_Basic(t *testing.T) {
 	tags["test-tag"] = "test-value"
 
 	expectedDiskTypeURI := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(
-		diskTypeURITemplateSingleZone, gceProjectId, zone, diskType)
+		diskTypeURITemplateSingleZone, gceProjectID, zone, diskType)
 	expectedDescription := "{\"test-tag\":\"test-value\"}"
 
 	/* Act */
@@ -90,15 +90,15 @@ func TestCreateDisk_Basic(t *testing.T) {
 
 func TestCreateRegionalDisk_Basic(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1", "zone3", "zone2"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
-		projectID:          gceProjectId,
+		projectID:          gceProjectID,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
@@ -111,7 +111,7 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 	tags["test-tag"] = "test-value"
 
 	expectedDiskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(
-		diskTypeURITemplateRegional, gceProjectId, gceRegion, diskType)
+		diskTypeURITemplateRegional, gceProjectID, gceRegion, diskType)
 	expectedDescription := "{\"test-tag\":\"test-value\"}"
 
 	/* Act */
@@ -144,12 +144,12 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 
 func TestCreateDisk_DiskAlreadyExists(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -175,11 +175,11 @@ func TestCreateDisk_DiskAlreadyExists(t *testing.T) {
 
 func TestCreateDisk_WrongZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	gce := GCECloud{
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
@@ -200,11 +200,11 @@ func TestCreateDisk_WrongZone(t *testing.T) {
 
 func TestCreateDisk_NoManagedZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	gce := GCECloud{
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
@@ -225,11 +225,11 @@ func TestCreateDisk_NoManagedZone(t *testing.T) {
 
 func TestCreateDisk_BadDiskType(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	gce := GCECloud{manager: fakeManager,
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
+	gce := Cloud{manager: fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true }}
@@ -250,12 +250,12 @@ func TestCreateDisk_BadDiskType(t *testing.T) {
 
 func TestCreateDisk_MultiZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1", "zone2", "zone3"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -279,12 +279,12 @@ func TestCreateDisk_MultiZone(t *testing.T) {
 
 func TestDeleteDisk_Basic(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -313,12 +313,12 @@ func TestDeleteDisk_Basic(t *testing.T) {
 
 func TestDeleteDisk_NotFound(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -338,12 +338,12 @@ func TestDeleteDisk_NotFound(t *testing.T) {
 
 func TestDeleteDisk_ResourceBeingUsed(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -369,12 +369,12 @@ func TestDeleteDisk_ResourceBeingUsed(t *testing.T) {
 
 func TestDeleteDisk_SameDiskMultiZone(t *testing.T) {
 	/* Assert */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1", "zone2", "zone3"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -403,12 +403,12 @@ func TestDeleteDisk_SameDiskMultiZone(t *testing.T) {
 
 func TestDeleteDisk_DiffDiskMultiZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -437,16 +437,16 @@ func TestDeleteDisk_DiffDiskMultiZone(t *testing.T) {
 
 func TestGetAutoLabelsForPD_Basic(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "us-central1"
 	zone := "us-central1-c"
 	zonesWithNodes := []string{zone}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
 	diskType := DiskTypeSSD
 	const sizeGb int64 = 128
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -474,16 +474,16 @@ func TestGetAutoLabelsForPD_Basic(t *testing.T) {
 
 func TestGetAutoLabelsForPD_NoZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "europe-west1"
 	zone := "europe-west1-d"
 	zonesWithNodes := []string{zone}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
 	diskType := DiskTypeStandard
 	const sizeGb int64 = 128
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -510,13 +510,13 @@ func TestGetAutoLabelsForPD_NoZone(t *testing.T) {
 
 func TestGetAutoLabelsForPD_DiskNotFound(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zone := "asia-northeast1-a"
 	zonesWithNodes := []string{zone}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
-	gce := GCECloud{manager: fakeManager,
+	gce := Cloud{manager: fakeManager,
 		managedZones:       zonesWithNodes,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true }}
@@ -532,13 +532,13 @@ func TestGetAutoLabelsForPD_DiskNotFound(t *testing.T) {
 
 func TestGetAutoLabelsForPD_DiskNotFoundAndNoZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -557,17 +557,17 @@ func TestGetAutoLabelsForPD_DiskNotFoundAndNoZone(t *testing.T) {
 
 func TestGetAutoLabelsForPD_DupDisk(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "us-west1"
 	zonesWithNodes := []string{"us-west1-b", "asia-southeast1-a"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
 	diskType := DiskTypeStandard
 	zone := "us-west1-b"
 	const sizeGb int64 = 128
 
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -596,16 +596,16 @@ func TestGetAutoLabelsForPD_DupDisk(t *testing.T) {
 
 func TestGetAutoLabelsForPD_DupDiskNoZone(t *testing.T) {
 	/* Arrange */
-	gceProjectId := "test-project"
+	gceProjectID := "test-project"
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"us-west1-b", "asia-southeast1-a"}
-	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	fakeManager := newFakeManager(gceProjectID, gceRegion)
 	diskName := "disk"
 	diskType := DiskTypeStandard
 	const sizeGb int64 = 128
 
 	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	gce := GCECloud{
+	gce := Cloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		AlphaFeatureGate:   alphaFeatureGate,
@@ -738,16 +738,16 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 		manager.regionalDisks[diskToCreateV1.Name] = zones
 		return nil
 	case targetBeta:
-		return fmt.Errorf("RegionalDisk CreateDisk op not supported in beta.")
+		return fmt.Errorf("regionalDisk CreateDisk op not supported in beta")
 	case targetAlpha:
-		return fmt.Errorf("RegionalDisk CreateDisk op not supported in alpha.")
+		return fmt.Errorf("regionalDisk CreateDisk op not supported in alpha")
 	default:
 		return fmt.Errorf("unexpected type: %T", t)
 	}
 }
 
 func (manager *FakeServiceManager) AttachDiskOnCloudProvider(
-	disk *GCEDisk,
+	disk *Disk,
 	readWrite string,
 	instanceZone string,
 	instanceName string) error {
@@ -784,7 +784,7 @@ func (manager *FakeServiceManager) DetachDiskOnCloudProvider(
  * Gets disk info stored in the FakeServiceManager.
  */
 func (manager *FakeServiceManager) GetDiskFromCloudProvider(
-	zone string, diskName string) (*GCEDisk, error) {
+	zone string, diskName string) (*Disk, error) {
 
 	if manager.zonalDisks[zone] == "" {
 		return nil, cloudprovider.DiskNotFound
@@ -796,7 +796,7 @@ func (manager *FakeServiceManager) GetDiskFromCloudProvider(
 		return nil, err
 	}
 
-	return &GCEDisk{
+	return &Disk{
 		Region:   manager.gceRegion,
 		ZoneInfo: singleZone{lastComponent(zone)},
 		Name:     diskName,
@@ -809,7 +809,7 @@ func (manager *FakeServiceManager) GetDiskFromCloudProvider(
  * Gets disk info stored in the FakeServiceManager.
  */
 func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
-	diskName string) (*GCEDisk, error) {
+	diskName string) (*Disk, error) {
 
 	if _, ok := manager.regionalDisks[diskName]; !ok {
 		return nil, cloudprovider.DiskNotFound
@@ -821,7 +821,7 @@ func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 		return nil, err
 	}
 
-	return &GCEDisk{
+	return &Disk{
 		Region:   manager.gceRegion,
 		ZoneInfo: multiZone{manager.regionalDisks[diskName]},
 		Name:     diskName,
@@ -831,14 +831,14 @@ func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 }
 
 func (manager *FakeServiceManager) ResizeDiskOnCloudProvider(
-	disk *GCEDisk,
+	disk *Disk,
 	size int64,
 	zone string) error {
 	panic("Not implmented")
 }
 
 func (manager *FakeServiceManager) RegionalResizeDiskOnCloudProvider(
-	disk *GCEDisk,
+	disk *Disk,
 	size int64) error {
 	panic("Not implemented")
 }

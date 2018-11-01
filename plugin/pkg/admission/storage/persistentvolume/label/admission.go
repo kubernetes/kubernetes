@@ -58,7 +58,7 @@ type persistentVolumeLabel struct {
 	mutex            sync.Mutex
 	ebsVolumes       aws.Volumes
 	cloudConfig      []byte
-	gceCloudProvider *gce.GCECloud
+	gceCloudProvider *gce.Cloud
 	azureProvider    *azure.Cloud
 }
 
@@ -259,7 +259,7 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 }
 
 // getGCECloudProvider returns the GCE cloud provider, for use for querying volume labels
-func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
+func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.Cloud, error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -272,7 +272,7 @@ func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}
-		gceCloudProvider, ok := cloudProvider.(*gce.GCECloud)
+		gceCloudProvider, ok := cloudProvider.(*gce.Cloud)
 		if !ok {
 			// GetCloudProvider has gone very wrong
 			return nil, fmt.Errorf("error retrieving GCE cloud provider")

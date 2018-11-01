@@ -36,12 +36,12 @@ import (
 
 type adapter struct {
 	k8s   clientset.Interface
-	cloud *gce.GCECloud
+	cloud *gce.Cloud
 
 	recorder record.EventRecorder
 }
 
-func newAdapter(k8s clientset.Interface, cloud *gce.GCECloud) *adapter {
+func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
 	ret := &adapter{
 		k8s:   k8s,
 		cloud: cloud,
