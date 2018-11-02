@@ -90,6 +90,7 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithLabelSelector("").
 			WithAllNamespaces(false).
+			WithAll(false).
 			WithLatest(),
 
 		Timeout: 30 * time.Second,
