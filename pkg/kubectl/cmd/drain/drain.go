@@ -748,7 +748,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					fmt.Fprintf(o.ErrOut, "error: %v\n", err)
 					continue
 				}
-				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
+				printObj(nodeInfo.Object, o.Out)
 			} else {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
@@ -774,7 +774,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					fmt.Fprintf(o.ErrOut, "%v\n", err)
 					continue
 				}
-				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
+				printObj(nodeInfo.Object, o.Out)
 			}
 		} else {
 			printObj, err := o.ToPrinter("skipped")
@@ -782,7 +782,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 				fmt.Fprintf(o.ErrOut, "%v\n", err)
 				continue
 			}
-			printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
+			printObj(nodeInfo.Object, o.Out)
 		}
 	}
 

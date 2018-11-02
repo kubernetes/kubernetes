@@ -245,7 +245,7 @@ func (options *CertificateOptions) modifyCertificateCondition(builder *resource.
 		}
 		found++
 
-		return options.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), options.Out)
+		return options.PrintObj(info.Object, options.Out)
 	})
 	if found == 0 {
 		fmt.Fprintf(options.Out, "No resources found\n")
