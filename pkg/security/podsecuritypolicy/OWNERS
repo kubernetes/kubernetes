@@ -1,10 +1,7 @@
 approvers:
-  - deads2k
-  - liggitt
-  - pweil-
-  - tallclair
+- sig-auth-policy-approvers
 reviewers:
-  - deads2k
-  - liggitt
-  - pweil-
-  - tallclair
+- sig-auth-policy-reviewers
+labels:
+- sig/auth
+

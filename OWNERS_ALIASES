@@ -96,6 +96,19 @@ aliases:
     - mikedanese
     - tallclair
 
+  sig-auth-policy-approvers:
+    - deads2k
+    - liggitt
+    - tallclair
+  sig-auth-policy-reviewers:
+    - deads2k
+    - hongchaodeng    
+    - jianhuiz
+    - liggitt
+    - mbohlool
+    - pweil-
+    - tallclair
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
