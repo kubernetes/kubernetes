@@ -280,7 +280,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 	}
 	return initcfg, nil
 }
-
+// defaultedInternalConfig obtains the internal kubeadm ClusterConfiguration with default values.
 func defaultedInternalConfig() *kubeadmapi.ClusterConfiguration {
 	externalcfg := &kubeadmapiv1beta1.ClusterConfiguration{}
 	internalcfg := &kubeadmapi.ClusterConfiguration{}
