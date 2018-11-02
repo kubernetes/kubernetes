@@ -16,27 +16,27 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Rev": "a88c19ef2016e095f0b6c3b451074b4663f53bed"
+			"Rev": "ea233b6412b0421a65dc6160e16c893364664a95"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Rev": "a88c19ef2016e095f0b6c3b451074b4663f53bed"
+			"Rev": "ea233b6412b0421a65dc6160e16c893364664a95"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Rev": "a88c19ef2016e095f0b6c3b451074b4663f53bed"
+			"Rev": "ea233b6412b0421a65dc6160e16c893364664a95"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Rev": "a88c19ef2016e095f0b6c3b451074b4663f53bed"
+			"Rev": "ea233b6412b0421a65dc6160e16c893364664a95"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/logger",
-			"Rev": "a88c19ef2016e095f0b6c3b451074b4663f53bed"
+			"Rev": "ea233b6412b0421a65dc6160e16c893364664a95"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/version",
-			"Rev": "a88c19ef2016e095f0b6c3b451074b4663f53bed"
+			"Rev": "ea233b6412b0421a65dc6160e16c893364664a95"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",

@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
@@ -33,6 +33,12 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+)
+
+const (
+	// default IOPS Caps & Throughput Cap (MBps) per https://docs.microsoft.com/en-us/azure/virtual-machines/linux/disks-ultra-ssd
+	defaultDiskIOPSReadWrite = 1200
+	defaultDiskMBpsReadWrite = 300
 )
 
 //ManagedDiskController : managed disk controller struct
@@ -55,7 +61,11 @@ type ManagedDiskOptions struct {
 	// The tags of the disk.
 	Tags map[string]string
 	// The SKU of storage account.
-	StorageAccountType storage.SkuName
+	StorageAccountType compute.DiskStorageAccountTypes
+	// IOPS Caps for UltraSSD disk
+	DiskIOPSReadWrite string
+	// Throughput Cap (MBps) for UltraSSD disk
+	DiskMBpsReadWrite string
 }
 
 func newManagedDiskController(common *controllerCommon) (*ManagedDiskController, error) {
@@ -87,17 +97,49 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	}
 
 	diskSizeGB := int32(options.SizeGB)
+	diskSku := compute.DiskStorageAccountTypes(options.StorageAccountType)
+	diskProperties := compute.DiskProperties{
+		DiskSizeGB:   &diskSizeGB,
+		CreationData: &compute.CreationData{CreateOption: compute.Empty},
+	}
+
+	if diskSku == compute.UltraSSDLRS {
+		diskIOPSReadWrite := int64(defaultDiskIOPSReadWrite)
+		if options.DiskIOPSReadWrite != "" {
+			v, err := strconv.Atoi(options.DiskIOPSReadWrite)
+			if err != nil {
+				return "", fmt.Errorf("AzureDisk - failed to parse DiskIOPSReadWrite: %v", err)
+			}
+			diskIOPSReadWrite = int64(v)
+		}
+		diskProperties.DiskIOPSReadWrite = to.Int64Ptr(diskIOPSReadWrite)
+
+		diskMBpsReadWrite := int32(defaultDiskMBpsReadWrite)
+		if options.DiskMBpsReadWrite != "" {
+			v, err := strconv.Atoi(options.DiskMBpsReadWrite)
+			if err != nil {
+				return "", fmt.Errorf("AzureDisk - failed to parse DiskMBpsReadWrite: %v", err)
+			}
+			diskMBpsReadWrite = int32(v)
+		}
+		diskProperties.DiskMBpsReadWrite = to.Int32Ptr(diskMBpsReadWrite)
+	} else {
+		if options.DiskIOPSReadWrite != "" {
+			return "", fmt.Errorf("AzureDisk - DiskIOPSReadWrite parameter is only applicable in UltraSSD_LRS disk type")
+		}
+		if options.DiskMBpsReadWrite != "" {
+			return "", fmt.Errorf("AzureDisk - DiskMBpsReadWrite parameter is only applicable in UltraSSD_LRS disk type")
+		}
+	}
+
 	model := compute.Disk{
 		Location: &c.common.location,
 		Tags:     newTags,
 		Zones:    createZones,
 		Sku: &compute.DiskSku{
-			Name: compute.StorageAccountTypes(options.StorageAccountType),
+			Name: diskSku,
 		},
-		DiskProperties: &compute.DiskProperties{
-			DiskSizeGB:   &diskSizeGB,
-			CreationData: &compute.CreationData{CreateOption: compute.Empty},
-		},
+		DiskProperties: &diskProperties,
 	}
 
 	if options.ResourceGroup == "" {
