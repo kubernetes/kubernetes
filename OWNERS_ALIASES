@@ -85,6 +85,17 @@ aliases:
     - smarterclayton
     - wojtek-t
 
+  sig-auth-node-isolation-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+  sig-auth-node-isolation-reviewers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
