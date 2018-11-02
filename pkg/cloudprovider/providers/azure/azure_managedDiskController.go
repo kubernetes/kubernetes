@@ -37,8 +37,8 @@ import (
 
 const (
 	// default IOPS Caps & Throughput Cap (MBps) per https://docs.microsoft.com/en-us/azure/virtual-machines/linux/disks-ultra-ssd
-	defaultDiskIOPSReadWrite = 1200
-	defaultDiskMBpsReadWrite = 300
+	defaultDiskIOPSReadWrite = 500
+	defaultDiskMBpsReadWrite = 100
 )
 
 //ManagedDiskController : managed disk controller struct
