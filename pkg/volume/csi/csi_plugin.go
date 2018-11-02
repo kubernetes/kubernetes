@@ -138,23 +138,34 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
-		unregisterDriver(pluginName)
-		return fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
+		glog.Error(log("registrationHandler.RegisterPlugin failed at CSI.NodeGetInfo: %v", err))
+		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+			glog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous: %v", unregErr))
+			return unregErr
+		}
+		return err
 	}
 
 	err = nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
-		unregisterDriver(pluginName)
-		return fmt.Errorf("error updating CSI node info in the cluster: %v", err)
+		glog.Error(log("registrationHandler.RegisterPlugin failed at AddNodeInfo: %v", err))
+		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+			glog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			return unregErr
+		}
+		return err
 	}
 
 	return nil
 }
 
-// DeRegisterPlugin is called when a plugin removed it's socket, signaling
+// DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
-// TODO: Handle DeRegistration
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
+	glog.V(4).Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
+	if err := unregisterDriver(pluginName); err != nil {
+		glog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+	}
 }
 
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
@@ -565,7 +576,7 @@ func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, dri
 	return attachment.Status.AttachmentMetadata, nil
 }
 
-func unregisterDriver(driverName string) {
+func unregisterDriver(driverName string) error {
 	func() {
 		csiDrivers.Lock()
 		defer csiDrivers.Unlock()
@@ -574,5 +585,8 @@ func unregisterDriver(driverName string) {
 
 	if err := nim.RemoveNodeInfo(driverName); err != nil {
 		glog.Errorf("Error unregistering CSI driver: %v", err)
+		return err
 	}
+
+	return nil
 }
