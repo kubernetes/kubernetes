@@ -60,6 +60,18 @@ func TestModifyContainerConfig(t *testing.T) {
 			isErr: false,
 		},
 		{
+			name: "container.SecurityContext.RunAsUsername and container.SecurityContext.RunAsUser set",
+			sc: &runtimeapi.LinuxContainerSecurityContext{
+				RunAsUsername: username,
+				RunAsUser:     &runtimeapi.Int64Value{Value: uid},
+			},
+			expected: &dockercontainer.Config{
+				User: username,
+			},
+			isErr: false,
+		},
+
+		{
 			name:     "no RunAsUser value set",
 			sc:       &runtimeapi.LinuxContainerSecurityContext{},
 			expected: &dockercontainer.Config{},
@@ -93,6 +105,18 @@ func TestModifyContainerConfig(t *testing.T) {
 				RunAsGroup: &runtimeapi.Int64Value{Value: gid},
 			},
 			isErr: true,
+		},
+		{
+			name: "RunAsUser/RunAsUsername both set, RunAsGroup set",
+			sc: &runtimeapi.LinuxContainerSecurityContext{
+				RunAsUser:     &runtimeapi.Int64Value{Value: uid},
+				RunAsUsername: username,
+				RunAsGroup:    &runtimeapi.Int64Value{Value: gid},
+			},
+			expected: &dockercontainer.Config{
+				User: "testuser:423",
+			},
+			isErr: false,
 		},
 	}
 
