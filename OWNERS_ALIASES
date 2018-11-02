@@ -12,15 +12,11 @@ aliases:
     - ravisantoshgudimetla
   sig-scheduling:
     - bsalamat
-    - davidopp
-    - jayunit100
     - k82cn
     - resouer
-    - timothysc
-    - wojtek-t
-    - aveshagarwal
     - ravisantoshgudimetla
     - misterikkit
+    - Huang-Wei
   sig-cli-maintainers:
     - adohe
     - brendandburns
