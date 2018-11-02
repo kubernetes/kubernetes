@@ -444,7 +444,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 	return dnsPod
 }
 
-func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace string) (string, []string) {
+func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace, dnsDomain string) (string, []string) {
 	fileNames := make([]string, 0, len(namesToResolve)*2)
 	probeCmd := "for i in `seq 1 600`; do "
 	for _, name := range namesToResolve {
@@ -471,7 +471,7 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 
 	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
 	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-	probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.cluster.local"}');`, namespace)
+	probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
 	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
 	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
 	fileNames = append(fileNames, podARecByUDPFileName)
