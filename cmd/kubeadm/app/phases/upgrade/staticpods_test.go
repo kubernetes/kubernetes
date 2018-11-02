@@ -135,6 +135,11 @@ func (w *fakeWaiter) WaitForHealthyKubelet(_ time.Duration, _ string) error {
 	return nil
 }
 
+// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
+func (w *fakeWaiter) WaitForKubeletAndFunc(f func() error) error {
+	return nil
+}
+
 type fakeStaticPodPathManager struct {
 	kubernetesDir     string
 	realManifestDir   string

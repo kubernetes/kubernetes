@@ -129,7 +129,7 @@ func runControlPlaneSubPhase(component string) func(c workflow.RunData) error {
 			}
 		}
 
-		fmt.Printf("[control-plane] creating static Pod manifest for %q\n", component)
+		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
 		if err := controlplane.CreateStaticPodFiles(data.ManifestDir(), cfg, component); err != nil {
 			return err
 		}
