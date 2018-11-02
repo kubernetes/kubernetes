@@ -49,6 +49,30 @@ aliases:
     - thockin
     - wojtek-t
 
+  sig-auth-certificates-approvers:
+    - liggitt
+    - mikedanese
+    - smarterclayton
+  sig-auth-certificates-reviewers:
+    - awly
+    - caesarxuchao
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - errordeveloper
+    - hongchaodeng
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - smarterclayton
+    - sttts
+    - thockin
+    - timothysc
+    - wojtek-t
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
