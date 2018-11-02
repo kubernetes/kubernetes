@@ -317,6 +317,12 @@ func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *
 	}
 }
 
+func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {
+		glog.Errorf("DeleteServiceAccountToken unsupported in expandController")
+	}
+}
+
 func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
 }

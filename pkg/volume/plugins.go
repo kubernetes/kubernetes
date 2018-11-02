@@ -354,6 +354,8 @@ type VolumeHost interface {
 
 	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 
+	DeleteServiceAccountTokenFunc() func(podUID types.UID)
+
 	// Returns an interface that should be used to execute any utilities in volume plugins
 	GetExec(pluginName string) mount.Exec
 
