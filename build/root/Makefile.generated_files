@@ -405,7 +405,15 @@ OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
 REPORT_FILENAME := $(OUT_DIR)/violations.report
 KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
-API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to api/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
+# When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
+# updated API violations to the known API violation exceptions list.
+ifeq ($(UPDATE_API_KNOWN_VIOLATIONS),true)
+    REPORT_FILENAME:=$(KNOWN_VIOLATION_FILENAME)
+    # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, touch the exceptions
+    # list so that the OPENAPI_OUTFILE target re-run instead of being cached.
+    $(shell touch $(KNOWN_VIOLATION_FILENAME))
+endif
+API_RULE_CHECK_FAILURE_MESSAGE := "ERROR: \n\t API rule check failed. Reported violations differ from known violations. Please read api/api-rules/README.md to resolve the failure. \n"
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
@@ -452,7 +460,7 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
 	    -r $(REPORT_FILENAME)                                                       \
 	    "$$@";                                                                      \
 	diff $(REPORT_FILENAME) $(KNOWN_VIOLATION_FILENAME) ||                          \
-	(echo $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
+	(echo -e $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
 
 
 # How to build the generator tool.  The deps for this are defined in
