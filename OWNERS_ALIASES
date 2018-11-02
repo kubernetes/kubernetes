@@ -73,6 +73,18 @@ aliases:
     - timothysc
     - wojtek-t
 
+  sig-auth-encryption-at-rest-approvers:
+    - immutableT
+    - smarterclayton
+  sig-auth-encryption-at-rest-reviewers:
+    - enj
+    - immutableT
+    - lavalamp
+    - liggitt
+    - sakshamsharma
+    - smarterclayton
+    - wojtek-t
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
