@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"

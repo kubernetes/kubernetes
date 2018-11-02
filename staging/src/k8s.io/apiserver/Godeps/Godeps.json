@@ -2013,6 +2013,10 @@
 		{
 			"ImportPath": "k8s.io/utils/pointer",
 			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/yaml",
+			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
 		}
 	]
 }

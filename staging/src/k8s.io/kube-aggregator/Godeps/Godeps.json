@@ -111,10 +111,6 @@
 			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
 		},
 		{
-			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
-		},
-		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
 			"Rev": "ef5f0afec364d3b9396b7b77b43dbe26bf1f8004"
 		},
@@ -1797,6 +1793,10 @@
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
 			"Rev": "72693cb1fadd73ae2742f6fe29af77d1aecdd8cd"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/yaml",
+			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
 		}
 	]
 }

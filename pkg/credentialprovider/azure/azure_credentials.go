@@ -27,9 +27,9 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	"k8s.io/kubernetes/pkg/credentialprovider"

@@ -21,7 +21,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/identity:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
