@@ -331,7 +331,7 @@ const (
 	VolumeSubpathEnvExpansion utilfeature.Feature = "VolumeSubpathEnvExpansion"
 
 	// owner: @vikaschoudhary16
-	// alpha: v1.11
+	// GA: v1.13
 	//
 	//
 	// Enable probe based plugin watcher utility for discovering Kubelet plugins
@@ -444,7 +444,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.Beta},
+	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA},
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
