@@ -33,6 +33,7 @@ filegroup(
         "//pkg/controller/apis/config/fuzzer:all-srcs",
         "//pkg/controller/apis/config/scheme:all-srcs",
         "//pkg/controller/apis/config/v1alpha1:all-srcs",
+        "//pkg/controller/apis/config/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

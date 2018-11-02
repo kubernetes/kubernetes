@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
+        "//pkg/controller/apis/config/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config/validation:go_default_library",
