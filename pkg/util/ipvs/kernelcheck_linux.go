@@ -44,6 +44,11 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Name() string {
 func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infoln("validating the kernel module IPVS required exists in machine or not")
 
+	kernelVersion, ipvsModules, err := GetKernelVersionAndIPVSMods(r.Executor)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
 	// Find out loaded kernel modules
 	out, err := r.Executor.Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
 	if err != nil {
@@ -60,14 +65,6 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []err
 
 	// Check builtin modules exist or not
 	if len(modules) != 0 {
-		kernelVersionFile := "/proc/sys/kernel/osrelease"
-		b, err := r.Executor.Command("cut", "-f1", "-d", " ", kernelVersionFile).CombinedOutput()
-		if err != nil {
-			errors = append(errors, fmt.Errorf("error getting os release kernel version: %v(%s)", err, out))
-			return nil, errors
-		}
-
-		kernelVersion := strings.TrimSpace(string(b))
 		builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
 		out, err := r.Executor.Command("cut", "-f1", "-d", " ", builtinModsFilePath).CombinedOutput()
 		if err != nil {
