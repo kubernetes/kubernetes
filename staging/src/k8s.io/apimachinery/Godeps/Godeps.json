@@ -28,7 +28,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
+			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",

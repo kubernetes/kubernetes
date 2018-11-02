@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Marshals the object into JSON then converts JSON to YAML and returns the
+// Marshal marshals the object into JSON then converts JSON to YAML and returns the
 // YAML.
 func Marshal(o interface{}) ([]byte, error) {
 	j, err := json.Marshal(o)
@@ -33,8 +33,24 @@ type JSONOpt func(*json.Decoder) *json.Decoder
 // Unmarshal converts YAML to JSON then uses JSON to unmarshal into an object,
 // optionally configuring the behavior of the JSON unmarshal.
 func Unmarshal(y []byte, o interface{}, opts ...JSONOpt) error {
+	return yamlUnmarshal(y, o, false, opts...)
+}
+
+// UnmarshalStrict strictly converts YAML to JSON then uses JSON to unmarshal
+// into an object, optionally configuring the behavior of the JSON unmarshal.
+func UnmarshalStrict(y []byte, o interface{}, opts ...JSONOpt) error {
+	return yamlUnmarshal(y, o, true, append(opts, DisallowUnknownFields)...)
+}
+
+// yamlUnmarshal unmarshals the given YAML byte stream into the given interface,
+// optionally performing the unmarshalling strictly
+func yamlUnmarshal(y []byte, o interface{}, strict bool, opts ...JSONOpt) error {
 	vo := reflect.ValueOf(o)
-	j, err := yamlToJSON(y, &vo, yaml.Unmarshal)
+	unmarshalFn := yaml.Unmarshal
+	if strict {
+		unmarshalFn = yaml.UnmarshalStrict
+	}
+	j, err := yamlToJSON(y, &vo, unmarshalFn)
 	if err != nil {
 		return fmt.Errorf("error converting YAML to JSON: %v", err)
 	}
@@ -62,7 +78,7 @@ func jsonUnmarshal(r io.Reader, o interface{}, opts ...JSONOpt) error {
 	return nil
 }
 
-// Convert JSON to YAML.
+// JSONToYAML Converts JSON to YAML.
 func JSONToYAML(j []byte) ([]byte, error) {
 	// Convert the JSON to an object.
 	var jsonObj interface{}
@@ -300,6 +316,4 @@ func convertToJSONableObject(yamlObj interface{}, jsonTarget *reflect.Value) (in
 		}
 		return yamlObj, nil
 	}
-
-	return nil, nil
 }
