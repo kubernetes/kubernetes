@@ -1,4 +1,15 @@
 aliases:
+  # sig-auth subproject aliases
+  sig-auth-audit-approvers:
+    - sttts
+    - tallclair
+  sig-auth-audit-reviewers:
+    - CaoShuFeng
+    - hzxuzhonghu
+    - lavalamp
+    - sttts
+    - tallclair
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
