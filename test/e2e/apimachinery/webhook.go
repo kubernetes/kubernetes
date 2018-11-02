@@ -620,7 +620,7 @@ func testWebhook(f *framework.Framework) {
 	// Creating the pod, the request should be rejected
 	pod := nonCompliantPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "create pod %s in namespace %s should have been denied by webhook", pod.Name, f.Namespace.Name)
 	expectedErrMsg1 := "the pod contains unwanted container name"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
@@ -635,7 +635,7 @@ func testWebhook(f *framework.Framework) {
 	// Creating the pod, the request should be rejected
 	pod = hangingPod(f)
 	_, err = client.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "create pod %s in namespace %s should have caused webhook to hang", pod.Name, f.Namespace.Name)
 	expectedTimeoutErr := "request did not complete within"
 	if !strings.Contains(err.Error(), expectedTimeoutErr) {
 		framework.Failf("expect timeout error %q, got %q", expectedTimeoutErr, err.Error())
@@ -645,7 +645,7 @@ func testWebhook(f *framework.Framework) {
 	// Creating the configmap, the request should be rejected
 	configmap := nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "create configmap %s in namespace %s should have been denied by the webhook", configmap.Name, f.Namespace.Name)
 	expectedErrMsg := "the configmap contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -662,7 +662,7 @@ func testWebhook(f *framework.Framework) {
 		},
 	}
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	By("update (PUT) the admitted configmap to a non-compliant one should be rejected by the webhook")
 	toNonCompliantFn := func(cm *v1.ConfigMap) {
@@ -672,7 +672,7 @@ func testWebhook(f *framework.Framework) {
 		cm.Data["webhook-e2e-test"] = "webhook-disallow"
 	}
 	_, err = updateConfigMap(client, f.Namespace.Name, allowedConfigMapName, toNonCompliantFn)
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "update (PUT) admitted configmap %s in namespace %s to a non-compliant one should be rejected by webhook", allowedConfigMapName, f.Namespace.Name)
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
@@ -680,7 +680,7 @@ func testWebhook(f *framework.Framework) {
 	By("update (PATCH) the admitted configmap to a non-compliant one should be rejected by the webhook")
 	patch := nonCompliantConfigMapPatch()
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Patch(allowedConfigMapName, types.StrategicMergePatchType, []byte(patch))
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "update admitted configmap %s in namespace %s by strategic merge patch to a non-compliant one should be rejected by webhook. Patch: %+v", allowedConfigMapName, f.Namespace.Name, patch)
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
@@ -699,7 +699,7 @@ func testWebhook(f *framework.Framework) {
 	By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
 	configmap = nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(skippedNamespaceName).Create(configmap)
-	Expect(err).To(BeNil())
+	Expect(err).NotTo(HaveOccurred(), "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
 }
 
 func testAttachingPodWebhook(f *framework.Framework) {
@@ -707,15 +707,15 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	client := f.ClientSet
 	pod := toBeAttachedPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	Expect(err).To(BeNil())
+	Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 	err = framework.WaitForPodNameRunningInNamespace(client, pod.Name, f.Namespace.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "error while waiting for pod %s to go to Running phase in namespace: %s", pod.Name, f.Namespace.Name)
 
 	By("'kubectl attach' the pod, should be denied by the webhook")
 	timer := time.NewTimer(30 * time.Second)
 	defer timer.Stop()
 	_, err = framework.NewKubectlCommand("attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "'kubectl attach' the pod, should be denied by the webhook")
 	if e, a := "attaching to pod 'to-be-attached-pod' is not allowed", err.Error(); !strings.Contains(a, e) {
 		framework.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
 	}
@@ -804,7 +804,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 		},
 	}
 	_, err = client.CoreV1().ConfigMaps(failNamespaceName).Create(configmap)
-	Expect(err).To(HaveOccurred())
+	Expect(err).To(HaveOccurred(), "create configmap in namespace: %s should be unconditionally rejected by the webhook", failNamespaceName)
 	if !errors.IsInternalError(err) {
 		framework.Failf("expect an internal error, got %#v", err)
 	}
@@ -1242,12 +1242,13 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 
 func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be denied by the webhook")
+	crInstanceName := "cr-instance-1"
 	crInstance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
 			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
 			"metadata": map[string]interface{}{
-				"name":      "cr-instance-1",
+				"name":      crInstanceName,
 				"namespace": f.Namespace.Name,
 			},
 			"data": map[string]interface{}{
@@ -1256,7 +1257,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 		},
 	}
 	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "create custom resource %s in namespace %s should be denied by webhook", crInstanceName, f.Namespace.Name)
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -1265,12 +1266,13 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 
 func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be mutated by the webhook")
+	crName := "cr-instance-1"
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crd.Spec.Names.Kind,
 			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
 			"metadata": map[string]interface{}{
-				"name":      "cr-instance-1",
+				"name":      crName,
 				"namespace": f.Namespace.Name,
 			},
 			"data": map[string]interface{}{
@@ -1279,7 +1281,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 		},
 	}
 	mutatedCR, err := customResourceClient.Create(cr, metav1.CreateOptions{})
-	Expect(err).To(BeNil())
+	Expect(err).NotTo(HaveOccurred(), "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
@@ -1382,7 +1384,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 
 	// create CRD
 	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-	Expect(err).NotTo(BeNil())
+	Expect(err).To(HaveOccurred(), "create custom resource definition %s should be denied by webhook", testcrd.GetMetaName())
 	expectedErrMsg := "the crd contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
