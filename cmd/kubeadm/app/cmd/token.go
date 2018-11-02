@@ -120,7 +120,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			err = bto.ApplyTo(cfg)
 			kubeadmutil.CheckErr(err)
 
-			glog.V(1).Infoln("[token] getting Clientsets from KubeConfig file")
+			glog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)

@@ -23,7 +23,6 @@ import (
 
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // cacheRecord holds the three return values of the authenticator.Token AuthenticateToken method
@@ -67,7 +66,7 @@ func newWithClock(authenticator authenticator.Token, successTTL, failureTTL time
 
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	auds, _ := request.AudiencesFrom(ctx)
+	auds, _ := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(auds, token)
 	if record, ok := a.cache.get(key); ok {

@@ -16,7 +16,10 @@ limitations under the License.
 
 package util
 
-import "strings"
+import (
+	"reflect"
+	"strings"
+)
 
 // ToCanonicalName converts Golang package/type name into canonical OpenAPI name.
 // Examples:
@@ -36,4 +39,21 @@ func ToCanonicalName(name string) string {
 		nameParts[0] = strings.Join(parts, ".")
 	}
 	return strings.Join(nameParts, ".")
+}
+
+// GetCanonicalTypeName will find the canonical type name of a sample object, removing
+// the "vendor" part of the path
+func GetCanonicalTypeName(model interface{}) string {
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.PkgPath() == "" {
+		return t.Name()
+	}
+	path := t.PkgPath()
+	if strings.Contains(path, "/vendor/") {
+		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
+	}
+	return path + "." + t.Name()
 }

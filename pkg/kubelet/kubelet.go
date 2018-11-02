@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
@@ -777,7 +776,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		glog.Warning("Mount propagation feature gate has been deprecated and will be removed in the next release")
+		return nil, fmt.Errorf("mount propagation feature gate has been deprecated and will be removed in 1.14")
 	}
 
 	klet.volumePluginMgr, err =

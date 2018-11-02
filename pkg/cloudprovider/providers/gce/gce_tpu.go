@@ -50,20 +50,20 @@ type tpuService struct {
 
 // CreateTPU creates the Cloud TPU node with the specified name in the
 // specified zone.
-func (gce *GCECloud) CreateTPU(ctx context.Context, name, zone string, node *tpuapi.Node) (*tpuapi.Node, error) {
+func (g *Cloud) CreateTPU(ctx context.Context, name, zone string, node *tpuapi.Node) (*tpuapi.Node, error) {
 	var err error
 	mc := newTPUMetricContext("create", zone)
 	defer mc.Observe(err)
 
 	var op *tpuapi.Operation
-	parent := getTPUParentName(gce.projectID, zone)
-	op, err = gce.tpuService.projects.Locations.Nodes.Create(parent, node).NodeId(name).Do()
+	parent := getTPUParentName(g.projectID, zone)
+	op, err = g.tpuService.projects.Locations.Nodes.Create(parent, node).NodeId(name).Do()
 	if err != nil {
 		return nil, err
 	}
 	glog.V(2).Infof("Creating Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
 
-	op, err = gce.waitForTPUOp(ctx, op)
+	op, err = g.waitForTPUOp(ctx, op)
 	if err != nil {
 		return nil, err
 	}
@@ -83,20 +83,20 @@ func (gce *GCECloud) CreateTPU(ctx context.Context, name, zone string, node *tpu
 
 // DeleteTPU deletes the Cloud TPU with the specified name in the specified
 // zone.
-func (gce *GCECloud) DeleteTPU(ctx context.Context, name, zone string) error {
+func (g *Cloud) DeleteTPU(ctx context.Context, name, zone string) error {
 	var err error
 	mc := newTPUMetricContext("delete", zone)
 	defer mc.Observe(err)
 
 	var op *tpuapi.Operation
-	name = getTPUName(gce.projectID, zone, name)
-	op, err = gce.tpuService.projects.Locations.Nodes.Delete(name).Do()
+	name = getTPUName(g.projectID, zone, name)
+	op, err = g.tpuService.projects.Locations.Nodes.Delete(name).Do()
 	if err != nil {
 		return err
 	}
 	glog.V(2).Infof("Deleting Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
 
-	op, err = gce.waitForTPUOp(ctx, op)
+	op, err = g.waitForTPUOp(ctx, op)
 	if err != nil {
 		return err
 	}
@@ -108,11 +108,11 @@ func (gce *GCECloud) DeleteTPU(ctx context.Context, name, zone string) error {
 }
 
 // GetTPU returns the Cloud TPU with the specified name in the specified zone.
-func (gce *GCECloud) GetTPU(ctx context.Context, name, zone string) (*tpuapi.Node, error) {
+func (g *Cloud) GetTPU(ctx context.Context, name, zone string) (*tpuapi.Node, error) {
 	mc := newTPUMetricContext("get", zone)
 
-	name = getTPUName(gce.projectID, zone, name)
-	node, err := gce.tpuService.projects.Locations.Nodes.Get(name).Do()
+	name = getTPUName(g.projectID, zone, name)
+	node, err := g.tpuService.projects.Locations.Nodes.Get(name).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -120,11 +120,11 @@ func (gce *GCECloud) GetTPU(ctx context.Context, name, zone string) (*tpuapi.Nod
 }
 
 // ListTPUs returns Cloud TPUs in the specified zone.
-func (gce *GCECloud) ListTPUs(ctx context.Context, zone string) ([]*tpuapi.Node, error) {
+func (g *Cloud) ListTPUs(ctx context.Context, zone string) ([]*tpuapi.Node, error) {
 	mc := newTPUMetricContext("list", zone)
 
-	parent := getTPUParentName(gce.projectID, zone)
-	response, err := gce.tpuService.projects.Locations.Nodes.List(parent).Do()
+	parent := getTPUParentName(g.projectID, zone)
+	response, err := g.tpuService.projects.Locations.Nodes.List(parent).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -132,10 +132,10 @@ func (gce *GCECloud) ListTPUs(ctx context.Context, zone string) ([]*tpuapi.Node,
 }
 
 // ListLocations returns the zones where Cloud TPUs are available.
-func (gce *GCECloud) ListLocations(ctx context.Context) ([]*tpuapi.Location, error) {
+func (g *Cloud) ListLocations(ctx context.Context) ([]*tpuapi.Location, error) {
 	mc := newTPUMetricContext("list_locations", "")
-	parent := getTPUProjectURL(gce.projectID)
-	response, err := gce.tpuService.projects.Locations.List(parent).Do()
+	parent := getTPUProjectURL(g.projectID)
+	response, err := g.tpuService.projects.Locations.List(parent).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -144,7 +144,7 @@ func (gce *GCECloud) ListLocations(ctx context.Context) ([]*tpuapi.Location, err
 
 // waitForTPUOp checks whether the op is done every 30 seconds before the ctx
 // is cancelled.
-func (gce *GCECloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*tpuapi.Operation, error) {
+func (g *Cloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*tpuapi.Operation, error) {
 	if err := wait.PollInfinite(30*time.Second, func() (bool, error) {
 		// Check if context has been cancelled.
 		select {
@@ -157,14 +157,14 @@ func (gce *GCECloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*t
 		glog.V(3).Infof("Waiting for operation %q to complete...", op.Name)
 
 		start := time.Now()
-		gce.operationPollRateLimiter.Accept()
+		g.operationPollRateLimiter.Accept()
 		duration := time.Now().Sub(start)
 		if duration > 5*time.Second {
 			glog.V(2).Infof("Getting operation %q throttled for %v", op.Name, duration)
 		}
 
 		var err error
-		op, err = gce.tpuService.projects.Locations.Operations.Get(op.Name).Do()
+		op, err = g.tpuService.projects.Locations.Operations.Get(op.Name).Do()
 		if err != nil {
 			return true, err
 		}

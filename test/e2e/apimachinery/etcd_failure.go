@@ -94,8 +94,9 @@ func doEtcdFailure(failCommand, fixCommand string) {
 }
 
 func masterExec(cmd string) {
-	result, err := framework.SSH(cmd, framework.GetMasterHost()+":22", framework.TestContext.Provider)
-	Expect(err).NotTo(HaveOccurred())
+	host := framework.GetMasterHost() + ":22"
+	result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred(), "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		framework.LogSSHResult(result)
 		framework.Failf("master exec command returned non-zero")
@@ -120,7 +121,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 		}
 		for _, pod := range pods.Items {
 			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 		}
 		framework.Logf("apiserver has recovered")
 		return true, nil
@@ -130,7 +131,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(options)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {
 				return true, nil

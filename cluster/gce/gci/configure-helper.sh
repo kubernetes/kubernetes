@@ -25,21 +25,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
-readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
-readonly COREDNS_AUTOSCALER="Deployment/coredns"
-readonly KUBEDNS_AUTOSCALER="Deployment/kube-dns"
-
-# Resource requests of master components.
-KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
-KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
-
-# Use --retry-connrefused opt only if it's supported by curl.
-CURL_RETRY_CONNREFUSED=""
-if curl --help | grep -q -- '--retry-connrefused'; then
-  CURL_RETRY_CONNREFUSED='--retry-connrefused'
-fi
-
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -2750,6 +2735,21 @@ EOF
 function main() {
   echo "Start to configure instance for kubernetes"
 
+  readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
+  readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
+  readonly COREDNS_AUTOSCALER="Deployment/coredns"
+  readonly KUBEDNS_AUTOSCALER="Deployment/kube-dns"
+
+  # Resource requests of master components.
+  KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
+  KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
+
+  # Use --retry-connrefused opt only if it's supported by curl.
+  CURL_RETRY_CONNREFUSED=""
+  if curl --help | grep -q -- '--retry-connrefused'; then
+    CURL_RETRY_CONNREFUSED='--retry-connrefused'
+  fi
+
   KUBE_HOME="/home/kubernetes"
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
@@ -2841,9 +2841,6 @@ function main() {
   echo "Done for the configuration for kubernetes"
 }
 
-# use --source-only to test functions defined in this script.
-if [[ "$#" -eq 1 && "${1}" == "--source-only" ]]; then
-   :
-else
-   main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
 fi

@@ -383,7 +383,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	}
 }
 
-// NewCmdConfigUploadFromFile verifies given kubernetes config file and returns cobra.Command for
+// NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
 // "kubeadm config upload from-file" command
 func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	var cfgPath string
@@ -559,7 +559,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 	var cfgPath, featureGatesString string
 	var err error
 
-	// This just sets the kubernetes version for unit testing so kubeadm won't try to
+	// This just sets the Kubernetes version for unit testing so kubeadm won't try to
 	// lookup the latest release from the internet.
 	if mockK8sVersion != nil {
 		externalcfg.KubernetesVersion = *mockK8sVersion

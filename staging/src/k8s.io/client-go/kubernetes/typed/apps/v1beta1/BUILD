@@ -13,7 +13,6 @@ go_library(
         "deployment.go",
         "doc.go",
         "generated_expansion.go",
-        "scale.go",
         "statefulset.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1",

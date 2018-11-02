@@ -60,52 +60,52 @@ func (t *dnsFederationsConfigMapTest) run() {
 	originalConfigMapData := t.fetchDNSConfigMapData()
 	defer t.restoreDNSConfigMap(originalConfigMapData)
 
-	t.validate()
+	t.validate(framework.TestContext.ClusterDNSDomain)
 
 	if t.name == "coredns" {
 		t.labels = []string{"abc", "ghi"}
 		valid1 := map[string]string{
-			"Corefile": `.:53 {
-        kubernetes cluster.local in-addr.arpa ip6.arpa {
+			"Corefile": fmt.Sprintf(`.:53 {
+        kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
             upstream
             fallthrough in-addr.arpa ip6.arpa
         }
-        federation cluster.local {
+        federation %v {
            abc def.com
         }
         proxy . /etc/resolv.conf
-    }`}
+    }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
 		valid1m := map[string]string{t.labels[0]: "def.com"}
 
 		valid2 := map[string]string{
-			"Corefile": `:53 {
-        kubernetes cluster.local in-addr.arpa ip6.arpa {
+			"Corefile": fmt.Sprintf(`:53 {
+        kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
             upstream
             fallthrough in-addr.arpa ip6.arpa
         }
-        federation cluster.local {
+        federation %v {
            ghi xyz.com
         }
         proxy . /etc/resolv.conf
-    }`}
+    }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
 		valid2m := map[string]string{t.labels[1]: "xyz.com"}
 
 		By("default -> valid1")
 		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
 		t.deleteCoreDNSPods()
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("valid1 -> valid2")
 		t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
 		t.deleteCoreDNSPods()
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("valid2 -> default")
 		t.setConfigMap(&v1.ConfigMap{Data: originalConfigMapData}, nil, false)
 		t.deleteCoreDNSPods()
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		t.restoreDNSConfigMap(originalConfigMapData)
 
@@ -119,39 +119,39 @@ func (t *dnsFederationsConfigMapTest) run() {
 
 		By("empty -> valid1")
 		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("valid1 -> valid2")
 		t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("valid2 -> invalid")
 		t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("invalid -> valid1")
 		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("valid1 -> deleted")
 		t.deleteConfigMap()
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 
 		By("deleted -> invalid")
 		t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
-		t.validate()
+		t.validate(framework.TestContext.ClusterDNSDomain)
 	}
 }
 
-func (t *dnsFederationsConfigMapTest) validate() {
+func (t *dnsFederationsConfigMapTest) validate(dnsDomain string) {
 	federations := t.fedMap
 
 	if len(federations) == 0 {
 		By(fmt.Sprintf("Validating federation labels %v do not exist", t.labels))
 
 		for _, label := range t.labels {
-			var federationDNS = fmt.Sprintf("e2e-dns-configmap.%s.%s.svc.cluster.local.",
-				t.f.Namespace.Name, label)
+			var federationDNS = fmt.Sprintf("e2e-dns-configmap.%s.%s.svc.%s.",
+				t.f.Namespace.Name, label, framework.TestContext.ClusterDNSDomain)
 			predicate := func(actual []string) bool {
 				return len(actual) == 0
 			}
@@ -159,10 +159,10 @@ func (t *dnsFederationsConfigMapTest) validate() {
 		}
 	} else {
 		for label := range federations {
-			var federationDNS = fmt.Sprintf("%s.%s.%s.svc.cluster.local.",
-				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, label)
-			var localDNS = fmt.Sprintf("%s.%s.svc.cluster.local.",
-				t.utilService.ObjectMeta.Name, t.f.Namespace.Name)
+			var federationDNS = fmt.Sprintf("%s.%s.%s.svc.%s.",
+				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, label, framework.TestContext.ClusterDNSDomain)
+			var localDNS = fmt.Sprintf("%s.%s.svc.%s.",
+				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 			if t.name == "coredns" {
 				localDNS = t.utilService.Spec.ClusterIP
 			}
@@ -228,7 +228,7 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
-        kubernetes cluster.local in-addr.arpa ip6.arpa {
+        kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
@@ -237,7 +237,7 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
     }
      acme.local:53 {
        proxy . %v
-    }`, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
+    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -325,13 +325,13 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
-        kubernetes cluster.local in-addr.arpa ip6.arpa {
+        kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
         }
         proxy . %v
-    }`, t.dnsServerPod.Status.PodIP),
+    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -415,7 +415,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDnsHostname+"."
 			},
@@ -423,7 +423,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDnsHostname+"."
 			},
@@ -434,13 +434,13 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
-        kubernetes cluster.local in-addr.arpa ip6.arpa {
+        kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
         }
         proxy . %v
-    }`, t.dnsServerPod.Status.PodIP),
+    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -451,7 +451,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	}
 	if isIPv6 {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.cluster.local", serviceNameLocal, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
 			},
@@ -459,7 +459,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.cluster.local", serviceNameLocal, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) == 2 && actual[0] == fooHostname+"." && actual[1] == "192.0.2.123"
 			},

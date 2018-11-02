@@ -17,21 +17,13 @@ limitations under the License.
 package phases
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/spf13/cobra"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -41,17 +33,6 @@ var (
 		# Run master pre-flight checks using a config file.
 		kubeadm init phase preflight --config kubeadm-config.yml
 		`)
-
-	nodePreflightLongDesc = normalizer.LongDesc(`
-		Run node pre-flight checks, functionally equivalent to what implemented by kubeadm join.
-		` + cmdutil.AlphaDisclaimer)
-
-	nodePreflightExample = normalizer.Examples(`
-		# Run node pre-flight checks.
-		kubeadm alpha phase preflight node
-	`)
-
-	errorMissingConfigFlag = errors.New("the --config flag is mandatory")
 )
 
 // preflightMasterData defines the behavior that a runtime data struct passed to the PreflightMaster master phase
@@ -98,57 +79,4 @@ func runPreflightMaster(c workflow.RunData) error {
 	}
 
 	return nil
-}
-
-// NewCmdPreFlight calls cobra.Command for preflight checks
-func NewCmdPreFlight() *cobra.Command {
-	var cfgPath string
-	var ignorePreflightErrors []string
-
-	cmd := &cobra.Command{
-		Use:   "preflight",
-		Short: "Run pre-flight checks",
-		Long:  cmdutil.MacroCommandLongDescription,
-	}
-
-	options.AddConfigFlag(cmd.PersistentFlags(), &cfgPath)
-	options.AddIgnorePreflightErrorsFlag(cmd.PersistentFlags(), &ignorePreflightErrors)
-
-	cmd.AddCommand(NewCmdPreFlightNode(&cfgPath, &ignorePreflightErrors))
-
-	return cmd
-}
-
-// NewCmdPreFlightNode calls cobra.Command for node preflight checks
-func NewCmdPreFlightNode(cfgPath *string, ignorePreflightErrors *[]string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "node",
-		Short:   "Run node pre-flight checks",
-		Long:    nodePreflightLongDesc,
-		Example: nodePreflightExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(*cfgPath) == 0 {
-				kubeadmutil.CheckErr(errorMissingConfigFlag)
-			}
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(*ignorePreflightErrors)
-			kubeadmutil.CheckErr(err)
-
-			cfg := &kubeadmapiv1beta1.JoinConfiguration{}
-			kubeadmscheme.Scheme.Default(cfg)
-
-			internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-			err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
-			kubeadmutil.CheckErr(err)
-
-			fmt.Println("[preflight] running pre-flight checks")
-
-			err = preflight.RunJoinNodeChecks(utilsexec.New(), internalcfg, ignorePreflightErrorsSet)
-			kubeadmutil.CheckErr(err)
-
-			fmt.Println("[preflight] pre-flight checks passed")
-		},
-	}
-
-	return cmd
 }

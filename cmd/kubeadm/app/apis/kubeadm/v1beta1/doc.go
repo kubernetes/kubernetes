@@ -200,44 +200,47 @@ limitations under the License.
 // 	  dnsDomain: "cluster.local"
 // 	kubernetesVersion: "v1.12.0"
 // 	controlPlaneEndpoint: "10.100.0.1:6443"
-// 	apiServerExtraArgs:
-// 	  authorization-mode: "Node,RBAC"
-// 	controllerManagerExtraArgs:
-// 	  node-cidr-mask-size: 20
-// 	schedulerExtraArgs:
-// 	  address: "10.100.0.1"
-// 	apiServerExtraVolumes:
-// 	- name: "some-volume"
-// 	  hostPath: "/etc/some-path"
-// 	  mountPath: "/etc/some-pod-path"
-// 	  writable: true
-// 	  pathType: File
-// 	controllerManagerExtraVolumes:
-// 	- name: "some-volume"
-// 	  hostPath: "/etc/some-path"
-// 	  mountPath: "/etc/some-pod-path"
-// 	  writable: true
-// 	  pathType: File
-// 	schedulerExtraVolumes:
-// 	- name: "some-volume"
-// 	  hostPath: "/etc/some-path"
-// 	  mountPath: "/etc/some-pod-path"
-// 	  writable: true
-// 	  pathType: File
-// 	apiServerCertSANs:
-// 	- "10.100.1.1"
-// 	- "ec2-10-100-0-1.compute-1.amazonaws.com"
-// 	certificatesDir: "/etc/kubernetes/pki"
-// 	imageRepository: "k8s.gcr.io"
-// 	unifiedControlPlaneImage: "k8s.gcr.io/controlplane:v1.12.0"
-// 	auditPolicy:
-// 	  # https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#audit-policy
-// 	  path: "/var/log/audit/audit.json"
-// 	  logDir: "/var/log/audit"
-// 	  logMaxAge: 7 # in days
-// 	featureGates:
-// 	  selfhosting: false
-// 	clusterName: "example-cluster"
+//	apiServer:
+//	  extraArgs:
+//	    authorization-mode: "Node,RBAC"
+//	  extraVolumes:
+//	  - name: "some-volume"
+//	    hostPath: "/etc/some-path"
+//	    mountPath: "/etc/some-pod-path"
+//	    writable: true
+//	    pathType: File
+//	  certSANs:
+//	  - "10.100.1.1"
+//	  - "ec2-10-100-0-1.compute-1.amazonaws.com"
+//	controllerManager:
+//	  extraArgs:
+//	    node-cidr-mask-size: 20
+//	  extraVolumes:
+//	  - name: "some-volume"
+//	    hostPath: "/etc/some-path"
+//	    mountPath: "/etc/some-pod-path"
+//	    writable: true
+//	    pathType: File
+//	scheduler:
+//	  extraArgs:
+//	    address: "10.100.0.1"
+//	  extraVolumes:
+//	  - name: "some-volume"
+//	    hostPath: "/etc/some-path"
+//	    mountPath: "/etc/some-pod-path"
+//	    writable: true
+//	    pathType: File
+//	certificatesDir: "/etc/kubernetes/pki"
+//	imageRepository: "k8s.gcr.io"
+//	unifiedControlPlaneImage: "k8s.gcr.io/controlplane:v1.12.0"
+//	auditPolicy:
+//	  # https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#audit-policy
+//	  path: "/var/log/audit/audit.json"
+//	  logDir: "/var/log/audit"
+//	  logMaxAge: 7 # in days
+//	featureGates:
+//	  selfhosting: false
+//	clusterName: "example-cluster"
 //
 // Kubeadm join configuration types
 //

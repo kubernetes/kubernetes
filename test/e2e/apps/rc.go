@@ -60,11 +60,21 @@ var _ = SIGDescribe("ReplicationController", func() {
 		testReplicationControllerConditionCheck(f)
 	})
 
-	It("should adopt matching pods on creation", func() {
+	/*
+		Release : v1.13
+		Testname: Replication Controller, adopt matching pods
+		Description: An ownerless Pod is created, then a Replication Controller (RC) is created whose label selector will match the Pod. The RC MUST either adopt the Pod or delete and replace it with a new Pod
+	*/
+	framework.ConformanceIt("should adopt matching pods on creation", func() {
 		testRCAdoptMatchingOrphans(f)
 	})
 
-	It("should release no longer matching pods", func() {
+	/*
+		Release : v1.13
+		Testname: Replication Controller, release pods
+		Description: A Replication Controller (RC) is created, and its Pods are created. When the labels on one of the Pods change to no longer match the RC's label selector, the RC MUST release the Pod and update the Pod's owner references.
+	*/
+	framework.ConformanceIt("should release no longer matching pods", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 })

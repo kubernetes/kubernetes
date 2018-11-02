@@ -77,7 +77,6 @@ func (f *Framework) LoadFromManifests(files ...string) ([]interface{}, error) {
 
 func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
-		Logf("parsing %s", fileName)
 		data, err := testfiles.Read(fileName)
 		if err != nil {
 			Failf("reading manifest file: %v", err)
@@ -115,7 +114,8 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 // - only the latest stable API version for each item is supported
 func (f *Framework) PatchItems(items ...interface{}) error {
 	for _, item := range items {
-		Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
+		// Uncomment when debugging the loading and patching of items.
+		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
 		if err := f.patchItemRecursively(item); err != nil {
 			return err
 		}
@@ -164,11 +164,17 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 	for _, item := range items {
 		// Each factory knows which item(s) it supports, so try each one.
 		done := false
-		Logf("creating %T:\n%s", item, PrettyPrint(item))
+		description := DescribeItem(item)
+		// Uncomment this line to get a full dump of the entire item.
+		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
+		Logf("creating %s", description)
 		for _, factory := range Factories {
 			destructor, err := factory.Create(f, item)
 			if destructor != nil {
-				destructors = append(destructors, destructor)
+				destructors = append(destructors, func() error {
+					Logf("deleting %s", description)
+					return destructor()
+				})
 			}
 			if err == nil {
 				done = true
@@ -247,6 +253,25 @@ type ItemFactory interface {
 	// If the item is of an unsupported type, it must return
 	// an error that has ItemNotSupported as cause.
 	Create(f *Framework, item interface{}) (func() error, error)
+
+	// UniqueName returns just the name (for global items)
+	// or <namespace>/<name> (for namespaced items) if the
+	// item has the right type for this factory, otherwise
+	// the empty string.
+	UniqueName(item interface{}) string
+}
+
+// DescribeItem always returns a string that describes the item,
+// usually by calling out to a factory that supports the item
+// type. If that fails, the entire item gets converted to a string.
+func DescribeItem(item interface{}) string {
+	for _, factory := range Factories {
+		name := factory.UniqueName(item)
+		if name != "" {
+			return fmt.Sprintf("%T: %s", item, name)
+		}
+	}
+	return fmt.Sprintf("%T: %s", item, item)
 }
 
 // ItemNotSupported is the error that Create methods
@@ -359,9 +384,16 @@ func (*ServiceAccountFactory) Create(f *Framework, i interface{}) (func() error,
 		return nil, errors.Wrap(err, "create ServiceAccount")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*ServiceAccountFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*v1.ServiceAccount)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 }
 
 type ClusterRoleFactory struct{}
@@ -400,9 +432,16 @@ func (*ClusterRoleFactory) Create(f *Framework, i interface{}) (func() error, er
 		return nil, errors.Wrap(err, "create ClusterRole")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*ClusterRoleFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*rbac.ClusterRole)
+	if !ok {
+		return ""
+	}
+	return item.GetName()
 }
 
 type ClusterRoleBindingFactory struct{}
@@ -422,9 +461,16 @@ func (*ClusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() er
 		return nil, errors.Wrap(err, "create ClusterRoleBinding")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*ClusterRoleBindingFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*rbac.ClusterRoleBinding)
+	if !ok {
+		return ""
+	}
+	return item.GetName()
 }
 
 type RoleFactory struct{}
@@ -444,9 +490,16 @@ func (*RoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
 		return nil, errors.Wrap(err, "create Role")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*RoleFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*rbac.Role)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 }
 
 type RoleBindingFactory struct{}
@@ -466,9 +519,16 @@ func (*RoleBindingFactory) Create(f *Framework, i interface{}) (func() error, er
 		return nil, errors.Wrap(err, "create RoleBinding")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*RoleBindingFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*rbac.RoleBinding)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 }
 
 type ServiceFactory struct{}
@@ -488,9 +548,16 @@ func (*ServiceFactory) Create(f *Framework, i interface{}) (func() error, error)
 		return nil, errors.Wrap(err, "create Service")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*ServiceFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*v1.Service)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 }
 
 type StatefulSetFactory struct{}
@@ -510,9 +577,16 @@ func (*StatefulSetFactory) Create(f *Framework, i interface{}) (func() error, er
 		return nil, errors.Wrap(err, "create StatefulSet")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*StatefulSetFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*apps.StatefulSet)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 }
 
 type DaemonSetFactory struct{}
@@ -532,9 +606,16 @@ func (*DaemonSetFactory) Create(f *Framework, i interface{}) (func() error, erro
 		return nil, errors.Wrap(err, "create DaemonSet")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*DaemonSetFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*apps.DaemonSet)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 }
 
 type StorageClassFactory struct{}
@@ -554,9 +635,16 @@ func (*StorageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 		return nil, errors.Wrap(err, "create StorageClass")
 	}
 	return func() error {
-		Logf("deleting %T %s", item, item.GetName())
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
 	}, nil
+}
+
+func (*StorageClassFactory) UniqueName(i interface{}) string {
+	item, ok := i.(*storage.StorageClass)
+	if !ok {
+		return ""
+	}
+	return item.GetName()
 }
 
 // PrettyPrint returns a human-readable representation of an item.

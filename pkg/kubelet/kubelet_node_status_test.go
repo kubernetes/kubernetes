@@ -309,7 +309,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			assert.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
 				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
 				updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 				updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}

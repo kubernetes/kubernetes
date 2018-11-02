@@ -1750,7 +1750,7 @@ func TestValidateGlusterfs(t *testing.T) {
 			errfield: "path",
 		},
 		{
-			name:     "missing endpintname and path",
+			name:     "missing endpointname and path",
 			gfs:      &core.GlusterfsVolumeSource{EndpointsName: "", Path: ""},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "endpoints",
@@ -5036,26 +5036,6 @@ func TestValidateMountPropagation(t *testing.T) {
 			nil,
 			false,
 		},
-	}
-
-	// Enable MountPropagation for this test
-	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("MountPropagation")
-	defer func() {
-		var err error
-		// restoring the old value
-		if priorityEnabled {
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-		} else {
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
-		}
-		if err != nil {
-			t.Errorf("Failed to restore feature gate for MountPropagation: %v", err)
-		}
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-		return
 	}
 
 	volumes := []core.Volume{

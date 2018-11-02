@@ -39,7 +39,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 	var cs clientset.Interface
 	var cloudConfig framework.CloudConfig
-	var gceCloud *gcecloud.GCECloud
+	var gceCloud *gcecloud.Cloud
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")

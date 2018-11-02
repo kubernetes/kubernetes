@@ -24,7 +24,7 @@ For instance
 
 	preflight     	Run master pre-flight checks
 	certs         	Generates all PKI assets necessary to establish the control plane
-		/ca             Generates a self-signed kubernetes CA to provision identities for Kubernetes components
+		/ca             Generates a self-signed Kubernetes CA to provision identities for Kubernetes components
 		/apiserver      Generates an API server serving certificate and key
 		...
 	kubeconfig		Generates all kubeconfig files necessary to establish the control plane

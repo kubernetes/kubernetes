@@ -169,7 +169,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	return baseKubeConfig, nil
 }
 
-// buildInsecureBootstrapKubeConfig makes a KubeConfig object that connects insecurely to the API Server for bootstrapping purposes
+// buildInsecureBootstrapKubeConfig makes a kubeconfig object that connects insecurely to the API Server for bootstrapping purposes
 func buildInsecureBootstrapKubeConfig(endpoint, clustername string) *clientcmdapi.Config {
 	masterEndpoint := fmt.Sprintf("https://%s", endpoint)
 	bootstrapConfig := kubeconfigutil.CreateBasic(masterEndpoint, clustername, BootstrapUser, []byte{})
@@ -177,7 +177,7 @@ func buildInsecureBootstrapKubeConfig(endpoint, clustername string) *clientcmdap
 	return bootstrapConfig
 }
 
-// buildSecureBootstrapKubeConfig makes a KubeConfig object that connects securely to the API Server for bootstrapping purposes (validating with the specified CA)
+// buildSecureBootstrapKubeConfig makes a kubeconfig object that connects securely to the API Server for bootstrapping purposes (validating with the specified CA)
 func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte, clustername string) *clientcmdapi.Config {
 	masterEndpoint := fmt.Sprintf("https://%s", endpoint)
 	bootstrapConfig := kubeconfigutil.CreateBasic(masterEndpoint, clustername, BootstrapUser, caCert)

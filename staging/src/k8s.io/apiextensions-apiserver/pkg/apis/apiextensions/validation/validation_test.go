@@ -49,6 +49,8 @@ func (v validationMatch) matches(err *field.Error) bool {
 	return err.Type == v.errorType && err.Field == v.path.String()
 }
 
+func strPtr(s string) *string { return &s }
+
 func TestValidateCustomResourceDefinition(t *testing.T) {
 	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
 		{
@@ -62,6 +64,205 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 		resource *apiextensions.CustomResourceDefinition
 		errors   []validationMatch
 	}{
+		{
+			name: "webhookconfig: blank URL",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							URL: strPtr("https://example.com/webhook"),
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "conversion", "webhookClientConfig"),
+			},
+		},
+		{
+			name: "webhookconfig: both service and URL provided",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							URL: strPtr(""),
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "conversion", "webhookClientConfig", "url"),
+				invalid("spec", "conversion", "webhookClientConfig", "url"),
+			},
+		},
+		{
+			name: "webhookconfig_should_not_be_set",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							URL: strPtr("https://example.com/webhook"),
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "conversion", "webhookClientConfig"),
+			},
+		},
+		{
+			name: "missing_webhookconfig",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "conversion", "webhookClientConfig"),
+			},
+		},
+		{
+			name: "invalid_conversion_strategy",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("non_existing_conversion"),
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				unsupported("spec", "conversion", "strategy"),
+			},
+		},
 		{
 			name: "no_storage_version",
 			resource: &apiextensions.CustomResourceDefinition{
@@ -86,6 +287,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Served:  true,
 							Storage: false,
 						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -120,6 +324,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Served:  true,
 							Storage: true,
 						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -156,6 +363,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Storage: true,
 						},
 					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
+					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -184,6 +394,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Served:  true,
 							Storage: true,
 						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -283,6 +496,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Group:    "group.c(*&om",
 					Version:  "version",
 					Versions: singleVersionList,
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
+					},
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -316,7 +532,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Group:    "group.com",
 					Version:  "version",
 					Versions: singleVersionList,
-					Scope:    apiextensions.NamespaceScoped,
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
+					},
+					Scope: apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -348,7 +567,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Group:    "group.com",
 					Version:  "version",
 					Versions: singleVersionList,
-					Scope:    apiextensions.NamespaceScoped,
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("None"),
+					},
+					Scope: apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",

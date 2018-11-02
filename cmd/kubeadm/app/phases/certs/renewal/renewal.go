@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // RenewExistingCert loads a certificate file, uses the renew interface to renew it,

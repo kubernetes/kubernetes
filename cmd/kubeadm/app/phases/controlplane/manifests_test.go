@@ -444,18 +444,22 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "test APIServerExtraArgs works as expected",
+			name: "test APIServer.ExtraArgs works as expected",
 			cfg: &kubeadmapi.InitConfiguration{
 				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 					CertificatesDir: testCertsDir,
 					FeatureGates:    map[string]bool{features.DynamicKubeletConfig: true, features.Auditing: true},
-					APIServerExtraArgs: map[string]string{
-						"service-cluster-ip-range": "baz",
-						"advertise-address":        "9.9.9.9",
-						"audit-policy-file":        "/etc/config/audit.yaml",
-						"audit-log-path":           "/var/log/kubernetes",
+					APIServer: kubeadmapi.APIServer{
+						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+							ExtraArgs: map[string]string{
+								"service-cluster-ip-range": "baz",
+								"advertise-address":        "9.9.9.9",
+								"audit-policy-file":        "/etc/config/audit.yaml",
+								"audit-log-path":           "/var/log/kubernetes",
+							},
+						},
 					},
 				},
 			},
@@ -500,8 +504,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 					CertificatesDir: testCertsDir,
-					APIServerExtraArgs: map[string]string{
-						"authorization-mode": authzmodes.ModeABAC,
+					APIServer: kubeadmapi.APIServer{
+						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+							ExtraArgs: map[string]string{
+								"authorization-mode": authzmodes.ModeABAC,
+							},
+						},
 					},
 				},
 			},
@@ -542,8 +550,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 					CertificatesDir: testCertsDir,
-					APIServerExtraArgs: map[string]string{
-						"insecure-port": "1234",
+					APIServer: kubeadmapi.APIServer{
+						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+							ExtraArgs: map[string]string{
+								"insecure-port": "1234",
+							},
+						},
 					},
 				},
 			},
@@ -584,8 +596,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 					CertificatesDir: testCertsDir,
-					APIServerExtraArgs: map[string]string{
-						"authorization-mode": authzmodes.ModeWebhook,
+					APIServer: kubeadmapi.APIServer{
+						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+							ExtraArgs: map[string]string{
+								"authorization-mode": authzmodes.ModeWebhook,
+							},
+						},
 					},
 				},
 			},
@@ -710,10 +726,12 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			name: "custom extra-args for v1.12.0-beta.2",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
-				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
-				CertificatesDir:            testCertsDir,
-				KubernetesVersion:          "v1.12.0-beta.2",
+				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
+				},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.12.0-beta.2",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -807,10 +825,12 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			name: "custom extra-args for v1.11.3",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
-				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
-				CertificatesDir:            testCertsDir,
-				KubernetesVersion:          "v1.11.3",
+				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
+				},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.11.3",
 			},
 			expected: []string{
 				"kube-controller-manager",

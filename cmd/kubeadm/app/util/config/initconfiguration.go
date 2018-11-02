@@ -150,7 +150,7 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 	}
 
 	// Downcase SANs. Some domain names (like ELBs) have capitals in them.
-	LowercaseSANs(cfg.APIServerCertSANs)
+	LowercaseSANs(cfg.APIServer.CertSANs)
 	return nil
 }
 

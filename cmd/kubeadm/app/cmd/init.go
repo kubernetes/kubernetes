@@ -47,7 +47,6 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
@@ -167,6 +166,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeConfigPhase())
 	initRunner.AppendPhase(phases.NewControlPlanePhase())
+	initRunner.AppendPhase(phases.NewEtcdPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -213,7 +213,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		`The path where to save and store the certificates.`,
 	)
 	flagSet.StringSliceVar(
-		&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", cfg.APIServerCertSANs,
+		&cfg.APIServer.CertSANs, "apiserver-cert-extra-sans", cfg.APIServer.CertSANs,
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	flagSet.StringVar(
@@ -342,6 +342,11 @@ func (d initData) IgnorePreflightErrors() sets.String {
 	return d.ignorePreflightErrors
 }
 
+// ExternalCA returns true if an external CA is provided by the user.
+func (d initData) ExternalCA() bool {
+	return d.externalCA
+}
+
 // Client returns a Kubernetes client to be used by kubeadm.
 // This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
 // Important. This function must be called after the admin.conf kubeconfig file is created.
@@ -403,20 +408,12 @@ func runInit(i *initData, out io.Writer) error {
 
 	adminKubeConfigPath := filepath.Join(i.paths.KubernetesDir(), kubeadmconstants.AdminKubeConfigFileName)
 
-	// Add etcd static pod spec only if external etcd is not configured
-	if i.cfg.Etcd.External == nil {
-		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
-		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(i.paths.ManifestDir(), i.cfg); err != nil {
-			return errors.Wrap(err, "error creating local etcd static pod manifest file")
-		}
-	}
-
 	// If we're dry-running, print the generated manifests
 	if err := printFilesIfDryRunning(i.dryRun, i.paths.ManifestDir()); err != nil {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
-	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
+	// Create a Kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	glog.V(1).Infof("creating Kubernetes client")
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {

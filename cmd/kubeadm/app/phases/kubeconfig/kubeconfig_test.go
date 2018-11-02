@@ -30,8 +30,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
@@ -249,7 +249,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			}
 		}
 
-		// Writes the KubeConfig file to disk
+		// Writes the kubeconfig file to disk
 		err := createKubeConfigFileIfNotExists(tmpdir, "test.conf", test.kubeConfig)
 		if test.expectedError && err == nil {
 			t.Errorf("createKubeConfigFileIfNotExists didn't failed when expected to fail")

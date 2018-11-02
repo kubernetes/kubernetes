@@ -34,7 +34,7 @@ var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
 ))
 
 // GetJoinCommand returns the kubeadm join command for a given token and
-// and kubernetes cluster (the current cluster in the kubeconfig file)
+// and Kubernetes cluster (the current cluster in the kubeconfig file)
 func GetJoinCommand(kubeConfigFile string, token string, skipTokenPrint bool) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)

@@ -68,7 +68,7 @@ func CreateWithToken(serverURL, clusterName, userName string, caCert []byte, tok
 	return config
 }
 
-// ClientSetFromFile returns a ready-to-use client from a KubeConfig file
+// ClientSetFromFile returns a ready-to-use client from a kubeconfig file
 func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {

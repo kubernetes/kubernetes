@@ -246,11 +246,11 @@ func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) st
 			return cfg.APIEndpoint.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:
-		if addr, exists := cfg.ControllerManagerExtraArgs[kubeControllerManagerAddressArg]; exists {
+		if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {
 			return addr
 		}
 	case componentName == kubeadmconstants.KubeScheduler:
-		if addr, exists := cfg.SchedulerExtraArgs[kubeSchedulerAddressArg]; exists {
+		if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerAddressArg]; exists {
 			return addr
 		}
 	case componentName == kubeadmconstants.Etcd:

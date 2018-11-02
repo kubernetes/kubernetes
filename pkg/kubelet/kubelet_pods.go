@@ -262,10 +262,6 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		// mount propagation is disabled, use private as in the old versions
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
-	}
 	switch {
 	case mountMode == nil:
 		// PRIVATE is the default

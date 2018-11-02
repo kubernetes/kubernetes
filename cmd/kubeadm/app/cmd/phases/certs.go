@@ -21,11 +21,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	certscmdphase "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -66,24 +64,6 @@ func NewCertsPhase() workflow.Phase {
 		Phases: newCertSubPhases(),
 		Run:    runCerts,
 	}
-}
-
-// NewCmdCerts returns main command for certs phase
-func NewCmdCerts() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "certs",
-		Aliases: []string{"certificates"},
-		Short:   "Generates certificates for a Kubernetes cluster",
-		Long:    cmdutil.MacroCommandLongDescription,
-	}
-
-	cmd.AddCommand(getCertsSubCommands()...)
-	return cmd
-}
-
-// getCertsSubCommands returns sub commands for certs phase
-func getCertsSubCommands() []*cobra.Command {
-	return []*cobra.Command{certscmdphase.NewCmdCertsRenewal()}
 }
 
 // newCertSubPhases returns sub phases for certs phase

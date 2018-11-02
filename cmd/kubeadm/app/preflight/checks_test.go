@@ -673,13 +673,13 @@ func TestKubeletVersionCheck(t *testing.T) {
 
 		switch {
 		case warnings != nil && !tc.expectWarnings:
-			t.Errorf("KubeletVersionCheck: unexpected warnings for kubelet version %q and kubernetes version %q. Warnings: %v", tc.kubeletVersion, tc.k8sVersion, warnings)
+			t.Errorf("KubeletVersionCheck: unexpected warnings for kubelet version %q and Kubernetes version %q. Warnings: %v", tc.kubeletVersion, tc.k8sVersion, warnings)
 		case warnings == nil && tc.expectWarnings:
-			t.Errorf("KubeletVersionCheck: expected warnings for kubelet version %q and kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+			t.Errorf("KubeletVersionCheck: expected warnings for kubelet version %q and Kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
 		case errors != nil && !tc.expectErrors:
-			t.Errorf("KubeletVersionCheck: unexpected errors for kubelet version %q and kubernetes version %q. errors: %v", tc.kubeletVersion, tc.k8sVersion, errors)
+			t.Errorf("KubeletVersionCheck: unexpected errors for kubelet version %q and Kubernetes version %q. errors: %v", tc.kubeletVersion, tc.k8sVersion, errors)
 		case errors == nil && tc.expectErrors:
-			t.Errorf("KubeletVersionCheck: expected errors for kubelet version %q and kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+			t.Errorf("KubeletVersionCheck: expected errors for kubelet version %q and Kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
 		}
 
 	}

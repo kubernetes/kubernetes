@@ -32,9 +32,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // clientCertAuth struct holds info required to build a client certificate to provide authentication info in a kubeconfig object
@@ -116,7 +116,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 			return err
 		}
 
-		// writes the KubeConfig to disk if it not exists
+		// writes the kubeconfig to disk if it not exists
 		if err = createKubeConfigFileIfNotExists(outDir, kubeConfigFileName, config); err != nil {
 			return err
 		}
@@ -217,7 +217,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 }
 
 // createKubeConfigFileIfNotExists saves the KubeConfig object into a file if there isn't any file at the given path.
-// If there already is a KubeConfig file at the given path; kubeadm tries to load it and check if the values in the
+// If there already is a kubeconfig file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected config equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // but if a file exists but has old content or isn't a kubeconfig file, this function returns an error.
 func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmdapi.Config) error {
@@ -257,7 +257,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 	// kubeadm doesn't validate the existing kubeconfig file more than this (kubeadm trusts the client certs to be valid)
 	// Basically, if we find a kubeconfig file with the same path; the same CA cert and the same server URL;
 	// kubeadm thinks those files are equal and doesn't bother writing a new file
-	fmt.Printf("[kubeconfig] Using existing up-to-date KubeConfig file: %q\n", kubeConfigFilePath)
+	fmt.Printf("[kubeconfig] Using existing up-to-date kubeconfig file: %q\n", kubeConfigFilePath)
 
 	return nil
 }
@@ -268,7 +268,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded: %v")
+		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
 	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
@@ -295,7 +295,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
+		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
 	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
@@ -324,7 +324,7 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 		return err
 	}
 
-	// writes the KubeConfig to disk if it not exists
+	// writes the kubeconfig to disk if it not exists
 	configBytes, err := clientcmd.Write(*config)
 	if err != nil {
 		return errors.Wrap(err, "failure while serializing admin kubeconfig")

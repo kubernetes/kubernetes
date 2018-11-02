@@ -128,7 +128,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	// Parse the given kubernetes version and make sure it's higher than the lowest supported
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't parse kubernetes version %q", cfg.KubernetesVersion)
+		return errors.Wrapf(err, "couldn't parse Kubernetes version %q", cfg.KubernetesVersion)
 	}
 	if k8sVersion.LessThan(constants.MinimumControlPlaneVersion) {
 		return errors.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", constants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
