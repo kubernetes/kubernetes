@@ -312,6 +312,12 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 	return awsVolume.ResizeDisk(volumeID, oldSize, newSize)
 }
 
+func (plugin *awsElasticBlockStorePlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
+	return err
+}
+
+var _ volume.FSResizableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 

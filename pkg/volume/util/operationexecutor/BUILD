@@ -18,7 +18,6 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/resizefs:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/nestedpendingoperations:go_default_library",
