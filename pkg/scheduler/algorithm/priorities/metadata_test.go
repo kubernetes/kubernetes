@@ -152,14 +152,14 @@ func TestPriorityMetadata(t *testing.T) {
 			name: "Produce a priorityMetadata with specified requests",
 		},
 	}
-	mataDataProducer := NewPriorityMetadataFactory(
+	metaDataProducer := NewPriorityMetadataFactory(
 		schedulertesting.FakeServiceLister([]*v1.Service{}),
 		schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 		schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
 		schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ptData := mataDataProducer(test.pod, nil)
+			ptData := metaDataProducer(test.pod, nil)
 			if !reflect.DeepEqual(test.expected, ptData) {
 				t.Errorf("expected %#v, got %#v", test.expected, ptData)
 			}
