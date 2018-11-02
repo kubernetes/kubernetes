@@ -25,6 +25,30 @@ aliases:
     - sttts
     - wojtek-t
 
+  sig-auth-authorizers-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authorizers-reviewers:
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - erictune
+    - jianhuiz
+    - krousey
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - mml
+    - ncdc
+    - nikhiljindal
+    - smarterclayton
+    - sttts
+    - thockin
+    - wojtek-t
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
