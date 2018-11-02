@@ -10,6 +10,21 @@ aliases:
     - sttts
     - tallclair
 
+  sig-auth-authenticators-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authenticators-reviewers:
+    - deads2k
+    - enj
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - sttts
+    - wojtek-t
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
