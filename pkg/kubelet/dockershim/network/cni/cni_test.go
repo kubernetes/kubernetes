@@ -291,6 +291,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	expectedBandwidth := map[string]interface{}{
 		"ingressRate": 1000.0, "egressRate": 1000.0,
+		"ingressBurst": 2147483647.0, "egressBurst": 2147483647.0,
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {
 		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)
