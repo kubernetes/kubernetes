@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
+	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -560,7 +561,10 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(s.Client, s.ConfigSyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
+			options.LabelSelector = "!service.kubernetes.io/service-proxy-name"
+		}))
 
 	// Create configs (i.e. Watches for Services and Endpoints)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
