@@ -392,19 +392,19 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
-			"Rev": "46af16f9f7b149af66e5d1bd010e3574dc06de98"
+			"Rev": "ef5f0afec364d3b9396b7b77b43dbe26bf1f8004"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
-			"Rev": "13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272"
+			"Rev": "8483a886a90412cd6858df4ea3483dce9c8e35a3"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",
-			"Rev": "1de3e0542de65ad8d75452a595886fdd0befb363"
+			"Rev": "5bae59e25b21498baea7f9d46e9c147ec106a42e"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/swag",
-			"Rev": "f3f9494671f93fcff853e3c6e9e948b3eb71e590"
+			"Rev": "5899d5c5e619fda5fa86e14795a835f473ca284c"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/gogoproto",
