@@ -69,6 +69,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		lc.Resources.CpuQuota = cpuQuota
 		lc.Resources.CpuPeriod = cpuPeriod
 	}
+	storageReadBandwidthLimit := container.Resources.Limits.StorageWriteBandwidth().Value()
+	storageReadIOpsLimit := container.Resources.Limits.StorageReadIOps().Value()
+	storageWriteBandwidthLimit := container.Resources.Limits.StorageWriteBandwidth().Value()
+	storageWriteIOpsLimit := container.Resources.Limits.StorageWriteIOps().Value()
+	lc.Resources.StorageReadBandwidthLimit = storageReadBandwidthLimit
+	lc.Resources.StorageReadIopsLimit = storageReadIOpsLimit
+	lc.Resources.StorageWriteBandwidthLimit = storageWriteBandwidthLimit
+	lc.Resources.StorageWriteIopsLimit = storageWriteIOpsLimit
 
 	return lc
 }

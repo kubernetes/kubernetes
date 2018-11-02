@@ -658,10 +658,10 @@ function kube::build::start_rsyncd_container() {
   kube::build::stop_rsyncd_container
   V=3 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
-    "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:${KUBE_RSYNC_PORT}:${KUBE_CONTAINER_RSYNC_PORT} -d \
-    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')" \
+    "${KUBE_RSYNC_CONTAINER_NAME}" -p 0.0.0.0:${KUBE_RSYNC_PORT}:${KUBE_CONTAINER_RSYNC_PORT} -d \
+    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' ' ')  " \
     -- /rsyncd.sh >/dev/null
-
+  V=3 kube::log::status "Started rsyncd container"
   local mapped_port
   if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" ${KUBE_CONTAINER_RSYNC_PORT} 2> /dev/null | cut -d: -f 2) ; then
     kube::log::error "Could not get effective rsync port"
@@ -676,8 +676,8 @@ function kube::build::start_rsyncd_container() {
   # machines) we have to talk directly to the container IP.  There is no one
   # strategy that works in all cases so we test to figure out which situation we
   # are in.
-  if kube::build::rsync_probe 127.0.0.1 ${mapped_port}; then
-    KUBE_RSYNC_ADDR="127.0.0.1:${mapped_port}"
+  if kube::build::rsync_probe $(docker-machine ip) ${mapped_port}; then
+    KUBE_RSYNC_ADDR="$(docker-machine ip):${mapped_port}"
     return 0
   elif kube::build::rsync_probe "${container_ip}" ${KUBE_CONTAINER_RSYNC_PORT}; then
     KUBE_RSYNC_ADDR="${container_ip}:${KUBE_CONTAINER_RSYNC_PORT}"

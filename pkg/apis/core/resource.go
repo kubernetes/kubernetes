@@ -60,3 +60,24 @@ func (self *ResourceList) StorageEphemeral() *resource.Quantity {
 	}
 	return &resource.Quantity{}
 }
+
+func (self *ResourceList) StorageWriteBandwidth() *resource.Quantity {
+	if val, ok := (*self)[ResourceStorageWriteBandwidth]; ok {
+		return &val
+	}
+	return &resource.Quantity{Format: resource.BinarySI}
+}
+
+func (self *ResourceList) StorageReadIOps() *resource.Quantity {
+	if val, ok := (*self)[ResourceStorageReadIOps]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
+
+func (self *ResourceList) StorageWriteIOps() *resource.Quantity {
+	if val, ok := (*self)[ResourceStorageWriteIOps]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}

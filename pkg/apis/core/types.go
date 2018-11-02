@@ -3653,6 +3653,14 @@ const (
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
+	// The number of read operations a device can perform, in bytes.
+	ResourceStorageReadBandwidth ResourceName = "storage-read-bandwidth"
+	// The number of write operations a device can perform, in bytes.
+	ResourceStorageWriteBandwidth ResourceName = "storage-write-bandwidth"
+	// The number of read operations a device can perform.
+	ResourceStorageReadIOps ResourceName = "storage-read-iops"
+	// The number of write operations a device can perform.
+	ResourceStorageWriteIOps ResourceName = "storage-write-iops"
 )
 
 const (

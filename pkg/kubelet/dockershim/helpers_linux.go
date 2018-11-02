@@ -27,14 +27,23 @@ import (
 	"path/filepath"
 	"strings"
 
+	"flag"
+
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/blkiodev"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
 	return 0
+}
+
+var BlkioDevicePath string
+
+func init() {
+	flag.StringVar(&BlkioDevicePath, "blkio-device-path", "", "The particular device path for blkio throttle.")
 }
 
 func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
@@ -103,13 +112,29 @@ func (ds *dockerService) updateCreateConfig(
 		// TODO: Can we assume the defaults are sane?
 		rOpts := lc.GetResources()
 		if rOpts != nil {
+			blkioDeviceReadBps := []*blkiodev.ThrottleDevice{
+				{Path: BlkioDevicePath, Rate: uint64(rOpts.StorageReadBandwidthLimit)},
+			}
+			blkioDeviceReadIOps := []*blkiodev.ThrottleDevice{
+				{Path: BlkioDevicePath, Rate: uint64(rOpts.StorageReadIopsLimit)},
+			}
+			blkioDeviceWriteBps := []*blkiodev.ThrottleDevice{
+				{Path: BlkioDevicePath, Rate: uint64(rOpts.StorageWriteBandwidthLimit)},
+			}
+			blkioDeviceWriteIOps := []*blkiodev.ThrottleDevice{
+				{Path: BlkioDevicePath, Rate: uint64(rOpts.StorageWriteIopsLimit)},
+			}
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
 				// Memory and MemorySwap are set to the same value, this prevents containers from using any swap.
-				Memory:     rOpts.MemoryLimitInBytes,
-				MemorySwap: rOpts.MemoryLimitInBytes,
-				CPUShares:  rOpts.CpuShares,
-				CPUQuota:   rOpts.CpuQuota,
-				CPUPeriod:  rOpts.CpuPeriod,
+				Memory:               rOpts.MemoryLimitInBytes,
+				MemorySwap:           rOpts.MemoryLimitInBytes,
+				CPUShares:            rOpts.CpuShares,
+				CPUQuota:             rOpts.CpuQuota,
+				CPUPeriod:            rOpts.CpuPeriod,
+				BlkioDeviceReadBps:   blkioDeviceReadBps,
+				BlkioDeviceReadIOps:  blkioDeviceReadIOps,
+				BlkioDeviceWriteBps:  blkioDeviceWriteBps,
+				BlkioDeviceWriteIOps: blkioDeviceWriteIOps,
 			}
 			createConfig.HostConfig.OomScoreAdj = int(rOpts.OomScoreAdj)
 		}

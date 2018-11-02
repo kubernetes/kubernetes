@@ -505,6 +505,14 @@ message LinuxContainerResources {
     string cpuset_cpus = 6;
     // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
     string cpuset_mems = 7;
+    // Blkio throttle read bps. Default: 0 (not specified).
+    int64 storage_read_bandwidth_limit = 8;
+    // Blkio throttle write bps. Default: 0 (not specified).
+    int64 storage_write_bandwidth_limit = 9;
+    // Blkio throttle read iops. Default: 0 (not specified).
+    int64 storage_read_iops_limit = 10;
+    // Blkio throttle write iops. Default: 0 (not specified).
+    int64 storage_write_iops_limit = 11;
 }
 
 // SELinuxOption are the labels to be applied to the container.
