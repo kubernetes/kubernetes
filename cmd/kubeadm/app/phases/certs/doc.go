@@ -23,7 +23,7 @@ package certs
 	INPUTS:
 		From InitConfiguration
 			.API.AdvertiseAddress is an optional parameter that can be passed for an extra addition to the SAN IPs
-			.APIServerCertSANs is an optional parameter for adding DNS names and IPs to the API Server serving cert SAN
+			.APIServer.CertSANs is an optional parameter for adding DNS names and IPs to the API Server serving cert SAN
 			.Etcd.Local.ServerCertSANs is an optional parameter for adding DNS names and IPs to the etcd serving cert SAN
 			.Etcd.Local.PeerCertSANs is an optional parameter for adding DNS names and IPs to the etcd peer cert SAN
 			.Networking.DNSDomain is needed for knowing which DNS name the internal Kubernetes service has

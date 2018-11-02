@@ -193,11 +193,11 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
 		}
 	}
-	if cfg.APIServerExtraArgs == nil {
-		cfg.APIServerExtraArgs = map[string]string{}
+	if cfg.APIServer.ExtraArgs == nil {
+		cfg.APIServer.ExtraArgs = map[string]string{}
 	}
-	cfg.APIServerExtraArgs["authorization-mode"] = getAuthzModes(cfg.APIServerExtraArgs["authorization-mode"])
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
+	cfg.APIServer.ExtraArgs["authorization-mode"] = getAuthzModes(cfg.APIServer.ExtraArgs["authorization-mode"])
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServer.ExtraArgs)...)
 
 	return command
 }
@@ -302,7 +302,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *
 	}
 
 	command := []string{"kube-controller-manager"}
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManagerExtraArgs)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManager.ExtraArgs)...)
 
 	return command
 }
@@ -316,7 +316,7 @@ func getSchedulerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	}
 
 	command := []string{"kube-scheduler"}
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.SchedulerExtraArgs)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Scheduler.ExtraArgs)...)
 	return command
 }
 
