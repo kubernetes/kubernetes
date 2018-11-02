@@ -109,6 +109,17 @@ aliases:
     - pweil-
     - tallclair
 
+  sig-auth-serviceaccounts-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-serviceaccounts-reviewers:
+    - awly
+    - deads2k
+    - enj
+    - liggitt
+    - mikedanese
+
   sig-storage-reviewers:
     - saad-ali
     - childsb
