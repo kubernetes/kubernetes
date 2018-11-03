@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
@@ -38,41 +37,15 @@ import (
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
+// AdmissionConfig holds the configuration for initializing the admission plugins
 type AdmissionConfig struct {
 	CloudConfigFile      string
 	LoopbackClientConfig *rest.Config
 	ExternalInformers    externalinformers.SharedInformerFactory
 }
 
-func (c *AdmissionConfig) buildAuthnInfoResolver(proxyTransport *http.Transport) webhook.AuthenticationInfoResolverWrapper {
-	webhookAuthResolverWrapper := func(delegate webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
-		return &webhook.AuthenticationInfoResolverDelegator{
-			ClientConfigForFunc: func(server string) (*rest.Config, error) {
-				if server == "kubernetes.default.svc" {
-					return c.LoopbackClientConfig, nil
-				}
-				return delegate.ClientConfigFor(server)
-			},
-			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string) (*rest.Config, error) {
-				if serviceName == "kubernetes" && serviceNamespace == v1.NamespaceDefault {
-					return c.LoopbackClientConfig, nil
-				}
-				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace)
-				if err != nil {
-					return nil, err
-				}
-				if proxyTransport != nil && proxyTransport.DialContext != nil {
-					ret.Dial = proxyTransport.DialContext
-				}
-				return ret, err
-			},
-		}
-	}
-	return webhookAuthResolverWrapper
-}
-
 func (c *AdmissionConfig) New(proxyTransport *http.Transport, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, server.PostStartHookFunc, error) {
-	webhookAuthResolverWrapper := c.buildAuthnInfoResolver(proxyTransport)
+	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, c.LoopbackClientConfig)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 
 	var cloudConfig []byte
