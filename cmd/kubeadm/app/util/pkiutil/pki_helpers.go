@@ -201,7 +201,7 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	case *rsa.PrivateKey:
 		key = k
 	default:
-		return nil, errors.Wrapf(err, "the private key file %s isn't in RSA format", privateKeyPath)
+		return nil, errors.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
 	}
 
 	return key, nil
@@ -228,7 +228,7 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	// Allow RSA format only
 	k, ok := privKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, nil, errors.Wrapf(err, "the private key file %s isn't in RSA format", privateKeyPath)
+		return nil, nil, errors.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
 	}
 
 	p := pubKeys[0].(*rsa.PublicKey)
