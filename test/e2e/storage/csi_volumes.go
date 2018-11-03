@@ -451,7 +451,6 @@ func (g *gcePDCSIDriver) createCSIDriver() {
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
-		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_service.yaml",
 	)
 	g.cleanup = cleanup
 	if err != nil {

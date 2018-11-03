@@ -1,5 +1,5 @@
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: csi-gce-controller
 spec:
@@ -17,7 +17,7 @@ spec:
       containers:
         - name: csi-external-provisioner
           imagePullPolicy: Always
-          image: quay.io/k8scsi/csi-provisioner:v0.4.1
+          image: gcr.io/gke-release/csi-provisioner:v0.4.1-gke.0
           args:
             - "--v=5"
             - "--provisioner=com.google.csi.gcepd"
@@ -27,7 +27,7 @@ spec:
               mountPath: /csi
         - name: csi-attacher
           imagePullPolicy: Always
-          image: quay.io/k8scsi/csi-attacher:v0.4.1
+          image: gcr.io/gke-release/csi-attacher:v0.4.1-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -36,16 +36,11 @@ spec:
               mountPath: /csi
         - name: gce-driver
           imagePullPolicy: Always
-          image: gcr.io/google-containers/volume-csi/gcp-compute-persistent-disk-csi-driver:v0.1.0.alpha
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.2.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:///csi/csi.sock"
-            - "--nodeid=$(KUBE_NODE_NAME)"
           env:
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: "/etc/service-account/cloud-sa.json"
           volumeMounts:

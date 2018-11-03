@@ -16,7 +16,7 @@ spec:
       containers:
         - name: csi-driver-registrar
           imagePullPolicy: Always
-          image: quay.io/k8scsi/driver-registrar:v0.4.1
+          image: gcr.io/gke-release/csi-driver-registrar:v0.4.1-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -35,16 +35,10 @@ spec:
           securityContext:
             privileged: true
           imagePullPolicy: Always
-          image: gcr.io/google-containers/volume-csi/gcp-compute-persistent-disk-csi-driver:v0.1.0.alpha
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.2.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:///csi/csi.sock"
-            - "--nodeid=$(KUBE_NODE_NAME)"
-          env:
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
           volumeMounts:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet
@@ -52,8 +46,21 @@ spec:
             - name: plugin-dir
               mountPath: /csi
             - name: device-dir
-              mountPath: /host/dev
+              mountPath: /dev
+            # The following mounts are required to trigger host udevadm from container
+            - name: udev-rules-etc
+              mountPath: /etc/udev
+            - name: udev-rules-lib
+              mountPath: /lib/udev
+            - name: udev-socket
+              mountPath: /run/udev
+            - name: sys
+              mountPath: /sys
       volumes:
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/
+            type: Directory
         - name: kubelet-dir
           hostPath:
             path: /var/lib/kubelet
@@ -62,11 +69,25 @@ spec:
           hostPath:
             path: /var/lib/kubelet/plugins/com.google.csi.gcepd/
             type: DirectoryOrCreate
-        - name: registration-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins/
-            type: Directory
         - name: device-dir
           hostPath:
             path: /dev
             type: Directory
+        # The following mounts are required to trigger host udevadm from container
+        - name: udev-rules-etc
+          hostPath:
+            path: /etc/udev
+            type: Directory
+        - name: udev-rules-lib
+          hostPath:
+            path: /lib/udev
+            type: Directory
+        - name: udev-socket
+          hostPath:
+            path: /run/udev
+            type: Directory
+        - name: sys
+          hostPath:
+            path: /sys
+            type: Directory
+
