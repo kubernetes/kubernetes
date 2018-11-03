@@ -336,8 +336,8 @@ type HostPathMount struct {
 	HostPath string `json:"hostPath"`
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string `json:"mountPath"`
-	// Writable controls write access to the volume
-	Writable bool `json:"writable,omitempty"`
+	// ReadOnly controls write access to the volume
+	ReadOnly bool `json:"readOnly,omitempty"`
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType `json:"pathType,omitempty"`
 }

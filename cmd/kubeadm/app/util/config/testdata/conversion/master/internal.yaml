@@ -5,7 +5,17 @@ APIServer:
   CertSANs: null
   ExtraArgs:
     authorization-mode: Node,RBAC,Webhook
-  ExtraVolumes: null
+  ExtraVolumes:
+  - HostPath: /host/read-only
+    MountPath: /mount/read-only
+    Name: ReadOnlyVolume
+    PathType: ""
+    ReadOnly: true
+  - HostPath: /host/writable
+    MountPath: /mount/writable
+    Name: WritableVolume
+    PathType: ""
+    ReadOnly: false
 AuditPolicyConfiguration:
   LogDir: /var/log/kubernetes/audit
   LogMaxAge: 2

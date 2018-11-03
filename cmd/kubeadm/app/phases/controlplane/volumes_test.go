@@ -621,28 +621,28 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 			Name:      "foo-0",
 			HostPath:  "/tmp/qux-0",
 			MountPath: "/tmp/qux-0",
-			Writable:  false,
+			ReadOnly:  true,
 			PathType:  v1.HostPathFile,
 		},
 		{
 			Name:      "bar-0",
 			HostPath:  "/tmp/asd-0",
 			MountPath: "/tmp/asd-0",
-			Writable:  true,
+			ReadOnly:  false,
 			PathType:  v1.HostPathDirectory,
 		},
 		{
 			Name:      "foo-1",
 			HostPath:  "/tmp/qux-1",
 			MountPath: "/tmp/qux-1",
-			Writable:  false,
+			ReadOnly:  true,
 			PathType:  v1.HostPathFileOrCreate,
 		},
 		{
 			Name:      "bar-1",
 			HostPath:  "/tmp/asd-1",
 			MountPath: "/tmp/asd-1",
-			Writable:  true,
+			ReadOnly:  false,
 			PathType:  v1.HostPathDirectoryOrCreate,
 		},
 	}
@@ -672,8 +672,8 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 		if volMount.MountPath != hostMount.MountPath {
 			t.Errorf("Expected container path %q", hostMount.MountPath)
 		}
-		if volMount.ReadOnly != !hostMount.Writable {
-			t.Errorf("Expected volume writable setting %t", hostMount.Writable)
+		if volMount.ReadOnly != hostMount.ReadOnly {
+			t.Errorf("Expected volume readOnly setting %t", hostMount.ReadOnly)
 		}
 	}
 }

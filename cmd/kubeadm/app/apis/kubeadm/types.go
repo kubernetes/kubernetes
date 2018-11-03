@@ -369,8 +369,8 @@ type HostPathMount struct {
 	HostPath string
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string
-	// Writable controls write access to the volume
-	Writable bool
+	// ReadOnly controls write access to the volume
+	ReadOnly bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
 }

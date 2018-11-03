@@ -20,6 +20,14 @@ nodeRegistration:
 ---
 apiServerExtraArgs:
   authorization-mode: Node,RBAC,Webhook
+apiServerExtraVolumes:
+- hostPath: /host/read-only
+  mountPath: /mount/read-only
+  name: ReadOnlyVolume
+- hostPath: /host/writable
+  mountPath: /mount/writable
+  name: WritableVolume
+  writable: true
 apiVersion: kubeadm.k8s.io/v1alpha3
 auditPolicy:
   logDir: /var/log/kubernetes/audit

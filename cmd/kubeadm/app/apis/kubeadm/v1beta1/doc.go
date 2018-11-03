@@ -207,7 +207,7 @@ limitations under the License.
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
 //	    mountPath: "/etc/some-pod-path"
-//	    writable: true
+//	    readOnly: false
 //	    pathType: File
 //	  certSANs:
 //	  - "10.100.1.1"
@@ -219,7 +219,7 @@ limitations under the License.
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
 //	    mountPath: "/etc/some-pod-path"
-//	    writable: true
+//	    readOnly: false
 //	    pathType: File
 //	scheduler:
 //	  extraArgs:
@@ -228,7 +228,7 @@ limitations under the License.
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
 //	    mountPath: "/etc/some-pod-path"
-//	    writable: true
+//	    readOnly: false
 //	    pathType: File
 //	certificatesDir: "/etc/kubernetes/pki"
 //	imageRepository: "k8s.gcr.io"
