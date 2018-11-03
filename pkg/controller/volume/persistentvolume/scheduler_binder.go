@@ -446,23 +446,24 @@ func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.Persiste
 			Namespace: namespace,
 		},
 	}
-	pvc, err := b.pvcCache.GetPVC(getPVCName(claim))
+	pvcKey := getPVCName(claim)
+	pvc, err := b.pvcCache.GetPVC(pvcKey)
 	if err != nil || pvc == nil {
-		return false, nil, fmt.Errorf("error getting PVC %q: %v", pvcName, err)
+		return false, nil, fmt.Errorf("error getting PVC %q: %v", pvcKey, err)
 	}
 
 	pvName := pvc.Spec.VolumeName
 	if pvName != "" {
 		if metav1.HasAnnotation(pvc.ObjectMeta, annBindCompleted) {
-			glog.V(5).Infof("PVC %q is fully bound to PV %q", getPVCName(pvc), pvName)
+			glog.V(5).Infof("PVC %q is fully bound to PV %q", pvcKey, pvName)
 			return true, pvc, nil
 		} else {
-			glog.V(5).Infof("PVC %q is not fully bound to PV %q", getPVCName(pvc), pvName)
+			glog.V(5).Infof("PVC %q is not fully bound to PV %q", pvcKey, pvName)
 			return false, pvc, nil
 		}
 	}
 
-	glog.V(5).Infof("PVC %q is not bound", getPVCName(pvc))
+	glog.V(5).Infof("PVC %q is not bound", pvcKey)
 	return false, pvc, nil
 }
 
@@ -552,6 +553,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingI
 			storageClassName = *storageClass
 		}
 		allPVs := b.pvCache.ListPVs(storageClassName)
+		pvcName := getPVCName(bindingInfo.pvc)
 
 		// Find a matching PV
 		bindingInfo.pv, err = findMatchingVolume(bindingInfo.pvc, allPVs, node, chosenPVs, true)
@@ -559,7 +561,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingI
 			return false, nil, err
 		}
 		if bindingInfo.pv == nil {
-			glog.V(4).Infof("No matching volumes for Pod %q, PVC %q on node %q", podName, getPVCName(bindingInfo.pvc), node.Name)
+			glog.V(4).Infof("No matching volumes for Pod %q, PVC %q on node %q", podName, pvcName, node.Name)
 			unboundClaims = append(unboundClaims, bindingInfo.pvc)
 			foundMatches = false
 			continue
@@ -568,7 +570,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingI
 		// matching PV needs to be excluded so we don't select it again
 		chosenPVs[bindingInfo.pv.Name] = bindingInfo.pv
 		matchedClaims = append(matchedClaims, bindingInfo)
-		glog.V(5).Infof("Found matching PV %q for PVC %q on node %q for pod %q", bindingInfo.pv.Name, getPVCName(bindingInfo.pvc), node.Name, podName)
+		glog.V(5).Infof("Found matching PV %q for PVC %q on node %q for pod %q", bindingInfo.pv.Name, pvcName, node.Name, podName)
 	}
 
 	// Mark cache with all the matches for each PVC for this node
@@ -591,9 +593,10 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 	provisionedClaims := []*v1.PersistentVolumeClaim{}
 
 	for _, claim := range claimsToProvision {
+		pvcName := getPVCName(claim)
 		className := v1helper.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
-			return false, fmt.Errorf("no class for claim %q", getPVCName(claim))
+			return false, fmt.Errorf("no class for claim %q", pvcName)
 		}
 
 		class, err := b.ctrl.classLister.Get(className)
@@ -602,13 +605,13 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 		}
 		provisioner := class.Provisioner
 		if provisioner == "" || provisioner == notSupportedProvisioner {
-			glog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, getPVCName(claim))
+			glog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, pvcName)
 			return false, nil
 		}
 
 		// Check if the node can satisfy the topology requirement in the class
 		if !v1helper.MatchTopologySelectorTerms(class.AllowedTopologies, labels.Set(node.Labels)) {
-			glog.V(4).Infof("Node %q cannot satisfy provisioning topology requirements of claim %q", node.Name, getPVCName(claim))
+			glog.V(4).Infof("Node %q cannot satisfy provisioning topology requirements of claim %q", node.Name, pvcName)
 			return false, nil
 		}
 
