@@ -18,11 +18,12 @@ package auth
 
 import (
 	"fmt"
+	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,21 +33,18 @@ import (
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	csicrd "k8s.io/csi-api/pkg/crd"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/coordination"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
-
-	"io/ioutil"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
-	csicrd "k8s.io/csi-api/pkg/crd"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"strings"
 )
 
 func TestNodeAuthorizer(t *testing.T) {
@@ -158,13 +156,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crd, err := superuserCRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(csicrd.CSINodeInfoCRD())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := waitForEstablishedCRD(superuserCRDClient, crd.Name); err != nil {
-		t.Fatalf("Failed to establish CSINodeInfo CRD: %v", err)
-	}
+	etcd.CreateTestCRDs(t, superuserCRDClient, false, csicrd.CSINodeInfoCRD())
 
 	getSecret := func(client clientset.Interface) func() error {
 		return func() error {
@@ -671,26 +663,4 @@ func expectAllowed(t *testing.T, f func() error) {
 	if ok, err := expect(t, f, func(e error) bool { return e == nil }); !ok {
 		t.Errorf("Expected no error, got %v", err)
 	}
-}
-
-func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string) error {
-	return wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, cond := range crd.Status.Conditions {
-			switch cond.Type {
-			case apiextensionsv1beta1.Established:
-				if cond.Status == apiextensionsv1beta1.ConditionTrue {
-					return true, err
-				}
-			case apiextensionsv1beta1.NamesAccepted:
-				if cond.Status == apiextensionsv1beta1.ConditionFalse {
-					fmt.Printf("Name conflict: %v\n", cond.Reason)
-				}
-			}
-		}
-		return false, nil
-	})
 }
