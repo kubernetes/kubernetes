@@ -457,9 +457,8 @@ func (p *PriorityQueue) movePodsToActiveQueue(pods []*v1.Pod) {
 
 // getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
 // any affinity term that matches "pod".
+// NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*v1.Pod {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
 	var podsToMove []*v1.Pod
 	for _, up := range p.unschedulableQ.pods {
 		affinity := up.Spec.Affinity
