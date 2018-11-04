@@ -483,6 +483,7 @@ function generate_certs {
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' controller system:kube-controller-manager
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' scheduler  system:kube-scheduler
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' admin system:admin system:masters
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-apiserver kube-apiserver
 
     # Create matching certificates for kube-aggregator
     kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-aggregator api.kube-public.svc "localhost" ${API_HOST_IP}
@@ -573,6 +574,8 @@ function start_apiserver {
       --vmodule="${LOG_SPEC}" \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
+      --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
+      --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
@@ -615,6 +618,9 @@ function start_apiserver {
     if [[ -z "${AUTH_ARGS}" ]]; then
         AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
+
+    # Grant apiserver permission to speak to the kubelet
+    kubectl --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kube-apiserver-kubelet-admin --clusterrole=system:kubelet-api-admin --user=kube-apiserver
 
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${CONTROLPLANE_SUDO} chown $(whoami) "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
@@ -723,14 +729,16 @@ function start_kubelet {
     fi
 
     auth_args=""
-    if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
+    if [[ "${KUBELET_AUTHORIZATION_WEBHOOK:-}" != "false" ]]; then
       auth_args="${auth_args} --authorization-mode=Webhook"
     fi
-    if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
+    if [[ "${KUBELET_AUTHENTICATION_WEBHOOK:-}" != "false" ]]; then
       auth_args="${auth_args} --authentication-token-webhook"
     fi
     if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
       auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
+    else
+      auth_args="${auth_args} --client-ca-file=${CERT_DIR}/client-ca.crt"
     fi
 
     cni_conf_dir_args=""
