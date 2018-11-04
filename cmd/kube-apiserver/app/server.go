@@ -461,7 +461,7 @@ func buildGenericConfig(
 	genericConfig.Version = &kubeVersion
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageFactoryConfig.ApiResourceConfig = genericConfig.MergedResourceConfig
+	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
 	completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd, s.StorageSerialization)
 	if err != nil {
 		lastErr = err
@@ -504,7 +504,7 @@ func buildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	admissionConfig := &kubeapiserveradmission.AdmissionConfig{
+	admissionConfig := &kubeapiserveradmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
 		CloudConfigFile:      s.CloudProvider.CloudConfigFile,

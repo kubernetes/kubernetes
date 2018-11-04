@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	// DefaultEtcdPathPrefix is used as the etcd path prefix when a prefix has not been provided.
 	DefaultEtcdPathPrefix = "/registry"
 )
 
@@ -38,6 +39,8 @@ type StorageSerializationOptions struct {
 	DefaultStorageVersions string
 }
 
+// NewStorageSerializationOptions creates a new NewStorageSerializationOptions with a default
+// config.
 func NewStorageSerializationOptions() *StorageSerializationOptions {
 	return &StorageSerializationOptions{
 		DefaultStorageVersions: ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),

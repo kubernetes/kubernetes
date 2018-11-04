@@ -51,6 +51,7 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
+// NewStorageFactoryConfig creates a new StorageFactoryConfig with a default config.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 	return &StorageFactoryConfig{
 		Serializer:              legacyscheme.Codecs,
@@ -63,9 +64,10 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 	}
 }
 
+// StorageFactoryConfig holds the configuration for creating a serverstorage.StorageFactory.
 type StorageFactoryConfig struct {
 	StorageConfig                    storagebackend.Config
-	ApiResourceConfig                *serverstorage.ResourceConfig
+	APIResourceConfig                *serverstorage.ResourceConfig
 	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
 	DefaultStorageMediaType          string
 	Serializer                       runtime.StorageSerializer
@@ -75,7 +77,8 @@ type StorageFactoryConfig struct {
 	EncryptionProviderConfigFilepath string
 }
 
-func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, serializationOptions *kubeapiserveroptions.StorageSerializationOptions) (*completedStorageFactoryConfig, error) {
+// Complete finalizes the setup of a StorageFactoryConfig.
+func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, serializationOptions *kubeapiserveroptions.StorageSerializationOptions) (*CompletedStorageFactoryConfig, error) {
 	storageGroupsToEncodingVersion, err := serializationOptions.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return nil, fmt.Errorf("error generating storage version map: %s", err)
@@ -85,14 +88,16 @@ func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, 
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
 	c.EncryptionProviderConfigFilepath = etcdOptions.EncryptionProviderConfigFilepath
-	return &completedStorageFactoryConfig{c}, nil
+	return &CompletedStorageFactoryConfig{c}, nil
 }
 
-type completedStorageFactoryConfig struct {
+// CompletedStorageFactoryConfig tags a StorageFactoryConfig as being completed.
+type CompletedStorageFactoryConfig struct {
 	*StorageFactoryConfig
 }
 
-func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
+// New creates a new serverstorage.DefaultStorageFactory.
+func (c *CompletedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
 	resourceEncodingConfig := resourceconfig.MergeGroupEncodingConfigs(c.DefaultResourceEncoding, c.StorageEncodingOverrides)
 	resourceEncodingConfig = resourceconfig.MergeResourceEncodingConfigs(resourceEncodingConfig, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
@@ -100,7 +105,7 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 		c.DefaultStorageMediaType,
 		c.Serializer,
 		resourceEncodingConfig,
-		c.ApiResourceConfig,
+		c.APIResourceConfig,
 		SpecialDefaultResourcePrefixes)
 
 	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))

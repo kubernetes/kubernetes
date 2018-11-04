@@ -33,8 +33,8 @@ type WantsCloudConfigAdmissionPlugin struct {
 	cloudConfig []byte
 }
 
-func (self *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
-	self.cloudConfig = cloudConfig
+func (w *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
+	w.cloudConfig = cloudConfig
 }
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {

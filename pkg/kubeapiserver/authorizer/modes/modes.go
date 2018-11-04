@@ -19,14 +19,21 @@ package modes
 import "k8s.io/apimachinery/pkg/util/sets"
 
 const (
+	// ModeAlwaysAllow results in all requests being allowed.
 	ModeAlwaysAllow string = "AlwaysAllow"
-	ModeAlwaysDeny  string = "AlwaysDeny"
-	ModeABAC        string = "ABAC"
-	ModeWebhook     string = "Webhook"
-	ModeRBAC        string = "RBAC"
-	ModeNode        string = "Node"
+	// ModeAlwaysDeny results in all requests being blocked.
+	ModeAlwaysDeny string = "AlwaysDeny"
+	// ModeABAC enables policies to be configured using local files.
+	ModeABAC string = "ABAC"
+	// ModeWebhook enables authorization to be managed using a remote REST endpoint.
+	ModeWebhook string = "Webhook"
+	// ModeRBAC enables the creation and storage of policies using the Kubernetes API.
+	ModeRBAC string = "RBAC"
+	// ModeNode enables node authorization to authorize requests.
+	ModeNode string = "Node"
 )
 
+// AuthorizationModeChoices is a list of possible authorization options.
 var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC, ModeNode}
 
 // IsValidAuthorizationMode returns true if the given authorization mode is a valid one for the apiserver

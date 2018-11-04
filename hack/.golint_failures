@@ -133,12 +133,6 @@ pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher
 pkg/features
-pkg/kubeapiserver
-pkg/kubeapiserver/admission
-pkg/kubeapiserver/authenticator
-pkg/kubeapiserver/authorizer
-pkg/kubeapiserver/authorizer/modes
-pkg/kubeapiserver/options
 pkg/kubectl
 pkg/kubectl/apps
 pkg/kubectl/cmd

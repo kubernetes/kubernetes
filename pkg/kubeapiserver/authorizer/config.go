@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
+// AuthorizationConfig holds options for various modes of authorization.
 type AuthorizationConfig struct {
 	AuthorizationModes []string
 
