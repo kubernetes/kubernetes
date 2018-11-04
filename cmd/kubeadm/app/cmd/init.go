@@ -109,6 +109,8 @@ type initOptions struct {
 	cfgPath               string
 	skipTokenPrint        bool
 	dryRun                bool
+	kubeconfigDir         string
+	kubeconfigPath        string
 	featureGatesString    string
 	ignorePreflightErrors []string
 	bto                   *options.BootstrapTokenOptions
@@ -121,6 +123,8 @@ type initData struct {
 	cfg                   *kubeadmapi.InitConfiguration
 	skipTokenPrint        bool
 	dryRun                bool
+	kubeconfigDir         string
+	kubeconfigPath        string
 	ignorePreflightErrors sets.String
 	certificatesDir       string
 	dryRunDir             string
@@ -132,7 +136,7 @@ type initData struct {
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
-	options := newInitOptions()
+	initOptions := newInitOptions()
 	initRunner := workflow.NewRunner()
 
 	cmd := &cobra.Command{
@@ -155,11 +159,20 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		},
 	}
 
-	// adds command flags
-	AddInitConfigFlags(cmd.PersistentFlags(), options.externalcfg, &options.featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &options.cfgPath, &options.skipTokenPrint, &options.dryRun, &options.ignorePreflightErrors)
-	options.bto.AddTokenFlag(cmd.PersistentFlags())
-	options.bto.AddTTLFlag(cmd.PersistentFlags())
+	// adds flags to the init command
+	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
+	AddInitConfigFlags(cmd.Flags(), initOptions.externalcfg, &initOptions.featureGatesString)
+	AddInitOtherFlags(cmd.Flags(), &initOptions.cfgPath, &initOptions.skipTokenPrint, &initOptions.dryRun, &initOptions.ignorePreflightErrors)
+	initOptions.bto.AddTokenFlag(cmd.Flags())
+	initOptions.bto.AddTTLFlag(cmd.Flags())
+
+	// defines additional flag that are not used by the init command but that could be eventually used
+	// by the sub-commands automatically generated for phases
+	initRunner.SetPhaseSubcommandsAdditionalFlags(func(flags *flag.FlagSet) {
+		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
+		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
+		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalcfg.APIServer.ExtraArgs, &initOptions.externalcfg.ControllerManager.ExtraArgs, &initOptions.externalcfg.Scheduler.ExtraArgs)
+	})
 
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
@@ -174,7 +187,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func() (workflow.RunData, error) {
-		return newInitData(cmd, options, out)
+		return newInitData(cmd, initOptions, out)
 	})
 
 	// binds the Runner to kubeadm init command by altering
@@ -187,67 +200,67 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
-		&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress,
+		&cfg.APIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.APIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
 	)
 	flagSet.Int32Var(
-		&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort,
+		&cfg.APIEndpoint.BindPort, options.APIServerBindPort, cfg.APIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
 	flagSet.StringVar(
-		&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet,
+		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
 		"Use alternative range of IP address for service VIPs.",
 	)
 	flagSet.StringVar(
-		&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet,
+		&cfg.Networking.PodSubnet, options.NetworkingPodSubnet, cfg.Networking.PodSubnet,
 		"Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.",
 	)
 	flagSet.StringVar(
-		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
+		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal".`,
 	)
 	flagSet.StringVar(
-		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
+		&cfg.KubernetesVersion, options.KubernetesVersion, cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane.`,
 	)
 	flagSet.StringVar(
-		&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir,
+		&cfg.CertificatesDir, options.CertificatesDir, cfg.CertificatesDir,
 		`The path where to save and store the certificates.`,
 	)
 	flagSet.StringSliceVar(
-		&cfg.APIServer.CertSANs, "apiserver-cert-extra-sans", cfg.APIServer.CertSANs,
+		&cfg.APIServer.CertSANs, options.APIServerCertSANs, cfg.APIServer.CertSANs,
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	flagSet.StringVar(
-		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
+		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
 	flagSet.StringVar(
-		&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket,
+		&cfg.NodeRegistration.CRISocket, options.NodeCRISocket, cfg.NodeRegistration.CRISocket,
 		`Specify the CRI socket to connect to.`,
 	)
-	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+	flagSet.StringVar(featureGatesString, options.FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
 func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
-		cfgPath, "config", *cfgPath,
+		cfgPath, options.CfgPath, *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
 	)
 	flagSet.StringSliceVar(
-		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
+		ignorePreflightErrors, options.IgnorePreflightErrors, *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
-		skipTokenPrint, "skip-token-print", *skipTokenPrint,
+		skipTokenPrint, options.SkipTokenPrint, *skipTokenPrint,
 		"Skip printing of the default bootstrap token generated by 'kubeadm init'.",
 	)
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
-		dryRun, "dry-run", *dryRun,
+		dryRun, options.DryRun, *dryRun,
 		"Don't apply any changes; just output what would be done.",
 	)
 }
@@ -263,8 +276,10 @@ func newInitOptions() *initOptions {
 	bto.Description = "The default bootstrap token generated by 'kubeadm init'."
 
 	return &initOptions{
-		externalcfg: externalcfg,
-		bto:         bto,
+		externalcfg:    externalcfg,
+		bto:            bto,
+		kubeconfigDir:  kubeadmconstants.KubernetesDir,
+		kubeconfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
 	}
 }
 
@@ -323,6 +338,8 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 		skipTokenPrint:        options.skipTokenPrint,
 		dryRun:                options.dryRun,
 		dryRunDir:             dryRunDir,
+		kubeconfigDir:         options.kubeconfigDir,
+		kubeconfigPath:        options.kubeconfigPath,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		externalCA:            externalCA,
 		outputWriter:          out,
@@ -367,7 +384,12 @@ func (d initData) KubeConfigDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
-	return kubeadmconstants.KubernetesDir
+	return d.kubeconfigDir
+}
+
+// KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
+func (d initData) KubeConfigPath() string {
+	return d.kubeconfigPath
 }
 
 // ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
@@ -408,7 +430,7 @@ func (d initData) Client() (clientset.Interface, error) {
 		} else {
 			// If we're acting for real, we should create a connection to the API server and wait for it to come up
 			var err error
-			d.client, err = kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
+			d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
 			if err != nil {
 				return nil, err
 			}

@@ -24,6 +24,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -59,10 +60,11 @@ type certsData interface {
 // NewCertsPhase returns the phase for the certs
 func NewCertsPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:   "certs",
-		Short:  "Certificate generation",
-		Phases: newCertSubPhases(),
-		Run:    runCerts,
+		Name:     "certs",
+		Short:    "Certificate generation",
+		Phases:   newCertSubPhases(),
+		Run:      runCerts,
+		CmdFlags: getCertPhaseFlags("all"),
 	}
 }
 
@@ -105,9 +107,26 @@ func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunDa
 			certSpec.BaseName,
 			getSANDescription(certSpec),
 		),
-		Run: run,
+		Run:      run,
+		CmdFlags: getCertPhaseFlags(certSpec.Name),
 	}
 	return phase
+}
+
+func getCertPhaseFlags(name string) []string {
+	flags := []string{
+		options.CertificatesDir,
+		options.CfgPath,
+	}
+	if name == "all" || name == "apiserver" {
+		flags = append(flags,
+			options.APIServerAdvertiseAddress,
+			options.APIServerCertSANs,
+			options.NetworkingDNSDomain,
+			options.NetworkingServiceSubnet,
+		)
+	}
+	return flags
 }
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {

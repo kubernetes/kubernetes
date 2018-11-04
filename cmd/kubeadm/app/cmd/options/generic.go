@@ -16,22 +16,37 @@ limitations under the License.
 
 package options
 
-import "github.com/spf13/pflag"
+import (
+	"github.com/spf13/pflag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+)
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
 func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
-	fs.StringVar(kubeConfigFile, "kubeconfig", *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
+	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
+}
+
+// AddKubeConfigDirFlag adds the --kubeconfig-dir flag to the given flagset
+func AddKubeConfigDirFlag(fs *pflag.FlagSet, kubeConfigDir *string) {
+	fs.StringVar(kubeConfigDir, KubeconfigDir, *kubeConfigDir, "The path where to save the kubeconfig file.")
 }
 
 // AddConfigFlag adds the --config flag to the given flagset
 func AddConfigFlag(fs *pflag.FlagSet, cfgPath *string) {
-	fs.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental).")
 }
 
 // AddIgnorePreflightErrorsFlag adds the --ignore-preflight-errors flag to the given flagset
 func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]string) {
 	fs.StringSliceVar(
-		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
+		ignorePreflightErrors, IgnorePreflightErrors, *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
+}
+
+// AddControlPlanExtraArgsFlags adds the ExtraArgs flags for control plane components
+func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *map[string]string) {
+	fs.Var(utilflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
+	fs.Var(utilflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
+	fs.Var(utilflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 }
