@@ -436,6 +436,11 @@ message ListOptions {
   // This field is not supported when watch is true. Clients may start a watch from the last
   // resourceVersion value returned by the server and not miss any modifications.
   optional string continue = 8;
+
+  // A subset of fields of interest
+  repeated string fieldMask = 9;
+
+  repeated string watchMask = 10;
 }
 
 // MicroTime is version of Time with microsecond level precision.
