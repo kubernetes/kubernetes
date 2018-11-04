@@ -135,7 +135,7 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			// Creates the bootstap token
+			// Creates the bootstrap token
 			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
 
