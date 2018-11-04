@@ -335,10 +335,20 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		chanSize = 1000
 	}
 
+	fieldMask, err := buildFieldMask(pred.FieldMask)
+	if err != nil {
+		return nil, err
+	}
+
+	watchMask, err := buildWatchMask(pred.WatchMask)
+	if err != nil {
+		return nil, err
+	}
+
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(watchRV, chanSize, initEvents, filterWithAttrsFunction(key, pred), forget, c.versioner)
+	watcher := newCacheWatcher(watchRV, chanSize, initEvents, filterWithAttrsFunction(key, pred), fieldMask, watchMask, forget, c.versioner)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -784,9 +794,23 @@ type cacheWatcher struct {
 	stopped   bool
 	forget    func(bool)
 	versioner storage.Versioner
+	// fieldMask allows for returning only a subset of fields of interest
+	fieldMask *fieldMask
+	// watchMask allows for notifying only when changes happen to a subset of fields of interest
+	watchMask *watchMask
 }
 
-func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter filterWithAttrsFunc, forget func(bool), versioner storage.Versioner) *cacheWatcher {
+// fieldMask specifies a subset of fields of interest for retrieval
+type fieldMask struct {
+	fields []string
+}
+
+// watchMask specifies a subset of fields of interest for notifications
+type watchMask struct {
+	fields []string
+}
+
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter filterWithAttrsFunc, fieldMask *fieldMask, watchMask *watchMask, forget func(bool), versioner storage.Versioner) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:     make(chan *watchCacheEvent, chanSize),
 		result:    make(chan watch.Event, chanSize),
@@ -795,6 +819,8 @@ func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCa
 		stopped:   false,
 		forget:    forget,
 		versioner: versioner,
+		fieldMask: fieldMask,
+		watchMask: watchMask,
 	}
 	go watcher.process(initEvents, resourceVersion)
 	return watcher
@@ -879,12 +905,32 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
+		watchEvent = watch.Event{Type: watch.Added, Object: c.deepCopy(event.Object)}
 	case curObjPasses && oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
+		if c.watchMask != nil {
+			prev := &objectWrapper{Object: event.PrevObject, Labels: event.PrevObjLabels}
+			new := &objectWrapper{Object: event.Object, Labels: event.ObjLabels}
+			didNotChange, err := c.watchMask.DidNotChange(prev, new)
+			if err != nil {
+				glog.Warningf("error from DidNotChange: %v", err)
+				// Assume a change
+			} else if didNotChange {
+				// Watcher is not interested in this change.
+
+				// TODO: Should we occasionally send a
+				// message to prevent the watcher
+				// falling so far behind that it can't
+				// resume a Watch.
+				//
+				// We could either send an update if it's been more than N seconds,
+				// or we could invent a new Event.Type (?)
+				return
+			}
+		}
+		watchEvent = watch.Event{Type: watch.Modified, Object: c.deepCopy(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
-		oldObj := event.PrevObject.DeepCopyObject()
+		oldObj := c.deepCopy(event.PrevObject)
 		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
 		}
@@ -913,6 +959,18 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	case c.result <- watchEvent:
 	case <-c.done:
 	}
+}
+
+func (c *cacheWatcher) deepCopy(in runtime.Object) runtime.Object {
+	if c.fieldMask == nil {
+		return in.DeepCopyObject()
+	}
+	obj, err := c.fieldMask.DeepCopyAndMask(in)
+	if err != nil {
+		glog.Warningf("error copying object with mask: %v", err)
+		obj = in.DeepCopyObject()
+	}
+	return obj
 }
 
 func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion uint64) {
@@ -989,4 +1047,143 @@ func (r *ready) set(ok bool) {
 	defer r.c.L.Unlock()
 	r.ok = ok
 	r.c.Broadcast()
+}
+
+// Builds a fieldMask representing the subfields of interest, or returns nil if there is no filtering
+func buildFieldMask(fields []string) (*fieldMask, error) {
+	if len(fields) == 0 {
+		return nil, nil
+	}
+	return &fieldMask{fields: fields}, nil
+}
+
+// Builds a watchMask representing the subfields of interest, or returns nil if there is no filtering
+func buildWatchMask(fields []string) (*watchMask, error) {
+	if len(fields) == 0 {
+		return nil, nil
+	}
+	return &watchMask{fields: fields}, nil
+}
+
+type objectWrapper struct {
+	Labels     map[string]string
+	Object     runtime.Object
+	MetaObject metav1.Object
+}
+
+func (o *objectWrapper) GetLabels() (map[string]string, error) {
+	if o.Labels == nil {
+		if o.MetaObject == nil {
+			accessor, err := meta.Accessor(o.Object)
+			if err != nil {
+				return nil, fmt.Errorf("error fetching accessor for %T: %v", o.Object, err)
+			}
+			o.MetaObject = accessor
+		}
+
+		o.Labels = o.MetaObject.GetLabels()
+	}
+	return o.Labels, nil
+}
+
+// DidNotChange checks if there was definitely no change to the observed fields.
+// We phrase it in the negative because we permit inaccurate implementations, as long as we err in the direction of sending more updates.
+func (m *watchMask) DidNotChange(old, new *objectWrapper) (bool, error) {
+	for _, f := range m.fields {
+		switch f {
+		case "metadata.name", "metadata.namespace", "metadata.uid":
+			// Well-known immutable fields
+			continue
+
+		case "metadata.labels":
+			{
+				oldLabels, err := old.GetLabels()
+				if err != nil {
+					return false, err
+				}
+				newLabels, err := new.GetLabels()
+				if err != nil {
+					return false, err
+				}
+				if !mapStringStringEquals(oldLabels, newLabels) {
+					// Actual change
+					return false, nil
+				}
+			}
+
+		default:
+			glog.Warningf("field change detection not implemented for %s, assuming change", f)
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func mapStringStringEquals(l, r map[string]string) bool {
+	if len(l) != len(r) {
+		return false
+	}
+	for k, v := range l {
+		if v != r[k] {
+			return false
+		}
+	}
+	return true
+}
+
+func (m *fieldMask) DeepCopyAndMask(in runtime.Object) (runtime.Object, error) {
+	outObj := reflect.New(reflect.ValueOf(in).Elem().Type()).Interface()
+	/*if err != nil {
+		return nil, fmt.Errorf("unable to create empty object of type %T for masking: %v", in, err)
+	}*/
+
+	out, ok := outObj.(runtime.Object)
+	if !ok {
+		glog.Fatalf("unexpected type for cloned object %T", outObj)
+	}
+	// TODO: Just always return full Meta values?  (and can we get the raw object and just DeepCopy it?)
+	inAccessor, err := meta.Accessor(in)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching accessor for %T: %v", in, err)
+	}
+
+	outAccessor, err := meta.Accessor(out)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching accessor for %T: %v", out, err)
+	}
+
+	for _, f := range m.fields {
+		switch f {
+		case "metadata.name":
+			outAccessor.SetName(inAccessor.GetName())
+		case "metadata.namespace":
+			outAccessor.SetNamespace(inAccessor.GetNamespace())
+		case "metadata.resourceVersion":
+			outAccessor.SetResourceVersion(inAccessor.GetResourceVersion())
+		case "metadata.uid":
+			outAccessor.SetUID(inAccessor.GetUID())
+		case "metadata.creationTimestamp":
+			outAccessor.SetCreationTimestamp(inAccessor.GetCreationTimestamp())
+		case "metadata.labels":
+			outAccessor.SetLabels(deepCopyMapStringString(inAccessor.GetLabels()))
+
+		default:
+			return nil, fmt.Errorf("field %s not supported", f)
+		}
+	}
+
+	return out, nil
+}
+
+func deepCopyMapStringString(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
+
+	out := make(map[string]string, len(in))
+	for key, val := range in {
+		(out)[key] = val
+	}
+	return out
 }
