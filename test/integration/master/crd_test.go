@@ -18,7 +18,6 @@ package master
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -37,6 +36,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -81,12 +81,8 @@ func TestCRDShadowGroup(t *testing.T) {
 			},
 		},
 	}
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
-		t.Fatalf("Failed to create networking group CRD: %v", err)
-	}
-	if err := waitForEstablishedCRD(apiextensionsclient, crd.Name); err != nil {
-		t.Fatalf("Failed to establish networking group CRD: %v", err)
-	}
+	etcd.CreateTestCRDs(t, apiextensionsclient, true, crd)
+
 	// wait to give aggregator time to update
 	time.Sleep(2 * time.Second)
 
@@ -97,11 +93,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	}
 
 	t.Logf("Checking that crd resource does not show up in networking group")
-	found, err := crdExistsInDiscovery(apiextensionsclient, crd)
-	if err != nil {
-		t.Fatalf("unexpected discovery error: %v", err)
-	}
-	if found {
+	if etcd.CrdExistsInDiscovery(apiextensionsclient, crd) {
 		t.Errorf("CRD resource shows up in discovery, but shouldn't.")
 	}
 }
@@ -137,17 +129,7 @@ func TestCRD(t *testing.T) {
 			},
 		},
 	}
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
-		t.Fatalf("Failed to create foos.cr.bar.com CRD; %v", err)
-	}
-	if err := waitForEstablishedCRD(apiextensionsclient, crd.Name); err != nil {
-		t.Fatalf("Failed to establish foos.cr.bar.com CRD: %v", err)
-	}
-	if err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-		return crdExistsInDiscovery(apiextensionsclient, crd)
-	}); err != nil {
-		t.Fatalf("Failed to see foos.cr.bar.com in discovery: %v", err)
-	}
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
 
 	t.Logf("Trying to access foos.cr.bar.com with dynamic client")
 	dynamicClient, err := dynamic.NewForConfig(result.ClientConfig)
@@ -305,39 +287,4 @@ func unstructuredFoo(foo *Foo) (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 	return ret, nil
-}
-
-func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string) error {
-	return wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, cond := range crd.Status.Conditions {
-			switch cond.Type {
-			case apiextensionsv1beta1.Established:
-				if cond.Status == apiextensionsv1beta1.ConditionTrue {
-					return true, err
-				}
-			case apiextensionsv1beta1.NamesAccepted:
-				if cond.Status == apiextensionsv1beta1.ConditionFalse {
-					fmt.Printf("Name conflict: %v\n", cond.Reason)
-				}
-			}
-		}
-		return false, nil
-	})
-}
-
-func crdExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) (bool, error) {
-	resourceList, err := client.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + crd.Spec.Version)
-	if err != nil {
-		return false, nil
-	}
-	for _, resource := range resourceList.APIResources {
-		if resource.Name == crd.Spec.Names.Plural {
-			return true, nil
-		}
-	}
-	return false, nil
 }

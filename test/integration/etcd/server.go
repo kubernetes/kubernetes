@@ -30,6 +30,8 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/clientv3/concurrency"
 
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -153,6 +155,9 @@ func StartRealMasterOrDie(t *testing.T) *Master {
 		t.Fatal(err)
 	}
 
+	// create CRDs so we can make sure that custom resources do not get lost
+	CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(kubeClientConfig), false, GetCustomResourceDefinitionData()...)
+
 	// force cached discovery reset
 	discoveryClient := cacheddiscovery.NewMemCacheClient(kubeClient.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
@@ -169,6 +174,9 @@ func StartRealMasterOrDie(t *testing.T) *Master {
 		}
 		close(stopCh)
 		lock.Unlock()
+		if err := session.Close(); err != nil {
+			t.Log(err)
+		}
 	}
 
 	return &Master{
@@ -280,4 +288,80 @@ func JSONToUnstructured(stub, namespace string, mapping *meta.RESTMapping, dynam
 	}
 
 	return dynamicClient.Resource(mapping.Resource).Namespace(namespace), &unstructured.Unstructured{Object: typeMetaAdder}, nil
+}
+
+// CreateTestCRDs creates the given CRDs, any failure causes the test to Fatal.
+// If skipCrdExistsInDiscovery is true, the CRDs are only checked for the Established condition via their Status.
+// If skipCrdExistsInDiscovery is false, the CRDs are checked via discovery, see CrdExistsInDiscovery.
+func CreateTestCRDs(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crds ...*apiextensionsv1beta1.CustomResourceDefinition) {
+	for _, crd := range crds {
+		createTestCRD(t, client, skipCrdExistsInDiscovery, crd)
+	}
+}
+
+func createTestCRD(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crd *apiextensionsv1beta1.CustomResourceDefinition) {
+	if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+		t.Fatalf("Failed to create %s CRD; %v", crd.Name, err)
+	}
+	if skipCrdExistsInDiscovery {
+		if err := waitForEstablishedCRD(client, crd.Name); err != nil {
+			t.Fatalf("Failed to establish %s CRD; %v", crd.Name, err)
+		}
+		return
+	}
+	if err := wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		return CrdExistsInDiscovery(client, crd), nil
+	}); err != nil {
+		t.Fatalf("Failed to see %s in discovery: %v", crd.Name, err)
+	}
+}
+
+func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string) error {
+	return wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, cond := range crd.Status.Conditions {
+			switch cond.Type {
+			case apiextensionsv1beta1.Established:
+				if cond.Status == apiextensionsv1beta1.ConditionTrue {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
+// CrdExistsInDiscovery checks to see if the given CRD exists in discovery at all served versions.
+func CrdExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) bool {
+	var versions []string
+	if len(crd.Spec.Version) != 0 {
+		versions = append(versions, crd.Spec.Version)
+	}
+	for _, v := range crd.Spec.Versions {
+		if v.Served {
+			versions = append(versions, v.Name)
+		}
+	}
+	for _, v := range versions {
+		if !crdVersionExistsInDiscovery(client, crd, v) {
+			return false
+		}
+	}
+	return true
+}
+
+func crdVersionExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition, version string) bool {
+	resourceList, err := client.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
+	if err != nil {
+		return false
+	}
+	for _, resource := range resourceList.APIResources {
+		if resource.Name == crd.Spec.Names.Plural {
+			return true
+		}
+	}
+	return false
 }
