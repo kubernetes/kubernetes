@@ -80,7 +80,6 @@ docs/admin/kubeadm_init_phase_kubeconfig_kubelet.md
 docs/admin/kubeadm_init_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_init_phase_kubelet-start.md
 docs/admin/kubeadm_init_phase_preflight.md
-docs/admin/kubeadm_init_phase_wait-control-plane.md
 docs/admin/kubeadm_join.md
 docs/admin/kubeadm_reset.md
 docs/admin/kubeadm_token.md
@@ -176,7 +175,6 @@ docs/man/man1/kubeadm-init-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-init-phase-kubeconfig.1
 docs/man/man1/kubeadm-init-phase-kubelet-start.1
 docs/man/man1/kubeadm-init-phase-preflight.1
-docs/man/man1/kubeadm-init-phase-wait-control-plane.1
 docs/man/man1/kubeadm-init-phase.1
 docs/man/man1/kubeadm-init.1
 docs/man/man1/kubeadm-join.1
