@@ -86158,6 +86158,10 @@
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
       "type": "integer",
       "format": "int32"
+     },
+     "waitForReadinessProbe": {
+      "description": "For livenessProbe only. Wait until readinessProbe succeeds to check livenessProbe. Default is false.",
+      "type": "boolean"
      }
     }
    },

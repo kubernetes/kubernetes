@@ -3290,6 +3290,10 @@
       "type": "integer",
       "format": "int32",
       "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1."
+     },
+     "waitForReadinessProbe": {
+      "type": "boolean",
+      "description": "For livenessProbe only. Wait until readinessProbe succeeds to check livenessProbe. Default is false."
      }
     }
    },

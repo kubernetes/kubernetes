@@ -3356,6 +3356,11 @@ message Probe {
   // Defaults to 3. Minimum value is 1.
   // +optional
   optional int32 failureThreshold = 6;
+
+  // For livenessProbe only. Wait until readinessProbe succeeds to check livenessProbe.
+  // Default is false.
+  // +optional
+  optional bool waitForReadinessProbe = 7;
 }
 
 // Represents a projected volume source

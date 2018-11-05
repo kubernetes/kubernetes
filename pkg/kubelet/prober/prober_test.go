@@ -213,6 +213,8 @@ func TestProbe(t *testing.T) {
 		execResult     probe.Result
 		expectedResult results.Result
 		expectCommand  []string
+		pod            *v1.Pod
+		livenessOnly   bool
 	}{
 		{ // No probe
 			probe:          nil,
@@ -272,6 +274,30 @@ func TestProbe(t *testing.T) {
 			execResult:     probe.Success,
 			expectedResult: results.Success,
 		},
+		{ // waitForReadinessProbe, livenessProbe fails but container is not ready
+			probe: &v1.Probe{
+				Handler: v1.Handler{
+					Exec: &v1.ExecAction{},
+				},
+				WaitForReadinessProbe: true,
+			},
+			pod:            &v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Ready: false}}}},
+			livenessOnly:   true,
+			execResult:     probe.Failure,
+			expectedResult: results.Success,
+		},
+		{ // waitForReadinessProbe, livenessProbe fails and container is ready
+			probe: &v1.Probe{
+				Handler: v1.Handler{
+					Exec: &v1.ExecAction{},
+				},
+				WaitForReadinessProbe: true,
+			},
+			pod:            &v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Ready: true}}}},
+			livenessOnly:   true,
+			execResult:     probe.Failure,
+			expectedResult: results.Failure,
+		},
 	}
 
 	for i, test := range tests {
@@ -286,6 +312,9 @@ func TestProbe(t *testing.T) {
 			case liveness:
 				testContainer.LivenessProbe = test.probe
 			case readiness:
+				if test.livenessOnly {
+					continue
+				}
 				testContainer.ReadinessProbe = test.probe
 			}
 			if test.execError {
@@ -293,8 +322,12 @@ func TestProbe(t *testing.T) {
 			} else {
 				prober.exec = fakeExecProber{test.execResult, nil}
 			}
+			pod := test.pod
+			if pod == nil {
+				pod = &v1.Pod{}
+			}
 
-			result, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			result, err := prober.probe(probeType, pod, v1.PodStatus{}, testContainer, containerID)
 			if test.expectError && err == nil {
 				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
 			}

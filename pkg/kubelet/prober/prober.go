@@ -95,6 +95,15 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		return results.Success, nil
 	}
 
+	if probeType == liveness &&
+		container.LivenessProbe.WaitForReadinessProbe &&
+		len(pod.Status.ContainerStatuses) > 0 &&
+		!pod.Status.ContainerStatuses[0].Ready {
+		// waitForReadinessProbe requires readinessProbe to succeed before checking livenessProbe
+		glog.V(3).Infof("LivenessProbe probe for %q skipped, waiting for readinessProbe to succeed", ctrName)
+		return results.Success, nil
+	}
+
 	result, output, err := pb.runProbeWithRetries(probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
 	if err != nil || result != probe.Success {
 		// Probe failed in one way or another.

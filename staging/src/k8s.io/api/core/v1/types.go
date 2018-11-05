@@ -1953,6 +1953,10 @@ type Probe struct {
 	// Defaults to 3. Minimum value is 1.
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+	// For livenessProbe only. Wait until readinessProbe succeeds to check livenessProbe.
+	// Default is false.
+	// +optional
+	WaitForReadinessProbe bool `json:"waitForReadinessProbe,omitempty" protobuf:"varint,7,opt,name=waitForReadinessProbe"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
