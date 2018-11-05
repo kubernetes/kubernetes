@@ -490,6 +490,11 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
 	}
 
+	fieldMask, err := buildFieldMask(pred.FieldMask)
+	if err != nil {
+		return err
+	}
+
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
@@ -538,7 +543,18 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
 		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
-			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
+			obj := elem.Object
+			if fieldMask != nil {
+				// TODO: Avoid deep copy by pushing down into serialization layer?
+				// Note: not copying this is suspicious anyway... e.g. don't we call SetLinkURL on the object?
+				oc, err := fieldMask.DeepCopyAndMask(elem.Object)
+				if err != nil {
+					glog.Warningf("error applying field mask: %v", err)
+				} else {
+					obj = oc
+				}
+			}
+			listVal.Set(reflect.Append(listVal, reflect.ValueOf(obj).Elem()))
 		}
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))

@@ -288,7 +288,11 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	out, err := e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+
+	predicate := e.PredicateFunc(label, field)
+	predicate.FieldMask = options.FieldMask
+
+	out, err := e.ListPredicate(ctx, predicate, options)
 	if err != nil {
 		return nil, err
 	}
