@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -81,18 +82,49 @@ func NewControlPlanePhase() workflow.Phase {
 			newControlPlaneSubPhase(kubeadmconstants.KubeControllerManager),
 			newControlPlaneSubPhase(kubeadmconstants.KubeScheduler),
 		},
-		Run: runControlPlanePhase,
+		Run:      runControlPlanePhase,
+		CmdFlags: getControlPlanePhaseFlags("all"),
 	}
 	return phase
 }
 
 func newControlPlaneSubPhase(component string) workflow.Phase {
 	phase := workflow.Phase{
-		Name:  controlPlanePhaseProperties[component].name,
-		Short: controlPlanePhaseProperties[component].short,
-		Run:   runControlPlaneSubPhase(component),
+		Name:     controlPlanePhaseProperties[component].name,
+		Short:    controlPlanePhaseProperties[component].short,
+		Run:      runControlPlaneSubPhase(component),
+		CmdFlags: getControlPlanePhaseFlags(component),
 	}
 	return phase
+}
+
+func getControlPlanePhaseFlags(name string) []string {
+	flags := []string{
+		options.CfgPath,
+		options.CertificatesDir,
+		options.KubernetesVersion,
+	}
+	if name == "all" || name == kubeadmconstants.KubeAPIServer {
+		flags = append(flags,
+			options.APIServerAdvertiseAddress,
+			options.APIServerBindPort,
+			options.APIServerExtraArgs,
+			options.FeatureGatesString,
+			options.NetworkingServiceSubnet,
+		)
+	}
+	if name == "all" || name == kubeadmconstants.KubeControllerManager {
+		flags = append(flags,
+			options.ControllerManagerExtraArgs,
+			options.NetworkingPodSubnet,
+		)
+	}
+	if name == "all" || name == kubeadmconstants.KubeScheduler {
+		flags = append(flags,
+			options.SchedulerExtraArgs,
+		)
+	}
+	return flags
 }
 
 func runControlPlanePhase(c workflow.RunData) error {

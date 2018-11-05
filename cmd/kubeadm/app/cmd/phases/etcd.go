@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -53,18 +54,28 @@ func NewEtcdPhase() workflow.Phase {
 		Phases: []workflow.Phase{
 			newEtcdLocalSubPhase(),
 		},
+		CmdFlags: getEtcdPhaseFlags(),
 	}
 	return phase
 }
 
 func newEtcdLocalSubPhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:    "local",
-		Short:   "Generates the static Pod manifest file for a local, single-node local etcd instance.",
-		Example: etcdLocalExample,
-		Run:     runEtcdPhaseLocal(),
+		Name:     "local",
+		Short:    "Generates the static Pod manifest file for a local, single-node local etcd instance.",
+		Example:  etcdLocalExample,
+		Run:      runEtcdPhaseLocal(),
+		CmdFlags: getEtcdPhaseFlags(),
 	}
 	return phase
+}
+
+func getEtcdPhaseFlags() []string {
+	flags := []string{
+		options.CertificatesDir,
+		options.CfgPath,
+	}
+	return flags
 }
 
 func runEtcdPhaseLocal() func(c workflow.RunData) error {

@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -52,6 +53,10 @@ func NewPreflightMasterPhase() workflow.Phase {
 		Long:    "Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init.",
 		Example: masterPreflightExample,
 		Run:     runPreflightMaster,
+		CmdFlags: []string{
+			options.CfgPath,
+			options.IgnorePreflightErrors,
+		},
 	}
 }
 
