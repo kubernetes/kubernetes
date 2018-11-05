@@ -941,7 +941,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
-		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 	if !cfg.ControlPlane {
@@ -968,6 +967,20 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+		)
+	}
+
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// RunOptionalJoinNodeChecks executes all individual, applicable to node configuration dependant checks
+func RunOptionalJoinNodeChecks(execer utilsexec.Interface, initCfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+	checks := []Checker{}
+
+	// Check ipvs required kernel module if we use ipvs kube-proxy mode
+	if initCfg.ComponentConfigs.KubeProxy != nil && initCfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+		checks = append(checks,
+			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)
 	}
 
