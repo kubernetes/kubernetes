@@ -167,7 +167,7 @@ type options struct {
 	bidirule func(s string) bool
 }
 
-// A Profile defines the configuration of a IDNA mapper.
+// A Profile defines the configuration of an IDNA mapper.
 type Profile struct {
 	options
 }
