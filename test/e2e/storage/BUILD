@@ -8,6 +8,7 @@ go_library(
         "empty_dir_wrapper.go",
         "ephemeral_volume.go",
         "flexvolume.go",
+        "flexvolume_mounted_volume_resize.go",
         "flexvolume_online_resize.go",
         "generic_persistent_volume-disruptive.go",
         "in_tree_volumes.go",
