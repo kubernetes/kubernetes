@@ -67,13 +67,21 @@ var _ volume.Deleter = &glusterfsVolumeDeleter{}
 const (
 	glusterfsPluginName            = "kubernetes.io/glusterfs"
 	volPrefix                      = "vol_"
-	dynamicEpSvcPrefix             = "glusterfs-dynamic-"
+	dynamicEpSvcPrefix             = "glusterfs-dynamic"
 	replicaCount                   = 3
 	durabilityType                 = "replicate"
 	secretKeyName                  = "key" // key name used in secret
 	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
 	defaultGidMin                  = 2000
 	defaultGidMax                  = math.MaxInt32
+
+	// maxCustomEpNamePrefix is the maximum number of chars.
+	// which can be used as ep/svc name prefix. This number is carved
+	// out from below formula.
+	// max length of name of an ep - length of pvc uuid
+	// where max length of name of an ep is 63 and length of uuid is 37
+
+	maxCustomEpNamePrefixLen = 26
 
 	// absoluteGidMin/Max are currently the same as the
 	// default values, but they play a different role and
@@ -443,6 +451,7 @@ type provisionerConfig struct {
 	volumeOptions      []string
 	volumeNamePrefix   string
 	thinPoolSnapFactor float32
+	customEpNamePrefix string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -772,6 +781,8 @@ func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTop
 func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
 	var clusterIDs []string
 	customVolumeName := ""
+	epServiceName := ""
+
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 
 	// GlusterFS/heketi creates volumes in units of GiB.
@@ -822,7 +833,11 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, "", fmt.Errorf("failed to get cluster nodes for volume %s: %v", volume, err)
 	}
 
-	epServiceName := dynamicEpSvcPrefix + string(p.options.PVC.UID)
+	if len(p.provisionerConfig.customEpNamePrefix) == 0 {
+		epServiceName = string(p.options.PVC.UID)
+	} else {
+		epServiceName = p.provisionerConfig.customEpNamePrefix + "-" + string(p.options.PVC.UID)
+	}
 	epNamespace := p.options.PVC.Namespace
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
@@ -970,6 +985,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	var err error
 	cfg.gidMin = defaultGidMin
 	cfg.gidMax = defaultGidMax
+	cfg.customEpNamePrefix = dynamicEpSvcPrefix
 
 	authEnabled := true
 	parseVolumeType := ""
@@ -1037,7 +1053,16 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			if len(v) != 0 {
 				parseThinPoolSnapFactor = v
 			}
-
+		case "customepnameprefix":
+			// If the string has > 'maxCustomEpNamePrefixLen' chars, the final endpoint name will
+			// exceed the limitation of 63 chars, so fail if prefix is > 'maxCustomEpNamePrefixLen'
+			// characters. This is only applicable for 'customepnameprefix' string and default ep name
+			// string will always pass.
+			if len(v) <= maxCustomEpNamePrefixLen {
+				cfg.customEpNamePrefix = v
+			} else {
+				return nil, fmt.Errorf("'customepnameprefix' value should be < %d characters", maxCustomEpNamePrefixLen)
+			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, glusterfsPluginName)
 		}
