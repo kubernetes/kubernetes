@@ -281,9 +281,9 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 				if optional {
 					continue
 				}
-				err_msg := "references non-existent secret key"
-				glog.Errorf(err_msg)
-				return nil, fmt.Errorf(err_msg)
+				errMsg := "references non-existent secret key"
+				glog.Errorf(errMsg)
+				return nil, fmt.Errorf(errMsg)
 			}
 
 			fileProjection.Data = []byte(content)

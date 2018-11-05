@@ -56,7 +56,7 @@ func newPluginMgr(t *testing.T, apiObject runtime.Object) (*volume.VolumePluginM
 		tmpDir,
 		fakeClient,
 		nil,
-		map[string]string{sdcGuidLabelName: "abc-123"},
+		map[string]string{sdcGUIDLabelName: "abc-123"},
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -206,9 +206,9 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		t.Errorf("SetUp() - expecting multiple volume disabled by default")
 	}
 
-	// did we read sdcGuid label
-	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
-		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
+	// did we read sdcGUID label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGUID]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGUID, but did not find it")
 	}
 
 	// rebuild spec
@@ -263,8 +263,8 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName:                   "testcluster",
-		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName: "testcluster",
+		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Name = "testpvc"
@@ -350,7 +350,7 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 
 	// did we read sdcGuid label
-	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGUID]; !ok {
 		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
 	}
 
@@ -408,9 +408,9 @@ func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName:                   "testcluster",
-		PVName:                        "pvc-sio-dynamic-vol",
-		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName: "testcluster",
+		PVName:      "pvc-sio-dynamic-vol",
+		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -440,9 +440,9 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName:                   "testcluster",
-		PVName:                        "pvc-sio-dynamic-vol",
-		PVC:                           volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName: "testcluster",
+		PVName:      "pvc-sio-dynamic-vol",
+		PVC:         volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -488,9 +488,9 @@ func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName:                   "testcluster",
-		PVName:                        "pvc-sio-dynamic-vol",
-		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName: "testcluster",
+		PVName:      "pvc-sio-dynamic-vol",
+		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 

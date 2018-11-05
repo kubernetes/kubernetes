@@ -926,7 +926,7 @@ func VerifyAttachCallCount(
 	}
 
 	return fmt.Errorf(
-		"No attachers have expected AttachCallCount. Expected: <%v>.",
+		"No attachers have expected AttachCallCount. Expected: <%v>",
 		expectedAttachCallCount)
 }
 
@@ -937,7 +937,7 @@ func VerifyZeroAttachCalls(fakeVolumePlugin *FakeVolumePlugin) error {
 		actualCallCount := attacher.GetAttachCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one attacher has non-zero AttachCallCount: <%v>.",
+				"At least one attacher has non-zero AttachCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -959,7 +959,7 @@ func VerifyWaitForAttachCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Attachers have expected WaitForAttachCallCount. Expected: <%v>.",
+		"No Attachers have expected WaitForAttachCallCount. Expected: <%v>",
 		expectedWaitForAttachCallCount)
 }
 
@@ -970,7 +970,7 @@ func VerifyZeroWaitForAttachCallCount(fakeVolumePlugin *FakeVolumePlugin) error 
 		actualCallCount := attacher.GetWaitForAttachCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one attacher has non-zero WaitForAttachCallCount: <%v>.",
+				"At least one attacher has non-zero WaitForAttachCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -992,7 +992,7 @@ func VerifyMountDeviceCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Attachers have expected MountDeviceCallCount. Expected: <%v>.",
+		"No Attachers have expected MountDeviceCallCount. Expected: <%v>",
 		expectedMountDeviceCallCount)
 }
 
@@ -1003,7 +1003,7 @@ func VerifyZeroMountDeviceCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 		actualCallCount := attacher.GetMountDeviceCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one attacher has non-zero MountDeviceCallCount: <%v>.",
+				"At least one attacher has non-zero MountDeviceCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -1025,7 +1025,7 @@ func VerifySetUpCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Mounters have expected SetUpCallCount. Expected: <%v>.",
+		"No Mounters have expected SetUpCallCount. Expected: <%v>",
 		expectedSetUpCallCount)
 }
 
@@ -1036,7 +1036,7 @@ func VerifyZeroSetUpCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 		actualCallCount := mounter.GetSetUpCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one mounter has non-zero SetUpCallCount: <%v>.",
+				"At least one mounter has non-zero SetUpCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -1058,7 +1058,7 @@ func VerifyTearDownCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Unmounters have expected SetUpCallCount. Expected: <%v>.",
+		"No Unmounters have expected SetUpCallCount. Expected: <%v>",
 		expectedTearDownCallCount)
 }
 
@@ -1069,7 +1069,7 @@ func VerifyZeroTearDownCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 		actualCallCount := mounter.GetTearDownCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one mounter has non-zero TearDownCallCount: <%v>.",
+				"At least one mounter has non-zero TearDownCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -1091,7 +1091,7 @@ func VerifyDetachCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Detachers have expected DetachCallCount. Expected: <%v>.",
+		"No Detachers have expected DetachCallCount. Expected: <%v>",
 		expectedDetachCallCount)
 }
 
@@ -1102,7 +1102,7 @@ func VerifyZeroDetachCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 		actualCallCount := detacher.GetDetachCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one detacher has non-zero DetachCallCount: <%v>.",
+				"At least one detacher has non-zero DetachCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -1124,7 +1124,7 @@ func VerifySetUpDeviceCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Mapper have expected SetUpDeviceCallCount. Expected: <%v>.",
+		"No Mapper have expected SetUpDeviceCallCount. Expected: <%v>",
 		expectedSetUpDeviceCallCount)
 }
 
@@ -1142,7 +1142,7 @@ func VerifyTearDownDeviceCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Unmapper have expected TearDownDeviceCallCount. Expected: <%v>.",
+		"No Unmapper have expected TearDownDeviceCallCount. Expected: <%v>",
 		expectedTearDownDeviceCallCount)
 }
 
@@ -1153,7 +1153,7 @@ func VerifyZeroTearDownDeviceCallCount(fakeVolumePlugin *FakeVolumePlugin) error
 		actualCallCount := unmapper.GetTearDownDeviceCallCount()
 		if actualCallCount != 0 {
 			return fmt.Errorf(
-				"At least one unmapper has non-zero TearDownDeviceCallCount: <%v>.",
+				"At least one unmapper has non-zero TearDownDeviceCallCount: <%v>",
 				actualCallCount)
 		}
 	}
@@ -1175,7 +1175,7 @@ func VerifyGetGlobalMapPathCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Mappers have expected GetGlobalMapPathCallCount. Expected: <%v>.",
+		"No Mappers have expected GetGlobalMapPathCallCount. Expected: <%v>",
 		expectedGlobalMapPathCallCount)
 }
 
@@ -1193,7 +1193,7 @@ func VerifyGetPodDeviceMapPathCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Mappers have expected GetPodDeviceMapPathCallCount. Expected: <%v>.",
+		"No Mappers have expected GetPodDeviceMapPathCallCount. Expected: <%v>",
 		expectedPodDeviceMapPathCallCount)
 }
 
@@ -1211,7 +1211,7 @@ func VerifyGetMapDeviceCallCount(
 	}
 
 	return fmt.Errorf(
-		"No Mapper have expected MapdDeviceCallCount. Expected: <%v>.",
+		"No Mapper have expected MapdDeviceCallCount. Expected: <%v>",
 		expectedMapDeviceCallCount)
 }
 

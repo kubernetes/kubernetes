@@ -68,10 +68,10 @@ const (
 	secretKeyName                  = "key" // key name used in secret
 	rbdImageFormat1                = "1"
 	rbdImageFormat2                = "2"
-	rbdDefaultAdminId              = "admin"
+	rbdDefaultAdminID              = "admin"
 	rbdDefaultAdminSecretNamespace = "default"
 	rbdDefaultPool                 = "rbd"
-	rbdDefaultUserId               = rbdDefaultAdminId
+	rbdDefaultUserID               = rbdDefaultAdminID
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -151,7 +151,7 @@ func (plugin *rbdPlugin) getAdminAndSecret(spec *volume.Spec) (string, string, e
 	}
 
 	if admin == "" {
-		admin = rbdDefaultAdminId
+		admin = rbdDefaultAdminID
 	}
 	secret, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
 	if err != nil {
@@ -184,7 +184,7 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 				exec:    plugin.host.GetExec(plugin.GetPluginName()),
 			},
 			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
-			adminId:     admin,
+			adminID:     admin,
 			adminSecret: secret,
 		},
 	}
@@ -192,9 +192,9 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 	expandedSize, err := expander.ResizeImage(oldSize, newSize)
 	if err != nil {
 		return oldSize, err
-	} else {
-		return expandedSize, nil
 	}
+	return expandedSize, nil
+
 }
 
 func (plugin *rbdPlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
@@ -271,7 +271,7 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	return &rbdMounter{
 		rbd:         newRBD("", spec.Name(), img, pool, ro, plugin, &RBDUtil{}),
 		Mon:         mon,
-		Id:          id,
+		ID:          id,
 		Keyring:     keyring,
 		Secret:      secret,
 		fsType:      fstype,
@@ -342,7 +342,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 	return &rbdMounter{
 		rbd:          newRBD(podUID, spec.Name(), img, pool, ro, plugin, manager),
 		Mon:          mon,
-		Id:           id,
+		ID:           id,
 		Keyring:      keyring,
 		Secret:       secret,
 		fsType:       fstype,
@@ -564,7 +564,7 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 		rbdMounter: &rbdMounter{
 			rbd:         newRBD("", spec.Name(), spec.PersistentVolume.Spec.RBD.RBDImage, spec.PersistentVolume.Spec.RBD.RBDPool, false, plugin, manager),
 			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
-			adminId:     admin,
+			adminID:     admin,
 			adminSecret: secret,
 		}}, nil
 }
@@ -614,13 +614,13 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			arr := dstrings.Split(v, ",")
 			r.Mon = append(r.Mon, arr...)
 		case "adminid":
-			r.adminId = v
+			r.adminID = v
 		case "adminsecretname":
 			adminSecretName = v
 		case "adminsecretnamespace":
 			adminSecretNamespace = v
 		case "userid":
-			r.Id = v
+			r.ID = v
 		case "pool":
 			r.Pool = v
 		case "usersecretname":
@@ -636,9 +636,8 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			for _, f := range arr {
 				if !supportedFeatures.Has(f) {
 					return nil, fmt.Errorf("invalid feature %q for volume plugin %s, supported features are: %v", f, r.plugin.GetPluginName(), supportedFeatures)
-				} else {
-					r.imageFeatures = append(r.imageFeatures, f)
 				}
+				r.imageFeatures = append(r.imageFeatures, f)
 			}
 		case volume.VolumeParameterFSType:
 			fstype = v
@@ -665,14 +664,14 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	if secretName == "" && keyring == "" {
 		return nil, fmt.Errorf("must specify either keyring or user secret name")
 	}
-	if r.adminId == "" {
-		r.adminId = rbdDefaultAdminId
+	if r.adminID == "" {
+		r.adminID = rbdDefaultAdminID
 	}
 	if r.Pool == "" {
 		r.Pool = rbdDefaultPool
 	}
-	if r.Id == "" {
-		r.Id = r.adminId
+	if r.ID == "" {
+		r.ID = r.adminID
 	}
 
 	// create random image name
@@ -708,7 +707,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 	}
 
-	rbd.RadosUser = r.Id
+	rbd.RadosUser = r.ID
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
@@ -789,12 +788,12 @@ type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
 	Mon           []string
-	Id            string
+	ID            string
 	Keyring       string
 	Secret        string
 	fsType        string
 	adminSecret   string
-	adminId       string
+	adminID       string
 	mountOptions  []string
 	imageFormat   string
 	imageFeatures []string
@@ -871,7 +870,7 @@ type rbdDiskMapper struct {
 	keyring       string
 	secret        string
 	adminSecret   string
-	adminId       string
+	adminID       string
 	imageFormat   string
 	imageFeatures []string
 }
@@ -1066,9 +1065,8 @@ func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, e
 	if spec.PersistentVolume != nil {
 		if spec.PersistentVolume.Spec.RBD != nil {
 			return spec.PersistentVolume.Spec.AccessModes, nil
-		} else {
-			return nil, fmt.Errorf("Spec does not reference a RBD volume type")
 		}
+		return nil, fmt.Errorf("Spec does not reference a RBD volume type")
 	}
 
 	return nil, nil

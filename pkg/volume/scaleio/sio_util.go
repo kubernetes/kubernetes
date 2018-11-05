@@ -54,7 +54,7 @@ var (
 		username,
 		password,
 		secretNamespace,
-		sdcGuid string
+		sdcGUID string
 	}{
 		gateway:          "gateway",
 		sslEnabled:       "sslEnabled",
@@ -71,18 +71,17 @@ var (
 		readOnly:         "readOnly",
 		username:         "username",
 		password:         "password",
-		sdcGuid:          "sdcGuid",
+		sdcGUID:          "sdcGUID",
 	}
-	sdcGuidLabelName = "scaleio.sdcGuid"
+	sdcGUIDLabelName = "scaleio.sdcGUID"
 	sdcRootPath      = "/opt/emc/scaleio/sdc/bin"
 
-	secretNotFoundErr              = errors.New("secret not found")
-	configMapNotFoundErr           = errors.New("configMap not found")
-	gatewayNotProvidedErr          = errors.New("ScaleIO gateway not provided")
-	secretRefNotProvidedErr        = errors.New("secret ref not provided")
-	systemNotProvidedErr           = errors.New("ScaleIO system not provided")
-	storagePoolNotProvidedErr      = errors.New("ScaleIO storage pool not provided")
-	protectionDomainNotProvidedErr = errors.New("ScaleIO protection domain not provided")
+	errSecretNotFound              = errors.New("secret not found")
+	errGatewayNotProvided          = errors.New("ScaleIO gateway not provided")
+	errSecretRefNotProvided        = errors.New("secret ref not provided")
+	errSystemNotProvided           = errors.New("ScaleIO system not provided")
+	errStoragePoolNotProvided      = errors.New("ScaleIO storage pool not provided")
+	errProtectionDomainNotProvided = errors.New("ScaleIO protection domain not provided")
 )
 
 // mapVolumeSpec maps attributes from either ScaleIOVolumeSource  or ScaleIOPersistentVolumeSource to config
@@ -118,19 +117,19 @@ func mapVolumeSpec(config map[string]string, spec *volume.Spec) {
 
 func validateConfigs(config map[string]string) error {
 	if config[confKey.gateway] == "" {
-		return gatewayNotProvidedErr
+		return errGatewayNotProvided
 	}
 	if config[confKey.secretName] == "" {
-		return secretRefNotProvidedErr
+		return errSecretRefNotProvided
 	}
 	if config[confKey.system] == "" {
-		return systemNotProvidedErr
+		return errSystemNotProvided
 	}
 	if config[confKey.storagePool] == "" {
-		return storagePoolNotProvidedErr
+		return errStoragePoolNotProvided
 	}
 	if config[confKey.protectionDomain] == "" {
-		return protectionDomainNotProvidedErr
+		return errProtectionDomainNotProvided
 	}
 
 	return nil
@@ -222,7 +221,7 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
 	if err != nil {
 		glog.Error(log("failed to get secret: %v", err))
-		return secretNotFoundErr
+		return errSecretNotFound
 	}
 	// merge secret data
 	for key, val := range secretMap {
@@ -232,30 +231,30 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	return nil
 }
 
-// attachSdcGuid injects the sdc guid node label value into config
-func attachSdcGuid(plug *sioPlugin, conf map[string]string) error {
-	guid, err := getSdcGuidLabel(plug)
+// attachSdcGUID injects the sdc guid node label value into config
+func attachSdcGUID(plug *sioPlugin, conf map[string]string) error {
+	guid, err := getSdcGUIDLabel(plug)
 	if err != nil {
 		return err
 	}
-	conf[confKey.sdcGuid] = guid
+	conf[confKey.sdcGUID] = guid
 	return nil
 }
 
-// getSdcGuidLabel fetches the scaleio.sdcGuid node label
+// getSdcGUIDLabel fetches the scaleio.sdcGuid node label
 // associated with the node executing this code.
-func getSdcGuidLabel(plug *sioPlugin) (string, error) {
+func getSdcGUIDLabel(plug *sioPlugin) (string, error) {
 	nodeLabels, err := plug.host.GetNodeLabels()
 	if err != nil {
 		return "", err
 	}
-	label, ok := nodeLabels[sdcGuidLabelName]
+	label, ok := nodeLabels[sdcGUIDLabelName]
 	if !ok {
-		glog.V(4).Info(log("node label %s not found", sdcGuidLabelName))
+		glog.V(4).Info(log("node label %s not found", sdcGUIDLabelName))
 		return "", nil
 	}
 
-	glog.V(4).Info(log("found node label %s=%s", sdcGuidLabelName, label))
+	glog.V(4).Info(log("found node label %s=%s", sdcGUIDLabelName, label))
 	return label, nil
 }
 
