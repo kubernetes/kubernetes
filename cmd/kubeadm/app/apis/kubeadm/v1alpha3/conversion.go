@@ -17,8 +17,10 @@ limitations under the License.
 package v1alpha3
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
@@ -84,6 +86,9 @@ func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *C
 
 	out.APIServer.ExtraArgs = in.APIServerExtraArgs
 	out.APIServer.CertSANs = in.APIServerCertSANs
+	out.APIServer.TimeoutForControlPlane = &metav1.Duration{
+		Duration: constants.DefaultControlPlaneTimeout,
+	}
 	if err := convertSlice_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(&in.APIServerExtraVolumes, &out.APIServer.ExtraVolumes, s); err != nil {
 		return err
 	}

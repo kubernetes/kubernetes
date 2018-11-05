@@ -257,6 +257,7 @@ func autoConvert_v1beta1_APIServer_To_kubeadm_APIServer(in *APIServer, out *kube
 		return err
 	}
 	out.CertSANs = *(*[]string)(unsafe.Pointer(&in.CertSANs))
+	out.TimeoutForControlPlane = (*v1.Duration)(unsafe.Pointer(in.TimeoutForControlPlane))
 	return nil
 }
 
@@ -270,6 +271,7 @@ func autoConvert_kubeadm_APIServer_To_v1beta1_APIServer(in *kubeadm.APIServer, o
 		return err
 	}
 	out.CertSANs = *(*[]string)(unsafe.Pointer(&in.CertSANs))
+	out.TimeoutForControlPlane = (*v1.Duration)(unsafe.Pointer(in.TimeoutForControlPlane))
 	return nil
 }
 
