@@ -20,7 +20,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -171,7 +173,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	// Get the list of etcd endpoints from cluster status
 	endpoints := []string{}
 	for _, e := range clusterStatus.APIEndpoints {
-		endpoints = append(endpoints, fmt.Sprintf("https://%s:%d", e.AdvertiseAddress, constants.EtcdListenClientPort))
+		endpoints = append(endpoints, GetClientURLByIP(e.AdvertiseAddress))
 	}
 	klog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
 
@@ -357,4 +359,22 @@ func (c Client) WaitForClusterAvailable(delay time.Duration, retries int, retryI
 // CheckConfigurationIsHA returns true if the given InitConfiguration etcd block appears to be an HA configuration.
 func CheckConfigurationIsHA(cfg *kubeadmapi.Etcd) bool {
 	return cfg.External != nil && len(cfg.External.Endpoints) > 1
+}
+
+// GetClientURL creates an HTTPS URL that uses the configured advertise
+// address and client port for the API controller
+func GetClientURL(cfg *kubeadmapi.InitConfiguration) string {
+	return "https://" + net.JoinHostPort(cfg.LocalAPIEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenClientPort))
+}
+
+// GetPeerURL creates an HTTPS URL that uses the configured advertise
+// address and peer port for the API controller
+func GetPeerURL(cfg *kubeadmapi.InitConfiguration) string {
+	return "https://" + net.JoinHostPort(cfg.LocalAPIEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenPeerPort))
+}
+
+// GetClientURLByIP creates an HTTPS URL based on an IP address
+// and the client listening port.
+func GetClientURLByIP(ip string) string {
+	return "https://" + net.JoinHostPort(ip, strconv.Itoa(constants.EtcdListenClientPort))
 }
