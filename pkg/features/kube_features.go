@@ -188,10 +188,9 @@ const (
 	MountContainers utilfeature.Feature = "MountContainers"
 
 	// owner: @msau42
-	// alpha: v1.9
+	// GA: v1.13
 	//
 	// Extend the default scheduler to be aware of PV topology and handle PV binding
-	// Before moving to beta, resolve Kubernetes issue #56180
 	VolumeScheduling utilfeature.Feature = "VolumeScheduling"
 
 	// owner: @vladimirvivien
@@ -415,7 +414,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
+	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.GA},
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
 	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
