@@ -102,7 +102,7 @@ func AnnotateFlags(cmd *cobra.Command, generators map[string]Generator) {
 	}
 }
 
-//  EnsureFlagsValid ensures that no invalid flags are being used against a
+// EnsureFlagsValid ensures that no invalid flags are being used against a
 func EnsureFlagsValid(cmd *cobra.Command, generators map[string]Generator, generatorInUse string) error {
 	AnnotateFlags(cmd, generators)
 

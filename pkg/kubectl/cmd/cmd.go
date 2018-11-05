@@ -284,7 +284,7 @@ __custom_func() {
 )
 
 var (
-	bash_completion_flags = map[string]string{
+	bashCompletionFlags = map[string]string{
 		"namespace": "__kubectl_get_resource_namespace",
 		"context":   "__kubectl_config_get_contexts",
 		"cluster":   "__kubectl_config_get_clusters",
@@ -292,10 +292,12 @@ var (
 	}
 )
 
+// NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
 	return NewDefaultKubectlCommandWithArgs(&defaultPluginHandler{}, os.Args, os.Stdin, os.Stdout, os.Stderr)
 }
 
+// NewDefaultKubectlCommandWithArgs creates the `kubectl` command with arguments
 func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string, in io.Reader, out, errout io.Writer) *cobra.Command {
 	cmd := NewKubectlCommand(in, out, errout)
 
@@ -528,7 +530,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	for name, completion := range bash_completion_flags {
+	for name, completion := range bashCompletionFlags {
 		if cmds.Flag(name) != nil {
 			if cmds.Flag(name).Annotations == nil {
 				cmds.Flag(name).Annotations = map[string][]string{}
@@ -544,8 +546,8 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
 	cmds.AddCommand(plugin.NewCmdPlugin(f, ioStreams))
 	cmds.AddCommand(version.NewCmdVersion(f, ioStreams))
-	cmds.AddCommand(apiresources.NewCmdApiVersions(f, ioStreams))
-	cmds.AddCommand(apiresources.NewCmdApiResources(f, ioStreams))
+	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, ioStreams))
+	cmds.AddCommand(apiresources.NewCmdAPIResources(f, ioStreams))
 	cmds.AddCommand(options.NewCmdOptions(ioStreams.Out))
 
 	return cmds

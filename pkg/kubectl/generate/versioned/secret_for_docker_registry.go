@@ -97,11 +97,11 @@ func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object
 		}
 	}
 	if len(s.FileSources) == 0 {
-		dockercfgJsonContent, err := handleDockerCfgJsonContent(s.Username, s.Password, s.Email, s.Server)
+		dockercfgJSONContent, err := handleDockerCfgJSONContent(s.Username, s.Password, s.Email, s.Server)
 		if err != nil {
 			return nil, err
 		}
-		secret.Data[v1.DockerConfigJsonKey] = dockercfgJsonContent
+		secret.Data[v1.DockerConfigJsonKey] = dockercfgJSONContent
 	}
 	if s.AppendHash {
 		h, err := hash.SecretHash(secret)
@@ -146,24 +146,24 @@ func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	return nil
 }
 
-// handleDockerCfgJsonContent serializes a ~/.docker/config.json file
-func handleDockerCfgJsonContent(username, password, email, server string) ([]byte, error) {
+// handleDockerCfgJSONContent serializes a ~/.docker/config.json file
+func handleDockerCfgJSONContent(username, password, email, server string) ([]byte, error) {
 	dockercfgAuth := DockerConfigEntry{
 		Username: username,
 		Password: password,
 		Email:    email,
 	}
 
-	dockerCfgJson := DockerConfigJson{
+	dockerCfgJSON := DockerConfigJSON{
 		Auths: map[string]DockerConfigEntry{server: dockercfgAuth},
 	}
 
-	return json.Marshal(dockerCfgJson)
+	return json.Marshal(dockerCfgJSON)
 }
 
-// DockerConfigJson represents a local docker auth config file
+// DockerConfigJSON represents a local docker auth config file
 // for pulling images.
-type DockerConfigJson struct {
+type DockerConfigJSON struct {
 	Auths DockerConfig `json:"auths"`
 	// +optional
 	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`

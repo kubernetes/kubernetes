@@ -141,7 +141,6 @@ pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
 pkg/kubectl
 pkg/kubectl/apps
-pkg/kubectl/cmd
 pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apiresources
 pkg/kubectl/cmd/apply
@@ -189,8 +188,6 @@ pkg/kubectl/cmd/wait
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
-pkg/kubectl/util
-pkg/kubectl/util/slice
 pkg/kubectl/util/templates
 pkg/kubelet
 pkg/kubelet/apis
