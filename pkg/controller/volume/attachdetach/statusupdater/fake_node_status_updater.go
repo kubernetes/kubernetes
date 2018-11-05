@@ -20,6 +20,7 @@ import (
 	"fmt"
 )
 
+// NewFakeNodeStatusUpdater returns a NodeStatusUpdater for use in testing.
 func NewFakeNodeStatusUpdater(returnError bool) NodeStatusUpdater {
 	return &fakeNodeStatusUpdater{
 		returnError: returnError,

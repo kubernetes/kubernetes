@@ -16,8 +16,8 @@ limitations under the License.
 
 package events
 
+// Volume relevant event reasons
 const (
-	// volume relevant event reasons
 	FailedBinding             = "FailedBinding"
 	VolumeMismatch            = "VolumeMismatch"
 	VolumeFailedRecycle       = "VolumeFailedRecycle"

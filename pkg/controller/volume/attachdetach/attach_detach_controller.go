@@ -81,21 +81,21 @@ type TimerConfig struct {
 
 // DefaultTimerConfig is the default configuration of Attach/Detach controller
 // timers.
-var DefaultTimerConfig TimerConfig = TimerConfig{
+var DefaultTimerConfig = TimerConfig{
 	ReconcilerLoopPeriod:                              100 * time.Millisecond,
 	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
 	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
 }
 
-// AttachDetachController defines the operations supported by this controller.
-type AttachDetachController interface {
+// Controller defines the operations supported by this controller.
+type Controller interface {
 	Run(stopCh <-chan struct{})
 	GetDesiredStateOfWorld() cache.DesiredStateOfWorld
 }
 
-// NewAttachDetachController returns a new instance of AttachDetachController.
-func NewAttachDetachController(
+// NewController returns a new instance of Controller.
+func NewController(
 	kubeClient clientset.Interface,
 	csiClient csiclient.Interface,
 	podInformer coreinformers.PodInformer,
@@ -107,7 +107,7 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig) (Controller, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in

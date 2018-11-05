@@ -200,7 +200,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 	csiClientConfig.ContentType = "application/json"
 
 	attachDetachController, attachDetachControllerErr :=
-		attachdetach.NewAttachDetachController(
+		attachdetach.NewController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
 			csiclientset.NewForConfigOrDie(csiClientConfig),
 			ctx.InformerFactory.Core().V1().Pods(),
@@ -223,7 +223,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 
 func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		expandController, expandControllerErr := expand.NewExpandController(
+		expandController, expandControllerErr := expand.NewController(
 			ctx.ClientBuilder.ClientOrDie("expand-controller"),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),

@@ -56,6 +56,7 @@ type pvcPopulator struct {
 	recorder        record.EventRecorder
 }
 
+// NewPVCPopulator creates and initializes a new PVCPopulator.
 func NewPVCPopulator(
 	loopPeriod time.Duration,
 	resizeMap cache.VolumeResizeMap,

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
+// TestPluginName is the name of the mock test plugin.
 const TestPluginName = "kubernetes.io/testPlugin"
 
 // GetTestVolumeSpec returns a test volume spec
@@ -60,6 +61,7 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 
 var extraPods *v1.PodList
 
+// CreateTestClient returns a new instance of fake.Clientset.
 func CreateTestClient() *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 
@@ -176,7 +178,7 @@ func NewPod(uid, name string) *v1.Pod {
 	}
 }
 
-// NewPod returns a test pod object
+// NewPodWithVolume returns a test pod object
 func NewPodWithVolume(podName, volumeName, nodeName string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -218,6 +220,8 @@ func NewPodWithVolume(podName, volumeName, nodeName string) *v1.Pod {
 	}
 }
 
+// TestPlugin provides a mock plugin that satisfies the VolumePlugin interface
+// for use in testing.
 type TestPlugin struct {
 	ErrorEncountered  bool
 	attachedVolumeMap map[string][]string
@@ -225,14 +229,17 @@ type TestPlugin struct {
 	pluginLock        *sync.RWMutex
 }
 
+// Init is a trivial implementation of VolumePlugin.Init.
 func (plugin *TestPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
+// GetPluginName returns the name of the plugin.
 func (plugin *TestPlugin) GetPluginName() string {
 	return TestPluginName
 }
 
+// GetVolumeName returns the volume name.
 func (plugin *TestPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	plugin.pluginLock.Lock()
 	defer plugin.pluginLock.Unlock()
@@ -243,6 +250,7 @@ func (plugin *TestPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	return spec.Name(), nil
 }
 
+// CanSupport returns true if the volume spec can be supported.
 func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
 	plugin.pluginLock.Lock()
 	defer plugin.pluginLock.Unlock()
@@ -253,10 +261,12 @@ func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
+// RequiresRemount is a trivial implementation of VolumePlugin.RequiresRemount.
 func (plugin *TestPlugin) RequiresRemount() bool {
 	return false
 }
 
+// NewMounter returns a nil volume.Mounter.
 func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin.pluginLock.Lock()
 	defer plugin.pluginLock.Unlock()
@@ -267,10 +277,12 @@ func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts vol
 	return nil, nil
 }
 
+// NewUnmounter is a trivial implementation of VolumePlugin.NewUnmounter.
 func (plugin *TestPlugin) NewUnmounter(name string, podUID types.UID) (volume.Unmounter, error) {
 	return nil, nil
 }
 
+// ConstructVolumeSpec creates and initializes a mock volume.Spec.
 func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	fakeVolume := &v1.Volume{
 		Name: volumeName,
@@ -285,6 +297,7 @@ func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vo
 	return volume.NewSpecFromVolume(fakeVolume), nil
 }
 
+// NewAttacher creates and initializes a volume.Attacher.
 func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
 	attacher := testPluginAttacher{
 		ErrorEncountered:  &plugin.ErrorEncountered,
@@ -294,10 +307,12 @@ func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
 	return &attacher, nil
 }
 
+// NewDeviceMounter creates a volume.DeviceMounter.
 func (plugin *TestPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 	return plugin.NewAttacher()
 }
 
+// NewDetacher creates and initializes a volume.Detacher.
 func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	detacher := testPluginDetacher{
 		detachedVolumeMap: plugin.detachedVolumeMap,
@@ -306,28 +321,34 @@ func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	return &detacher, nil
 }
 
+// NewDeviceUnmounter creates a volume.DeviceUnmounter.
 func (plugin *TestPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return plugin.NewDetacher()
 }
 
+// GetDeviceMountRefs is a trivial implementation of VolumePlugin.GetDeviceMountRefs.
 func (plugin *TestPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	return []string{}, nil
 }
 
+// SupportsMountOption is a trivial implementation of VolumePlugin.SupportsMountOption.
 func (plugin *TestPlugin) SupportsMountOption() bool {
 	return false
 }
 
+// SupportsBulkVolumeVerification is a trivial implementation of VolumePlugin.SupportsBulkVolumeVerification.
 func (plugin *TestPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+// GetErrorEncountered returns true if errors were encountered.
 func (plugin *TestPlugin) GetErrorEncountered() bool {
 	plugin.pluginLock.RLock()
 	defer plugin.pluginLock.RUnlock()
 	return plugin.ErrorEncountered
 }
 
+// GetAttachedVolumes returns a list of attached volumes.
 func (plugin *TestPlugin) GetAttachedVolumes() map[string][]string {
 	plugin.pluginLock.RLock()
 	defer plugin.pluginLock.RUnlock()
@@ -339,6 +360,7 @@ func (plugin *TestPlugin) GetAttachedVolumes() map[string][]string {
 	return ret
 }
 
+// GetDetachedVolumes returns a list of detached volumes.
 func (plugin *TestPlugin) GetDetachedVolumes() map[string][]string {
 	plugin.pluginLock.RLock()
 	defer plugin.pluginLock.RUnlock()
@@ -350,6 +372,8 @@ func (plugin *TestPlugin) GetDetachedVolumes() map[string][]string {
 	return ret
 }
 
+// CreateTestPlugin creates and initializes a new []volume.VolumePlugin array
+// for use in testing.
 func CreateTestPlugin() []volume.VolumePlugin {
 	attachedVolumes := make(map[string][]string)
 	detachedVolumes := make(map[string][]string)

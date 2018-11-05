@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
+// SyncVolumeResize provides an interface for resize handlers.
 type SyncVolumeResize interface {
 	Run(stopCh <-chan struct{})
 }

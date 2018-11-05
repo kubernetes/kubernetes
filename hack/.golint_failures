@@ -122,13 +122,7 @@ pkg/controller/service
 pkg/controller/serviceaccount
 pkg/controller/statefulset
 pkg/controller/ttl
-pkg/controller/volume/attachdetach
-pkg/controller/volume/attachdetach/statusupdater
-pkg/controller/volume/attachdetach/testing
-pkg/controller/volume/events
-pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
-pkg/controller/volume/persistentvolume/options
 pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher

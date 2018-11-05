@@ -56,8 +56,8 @@ const (
 	populatorLoopPeriod time.Duration = 2 * time.Minute
 )
 
-// ExpandController expands the pvs
-type ExpandController interface {
+// Controller expands the pvs
+type Controller interface {
 	Run(stopCh <-chan struct{})
 }
 
@@ -97,12 +97,13 @@ type expandController struct {
 	pvcPopulator PVCPopulator
 }
 
-func NewExpandController(
+// NewController creates and initializes a new Controller.
+func NewController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (ExpandController, error) {
+	plugins []volume.VolumePlugin) (Controller, error) {
 
 	expc := &expandController{
 		kubeClient: kubeClient,

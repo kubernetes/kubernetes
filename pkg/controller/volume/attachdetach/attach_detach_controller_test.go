@@ -32,13 +32,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-func Test_NewAttachDetachController_Positive(t *testing.T) {
+func Test_NewController_Positive(t *testing.T) {
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
 	// Act
-	_, err := NewAttachDetachController(
+	_, err := NewController(
 		fakeKubeClient,
 		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
@@ -82,7 +82,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 
 	// Act
 	plugins := controllervolumetesting.CreateTestPlugin()
-	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
 		t.Fatalf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
@@ -149,7 +149,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin()
-	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	var podsNum, extraPodsNum, nodesNum, i int
@@ -213,7 +213,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	}
 
 	// Create the controller
-	adcObj, err := NewAttachDetachController(
+	adcObj, err := NewController(
 		fakeKubeClient,
 		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
@@ -274,8 +274,8 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	testPlugin := plugins[0].(*controllervolumetesting.TestPlugin)
 	for i = 0; i <= 10; i++ {
-		var attachedVolumesNum int = 0
-		var detachedVolumesNum int = 0
+		var attachedVolumesNum int
+		var detachedVolumesNum int
 
 		time.Sleep(time.Second * 1) // Wait for a second
 		for _, volumeList := range testPlugin.GetAttachedVolumes() {
