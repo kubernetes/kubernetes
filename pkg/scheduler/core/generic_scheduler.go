@@ -653,28 +653,23 @@ func PrioritizeNodes(
 
 	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
 
-	for i, priorityConfig := range priorityConfigs {
-		if priorityConfig.Function != nil {
-			// DEPRECATED
-			wg.Add(1)
-			go func(index int, config algorithm.PriorityConfig) {
-				defer wg.Done()
-				var err error
-				results[index], err = config.Function(pod, nodeNameToInfo, nodes)
-				if err != nil {
-					appendError(err)
-				}
-			}(i, priorityConfig)
-		} else {
-			results[i] = make(schedulerapi.HostPriorityList, len(nodes))
-		}
+	for i := range priorityConfigs {
+		results[i] = make(schedulerapi.HostPriorityList, len(nodes))
 	}
 
 	processNode := func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		var err error
-		for i := range priorityConfigs {
+		for i, priorityConfig := range priorityConfigs {
+			// DEPRECATED when ALL priorityConfigs have Map-Reduce pattern.
 			if priorityConfigs[i].Function != nil {
+				// Make sure that the old-style priority function only runs once.
+				if results[i][0].Host == "" {
+					results[i], err = priorityConfig.Function(pod, nodeNameToInfo, nodes)
+					if err != nil {
+						appendError(err)
+					}
+				}
 				continue
 			}
 			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
