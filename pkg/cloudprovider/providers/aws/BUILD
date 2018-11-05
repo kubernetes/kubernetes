@@ -19,7 +19,6 @@ go_library(
         "device_allocator.go",
         "instances.go",
         "log_handler.go",
-        "regions.go",
         "retry_handler.go",
         "sets_ippermissions.go",
         "tags.go",
@@ -27,7 +26,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
     deps = [
-        "//pkg/credentialprovider/aws:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -73,7 +71,6 @@ go_test(
         "aws_test.go",
         "device_allocator_test.go",
         "instances_test.go",
-        "regions_test.go",
         "retry_handler_test.go",
         "tags_test.go",
     ],

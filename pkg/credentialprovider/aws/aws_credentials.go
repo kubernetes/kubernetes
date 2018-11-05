@@ -17,25 +17,68 @@ limitations under the License.
 package credentials
 
 import (
+	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"k8s.io/klog"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/version"
 )
 
-const awsChinaRegionPrefix = "cn-"
-const awsStandardDNSSuffix = "amazonaws.com"
-const awsChinaDNSSuffix = "amazonaws.com.cn"
-const registryURLTemplate = "*.dkr.ecr.%s.%s"
+const (
+	awsChinaRegionPrefix        = "cn-"
+	awsStandardDNSSuffix        = "amazonaws.com"
+	awsChinaDNSSuffix           = "amazonaws.com.cn"
+	registryURLTemplate         = "*.dkr.ecr.%s.%s"
+	awsOsakaLocalRegion         = "ap-northeast-3"
+	awsAvailabilityZoneEndpoint = "placement/availability-zone"
+	awsChassisFile              = "/sys/devices/virtual/dmi/id/chassis_vendor"
+	awsHypervisorFile           = "/sys/hypervisor/uuid"
+	awsVersionFile              = "/sys/hypervisor/version/extra"
+)
+
+func init() {
+	seen := sets.NewString()
+
+	for _, p := range endpoints.DefaultPartitions() {
+		for r := range p.Regions() {
+			if !seen.Has(r) {
+				registerCredentialsProvider(r)
+				seen.Insert(r)
+			}
+		}
+	}
+
+	// ap-northeast-3 is purposely excluded from the SDK because it requires an
+	// access request see: https://github.com/aws/aws-sdk-go/issues/1863
+	registerCredentialsProvider(awsOsakaLocalRegion)
+
+	// The metadata service is only available on AWS instances
+	if onAWSInstance() {
+		// Register the current region if we haven't seen it already just in case
+		// we're in a region that's not in the SDK for some reason.
+		currentRegion, err := getCurrentRegion()
+		if err != nil {
+			klog.Warningf("unable to detect region for current host, error: %v", err)
+		} else if !seen.Has(currentRegion) {
+			registerCredentialsProvider(currentRegion)
+		}
+	}
+}
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
 // Copied from pkg/cloudprovider/providers/aws/log_handler.go
@@ -95,13 +138,13 @@ func registryURL(region string) string {
 	return fmt.Sprintf(registryURLTemplate, region, dnsSuffix)
 }
 
-// RegisterCredentialsProvider registers a credential provider for the specified region.
+// registerCredentialsProvider registers a credential provider for the specified region.
 // It creates a lazy provider for each AWS region, in order to support
 // cross-region ECR access. They have to be lazy because it's unlikely, but not
 // impossible, that we'll use more than one.
 // This should be called only if using the AWS cloud provider.
 // This way, we avoid timeouts waiting for a non-existent provider.
-func RegisterCredentialsProvider(region string) {
+func registerCredentialsProvider(region string) {
 	klog.V(4).Infof("registering credentials provider for AWS region %q", region)
 
 	credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
@@ -111,11 +154,48 @@ func RegisterCredentialsProvider(region string) {
 		})
 }
 
-// Enabled implements DockerConfigProvider.Enabled for the lazy provider.
-// Since we perform no checks/work of our own and actualProvider is only created
-// later at image pulling time (if ever), always return true.
+func onAWSInstance() bool {
+	// This test is for all modern instance types. On these instance types the
+	// file will exist and contain the value "Amazon EC2\n". On older HVM
+	// instances the file may exist and if it does will contain the value
+	// "Xen\n". It's insufficient to differentiate the instance purely on these
+	// factors because non-EC2 Xen guests will incorrectly pass the second
+	// test. On older PV instances the file will not exist at all.
+	//
+	// This does not use the test recommended in the Amazon documentation to
+	// avoid requiring root.
+	//
+	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+	if data, err := ioutil.ReadFile(awsChassisFile); err != nil {
+		klog.V(2).Infof("Error while reading %s: %v", awsChassisFile, err)
+	} else if bytes.Equal(bytes.TrimSpace(data), []byte("Amazon EC2")) {
+		return true
+	}
+
+	// Older PV and HVM EC2 instances will always have a prefix of ec2 on the
+	// hypervisor UUID. They should generally also have an amazon suffix on the
+	// hypervisor extra version.
+	if data, err := ioutil.ReadFile(awsHypervisorFile); err != nil {
+		klog.V(2).Infof("Error while reading %s: %v", awsHypervisorFile, err)
+	} else if bytes.HasPrefix(bytes.TrimSpace(bytes.ToLower(data)), []byte("ec2")) {
+		return true
+	}
+
+	// This check is an extra bit of paranoia in the off-chance that a non-EC2
+	// Xen guest has a ec2 prefix on the hypervisor UUID.
+	if data, err := ioutil.ReadFile(awsVersionFile); err != nil {
+		klog.V(2).Infof("Error while reading %s: %v", awsVersionFile, err)
+	} else if bytes.HasSuffix(bytes.TrimSpace(bytes.ToLower(data)), []byte("amazon")) {
+		return true
+	}
+
+	return false
+}
+
+// Enabled implements DockerConfigProvider.Enabled for the lazy provider. It
+// will return true only if we're running on a AWS instance.
 func (p *lazyEcrProvider) Enabled() bool {
-	return true
+	return onAWSInstance()
 }
 
 // LazyProvide implements DockerConfigProvider.LazyProvide. It will be called
@@ -161,6 +241,10 @@ func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
 // TODO: figure how to enable it manually for deployments that are not on AWS but still
 // use ECR somehow?
 func (p *ecrProvider) Enabled() bool {
+	if !onAWSInstance() {
+		return false
+	}
+
 	if p.region == "" {
 		klog.Errorf("Called ecrProvider.Enabled() with no region set")
 		return false
@@ -229,4 +313,31 @@ func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 		}
 	}
 	return cfg
+}
+
+// getCurrentRegion queries the local EC2 metadata service and returns the name
+// of the region in which the current host is running
+func getCurrentRegion() (string, error) {
+	// Without a timeout this hangs forever. Use a really aggressively low
+	// timeout because the ec2metadata service is bound to a local interface on
+	// the EC2 hosts.
+	sess, err := session.NewSession(aws.NewConfig().
+		WithHTTPClient(&http.Client{Timeout: 3 * time.Millisecond}).
+		WithMaxRetries(1))
+	if err != nil {
+		return "", err
+	}
+
+	client := ec2metadata.New(sess)
+	zone, err := client.GetMetadata(awsAvailabilityZoneEndpoint)
+	if err != nil {
+		return "", err
+	}
+
+	if v := strings.TrimSpace(zone); len(v) <= 1 {
+		return "", errors.New("ec2metadata returned a blank zone")
+	}
+
+	// Zone format: ${REGION}-${LOCATION}-${NUMBER}${ZONE} (ex: us-west-2c)
+	return zone[:len(zone)-1], nil
 }
