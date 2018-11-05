@@ -157,15 +157,6 @@ var ipsetWithIptablesChain = []struct {
 	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst", "sctp"},
 }
 
-var ipvsModules = []string{
-	"ip_vs",
-	"ip_vs_rr",
-	"ip_vs_wrr",
-	"ip_vs_sh",
-	"nf_conntrack_ipv4",
-	"nf_conntrack",
-}
-
 // In IPVS proxy mode, the following flags need to be set
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
@@ -455,14 +446,12 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 // GetModules returns all installed kernel modules.
 func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	// Check whether IPVS required kernel modules are built-in
-	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	b, err := ioutil.ReadFile(kernelVersionFile)
+	kernelVersion, ipvsModules, err := utilipvs.GetKernelVersionAndIPVSMods(handle.executor)
 	if err != nil {
-		glog.Errorf("Failed to read file %s with error %v", kernelVersionFile, err)
+		return nil, err
 	}
-	kernelVersion := strings.TrimSpace(string(b))
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
-	b, err = ioutil.ReadFile(builtinModsFilePath)
+	b, err := ioutil.ReadFile(builtinModsFilePath)
 	if err != nil {
 		glog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
 	}
@@ -503,6 +492,8 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	}
 	wantModules := sets.NewString()
 	loadModules := sets.NewString()
+	linuxKernelHandler := NewLinuxKernelHandler()
+	_, ipvsModules, _ := utilipvs.GetKernelVersionAndIPVSMods(linuxKernelHandler.executor)
 	wantModules.Insert(ipvsModules...)
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).UnsortedList()
