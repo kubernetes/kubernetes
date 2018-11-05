@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -253,23 +254,16 @@ type ItemFactory interface {
 	// If the item is of an unsupported type, it must return
 	// an error that has ItemNotSupported as cause.
 	Create(f *Framework, item interface{}) (func() error, error)
-
-	// UniqueName returns just the name (for global items)
-	// or <namespace>/<name> (for namespaced items) if the
-	// item has the right type for this factory, otherwise
-	// the empty string.
-	UniqueName(item interface{}) string
 }
 
 // DescribeItem always returns a string that describes the item,
-// usually by calling out to a factory that supports the item
-// type. If that fails, the entire item gets converted to a string.
+// usually by calling out to cache.MetaNamespaceKeyFunc which
+// concatenates namespace (if set) and name. If that fails, the entire
+// item gets converted to a string.
 func DescribeItem(item interface{}) string {
-	for _, factory := range Factories {
-		name := factory.UniqueName(item)
-		if name != "" {
-			return fmt.Sprintf("%T: %s", item, name)
-		}
+	key, err := cache.MetaNamespaceKeyFunc(item)
+	if err == nil && key != "" {
+		return fmt.Sprintf("%T: %s", item, key)
 	}
 	return fmt.Sprintf("%T: %s", item, item)
 }
@@ -279,15 +273,16 @@ func DescribeItem(item interface{}) string {
 var ItemNotSupported = errors.New("not supported")
 
 var Factories = map[What]ItemFactory{
-	{"ClusterRole"}:        &ClusterRoleFactory{},
-	{"ClusterRoleBinding"}: &ClusterRoleBindingFactory{},
-	{"DaemonSet"}:          &DaemonSetFactory{},
-	{"Role"}:               &RoleFactory{},
-	{"RoleBinding"}:        &RoleBindingFactory{},
-	{"ServiceAccount"}:     &ServiceAccountFactory{},
-	{"StatefulSet"}:        &StatefulSetFactory{},
-	{"StorageClass"}:       &StorageClassFactory{},
-	{"Service"}:            &ServiceFactory{},
+	{"ClusterRole"}:        &clusterRoleFactory{},
+	{"ClusterRoleBinding"}: &clusterRoleBindingFactory{},
+	{"DaemonSet"}:          &daemonSetFactory{},
+	{"Role"}:               &roleFactory{},
+	{"RoleBinding"}:        &roleBindingFactory{},
+	{"Secret"}:             &secretFactory{},
+	{"Service"}:            &serviceFactory{},
+	{"ServiceAccount"}:     &serviceAccountFactory{},
+	{"StatefulSet"}:        &statefulSetFactory{},
+	{"StorageClass"}:       &storageClassFactory{},
 }
 
 // PatchName makes the name of some item unique by appending the
@@ -331,6 +326,8 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		f.PatchName(&item.Name)
 	case *v1.ServiceAccount:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+	case *v1.Secret:
+		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *rbac.ClusterRoleBinding:
 		f.PatchName(&item.Name)
 		for i := range item.Subjects {
@@ -368,13 +365,13 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 // looked like the least dirty approach. Perhaps one day Go will have
 // generics.
 
-type ServiceAccountFactory struct{}
+type serviceAccountFactory struct{}
 
-func (f *ServiceAccountFactory) New() runtime.Object {
+func (f *serviceAccountFactory) New() runtime.Object {
 	return &v1.ServiceAccount{}
 }
 
-func (*ServiceAccountFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*serviceAccountFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*v1.ServiceAccount)
 	if !ok {
 		return nil, ItemNotSupported
@@ -388,21 +385,13 @@ func (*ServiceAccountFactory) Create(f *Framework, i interface{}) (func() error,
 	}, nil
 }
 
-func (*ServiceAccountFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*v1.ServiceAccount)
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
-}
+type clusterRoleFactory struct{}
 
-type ClusterRoleFactory struct{}
-
-func (f *ClusterRoleFactory) New() runtime.Object {
+func (f *clusterRoleFactory) New() runtime.Object {
 	return &rbac.ClusterRole{}
 }
 
-func (*ClusterRoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbac.ClusterRole)
 	if !ok {
 		return nil, ItemNotSupported
@@ -436,21 +425,13 @@ func (*ClusterRoleFactory) Create(f *Framework, i interface{}) (func() error, er
 	}, nil
 }
 
-func (*ClusterRoleFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*rbac.ClusterRole)
-	if !ok {
-		return ""
-	}
-	return item.GetName()
-}
+type clusterRoleBindingFactory struct{}
 
-type ClusterRoleBindingFactory struct{}
-
-func (f *ClusterRoleBindingFactory) New() runtime.Object {
+func (f *clusterRoleBindingFactory) New() runtime.Object {
 	return &rbac.ClusterRoleBinding{}
 }
 
-func (*ClusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*clusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbac.ClusterRoleBinding)
 	if !ok {
 		return nil, ItemNotSupported
@@ -465,21 +446,13 @@ func (*ClusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() er
 	}, nil
 }
 
-func (*ClusterRoleBindingFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*rbac.ClusterRoleBinding)
-	if !ok {
-		return ""
-	}
-	return item.GetName()
-}
+type roleFactory struct{}
 
-type RoleFactory struct{}
-
-func (f *RoleFactory) New() runtime.Object {
+func (f *roleFactory) New() runtime.Object {
 	return &rbac.Role{}
 }
 
-func (*RoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*roleFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbac.Role)
 	if !ok {
 		return nil, ItemNotSupported
@@ -494,21 +467,13 @@ func (*RoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	}, nil
 }
 
-func (*RoleFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*rbac.Role)
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
-}
+type roleBindingFactory struct{}
 
-type RoleBindingFactory struct{}
-
-func (f *RoleBindingFactory) New() runtime.Object {
+func (f *roleBindingFactory) New() runtime.Object {
 	return &rbac.RoleBinding{}
 }
 
-func (*RoleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*roleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbac.RoleBinding)
 	if !ok {
 		return nil, ItemNotSupported
@@ -523,21 +488,13 @@ func (*RoleBindingFactory) Create(f *Framework, i interface{}) (func() error, er
 	}, nil
 }
 
-func (*RoleBindingFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*rbac.RoleBinding)
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
-}
+type serviceFactory struct{}
 
-type ServiceFactory struct{}
-
-func (f *ServiceFactory) New() runtime.Object {
+func (f *serviceFactory) New() runtime.Object {
 	return &v1.Service{}
 }
 
-func (*ServiceFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*serviceFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*v1.Service)
 	if !ok {
 		return nil, ItemNotSupported
@@ -552,21 +509,13 @@ func (*ServiceFactory) Create(f *Framework, i interface{}) (func() error, error)
 	}, nil
 }
 
-func (*ServiceFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*v1.Service)
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
-}
+type statefulSetFactory struct{}
 
-type StatefulSetFactory struct{}
-
-func (f *StatefulSetFactory) New() runtime.Object {
+func (f *statefulSetFactory) New() runtime.Object {
 	return &apps.StatefulSet{}
 }
 
-func (*StatefulSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*statefulSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*apps.StatefulSet)
 	if !ok {
 		return nil, ItemNotSupported
@@ -581,21 +530,13 @@ func (*StatefulSetFactory) Create(f *Framework, i interface{}) (func() error, er
 	}, nil
 }
 
-func (*StatefulSetFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*apps.StatefulSet)
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
-}
+type daemonSetFactory struct{}
 
-type DaemonSetFactory struct{}
-
-func (f *DaemonSetFactory) New() runtime.Object {
+func (f *daemonSetFactory) New() runtime.Object {
 	return &apps.DaemonSet{}
 }
 
-func (*DaemonSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*daemonSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*apps.DaemonSet)
 	if !ok {
 		return nil, ItemNotSupported
@@ -610,21 +551,13 @@ func (*DaemonSetFactory) Create(f *Framework, i interface{}) (func() error, erro
 	}, nil
 }
 
-func (*DaemonSetFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*apps.DaemonSet)
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
-}
+type storageClassFactory struct{}
 
-type StorageClassFactory struct{}
-
-func (f *StorageClassFactory) New() runtime.Object {
+func (f *storageClassFactory) New() runtime.Object {
 	return &storage.StorageClass{}
 }
 
-func (*StorageClassFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*storage.StorageClass)
 	if !ok {
 		return nil, ItemNotSupported
@@ -639,12 +572,25 @@ func (*StorageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 	}, nil
 }
 
-func (*StorageClassFactory) UniqueName(i interface{}) string {
-	item, ok := i.(*storage.StorageClass)
+type secretFactory struct{}
+
+func (f *secretFactory) New() runtime.Object {
+	return &v1.Secret{}
+}
+
+func (*secretFactory) Create(f *Framework, i interface{}) (func() error, error) {
+	item, ok := i.(*v1.Secret)
 	if !ok {
-		return ""
+		return nil, ItemNotSupported
 	}
-	return item.GetName()
+
+	client := f.ClientSet.CoreV1().Secrets(f.Namespace.GetName())
+	if _, err := client.Create(item); err != nil {
+		return nil, errors.Wrap(err, "create Secret")
+	}
+	return func() error {
+		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
+	}, nil
 }
 
 // PrettyPrint returns a human-readable representation of an item.
