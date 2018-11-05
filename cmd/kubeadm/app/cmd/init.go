@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
@@ -331,6 +332,15 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 
 	// Checks if an external CA is provided by the user.
 	externalCA, _ := certsphase.UsingExternalCA(cfg)
+	if externalCA {
+		kubeconfigDir := kubeadmconstants.KubernetesDir
+		if options.dryRun {
+			kubeconfigDir = dryRunDir
+		}
+		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
+			return initData{}, err
+		}
+	}
 
 	return initData{
 		cfg:                   cfg,
