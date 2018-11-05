@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"regexp"
+	"strconv"
 	libstrings "strings"
 
 	storage "github.com/Azure/azure-sdk-for-go/arm/storage"
@@ -59,6 +61,7 @@ var (
 		string(api.AzureManagedDisk))
 
 	supportedStorageAccountTypes = sets.NewString("Premium_LRS", "Standard_LRS", "Standard_GRS", "Standard_RAGRS")
+	lunPathRE                    = regexp.MustCompile(`/dev/disk/azure/scsi(?:.*)/lun(.+)`)
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -195,4 +198,26 @@ func strFirstLetterToUpper(str string) string {
 		return str
 	}
 	return libstrings.ToUpper(string(str[0])) + str[1:]
+}
+
+// getDiskLUN : deviceInfo could be a LUN number or a device path, e.g. /dev/disk/azure/scsi1/lun2
+func getDiskLUN(deviceInfo string) (int32, error) {
+	var diskLUN string
+	if len(deviceInfo) <= 2 {
+		diskLUN = deviceInfo
+	} else {
+		// extract the LUN num from a device path
+		matches := lunPathRE.FindStringSubmatch(deviceInfo)
+		if len(matches) == 2 {
+			diskLUN = matches[1]
+		} else {
+			return -1, fmt.Errorf("cannot parse deviceInfo: %s", deviceInfo)
+		}
+	}
+
+	lun, err := strconv.Atoi(diskLUN)
+	if err != nil {
+		return -1, err
+	}
+	return int32(lun), nil
 }
