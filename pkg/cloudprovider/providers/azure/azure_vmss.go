@@ -492,7 +492,7 @@ func (ss *scaleSet) getScaleSetWithRetry(name string) (computepreview.VirtualMac
 			glog.Errorf("backoff: failure for scale set %q, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(4).Info("backoff: success for scale set %q", name)
+		glog.V(4).Infof("backoff: success for scale set %q", name)
 
 		if cached != nil {
 			exists = true

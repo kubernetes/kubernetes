@@ -242,9 +242,9 @@ func (az *azVirtualMachinesClient) ListNextResults(resourceGroupName string, las
 		return
 	}
 
-	glog.V(10).Infof("azVirtualMachinesClient.ListNextResults(%q): start", lastResults)
+	glog.V(10).Infof("azVirtualMachinesClient.ListNextResults(%v): start", lastResults)
 	defer func() {
-		glog.V(10).Infof("azVirtualMachinesClient.ListNextResults(%q): end", lastResults)
+		glog.V(10).Infof("azVirtualMachinesClient.ListNextResults(%v): end", lastResults)
 	}()
 
 	mc := newMetricContext("vm", "list_next_results", resourceGroupName, az.client.SubscriptionID)
@@ -438,9 +438,9 @@ func (az *azLoadBalancersClient) ListNextResults(resourceGroupName string, lastR
 		return
 	}
 
-	glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%q): start", lastResult)
+	glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%v): start", lastResult)
 	defer func() {
-		glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%q): end", lastResult)
+		glog.V(10).Infof("azLoadBalancersClient.ListNextResults(%v): end", lastResult)
 	}()
 
 	mc := newMetricContext("load_balancers", "list_next_results", resourceGroupName, az.client.SubscriptionID)
@@ -556,9 +556,9 @@ func (az *azPublicIPAddressesClient) ListNextResults(resourceGroupName string, l
 		return
 	}
 
-	glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%q): start", lastResults)
+	glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%v): start", lastResults)
 	defer func() {
-		glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%q): end", lastResults)
+		glog.V(10).Infof("azPublicIPAddressesClient.ListNextResults(%v): end", lastResults)
 	}()
 
 	mc := newMetricContext("public_ip_addresses", "list_next_results", resourceGroupName, az.client.SubscriptionID)
@@ -837,9 +837,9 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 		return
 	}
 
-	glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q,%q): start", resourceGroupName)
+	glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): start", resourceGroupName)
 	defer func() {
-		glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q,%q): end", resourceGroupName)
+		glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): end", resourceGroupName)
 	}()
 
 	mc := newMetricContext("vmss", "list", resourceGroupName, az.client.SubscriptionID)
@@ -868,9 +868,9 @@ func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, 
 		return
 	}
 
-	glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
+	glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	defer func() {
-		glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
+		glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	}()
 
 	mc := newMetricContext("vmss", "update_instances", resourceGroupName, az.client.SubscriptionID)

@@ -52,7 +52,16 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	}
 
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		metadata, err := az.metadata.GetMetadata()
+		if err != nil {
+			return nil, err
+		}
+
+		if metadata.Compute == nil || metadata.Network == nil {
+			return nil, fmt.Errorf("failure of getting instance metadata")
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, metadata.Compute.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -62,30 +71,38 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 			return addressGetter(name)
 		}
 
-		ipAddress := IPAddress{}
-		err = az.metadata.Object("instance/network/interface/0/ipv4/ipAddress/0", &ipAddress)
-		if err != nil {
-			return nil, err
-		}
-
-		// Fall back to ARM API if the address is empty string.
-		// TODO: this is a workaround because IMDS is not stable enough.
-		// It should be removed after IMDS fixing the issue.
-		if strings.TrimSpace(ipAddress.PrivateIP) == "" {
-			return addressGetter(name)
+		if len(metadata.Network.Interface) == 0 {
+			return nil, fmt.Errorf("no interface is found for the instance")
 		}
 
 		// Use ip address got from instance metadata.
+		ipAddress := metadata.Network.Interface[0]
 		addresses := []v1.NodeAddress{
-			{Type: v1.NodeInternalIP, Address: ipAddress.PrivateIP},
 			{Type: v1.NodeHostName, Address: string(name)},
 		}
-		if len(ipAddress.PublicIP) > 0 {
-			addr := v1.NodeAddress{
-				Type:    v1.NodeExternalIP,
-				Address: ipAddress.PublicIP,
+		for _, address := range ipAddress.IPV4.IPAddress {
+			addresses = append(addresses, v1.NodeAddress{
+				Type:    v1.NodeInternalIP,
+				Address: address.PrivateIP,
+			})
+			if len(address.PublicIP) > 0 {
+				addresses = append(addresses, v1.NodeAddress{
+					Type:    v1.NodeExternalIP,
+					Address: address.PublicIP,
+				})
 			}
-			addresses = append(addresses, addr)
+		}
+		for _, address := range ipAddress.IPV6.IPAddress {
+			addresses = append(addresses, v1.NodeAddress{
+				Type:    v1.NodeInternalIP,
+				Address: address.PrivateIP,
+			})
+			if len(address.PublicIP) > 0 {
+				addresses = append(addresses, v1.NodeAddress{
+					Type:    v1.NodeExternalIP,
+					Address: address.PublicIP,
+				})
+			}
 		}
 		return addresses, nil
 	}
@@ -129,23 +146,19 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 	return true, nil
 }
 
-func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
+func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (bool, error) {
+	var err error
 	nodeName := mapNodeNameToVMName(name)
-	metadataName, err := az.metadata.Text("instance/compute/name")
-	if err != nil {
-		return false, err
-	}
-
 	if az.VMType == vmTypeVMSS {
 		// VMSS vmName is not same with hostname, use hostname instead.
-		metadataName, err = os.Hostname()
+		metadataVMName, err = os.Hostname()
 		if err != nil {
 			return false, err
 		}
 	}
 
-	metadataName = strings.ToLower(metadataName)
-	return (metadataName == nodeName), err
+	metadataVMName = strings.ToLower(metadataVMName)
+	return (metadataVMName == nodeName), err
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -154,7 +167,16 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 	nodeName := mapNodeNameToVMName(name)
 
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		metadata, err := az.metadata.GetMetadata()
+		if err != nil {
+			return "", err
+		}
+
+		if metadata.Compute == nil {
+			return "", fmt.Errorf("failure of getting instance metadata")
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, metadata.Compute.Name)
 		if err != nil {
 			return "", err
 		}
@@ -170,11 +192,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 		}
 
 		// Get scale set name and instanceID from vmName for vmss.
-		metadataName, err := az.metadata.Text("instance/compute/name")
-		if err != nil {
-			return "", err
-		}
-		ssName, instanceID, err := extractVmssVMName(metadataName)
+		ssName, instanceID, err := extractVmssVMName(metadata.Compute.Name)
 		if err != nil {
 			if err == ErrorNotVmssInstance {
 				// Compose machineID for standard Node.
@@ -207,14 +225,22 @@ func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string
 //       Adding node label from cloud provider: beta.kubernetes.io/instance-type=[value]
 func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		metadata, err := az.metadata.GetMetadata()
+		if err != nil {
+			return "", err
+		}
+
+		if metadata.Compute == nil {
+			return "", fmt.Errorf("failure of getting instance metadata")
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, metadata.Compute.Name)
 		if err != nil {
 			return "", err
 		}
 		if isLocalInstance {
-			machineType, err := az.metadata.Text("instance/compute/vmSize")
-			if err == nil {
-				return machineType, nil
+			if metadata.Compute.VMSize != "" {
+				return metadata.Compute.VMSize, nil
 			}
 		}
 	}
