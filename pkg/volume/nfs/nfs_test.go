@@ -245,3 +245,21 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
 }
+
+func TestConstructVolumeSpec(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("nfsTest")
+	if err != nil {
+		t.Fatalf("Can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
+	if err != nil {
+		t.Errorf("can't find nfs plugin by name")
+	}
+	nfsSpec, err := plug.(*nfsPlugin).ConstructVolumeSpec("nfsVolume", "/nfsVolume/")
+	if nfsSpec.Name() != "nfsVolume" {
+		t.Errorf("Get wrong nfs spec name, got: %s", nfsSpec.Name())
+	}
+}
