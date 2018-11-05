@@ -184,6 +184,10 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
 				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
 			} else if !subPathExists {
+				if vol.Mounter.GetAttributes().ReadOnly {
+					return nil, cleanupAction, fmt.Errorf("cannot create subPath for readOnly mount")
+				}
+
 				// Create the sub path now because if it's auto-created later when referenced, it may have an
 				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
 				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will

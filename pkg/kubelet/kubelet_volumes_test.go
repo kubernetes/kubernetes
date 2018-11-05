@@ -423,7 +423,8 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 }
 
 type stubVolume struct {
-	path string
+	path     string
+	readOnly bool
 	volume.MetricsNil
 }
 
@@ -432,7 +433,7 @@ func (f *stubVolume) GetPath() string {
 }
 
 func (f *stubVolume) GetAttributes() volume.Attributes {
-	return volume.Attributes{}
+	return volume.Attributes{ReadOnly: f.readOnly}
 }
 
 func (f *stubVolume) CanMount() error {

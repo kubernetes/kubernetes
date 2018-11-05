@@ -39,11 +39,12 @@ func TestMakeMounts(t *testing.T) {
 	propagationNone := v1.MountPropagationNone
 
 	testCases := map[string]struct {
-		container      v1.Container
-		podVolumes     kubecontainer.VolumeMap
-		expectErr      bool
-		expectedErrMsg string
-		expectedMounts []kubecontainer.Mount
+		container          v1.Container
+		podVolumes         kubecontainer.VolumeMap
+		existingFilesystem map[string]mount.FileType
+		expectErr          bool
+		expectedErrMsg     string
+		expectedMounts     []kubecontainer.Mount
 	}{
 		"valid mounts in unprivileged container": {
 			podVolumes: kubecontainer.VolumeMap{
@@ -207,6 +208,47 @@ func TestMakeMounts(t *testing.T) {
 			expectErr:      true,
 			expectedErrMsg: "unable to provision SubPath `no/backsteps/../allowed`: must not contain '..'",
 		},
+		"readOnly volumeSource with existing subPath": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk", readOnly: true}},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						SubPath:   "exists",
+						Name:      "disk",
+					},
+				},
+			},
+			existingFilesystem: map[string]mount.FileType{"/mnt/disk/exists": mount.FileTypeDirectory},
+			expectedMounts: []kubecontainer.Mount{
+				{
+					Name:           "disk",
+					ContainerPath:  "/mnt/path3",
+					HostPath:       "/mnt/disk/exists",
+					ReadOnly:       true,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
+				},
+			},
+		},
+		"invalid readOnly volumeSource with new subPath": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk", readOnly: true}},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						SubPath:   "not/exists",
+						Name:      "disk",
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "cannot create subPath for readOnly mount",
+		},
 		"volume doesn't exist": {
 			podVolumes: kubecontainer.VolumeMap{},
 			container: v1.Container{
@@ -241,7 +283,7 @@ func TestMakeMounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			fm := &mount.FakeMounter{}
+			fm := &mount.FakeMounter{Filesystem: tc.existingFilesystem}
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
 					HostNetwork: true,
