@@ -72,6 +72,12 @@ kube::log::status "Running godep save - this might take a while"
 # realpath'ed, and godep barfs ("... is not using a known version control
 # system") on our staging dirs.
 GOPATH="${GOPATH}:$(pwd)/staging" godep save "${REQUIRED_BINS[@]}"
+# Normalize 'Comment' field. This also prevents conflicts because
+# `godep` may generate different comments on same commit in same repo.
+kube::log::status "Normalizing '.Deps[].Comment' field"
+jq --tab '.Deps[] |= if has("Comment") then .Comment |= sub("-g[0-9a-z]+$"; "") else . end' \
+    Godeps/Godeps.json > Godeps/Godeps.json.out
+mv Godeps/Godeps.json.out Godeps/Godeps.json
 
 # create a symlink in vendor directory pointing to the staging client. This
 # let other packages use the staging client as if it were vendored.
