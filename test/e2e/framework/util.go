@@ -3173,15 +3173,29 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 // and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
 // when the pod is inactvie.
 func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+	var activePods []*v1.Pod
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
+		activePods = nil
 		for _, pod := range pods {
 			if controller.IsPodActive(pod) {
-				return false, nil
+				activePods = append(activePods, pod)
 			}
+		}
+
+		if len(activePods) != 0 {
+			return false, nil
 		}
 		return true, nil
 	})
+
+	if err == wait.ErrWaitTimeout {
+		for _, pod := range activePods {
+			Logf("Pod %q running on %q is still active", pod.ObjectMeta.Name, pod.Spec.NodeName)
+		}
+		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].ObjectMeta.Name, activePods[0].Spec.NodeName)
+	}
+	return err
 }
 
 // waitForPodsGone waits until there are no pods left in the PodStore.
