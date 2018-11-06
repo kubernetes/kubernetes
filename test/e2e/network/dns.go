@@ -33,7 +33,7 @@ import (
 const dnsTestPodHostName = "dns-querier-1"
 const dnsTestServiceName = "dns-test-service"
 
-var _ = SIGDescribe("DNS", func() {
+func dnsTests(isIPv6 bool) {
 	f := framework.NewDefaultFramework("dns")
 
 	/*
@@ -41,7 +41,8 @@ var _ = SIGDescribe("DNS", func() {
 		Testname: DNS, cluster
 		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via DNS.
 	*/
-	framework.ConformanceIt("should provide DNS for the cluster ", func() {
+
+	testDNSforCluster := func() {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
@@ -53,8 +54,22 @@ var _ = SIGDescribe("DNS", func() {
 			namesToResolve = append(namesToResolve, "google.com")
 			namesToResolve = append(namesToResolve, "metadata")
 		}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			nil,
+			"",
+			"wheezy",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			nil,
+			"",
+			"jessie",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -62,7 +77,14 @@ var _ = SIGDescribe("DNS", func() {
 		By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
-	})
+	}
+
+	// only IPv4 is conformance for now
+	if isIPv6 {
+		It("should provide DNS for the cluster", testDNSforCluster)
+	} else {
+		framework.ConformanceIt("should provide DNS for the cluster", testDNSforCluster)
+	}
 
 	It("should resolve DNS of partial qualified names for the cluster ", func() {
 		// All the names we need to be able to resolve.
@@ -76,10 +98,26 @@ var _ = SIGDescribe("DNS", func() {
 			namesToResolve = append(namesToResolve, "google.com")
 			namesToResolve = append(namesToResolve, "metadata")
 		}
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
+		hostFQDN := fmt.Sprintf(
+			"%s.%s.%s.svc.%s",
+			dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			hostEntries,
+			"",
+			"wheezy",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			hostEntries,
+			"",
+			"jessie",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -94,11 +132,25 @@ var _ = SIGDescribe("DNS", func() {
 		Testname: DNS, cluster
 		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via /etc/hosts.
 	*/
-	framework.ConformanceIt("should provide /etc/hosts entries for the cluster [LinuxOnly]", func() {
+	testHostEntries := func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(
+			isIPv6,
+			nil,
+			hostEntries,
+			"",
+			"wheezy",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(
+			isIPv6,
+			nil,
+			hostEntries,
+			"",
+			"jessie",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -106,15 +158,19 @@ var _ = SIGDescribe("DNS", func() {
 		By("creating a pod to probe /etc/hosts")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
-	})
+	}
+	if isIPv6 {
+		It("should provide /etc/hosts entries for the cluster [LinuxOnly]", testHostEntries)
+	} else {
+		framework.ConformanceIt("should provide /etc/hosts entries for the cluster [LinuxOnly]", testHostEntries)
+	}
 
 	/*
 		Release : v1.9
 		Testname: DNS, services
 		Description: When a headless service is created, the service MUST be able to resolve all the required service endpoints. When the service is created, any pod in the same namespace must be able to resolve the service by all of the expected DNS names.
 	*/
-	framework.ConformanceIt("should provide DNS for services ", func() {
-		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
+	testDNSService := func() {
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
@@ -144,13 +200,27 @@ var _ = SIGDescribe("DNS", func() {
 		// TODO: Create more endpoints and ensure that multiple A records are returned
 		// for headless service.
 		namesToResolve := []string{
-			fmt.Sprintf("%s.%s.svc.cluster.local", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("_http._tcp.%s.%s.svc.cluster.local", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("_http._tcp.%s.%s.svc.cluster.local", regularService.Name, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", regularService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			nil,
+			regularService.Spec.ClusterIP,
+			"wheezy",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			nil,
+			regularService.Spec.ClusterIP,
+			"jessie",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -160,7 +230,12 @@ var _ = SIGDescribe("DNS", func() {
 		pod.ObjectMeta.Labels = testServiceSelector
 
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
-	})
+	}
+	if isIPv6 {
+		It("should provide DNS for services", testDNSService)
+	} else {
+		framework.ConformanceIt("should provide DNS for services", testDNSService)
+	}
 
 	It("should resolve DNS of partial qualified names for services ", func() {
 		// Create a test headless service.
@@ -198,8 +273,22 @@ var _ = SIGDescribe("DNS", func() {
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			nil,
+			regularService.Spec.ClusterIP,
+			"wheezy",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			nil,
+			regularService.Spec.ClusterIP,
+			"jessie",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -232,8 +321,22 @@ var _ = SIGDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostNames := []string{hostFQDN, podHostname}
 		namesToResolve := []string{hostFQDN}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			hostNames,
+			"",
+			"wheezy",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(
+			isIPv6,
+			namesToResolve,
+			hostNames,
+			"",
+			"jessie",
+			f.Namespace.Name,
+			framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -298,8 +401,13 @@ var _ = SIGDescribe("DNS", func() {
 			}
 		})
 		Expect(err).NotTo(HaveOccurred(), "failed to change service type to ClusterIP for service: %s", serviceName)
-		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "A", "wheezy")
-		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "A", "jessie")
+
+		lookup := "A"
+		if isIPv6 {
+			lookup = "AAAA"
+		}
+		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, lookup, "wheezy")
+		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, lookup, "jessie")
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -313,81 +421,63 @@ var _ = SIGDescribe("DNS", func() {
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
-	It("should support configurable pod resolv.conf", func() {
-		By("Preparing a test DNS service with injected DNS names...")
-		testInjectedIP := "1.1.1.1"
-		testDNSNameShort := "notexistname"
-		testSearchPath := "resolv.conf.local"
-		testDNSNameFull := fmt.Sprintf("%s.%s", testDNSNameShort, testSearchPath)
+	if !isIPv6 {
+		It("should support configurable pod resolv.conf", func() {
+			By("Preparing a test DNS service with injected DNS names...")
+			testInjectedIP := "1.1.1.1"
+			testDNSNameShort := "notexistname"
+			testSearchPath := "resolv.conf.local"
+			testDNSNameFull := fmt.Sprintf("%s.%s", testDNSNameShort, testSearchPath)
 
-		testServerPod := generateDNSServerPod(map[string]string{
-			testDNSNameFull: testInjectedIP,
-		})
-		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testServerPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testServerPod.Name)
-		framework.Logf("Created pod %v", testServerPod)
-		defer func() {
-			framework.Logf("Deleting pod %s...", testServerPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testServerPod.Name, err)
-			}
-		}()
-		Expect(f.WaitForPodRunning(testServerPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testServerPod.Name)
+			testServerPod := generateDNSServerPod(map[string]string{
+				testDNSNameFull: testInjectedIP,
+			})
+			testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testServerPod)
+			Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testServerPod.Name)
+			framework.Logf("Created pod %v", testServerPod)
+			defer func() {
+				framework.Logf("Deleting pod %s...", testServerPod.Name)
+				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+					framework.Failf("Failed to delete pod %s: %v", testServerPod.Name, err)
+				}
+			}()
+			Expect(f.WaitForPodRunning(testServerPod.Name)).NotTo(HaveOccurred(),
+				"failed to wait for pod %s to be running", testServerPod.Name)
 
-		// Retrieve server pod IP.
-		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(testServerPod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to get pod %v", testServerPod.Name)
-		testServerIP := testServerPod.Status.PodIP
-		framework.Logf("testServerIP is %s", testServerIP)
+			// Retrieve server pod IP.
+			testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(testServerPod.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "failed to get pod %v", testServerPod.Name)
+			testServerIP := testServerPod.Status.PodIP
+			framework.Logf("testServerIP is %s", testServerIP)
 
-		By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
-		testUtilsPod := generateDNSUtilsPod()
-		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
-		testNdotsValue := "2"
-		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
-			Nameservers: []string{testServerIP},
-			Searches:    []string{testSearchPath},
-			Options: []v1.PodDNSConfigOption{
-				{
-					Name:  "ndots",
-					Value: &testNdotsValue,
+			By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
+			testUtilsPod := generateDNSUtilsPod()
+			testUtilsPod.Spec.DNSPolicy = v1.DNSNone
+			testNdotsValue := "2"
+			testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
+				Nameservers: []string{testServerIP},
+				Searches:    []string{testSearchPath},
+				Options: []v1.PodDNSConfigOption{
+					{
+						Name:  "ndots",
+						Value: &testNdotsValue,
+					},
 				},
-			},
-		}
-		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testUtilsPod.Name)
-		framework.Logf("Created pod %v", testUtilsPod)
-		defer func() {
-			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
-		}()
-		Expect(f.WaitForPodRunning(testUtilsPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testUtilsPod.Name)
+			testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
+			Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testUtilsPod.Name)
+			framework.Logf("Created pod %v", testUtilsPod)
+			defer func() {
+				framework.Logf("Deleting pod %s...", testUtilsPod.Name)
+				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+					framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
+				}
+			}()
+			Expect(f.WaitForPodRunning(testUtilsPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testUtilsPod.Name)
 
-		By("Verifying customized DNS option is configured on pod...")
-		// TODO: Figure out a better way other than checking the actual resolv,conf file.
-		cmd := []string{"cat", "/etc/resolv.conf"}
-		stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
-			Command:       cmd,
-			Namespace:     f.Namespace.Name,
-			PodName:       testUtilsPod.Name,
-			ContainerName: "util",
-			CaptureStdout: true,
-			CaptureStderr: true,
-		})
-		Expect(err).NotTo(HaveOccurred(), "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
-		if !strings.Contains(stdout, "ndots:2") {
-			framework.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
-		}
-
-		By("Verifying customized name server and search path are working...")
-		// Do dig on not-exist-dns-name and see if the injected DNS record is returned.
-		// This verifies both:
-		// - Custom search path is appended.
-		// - DNS query is sent to the specified server.
-		cmd = []string{"/usr/bin/dig", "+short", "+search", testDNSNameShort}
-		digFunc := func() (bool, error) {
+			By("Verifying customized DNS option is configured on pod...")
+			// TODO: Figure out a better way other than checking the actual resolv,conf file.
+			cmd := []string{"cat", "/etc/resolv.conf"}
 			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
@@ -396,21 +486,49 @@ var _ = SIGDescribe("DNS", func() {
 				CaptureStdout: true,
 				CaptureStderr: true,
 			})
-			if err != nil {
-				framework.Logf("Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
-				return false, nil
+			Expect(err).NotTo(HaveOccurred(), "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
+			if !strings.Contains(stdout, "ndots:2") {
+				framework.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
 			}
-			res := strings.Split(stdout, "\n")
-			if len(res) != 1 || res[0] != testInjectedIP {
-				framework.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
-				return false, nil
+
+			By("Verifying customized name server and search path are working...")
+			// Do dig on not-exist-dns-name and see if the injected DNS record is returned.
+			// This verifies both:
+			// - Custom search path is appended.
+			// - DNS query is sent to the specified server.
+			cmd = []string{"/usr/bin/dig", "+short", "+search", testDNSNameShort}
+			digFunc := func() (bool, error) {
+				stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+					Command:       cmd,
+					Namespace:     f.Namespace.Name,
+					PodName:       testUtilsPod.Name,
+					ContainerName: "util",
+					CaptureStdout: true,
+					CaptureStderr: true,
+				})
+				if err != nil {
+					framework.Logf("Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
+					return false, nil
+				}
+				res := strings.Split(stdout, "\n")
+				if len(res) != 1 || res[0] != testInjectedIP {
+					framework.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
+					return false, nil
+				}
+				return true, nil
 			}
-			return true, nil
-		}
-		err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
-		Expect(err).NotTo(HaveOccurred(), "failed to verify customized name server and search path")
+			err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
+			Expect(err).NotTo(HaveOccurred(), "failed to verify customized name server and search path")
 
-		// TODO: Add more test cases for other DNSPolicies.
-	})
+			// TODO: Add more test cases for other DNSPolicies.
+		})
+	}
+}
 
+var _ = SIGDescribe("DNS [IPv4]", func() {
+	dnsTests(false)
+})
+
+var _ = SIGDescribe("DNS [Feature:Networking-IPv6]", func() {
+	dnsTests(true)
 })

@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -444,14 +445,20 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 	return dnsPod
 }
 
-func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace, dnsDomain string) (string, []string) {
+func createProbeCommand(isIpv6 bool, namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace, dnsDomain string) (string, []string) {
 	fileNames := make([]string, 0, len(namesToResolve)*2)
 	probeCmd := "for i in `seq 1 600`; do "
+	typeA := "A"
+	getentdb := "ahostsv4"
+	if isIpv6 {
+		typeA = "AAAA"
+		getentdb = "ahostsv6"
+	}
 	for _, name := range namesToResolve {
 		// Resolve by TCP and UDP DNS.  Use $$(...) because $(...) is
 		// expanded by kubernetes (though this won't expand so should
 		// remain a literal, safe > sorry).
-		lookup := "A"
+		lookup := typeA
 		if strings.HasPrefix(name, "_") {
 			lookup = "SRV"
 		}
@@ -466,19 +473,24 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 	for _, name := range hostEntries {
 		fileName := fmt.Sprintf("%s_hosts@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(getent hosts %s)" && echo OK > /results/%s;`, name, fileName)
+		probeCmd += fmt.Sprintf(`test -n "$$(getent %s %s)" && echo OK > /results/%s;`, getentdb, name, fileName)
 	}
 
-	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
-	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-	probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
-	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
-	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
+	podARecByUDPFileName := fmt.Sprintf("%s_udp@Pod%sRecord", fileNamePrefix, typeA)
+	podARecByTCPFileName := fmt.Sprintf("%s_tcp@Pod%sRecord", fileNamePrefix, typeA)
+	if isIpv6 {
+		probeCmd += fmt.Sprintf(`podARec="$$(ifconfig eth0  | awk '/inet6/{print $3}' | sed s/\:/-/g | sed -e's/\/.*$//g' | head -n 1 | awk '{print $1".%s.pod.%s"}')";`, namespace, dnsDomain)
+	} else {
+		probeCmd += fmt.Sprintf(`podARec="$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}')";`, namespace, dnsDomain)
+	}
+	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} %s)" && test -n "$$check" && echo OK > /results/%s;`, typeA, podARecByUDPFileName)
+	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} %s)" && test -n "$$check" && echo OK > /results/%s;`, typeA, podARecByTCPFileName)
+
 	fileNames = append(fileNames, podARecByUDPFileName)
 	fileNames = append(fileNames, podARecByTCPFileName)
 
 	if len(ptrLookupIP) > 0 {
-		ptrLookup := fmt.Sprintf("%s.in-addr.arpa.", strings.Join(reverseArray(strings.Split(ptrLookupIP, ".")), "."))
+		ptrLookup := ReverseAddr(ptrLookupIP)
 		ptrRecByUDPFileName := fmt.Sprintf("%s_udp@PTR", ptrLookupIP)
 		ptrRecByTCPFileName := fmt.Sprintf("%s_tcp@PTR", ptrLookupIP)
 		probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search %s PTR)" && test -n "$$check" && echo OK > /results/%s;`, ptrLookup, ptrRecByUDPFileName)
@@ -596,12 +608,25 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
-func reverseArray(arr []string) []string {
-	for i := 0; i < len(arr)/2; i++ {
-		j := len(arr) - i - 1
-		arr[i], arr[j] = arr[j], arr[i]
+const hexDigit = "0123456789abcdef"
+
+func ReverseAddr(addr string) string {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return ""
 	}
-	return arr
+	if ip4 := ip.To4(); ip4 != nil {
+		return fmt.Sprintf("%d.%d.%d.%d.in-addr.arpa.", ip4[3], ip4[2], ip4[1], ip4[0])
+	}
+	// Must be IPv6
+	var buf string
+	// Add it, in reverse, to the buffer
+	for i := len(ip) - 1; i >= 0; i-- {
+		v := ip[i]
+		buf += fmt.Sprintf("%x.%x.", v&0xf, v>>4)
+	}
+	// Append "ip6.arpa." and return (buf already has the final .)
+	return buf + "ip6.arpa."
 }
 
 func generateDNSUtilsPod() *v1.Pod {
