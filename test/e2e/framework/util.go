@@ -4941,7 +4941,7 @@ func getMaster(c clientset.Interface) Address {
 func GetAllMasterAddresses(c clientset.Interface) []string {
 	master := getMaster(c)
 
-	var ips sets.String
+	ips := sets.NewString()
 	switch TestContext.Provider {
 	case "gce", "gke":
 		if master.externalIP != "" {
