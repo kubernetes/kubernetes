@@ -828,6 +828,13 @@ rules:
     resources:
       - group: "" # core
         resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+  - level: None
+    users: ["cluster-autoscaler"]
+    verbs: ["get", "update"]
+    namespaces: ["kube-system"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps", "endpoints"]
   # Don't log HPA fetching metrics.
   - level: None
     users:
