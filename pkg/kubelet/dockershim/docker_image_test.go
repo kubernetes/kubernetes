@@ -34,8 +34,9 @@ func TestRemoveImage(t *testing.T) {
 	id := "1111"
 	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo"}}})
 	ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: id}})
-	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
+	err := fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
 		libdocker.NewCalledDetail("remove_image", []interface{}{id, dockertypes.ImageRemoveOptions{PruneChildren: true}}))
+	assert.NoError(t, err)
 }
 
 func TestRemoveImageWithMultipleTags(t *testing.T) {
@@ -43,9 +44,10 @@ func TestRemoveImageWithMultipleTags(t *testing.T) {
 	id := "1111"
 	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo", "bar"}}})
 	ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: id}})
-	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
+	err := fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
+	assert.NoError(t, err)
 }
 
 func TestPullWithJSONError(t *testing.T) {
