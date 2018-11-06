@@ -292,35 +292,35 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/http2",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/http2/hpack",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/idna",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/internal/timeseries",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/lex/httplex",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/trace",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/net/websocket",
-			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2",
