@@ -42,7 +42,10 @@ type fakeAuditSink struct {
 func (s *fakeAuditSink) ProcessEvents(evs ...*auditinternal.Event) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.events = append(s.events, evs...)
+	for _, ev := range evs {
+		e := ev.DeepCopy()
+		s.events = append(s.events, e)
+	}
 }
 
 func (s *fakeAuditSink) Events() []*auditinternal.Event {
@@ -90,6 +93,9 @@ func TestAudit(t *testing.T) {
 	}
 	requestBodyMatches := func(i int, pattern string) eventCheck {
 		return func(events []*auditinternal.Event) error {
+			if events[i].RequestObject == nil {
+				return fmt.Errorf("expected non nil request object")
+			}
 			if matched, _ := regexp.Match(pattern, events[i].RequestObject.Raw); !matched {
 				return fmt.Errorf("expected RequestBody to match %q, but didn't: %q", pattern, string(events[i].RequestObject.Raw))
 			}
@@ -106,6 +112,9 @@ func TestAudit(t *testing.T) {
 	}
 	responseBodyMatches := func(i int, pattern string) eventCheck {
 		return func(events []*auditinternal.Event) error {
+			if events[i].ResponseObject == nil {
+				return fmt.Errorf("expected non nil response object")
+			}
 			if matched, _ := regexp.Match(pattern, events[i].ResponseObject.Raw); !matched {
 				return fmt.Errorf("expected ResponseBody to match %q, but didn't: %q", pattern, string(events[i].ResponseObject.Raw))
 			}
@@ -117,6 +126,19 @@ func TestAudit(t *testing.T) {
 			for i := range events {
 				if events[i].UserAgent != userAgent {
 					return fmt.Errorf("expected request user agent to match %q, but got: %q", userAgent, events[i].UserAgent)
+				}
+			}
+			return nil
+		}
+	}
+	expectedStages := func(stages ...auditinternal.Stage) eventCheck {
+		return func(events []*auditinternal.Event) error {
+			if len(stages) != len(events) {
+				return fmt.Errorf("expected %d stages, but got %d events", len(stages), len(events))
+			}
+			for i, stage := range stages {
+				if events[i].Stage != stage {
+					return fmt.Errorf("expected stage %q, got %q", stage, events[i].Stage)
 				}
 			}
 			return nil
@@ -140,8 +162,9 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				noRequestBody(0),
-				responseBodyMatches(0, `{.*"name":"c".*}`),
+				noRequestBody(1),
+				responseBodyMatches(1, `{.*"name":"c".*}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -157,8 +180,9 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				noRequestBody(0),
-				responseBodyMatches(0, `{.*"name":"a".*"name":"b".*}`),
+				noRequestBody(1),
+				responseBodyMatches(1, `{.*"name":"a".*"name":"b".*}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -170,8 +194,9 @@ func TestAudit(t *testing.T) {
 			201,
 			2,
 			[]eventCheck{
-				requestBodyIs(0, string(simpleFooJSON)),
-				responseBodyMatches(0, `{.*"foo".*}`),
+				requestBodyIs(1, string(simpleFooJSON)),
+				responseBodyMatches(1, `{.*"foo".*}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -183,8 +208,9 @@ func TestAudit(t *testing.T) {
 			405,
 			2,
 			[]eventCheck{
-				noRequestBody(0),  // the 405 is thrown long before the create handler would be executed
-				noResponseBody(0), // the 405 is thrown long before the create handler would be executed
+				noRequestBody(1),  // the 405 is thrown long before the create handler would be executed
+				noResponseBody(1), // the 405 is thrown long before the create handler would be executed
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -196,8 +222,9 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				noRequestBody(0),
-				responseBodyMatches(0, `{.*"kind":"Status".*"status":"Success".*}`),
+				noRequestBody(1),
+				responseBodyMatches(1, `{.*"kind":"Status".*"status":"Success".*}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -209,8 +236,9 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				requestBodyMatches(0, "DeleteOptions"),
-				responseBodyMatches(0, `{.*"kind":"Status".*"status":"Success".*}`),
+				requestBodyMatches(1, "DeleteOptions"),
+				responseBodyMatches(1, `{.*"kind":"Status".*"status":"Success".*}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -222,8 +250,9 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				requestBodyIs(0, string(simpleCPrimeJSON)),
-				responseBodyMatches(0, `{.*"bla".*}`),
+				requestBodyIs(1, string(simpleCPrimeJSON)),
+				responseBodyMatches(1, `{.*"bla".*}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -235,8 +264,9 @@ func TestAudit(t *testing.T) {
 			400,
 			2,
 			[]eventCheck{
-				requestBodyIs(0, string(simpleCPrimeJSON)),
-				responseBodyMatches(0, `"Status".*"status":"Failure".*"code":400}`),
+				requestBodyIs(1, string(simpleCPrimeJSON)),
+				responseBodyMatches(1, `"Status".*"status":"Failure".*"code":400}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -255,8 +285,9 @@ func TestAudit(t *testing.T) {
 			200,
 			2,
 			[]eventCheck{
-				requestBodyIs(0, `{"labels":{"foo":"bar"}}`),
-				responseBodyMatches(0, `"name":"c".*"labels":{"foo":"bar"}`),
+				requestBodyIs(1, `{"labels":{"foo":"bar"}}`),
+				responseBodyMatches(1, `"name":"c".*"labels":{"foo":"bar"}`),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseComplete),
 			},
 		},
 		{
@@ -272,8 +303,9 @@ func TestAudit(t *testing.T) {
 			200,
 			3,
 			[]eventCheck{
-				noRequestBody(0),
-				noResponseBody(0),
+				noRequestBody(2),
+				noResponseBody(2),
+				expectedStages(auditinternal.StageRequestReceived, auditinternal.StageResponseStarted, auditinternal.StageResponseComplete),
 			},
 		},
 	} {
