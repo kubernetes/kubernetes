@@ -17,8 +17,10 @@ limitations under the License.
 package collectors
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
@@ -129,7 +131,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 
 	mockStatsProvider := new(statstest.StatsProvider)
 	mockStatsProvider.On("ListPodStats").Return(podStats, nil)
-	if err := gatherAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, want, metrics); err != nil {
+	if err := testutil.CollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}
 }
