@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const version = 80
+const version = "80-k8s-r1"
 
 var cmdVersion = &Command{
 	Name:  "version",
@@ -21,7 +21,7 @@ Displays the version of godep as well as the target OS, architecture and go runt
 }
 
 func versionString() string {
-	return fmt.Sprintf("godep v%d (%s/%s/%s)", version, runtime.GOOS, runtime.GOARCH, runtime.Version())
+	return fmt.Sprintf("godep v%s (%s/%s/%s)", version, runtime.GOOS, runtime.GOARCH, runtime.Version())
 }
 
 func runVersion(cmd *Command, args []string) {
