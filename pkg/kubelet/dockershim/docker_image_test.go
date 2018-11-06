@@ -30,24 +30,36 @@ import (
 )
 
 func TestRemoveImage(t *testing.T) {
-	ds, fakeDocker, _ := newTestDockerService()
-	id := "1111"
-	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo"}}})
-	ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: id}})
-	err := fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
-		libdocker.NewCalledDetail("remove_image", []interface{}{id, dockertypes.ImageRemoveOptions{PruneChildren: true}}))
-	assert.NoError(t, err)
-}
+	tests := map[string]struct {
+		image         dockertypes.ImageInspect
+		calledDetails []libdocker.CalledDetail
+	}{
+		"single tag": {
+			dockertypes.ImageInspect{ID: "1111", RepoTags: []string{"foo"}},
+			[]libdocker.CalledDetail{
+				libdocker.NewCalledDetail("inspect_image", nil),
+				libdocker.NewCalledDetail("remove_image", []interface{}{"1111", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
+			},
+		},
+		"multiple tags": {
+			dockertypes.ImageInspect{ID: "1111", RepoTags: []string{"foo", "bar"}},
+			[]libdocker.CalledDetail{
+				libdocker.NewCalledDetail("inspect_image", nil),
+				libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
+				libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
+			},
+		},
+	}
 
-func TestRemoveImageWithMultipleTags(t *testing.T) {
-	ds, fakeDocker, _ := newTestDockerService()
-	id := "1111"
-	fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{{ID: id, RepoTags: []string{"foo", "bar"}}})
-	ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: id}})
-	err := fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
-		libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
-		libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
-	assert.NoError(t, err)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ds, fakeDocker, _ := newTestDockerService()
+			fakeDocker.InjectImageInspects([]dockertypes.ImageInspect{test.image})
+			ds.RemoveImage(getTestCTX(), &runtimeapi.RemoveImageRequest{Image: &runtimeapi.ImageSpec{Image: test.image.ID}})
+			err := fakeDocker.AssertCallDetails(test.calledDetails...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestPullWithJSONError(t *testing.T) {
