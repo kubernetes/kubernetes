@@ -130,6 +130,7 @@ items:
   - apiGroups:
     - apps
     resources:
+    - controllerrevisions
     - daemonsets
     - deployments
     - deployments/rollback
@@ -323,6 +324,7 @@ items:
   - apiGroups:
     - apps
     resources:
+    - controllerrevisions
     - daemonsets
     - deployments
     - deployments/rollback
@@ -467,6 +469,7 @@ items:
   - apiGroups:
     - apps
     resources:
+    - controllerrevisions
     - daemonsets
     - deployments
     - deployments/scale
