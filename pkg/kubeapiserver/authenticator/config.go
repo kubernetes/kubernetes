@@ -178,7 +178,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		tokenAuth := tokenunion.New(tokenAuthenticators...)
 		// Optionally cache authentication results
 		if config.TokenSuccessCacheTTL > 0 || config.TokenFailureCacheTTL > 0 {
-			tokenAuth = tokencache.New(tokenAuth, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL)
+			tokenAuth = tokencache.New(tokenAuth, true, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL)
 		}
 		authenticators = append(authenticators, bearertoken.New(tokenAuth), websocket.NewProtocolAuthenticator(tokenAuth))
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{
@@ -316,10 +316,10 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Token, error) {
-	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, ttl)
+	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
-	return webhookTokenAuthenticator, nil
+	return tokencache.New(webhookTokenAuthenticator, false, ttl, ttl), nil
 }

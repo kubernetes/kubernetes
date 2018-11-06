@@ -62,6 +62,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/group:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/cache:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",

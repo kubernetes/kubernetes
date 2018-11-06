@@ -33,6 +33,8 @@ import (
 
 	"k8s.io/api/authentication/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -166,7 +168,7 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newTokenAuthenticator creates a temporary kubeconfig file from the provided
 // arguments and attempts to load a new WebhookTokenAuthenticator from it.
-func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*WebhookTokenAuthenticator, error) {
+func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (authenticator.Token, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -194,7 +196,12 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 		return nil, err
 	}
 
-	return newWithBackoff(c, cacheTime, 0)
+	authn, err := newWithBackoff(c, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return cache.New(authn, false, cacheTime, cacheTime), nil
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -549,15 +556,12 @@ func TestWebhookCacheAndRetry(t *testing.T) {
 			_, ok, err := wh.AuthenticateToken(context.Background(), testcase.token)
 			hasError := err != nil
 			if hasError != testcase.expectError {
-				t.Log(testcase.description)
 				t.Errorf("Webhook returned HTTP %d, expected error=%v, but got error %v", testcase.code, testcase.expectError, err)
 			}
 			if serv.called != testcase.expectCalls {
-				t.Log(testcase.description)
 				t.Errorf("Expected %d calls, got %d", testcase.expectCalls, serv.called)
 			}
 			if ok != testcase.expectOk {
-				t.Log(testcase.description)
 				t.Errorf("Expected ok=%v, got %v", testcase.expectOk, ok)
 			}
 		})
