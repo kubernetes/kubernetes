@@ -37,21 +37,21 @@ type CacheDumper struct {
 
 // DumpAll writes cached nodes and scheduling queue information to the scheduler logs.
 func (d *CacheDumper) DumpAll() {
-	d.DumpNodes()
-	d.DumpSchedulingQueue()
+	d.dumpNodes()
+	d.dumpSchedulingQueue()
 }
 
-// DumpNodes writes NodeInfo to the scheduler logs.
-func (d *CacheDumper) DumpNodes() {
+// dumpNodes writes NodeInfo to the scheduler logs.
+func (d *CacheDumper) dumpNodes() {
 	snapshot := d.cache.Snapshot()
 	glog.Info("Dump of cached NodeInfo")
-	for _, info := range snapshot.Nodes {
-		glog.Info(printNodeInfo(info))
+	for _, nodeInfo := range snapshot.Nodes {
+		glog.Info(printNodeInfo(nodeInfo))
 	}
 }
 
-// DumpSchedulingQueue writes pods in the scheduling queue to the scheduler logs.
-func (d *CacheDumper) DumpSchedulingQueue() {
+// dumpSchedulingQueue writes pods in the scheduling queue to the scheduler logs.
+func (d *CacheDumper) dumpSchedulingQueue() {
 	waitingPods := d.podQueue.WaitingPods()
 	var podData strings.Builder
 	for _, p := range waitingPods {
