@@ -35,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 

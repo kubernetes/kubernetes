@@ -161,6 +161,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --master-tag="${MASTER_TAG:-}" \
   --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
   --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
+  --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

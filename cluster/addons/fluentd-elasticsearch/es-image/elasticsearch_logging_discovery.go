@@ -113,7 +113,7 @@ func main() {
 		}
 		addrs = flattenSubsets(endpoints.Subsets)
 		glog.Infof("Found %s", addrs)
-		if len(addrs) > 0 && len(addrs) == count {
+		if len(addrs) > 0 && len(addrs) >= count {
 			break
 		}
 	}

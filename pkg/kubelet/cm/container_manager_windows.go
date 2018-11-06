@@ -16,31 +16,153 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// containerManagerImpl implements container manager on Windows.
+// Only GetNodeAllocatableReservation() and GetCapacity() are implemented now.
+
 package cm
 
 import (
-	"github.com/golang/glog"
+	"fmt"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type containerManagerImpl struct {
-	containerManagerStub
+	// Capacity of this node.
+	capacity v1.ResourceList
+	// Interface for cadvisor.
+	cadvisorInterface cadvisor.Interface
+	// Config of this node.
+	nodeConfig NodeConfig
 }
 
-var _ ContainerManager = &containerManagerImpl{}
+func (cm *containerManagerImpl) Start(node *v1.Node,
+	activePods ActivePodsFunc,
+	sourcesReady config.SourcesReady,
+	podStatusProvider status.PodStatusProvider,
+	runtimeService internalapi.RuntimeService) error {
+	glog.V(2).Infof("Starting Windows container manager")
 
-func (cm *containerManagerImpl) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
-	glog.V(2).Infof("Starting Windows stub container manager")
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
+		rootfs, err := cm.cadvisorInterface.RootFsInfo()
+		if err != nil {
+			return fmt.Errorf("failed to get rootfs info: %v", err)
+		}
+		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
+			cm.capacity[rName] = rCap
+		}
+	}
+
 	return nil
 }
 
+// NewContainerManager creates windows container manager.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
-	return &containerManagerImpl{}, nil
+	var capacity = v1.ResourceList{}
+	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
+	// machine info is computed and cached once as part of cAdvisor object creation.
+	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
+	machineInfo, err := cadvisorInterface.MachineInfo()
+	if err != nil {
+		return nil, err
+	}
+	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
+
+	return &containerManagerImpl{
+		capacity:          capacity,
+		nodeConfig:        nodeConfig,
+		cadvisorInterface: cadvisorInterface,
+	}, nil
+}
+
+func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
+	return v1.ResourceList{}
+}
+
+func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
+	return NodeConfig{}
+}
+
+func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
+	return &CgroupSubsystems{}
+}
+
+func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
+	return QOSContainersInfo{}
+}
+
+func (cm *containerManagerImpl) UpdateQOSCgroups() error {
+	return nil
+}
+
+func (cm *containerManagerImpl) Status() Status {
+	return Status{}
+}
+
+func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
+	evictionReservation := hardEvictionReservation(cm.nodeConfig.HardEvictionThresholds, cm.capacity)
+	result := make(v1.ResourceList)
+	for k := range cm.capacity {
+		value := resource.NewQuantity(0, resource.DecimalSI)
+		if cm.nodeConfig.SystemReserved != nil {
+			value.Add(cm.nodeConfig.SystemReserved[k])
+		}
+		if cm.nodeConfig.KubeReserved != nil {
+			value.Add(cm.nodeConfig.KubeReserved[k])
+		}
+		if evictionReservation != nil {
+			value.Add(evictionReservation[k])
+		}
+		if !value.IsZero() {
+			result[k] = *value
+		}
+	}
+	return result
+}
+
+func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
+	return cm.capacity
+}
+
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+	return nil, nil, []string{}
+}
+
+func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
+	return &podContainerManagerStub{}
+}
+
+func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+	return &kubecontainer.RunContainerOptions{}, nil
+}
+
+func (cm *containerManagerImpl) UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error {
+	return nil
+}
+
+func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
+}
+
+func (cm *containerManagerImpl) GetPodCgroupRoot() string {
+	return ""
 }

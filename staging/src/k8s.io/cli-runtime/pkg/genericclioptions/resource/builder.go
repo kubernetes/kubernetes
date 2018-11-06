@@ -1089,9 +1089,10 @@ func (b *Builder) Do() *Result {
 	if b.requireObject {
 		helpers = append(helpers, RetrieveLazy)
 	}
-	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	if b.continueOnError {
-		r.visitor = ContinueOnErrorVisitor{r.visitor}
+		r.visitor = NewDecoratedVisitor(ContinueOnErrorVisitor{r.visitor}, helpers...)
+	} else {
+		r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	}
 	return r
 }

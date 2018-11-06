@@ -49,7 +49,7 @@ Running this command will execute the following operations on your cluster:
 
 Each step is separated by an interactive prompt. You must hit the
 <kbd>Return</kbd> key to proceed to the next step. You can use these prompts as
-a break to take time to  run `kubectl` and inspect the result of the operations
+a break to take time to run `kubectl` and inspect the result of the operations
 executed.
 
 You should see an output like the following:

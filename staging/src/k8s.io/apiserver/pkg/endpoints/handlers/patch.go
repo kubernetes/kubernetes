@@ -220,6 +220,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		if wasCreated {
 			status = http.StatusCreated
 		}
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }

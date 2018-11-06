@@ -403,10 +403,10 @@ func (o *RollingUpdateOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(oldRc, nil), oldRcData); err != nil {
+			if err := printer.PrintObj(oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), newRcData); err != nil {
+			if err := printer.PrintObj(newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -455,7 +455,7 @@ func (o *RollingUpdateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), o.Out)
+	return printer.PrintObj(newRc, o.Out)
 }
 
 func findNewName(args []string, oldRc *corev1.ReplicationController) string {

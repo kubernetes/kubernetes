@@ -322,7 +322,7 @@ func InClusterConfig() (*Config, error) {
 		return nil, ErrNotInCluster
 	}
 
-	ts := newCachedPathTokenSource(tokenFile)
+	ts := NewCachedFileTokenSource(tokenFile)
 
 	if _, err := ts.Token(); err != nil {
 		return nil, err

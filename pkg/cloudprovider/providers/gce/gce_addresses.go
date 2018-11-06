@@ -42,106 +42,106 @@ func newAddressMetricContextWithVersion(request, region, version string) *metric
 // Caller is allocated a random IP if they do not specify an ipAddress. If an
 // ipAddress is specified, it must belong to the current project, eg: an
 // ephemeral IP associated with a global forwarding rule.
-func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) error {
+func (g *Cloud) ReserveGlobalAddress(addr *compute.Address) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("reserve", "")
-	return mc.Observe(gce.c.GlobalAddresses().Insert(ctx, meta.GlobalKey(addr.Name), addr))
+	return mc.Observe(g.c.GlobalAddresses().Insert(ctx, meta.GlobalKey(addr.Name), addr))
 }
 
 // DeleteGlobalAddress deletes a global address by name.
-func (gce *GCECloud) DeleteGlobalAddress(name string) error {
+func (g *Cloud) DeleteGlobalAddress(name string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("delete", "")
-	return mc.Observe(gce.c.GlobalAddresses().Delete(ctx, meta.GlobalKey(name)))
+	return mc.Observe(g.c.GlobalAddresses().Delete(ctx, meta.GlobalKey(name)))
 }
 
 // GetGlobalAddress returns the global address by name.
-func (gce *GCECloud) GetGlobalAddress(name string) (*compute.Address, error) {
+func (g *Cloud) GetGlobalAddress(name string) (*compute.Address, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("get", "")
-	v, err := gce.c.GlobalAddresses().Get(ctx, meta.GlobalKey(name))
+	v, err := g.c.GlobalAddresses().Get(ctx, meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // ReserveRegionAddress creates a region address
-func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) error {
+func (g *Cloud) ReserveRegionAddress(addr *compute.Address, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("reserve", region)
-	return mc.Observe(gce.c.Addresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
+	return mc.Observe(g.c.Addresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
 }
 
 // ReserveAlphaRegionAddress creates an Alpha, regional address.
-func (gce *GCECloud) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
+func (g *Cloud) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("reserve", region)
-	return mc.Observe(gce.c.AlphaAddresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
+	return mc.Observe(g.c.AlphaAddresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
 }
 
 // ReserveBetaRegionAddress creates a beta region address
-func (gce *GCECloud) ReserveBetaRegionAddress(addr *computebeta.Address, region string) error {
+func (g *Cloud) ReserveBetaRegionAddress(addr *computebeta.Address, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("reserve", region)
-	return mc.Observe(gce.c.BetaAddresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
+	return mc.Observe(g.c.BetaAddresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
 }
 
 // DeleteRegionAddress deletes a region address by name.
-func (gce *GCECloud) DeleteRegionAddress(name, region string) error {
+func (g *Cloud) DeleteRegionAddress(name, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("delete", region)
-	return mc.Observe(gce.c.Addresses().Delete(ctx, meta.RegionalKey(name, region)))
+	return mc.Observe(g.c.Addresses().Delete(ctx, meta.RegionalKey(name, region)))
 }
 
 // GetRegionAddress returns the region address by name
-func (gce *GCECloud) GetRegionAddress(name, region string) (*compute.Address, error) {
+func (g *Cloud) GetRegionAddress(name, region string) (*compute.Address, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("get", region)
-	v, err := gce.c.Addresses().Get(ctx, meta.RegionalKey(name, region))
+	v, err := g.c.Addresses().Get(ctx, meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
 // GetAlphaRegionAddress returns the Alpha, regional address by name.
-func (gce *GCECloud) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
+func (g *Cloud) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("get", region)
-	v, err := gce.c.AlphaAddresses().Get(ctx, meta.RegionalKey(name, region))
+	v, err := g.c.AlphaAddresses().Get(ctx, meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
 // GetBetaRegionAddress returns the beta region address by name
-func (gce *GCECloud) GetBetaRegionAddress(name, region string) (*computebeta.Address, error) {
+func (g *Cloud) GetBetaRegionAddress(name, region string) (*computebeta.Address, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("get", region)
-	v, err := gce.c.BetaAddresses().Get(ctx, meta.RegionalKey(name, region))
+	v, err := g.c.BetaAddresses().Get(ctx, meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
 // GetRegionAddressByIP returns the regional address matching the given IP address.
-func (gce *GCECloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
+func (g *Cloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("list", region)
-	addrs, err := gce.c.Addresses().List(ctx, region, filter.Regexp("address", ipAddress))
+	addrs, err := g.c.Addresses().List(ctx, region, filter.Regexp("address", ipAddress))
 
 	mc.Observe(err)
 	if err != nil {
@@ -160,12 +160,12 @@ func (gce *GCECloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Ad
 }
 
 // GetBetaRegionAddressByIP returns the beta regional address matching the given IP address.
-func (gce *GCECloud) GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta.Address, error) {
+func (g *Cloud) GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta.Address, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newAddressMetricContext("list", region)
-	addrs, err := gce.c.BetaAddresses().List(ctx, region, filter.Regexp("address", ipAddress))
+	addrs, err := g.c.BetaAddresses().List(ctx, region, filter.Regexp("address", ipAddress))
 
 	mc.Observe(err)
 	if err != nil {
@@ -184,11 +184,11 @@ func (gce *GCECloud) GetBetaRegionAddressByIP(region, ipAddress string) (*comput
 }
 
 // TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
-func (gce *GCECloud) getNetworkTierFromAddress(name, region string) (string, error) {
-	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
+func (g *Cloud) getNetworkTierFromAddress(name, region string) (string, error) {
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
 		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
-	addr, err := gce.GetAlphaRegionAddress(name, region)
+	addr, err := g.GetAlphaRegionAddress(name, region)
 	if err != nil {
 		return handleAlphaNetworkTierGetError(err)
 	}

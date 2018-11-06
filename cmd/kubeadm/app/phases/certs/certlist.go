@@ -19,12 +19,13 @@ package certs
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
+
+	"github.com/pkg/errors"
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *certutil.Config) error
@@ -56,7 +57,7 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*certutil.Con
 func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
-		return fmt.Errorf("couldn't create %q certificate: %v", k.Name, err)
+		return errors.Wrapf(err, "couldn't create %q certificate", k.Name)
 	}
 	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, cfg)
 	if err != nil {
@@ -71,7 +72,7 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to write certificate %q: %v", k.Name, err)
+		return errors.Wrapf(err, "failed to write certificate %q", k.Name)
 	}
 
 	return nil
@@ -81,11 +82,11 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, *rsa.PrivateKey, error) {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't get configuration for %q CA certificate: %v", k.Name, err)
+		return nil, nil, errors.Wrapf(err, "couldn't get configuration for %q CA certificate", k.Name)
 	}
 	caCert, caKey, err := NewCACertAndKey(cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't generate %q CA certificate: %v", k.Name, err)
+		return nil, nil, errors.Wrapf(err, "couldn't generate %q CA certificate", k.Name)
 	}
 
 	err = writeCertificateAuthorithyFilesIfNotExist(
@@ -95,7 +96,7 @@ func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certif
 		caKey,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't write out %q CA certificate: %v", k.Name, err)
+		return nil, nil, errors.Wrapf(err, "couldn't write out %q CA certificate", k.Name)
 	}
 
 	return caCert, caKey, nil
@@ -118,7 +119,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 		if err == nil {
 			// Cert exists already, make sure it's valid
 			if !caCert.IsCA {
-				return fmt.Errorf("certificate %q is not a CA", ca.Name)
+				return errors.Errorf("certificate %q is not a CA", ca.Name)
 			}
 			// Try and load a CA Key
 			caKey, err = pkiutil.TryLoadKeyFromDisk(ic.CertificatesDir, ca.BaseName)
@@ -131,10 +132,9 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 						uxName:   leaf.Name,
 					}
 					if err := validateSignedCertWithCA(cl, caCert); err != nil {
-						return fmt.Errorf("could not load expected certificate %q or validate the existence of key %q for it: %v", leaf.Name, ca.Name, err)
+						return errors.Wrapf(err, "could not load expected certificate %q or validate the existence of key %q for it", leaf.Name, ca.Name)
 					}
 				}
-				// CACert exists and all clients exist, continue to next CA.
 				continue
 			}
 			// CA key exists; just use that to create new certificates.
@@ -180,7 +180,7 @@ func (m CertificateMap) CertTree() (CertificateTree, error) {
 		} else {
 			ca, ok := m[cert.CAName]
 			if !ok {
-				return nil, fmt.Errorf("Certificate %q references unknown CA %q", cert.Name, cert.CAName)
+				return nil, errors.Errorf("certificate %q references unknown CA %q", cert.Name, cert.CAName)
 			}
 			caMap[ca] = append(caMap[ca], cert)
 		}
@@ -236,16 +236,16 @@ var (
 	// KubeadmCertRootCA is the definition of the Kubernetes Root CA for the API Server and kubelet.
 	KubeadmCertRootCA = KubeadmCert{
 		Name:     "ca",
-		LongName: "self-signed kubernetes CA to provision identities for other kuberenets components",
+		LongName: "self-signed Kubernetes CA to provision identities for other Kubernetes components",
 		BaseName: kubeadmconstants.CACertAndKeyBaseName,
 		config: certutil.Config{
 			CommonName: "kubernetes",
 		},
 	}
-	// KubeadmCertAPIServer is the definition of the cert used to serve the kubernetes API.
+	// KubeadmCertAPIServer is the definition of the cert used to serve the Kubernetes API.
 	KubeadmCertAPIServer = KubeadmCert{
 		Name:     "apiserver",
-		LongName: "certificate for serving the kubernetes API",
+		LongName: "certificate for serving the Kubernetes API",
 		BaseName: kubeadmconstants.APIServerCertAndKeyBaseName,
 		CAName:   "ca",
 		config: certutil.Config{

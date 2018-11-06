@@ -16,7 +16,11 @@ limitations under the License.
 
 package etcd
 
-import "k8s.io/apimachinery/pkg/runtime/schema"
+import (
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 // GetEtcdStorageData returns etcd data for all persisted objects.
 // It is exported so that it can be reused across multiple tests.
@@ -427,6 +431,23 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 			Stub:             `{"metadata": {"name": "openshiftwebconsoleconfigs.webconsole.operator.openshift.io"},"spec": {"scope": "Cluster","group": "webconsole.operator.openshift.io","version": "v1alpha1","names": {"kind": "OpenShiftWebConsoleConfig","plural": "openshiftwebconsoleconfigs","singular": "openshiftwebconsoleconfig"}}}`,
 			ExpectedEtcdPath: "/registry/apiextensions.k8s.io/customresourcedefinitions/openshiftwebconsoleconfigs.webconsole.operator.openshift.io",
 		},
+		gvr("cr.bar.com", "v1", "foos"): {
+			Stub:             `{"kind": "Foo", "apiVersion": "cr.bar.com/v1", "metadata": {"name": "cr1foo"}, "color": "blue"}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
+			ExpectedEtcdPath: "/registry/cr.bar.com/foos/etcdstoragepathtestnamespace/cr1foo",
+		},
+		gvr("custom.fancy.com", "v2", "pants"): {
+			Stub:             `{"kind": "Pant", "apiVersion": "custom.fancy.com/v2", "metadata": {"name": "cr2pant"}, "isFancy": true}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
+			ExpectedEtcdPath: "/registry/custom.fancy.com/pants/cr2pant",
+		},
+		gvr("awesome.bears.com", "v1", "pandas"): {
+			Stub:             `{"kind": "Panda", "apiVersion": "awesome.bears.com/v1", "metadata": {"name": "cr3panda"}, "weight": 100}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
+			ExpectedEtcdPath: "/registry/awesome.bears.com/pandas/cr3panda",
+		},
+		gvr("awesome.bears.com", "v3", "pandas"): {
+			Stub:             `{"kind": "Panda", "apiVersion": "awesome.bears.com/v3", "metadata": {"name": "cr4panda"}, "weight": 300}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
+			ExpectedEtcdPath: "/registry/awesome.bears.com/pandas/cr4panda",
+			ExpectedGVK:      gvkP("awesome.bears.com", "v1", "Panda"),
+		},
 		// --
 	}
 }
@@ -444,6 +465,74 @@ type StorageData struct {
 type Prerequisite struct {
 	GvrData schema.GroupVersionResource
 	Stub    string
+}
+
+// GetCustomResourceDefinitionData returns the resource definitions that back the custom resources
+// included in GetEtcdStorageData.  They should be created using CreateTestCRDs before running any tests.
+func GetCustomResourceDefinitionData() []*apiextensionsv1beta1.CustomResourceDefinition {
+	return []*apiextensionsv1beta1.CustomResourceDefinition{
+		// namespaced with legacy version field
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foos.cr.bar.com",
+			},
+			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+				Group:   "cr.bar.com",
+				Version: "v1",
+				Scope:   apiextensionsv1beta1.NamespaceScoped,
+				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+					Plural: "foos",
+					Kind:   "Foo",
+				},
+			},
+		},
+		// cluster scoped with legacy version field
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pants.custom.fancy.com",
+			},
+			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+				Group:   "custom.fancy.com",
+				Version: "v2",
+				Scope:   apiextensionsv1beta1.ClusterScoped,
+				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+					Plural: "pants",
+					Kind:   "Pant",
+				},
+			},
+		},
+		// cluster scoped with versions field
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pandas.awesome.bears.com",
+			},
+			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+				Group: "awesome.bears.com",
+				Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+					{
+						Name:    "v1",
+						Served:  true,
+						Storage: true,
+					},
+					{
+						Name:    "v2",
+						Served:  false,
+						Storage: false,
+					},
+					{
+						Name:    "v3",
+						Served:  true,
+						Storage: false,
+					},
+				},
+				Scope: apiextensionsv1beta1.ClusterScoped,
+				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+					Plural: "pandas",
+					Kind:   "Panda",
+				},
+			},
+		},
+	}
 }
 
 func gvr(g, v, r string) schema.GroupVersionResource {

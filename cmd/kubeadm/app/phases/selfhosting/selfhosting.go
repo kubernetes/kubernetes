@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,7 +112,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		// Remove the old Static Pod manifest if not dryrunning
 		if !dryRun {
 			if err := os.RemoveAll(manifestPath); err != nil {
-				return fmt.Errorf("unable to delete static pod manifest for %s [%v]", componentName, err)
+				return errors.Wrapf(err, "unable to delete static pod manifest for %s ", componentName)
 			}
 		}
 
@@ -179,18 +180,18 @@ func BuildSelfHostedComponentLabelQuery(componentName string) string {
 func loadPodSpecFromFile(filePath string) (*v1.PodSpec, error) {
 	podDef, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
+		return nil, errors.Wrapf(err, "failed to read file path %s", filePath)
 	}
 
 	if len(podDef) == 0 {
-		return nil, fmt.Errorf("file was empty: %s", filePath)
+		return nil, errors.Errorf("file was empty: %s", filePath)
 	}
 
 	codec := clientscheme.Codecs.UniversalDecoder()
 	pod := &v1.Pod{}
 
 	if err = runtime.DecodeInto(codec, podDef, pod); err != nil {
-		return nil, fmt.Errorf("failed decoding pod: %v", err)
+		return nil, errors.Wrap(err, "failed decoding pod")
 	}
 
 	return &pod.Spec, nil

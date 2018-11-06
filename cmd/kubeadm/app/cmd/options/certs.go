@@ -20,5 +20,5 @@ import "github.com/spf13/pflag"
 
 // AddCertificateDirFlag adds the --certs-dir flag to the given flagset
 func AddCertificateDirFlag(fs *pflag.FlagSet, certsDir *string) {
-	fs.StringVar(certsDir, "cert-dir", *certsDir, "The path where to save the certificates")
+	fs.StringVar(certsDir, CertificatesDir, *certsDir, "The path where to save the certificates")
 }

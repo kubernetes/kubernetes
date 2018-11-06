@@ -79,10 +79,12 @@ func (s *DeprecatedInsecureServingInfo) NewLoopbackClientConfig() (*rest.Config,
 type InsecureSuperuser struct{}
 
 func (InsecureSuperuser) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+	auds, _ := authenticator.AudiencesFrom(req.Context())
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   "system:unsecured",
 			Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
 		},
+		Audiences: auds,
 	}, true, nil
 }

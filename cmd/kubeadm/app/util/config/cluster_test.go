@@ -770,6 +770,94 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 	}
 }
 
+func TestGetGetClusterStatus(t *testing.T) {
+	var tests = []struct {
+		name              string
+		configMaps        []fakeConfigMap
+		expectedEndpoints int
+		expectedError     bool
+	}{
+		{
+			name:              "invalid missing config map",
+			expectedEndpoints: 0,
+		},
+		{
+			name: "valid v1beta1",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{
+						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1beta1"]),
+					},
+				},
+			},
+			expectedEndpoints: 1,
+		},
+		{
+			name: "valid v1alpha3",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{
+						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1alpha3"]),
+					},
+				},
+			},
+			expectedEndpoints: 1,
+		},
+		{
+			name: "invalid missing ClusterStatusConfigMapKey in the config map",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid wrong value in the config map",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{
+						kubeadmconstants.ClusterStatusConfigMapKey: "not a kubeadm type",
+					},
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+
+			for _, c := range rt.configMaps {
+				err := c.create(client)
+				if err != nil {
+					t.Errorf("couldn't create ConfigMap %s", c.name)
+					return
+				}
+			}
+
+			clusterStatus, err := GetClusterStatus(client)
+			if rt.expectedError != (err != nil) {
+				t.Errorf("unexpected return err from GetClusterStatus: %v", err)
+				return
+			}
+			if rt.expectedError {
+				return
+			}
+
+			// Test expected values in clusterStatus
+			if len(clusterStatus.APIEndpoints) != rt.expectedEndpoints {
+				t.Errorf("unexpected ClusterStatus return value")
+			}
+		})
+	}
+}
+
 type fakeConfigMap struct {
 	name string
 	data map[string]string

@@ -71,7 +71,7 @@ func NewController(
 		return nil, fmt.Errorf("invalid IPAM controller mode %q", config.Mode)
 	}
 
-	gceCloud, ok := cloud.(*gce.GCECloud)
+	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {
 		return nil, fmt.Errorf("cloud IPAM controller does not support %q provider", cloud.ProviderName())
 	}

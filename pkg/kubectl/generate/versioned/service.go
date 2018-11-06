@@ -88,7 +88,7 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 	}
 	selectorString, found := params["selector"]
 	if !found || len(selectorString) == 0 {
-		return nil, fmt.Errorf("'selector' is a required parameter.")
+		return nil, fmt.Errorf("'selector' is a required parameter")
 	}
 	selector, err := generate.ParseLabels(selectorString)
 	if err != nil {
@@ -108,7 +108,7 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
+			return nil, fmt.Errorf("'name' is a required parameter")
 		}
 	}
 
@@ -136,7 +136,7 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 	if portString, found = params["ports"]; !found {
 		portString, found = params["port"]
 		if !found && !isHeadlessService {
-			return nil, fmt.Errorf("'ports' or 'port' is a required parameter.")
+			return nil, fmt.Errorf("'ports' or 'port' is a required parameter")
 		}
 	}
 

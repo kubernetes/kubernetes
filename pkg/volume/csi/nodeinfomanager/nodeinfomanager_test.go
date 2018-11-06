@@ -18,18 +18,22 @@ package nodeinfomanager
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
@@ -682,9 +686,18 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 			continue
 		}
 
-		/* Node Validation */
-		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
+		actions := client.Actions()
+
+		var node *v1.Node
+		if hasPatchAction(actions) {
+			node, err = applyNodeStatusPatch(tc.existingNode, actions[1].(clienttesting.PatchActionImpl).GetPatch())
+			assert.NoError(t, err)
+		} else {
+			node, err = client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			assert.NoError(t, err)
+		}
+
+		if node == nil {
 			t.Errorf("error getting node: %v", err)
 			continue
 		}
@@ -806,4 +819,30 @@ func generateNodeInfo(nodeIDs map[string]string, topologyKeys map[string][]strin
 		},
 		CSIDrivers: drivers,
 	}
+}
+
+func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error) {
+	original, err := json.Marshal(originalNode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal original node %#v: %v", originalNode, err)
+	}
+	updated, err := strategicpatch.StrategicMergePatch(original, patch, v1.Node{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply strategic merge patch %q on node %#v: %v",
+			patch, originalNode, err)
+	}
+	updatedNode := &v1.Node{}
+	if err := json.Unmarshal(updated, updatedNode); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal updated node %q: %v", updated, err)
+	}
+	return updatedNode, nil
+}
+
+func hasPatchAction(actions []clienttesting.Action) bool {
+	for _, action := range actions {
+		if action.GetVerb() == "patch" {
+			return true
+		}
+	}
+	return false
 }

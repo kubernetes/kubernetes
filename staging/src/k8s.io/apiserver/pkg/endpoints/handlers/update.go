@@ -190,6 +190,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			status = http.StatusCreated
 		}
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }

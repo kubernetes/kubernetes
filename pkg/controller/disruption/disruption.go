@@ -379,7 +379,7 @@ func (dc *DisruptionController) deletePod(obj interface{}) {
 func (dc *DisruptionController) enqueuePdb(pdb *policy.PodDisruptionBudget) {
 	key, err := controller.KeyFunc(pdb)
 	if err != nil {
-		glog.Errorf("Cound't get key for PodDisruptionBudget object %+v: %v", pdb, err)
+		glog.Errorf("Couldn't get key for PodDisruptionBudget object %+v: %v", pdb, err)
 		return
 	}
 	dc.queue.Add(key)
@@ -388,7 +388,7 @@ func (dc *DisruptionController) enqueuePdb(pdb *policy.PodDisruptionBudget) {
 func (dc *DisruptionController) enqueuePdbForRecheck(pdb *policy.PodDisruptionBudget, delay time.Duration) {
 	key, err := controller.KeyFunc(pdb)
 	if err != nil {
-		glog.Errorf("Cound't get key for PodDisruptionBudget object %+v: %v", pdb, err)
+		glog.Errorf("Couldn't get key for PodDisruptionBudget object %+v: %v", pdb, err)
 		return
 	}
 	dc.recheckQueue.AddAfter(key, delay)

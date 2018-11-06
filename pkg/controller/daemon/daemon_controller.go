@@ -1103,7 +1103,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	return utilerrors.NewAggregate(errors)
 }
 
-func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int) error {
+func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int, updateObservedGen bool) error {
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
@@ -1119,7 +1119,9 @@ func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.
 
 	var updateErr, getErr error
 	for i := 0; i < StatusUpdateRetries; i++ {
-		toUpdate.Status.ObservedGeneration = ds.Generation
+		if updateObservedGen {
+			toUpdate.Status.ObservedGeneration = ds.Generation
+		}
 		toUpdate.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
 		toUpdate.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
 		toUpdate.Status.NumberMisscheduled = int32(numberMisscheduled)
@@ -1142,7 +1144,7 @@ func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.
 	return updateErr
 }
 
-func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash string) error {
+func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash string, updateObservedGen bool) error {
 	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
@@ -1195,7 +1197,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash 
 	}
 	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = storeDaemonSetStatus(dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
+	err = storeDaemonSetStatus(dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable, updateObservedGen)
 	if err != nil {
 		return fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
 	}
@@ -1257,8 +1259,8 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
 	if !dsc.expectations.SatisfiedExpectations(dsKey) {
-		// Only update status.
-		return dsc.updateDaemonSetStatus(ds, hash)
+		// Only update status. Don't raise observedGeneration since controller didn't process object of that generation.
+		return dsc.updateDaemonSetStatus(ds, hash, false)
 	}
 
 	err = dsc.manage(ds, hash)
@@ -1283,7 +1285,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return fmt.Errorf("failed to clean up revisions of DaemonSet: %v", err)
 	}
 
-	return dsc.updateDaemonSetStatus(ds, hash)
+	return dsc.updateDaemonSetStatus(ds, hash, true)
 }
 
 func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *apps.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {

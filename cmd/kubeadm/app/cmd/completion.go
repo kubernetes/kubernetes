@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -126,7 +125,7 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 	}
 	run, found := completionShells[args[0]]
 	if !found {
-		return fmt.Errorf("unsupported shell type %q", args[0])
+		return errors.Errorf("unsupported shell type %q", args[0])
 	}
 
 	if len(boilerPlate) == 0 {

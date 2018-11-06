@@ -74,7 +74,7 @@ type sioClient struct {
 	spClient         *sio.StoragePool
 	provisionMode    string
 	sdcPath          string
-	sdcGuid          string
+	sdcGUID          string
 	instanceID       string
 	inited           bool
 	diskRegex        *regexp.Regexp
@@ -301,11 +301,11 @@ func (c *sioClient) IID() (string, error) {
 
 	// if instanceID not set, retrieve it
 	if c.instanceID == "" {
-		guid, err := c.getGuid()
+		guid, err := c.getGUID()
 		if err != nil {
 			return "", err
 		}
-		sdc, err := c.sysClient.FindSdc("SdcGuid", guid)
+		sdc, err := c.sysClient.FindSdc("SdcGUID", guid)
 		if err != nil {
 			glog.Error(log("failed to retrieve sdc info %s", err))
 			return "", err
@@ -316,10 +316,10 @@ func (c *sioClient) IID() (string, error) {
 	return c.instanceID, nil
 }
 
-// getGuid returns instance GUID, if not set using resource labels
+// getGUID returns instance GUID, if not set using resource labels
 // it attempts to fallback to using drv_cfg binary
-func (c *sioClient) getGuid() (string, error) {
-	if c.sdcGuid == "" {
+func (c *sioClient) getGUID() (string, error) {
+	if c.sdcGUID == "" {
 		glog.V(4).Info(log("sdc guid label not set, falling back to using drv_cfg"))
 		cmd := c.getSdcCmd()
 		output, err := c.exec.Run(cmd, "--query_guid")
@@ -327,9 +327,9 @@ func (c *sioClient) getGuid() (string, error) {
 			glog.Error(log("drv_cfg --query_guid failed: %v", err))
 			return "", err
 		}
-		c.sdcGuid = strings.TrimSpace(string(output))
+		c.sdcGUID = strings.TrimSpace(string(output))
 	}
-	return c.sdcGuid, nil
+	return c.sdcGUID, nil
 }
 
 // getSioDiskPaths traverse local disk devices to retrieve device path
@@ -342,10 +342,10 @@ func (c *sioClient) getSioDiskPaths() ([]os.FileInfo, error) {
 		if os.IsNotExist(err) {
 			// sioDiskIDPath may not exist yet which is fine
 			return []os.FileInfo{}, nil
-		} else {
-			glog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
-			return nil, err
 		}
+		glog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
+		return nil, err
+
 	}
 	result := []os.FileInfo{}
 	for _, file := range files {
@@ -360,13 +360,13 @@ func (c *sioClient) getSioDiskPaths() ([]os.FileInfo, error) {
 
 // GetVolumeRefs counts the number of references an SIO volume has a disk device.
 // This is useful in preventing premature detach.
-func (c *sioClient) GetVolumeRefs(volId sioVolumeID) (refs int, err error) {
+func (c *sioClient) GetVolumeRefs(volID sioVolumeID) (refs int, err error) {
 	files, err := c.getSioDiskPaths()
 	if err != nil {
 		return 0, err
 	}
 	for _, file := range files {
-		if strings.Contains(file.Name(), string(volId)) {
+		if strings.Contains(file.Name(), string(volID)) {
 			refs++
 		}
 	}

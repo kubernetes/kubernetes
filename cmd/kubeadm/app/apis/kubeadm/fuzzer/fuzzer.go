@@ -50,6 +50,11 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	// More specifically:
 	// internal with manually applied defaults -> external object : loosing ClusterConfiguration) -> internal object with automatically applied defaults
 	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{
+		APIServer: kubeadm.APIServer{
+			TimeoutForControlPlane: &metav1.Duration{
+				Duration: constants.DefaultControlPlaneTimeout,
+			},
+		},
 		AuditPolicyConfiguration: kubeadm.AuditPolicyConfiguration{
 			LogDir:    constants.StaticPodAuditPolicyLogDir,
 			LogMaxAge: &v1beta1.DefaultAuditPolicyLogMaxAge,
@@ -97,6 +102,9 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.ClusterName = "bar"
 	obj.ImageRepository = "baz"
 	obj.KubernetesVersion = "qux"
+	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
+		Duration: constants.DefaultControlPlaneTimeout,
+	}
 }
 
 func fuzzAuditPolicyConfiguration(obj *kubeadm.AuditPolicyConfiguration, c fuzz.Continue) {

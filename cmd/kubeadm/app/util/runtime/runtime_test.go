@@ -17,9 +17,10 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/utils/exec"
@@ -31,7 +32,7 @@ func TestNewContainerRuntime(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 	execLookPathErr := fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return "", fmt.Errorf("%s not found", cmd) },
+		LookPathFunc: func(cmd string) (string, error) { return "", errors.Errorf("%s not found", cmd) },
 	}
 	cases := []struct {
 		name      string

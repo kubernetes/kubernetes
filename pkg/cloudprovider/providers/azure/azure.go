@@ -159,7 +159,7 @@ type Cloud struct {
 	DisksClient             DisksClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
-	metadata                *InstanceMetadata
+	metadata                *InstanceMetadataService
 	vmSet                   VMSet
 
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
@@ -328,7 +328,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderBackoffJitter)
 	}
 
-	az.metadata = NewInstanceMetadata()
+	az.metadata, err = NewInstanceMetadataService(metadataURL)
+	if err != nil {
+		return nil, err
+	}
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount

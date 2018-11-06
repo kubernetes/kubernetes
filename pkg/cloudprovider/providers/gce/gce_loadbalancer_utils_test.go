@@ -67,7 +67,7 @@ var (
 	FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 )
 
-func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([]*v1.Node, error) {
+func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v1.Node, error) {
 	nodes := []*v1.Node{}
 
 	for _, name := range nodeNames {
@@ -116,7 +116,7 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([
 	return nodes, nil
 }
 
-func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
+func assertExternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 	hcName := MakeNodesHealthCheckName(vals.ClusterID)
 
@@ -141,7 +141,7 @@ func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 	assert.Equal(t, 1, len(pool.Instances))
 
 	// Check that HealthCheck is created
-	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	healthcheck, err := gce.GetHTTPHealthCheck(hcName)
 	require.NoError(t, err)
 	assert.Equal(t, hcName, healthcheck.Name)
 
@@ -153,7 +153,7 @@ func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 	assert.Equal(t, "123-123", fwdRule.PortRange)
 }
 
-func assertExternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
+func assertExternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 	hcName := MakeNodesHealthCheckName(vals.ClusterID)
 
@@ -182,13 +182,13 @@ func assertExternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v
 	assert.Nil(t, pool)
 
 	// Check that HealthCheck is deleted
-	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	healthcheck, err := gce.GetHTTPHealthCheck(hcName)
 	require.Error(t, err)
 	assert.Nil(t, healthcheck)
 
 }
 
-func assertInternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
+func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 
 	// Check that Instance Group is created
@@ -241,7 +241,7 @@ func assertInternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 	assert.Equal(t, gce.NetworkURL(), fwdRule.Subnetwork)
 }
 
-func assertInternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
+func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)

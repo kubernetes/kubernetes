@@ -49,6 +49,7 @@ const (
 	// owner: @vishh
 	// alpha: v1.5
 	//
+	// DEPRECATED - This feature is deprecated by Pod Priority and Preemption as of Kubernetes 1.13.
 	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
 	// and also prevents them from being evicted from a node.
 	// Note: This feature is not supported for `BestEffort` pods.
@@ -139,6 +140,7 @@ const (
 	// owner: @jsafrane
 	// GA: v1.12
 	//
+	// Note: This feature gate is unconditionally enabled in v1.13 and will be removed in v1.14.
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
 
@@ -186,10 +188,9 @@ const (
 	MountContainers utilfeature.Feature = "MountContainers"
 
 	// owner: @msau42
-	// alpha: v1.9
+	// GA: v1.13
 	//
 	// Extend the default scheduler to be aware of PV topology and handle PV binding
-	// Before moving to beta, resolve Kubernetes issue #56180
 	VolumeScheduling utilfeature.Feature = "VolumeScheduling"
 
 	// owner: @vladimirvivien
@@ -413,7 +414,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
+	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.GA},
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
 	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
@@ -456,8 +457,9 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
-	apiextensionsfeatures.CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: false, PreRelease: utilfeature.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

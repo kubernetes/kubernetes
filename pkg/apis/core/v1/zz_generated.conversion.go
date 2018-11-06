@@ -29,8 +29,8 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func init() {
@@ -1990,6 +1990,21 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(a.(*apps.ReplicaSetSpec), b.(*v1.ReplicationControllerSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.ReplicaSetStatus)(nil), (*v1.ReplicationControllerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus(a.(*apps.ReplicaSetStatus), b.(*v1.ReplicationControllerStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.ReplicaSet)(nil), (*v1.ReplicationController)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSet_To_v1_ReplicationController(a.(*apps.ReplicaSet), b.(*v1.ReplicationController), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*core.PodSecurityContext)(nil), (*v1.PodSecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PodSecurityContext_To_v1_PodSecurityContext(a.(*core.PodSecurityContext), b.(*v1.PodSecurityContext), scope)
 	}); err != nil {
@@ -2020,21 +2035,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetSpec_To_v1_ReplicationControllerSpec(a.(*extensions.ReplicaSetSpec), b.(*v1.ReplicationControllerSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*extensions.ReplicaSetStatus)(nil), (*v1.ReplicationControllerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetStatus_To_v1_ReplicationControllerStatus(a.(*extensions.ReplicaSetStatus), b.(*v1.ReplicationControllerStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*extensions.ReplicaSet)(nil), (*v1.ReplicationController)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSet_To_v1_ReplicationController(a.(*extensions.ReplicaSet), b.(*v1.ReplicationController), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*v1.PodSecurityContext)(nil), (*core.PodSecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodSecurityContext_To_core_PodSecurityContext(a.(*v1.PodSecurityContext), b.(*core.PodSecurityContext), scope)
 	}); err != nil {
@@ -2055,23 +2055,23 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*v1.ReplicationControllerSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec(a.(*v1.ReplicationControllerSpec), b.(*apps.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1.ReplicationControllerSpec)(nil), (*core.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(a.(*v1.ReplicationControllerSpec), b.(*core.ReplicationControllerSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.ReplicationControllerSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicationControllerSpec_To_extensions_ReplicaSetSpec(a.(*v1.ReplicationControllerSpec), b.(*extensions.ReplicaSetSpec), scope)
+	if err := s.AddConversionFunc((*v1.ReplicationControllerStatus)(nil), (*apps.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicationControllerStatus_To_apps_ReplicaSetStatus(a.(*v1.ReplicationControllerStatus), b.(*apps.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.ReplicationControllerStatus)(nil), (*extensions.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicationControllerStatus_To_extensions_ReplicaSetStatus(a.(*v1.ReplicationControllerStatus), b.(*extensions.ReplicaSetStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.ReplicationController)(nil), (*extensions.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicationController_To_extensions_ReplicaSet(a.(*v1.ReplicationController), b.(*extensions.ReplicaSet), scope)
+	if err := s.AddConversionFunc((*v1.ReplicationController)(nil), (*apps.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicationController_To_apps_ReplicaSet(a.(*v1.ReplicationController), b.(*apps.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}

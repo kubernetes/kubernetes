@@ -30,7 +30,7 @@ import (
 	"testing"
 )
 
-var testApiSecretName = "storageos-api"
+var testAPISecretName = "storageos-api"
 var testVolName = "storageos-test-vol"
 var testPVName = "storageos-test-pv"
 var testNamespace = "storageos-test-namespace"

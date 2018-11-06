@@ -80,7 +80,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			for {
 				opts.Limit = int64(rand.Int31n(numberOfTotalResources/10) + 1)
 				list, err := client.List(opts)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred(), "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 				Expect(len(list.Items)).To(BeNumerically("<=", opts.Limit))
 
@@ -101,8 +101,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		}
 
 		By("retrieving those results all at once")
-		list, err := client.List(metav1.ListOptions{Limit: numberOfTotalResources + 1})
-		Expect(err).ToNot(HaveOccurred())
+		opts := metav1.ListOptions{Limit: numberOfTotalResources + 1}
+		list, err := client.List(opts)
+		Expect(err).ToNot(HaveOccurred(), "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 		Expect(list.Items).To(HaveLen(numberOfTotalResources))
 	})
 
@@ -116,7 +117,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		opts := metav1.ListOptions{}
 		opts.Limit = oneTenth
 		list, err := client.List(opts)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 		firstToken := list.Continue
 		firstRV := list.ResourceVersion
 		framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, firstToken)
@@ -149,7 +150,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		By("retrieving the second page again with the token received with the error message")
 		opts.Continue = inconsistentToken
 		list, err = client.List(opts)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
 		Expect(list.ResourceVersion).ToNot(Equal(firstRV))
 		Expect(len(list.Items)).To(BeNumerically("==", opts.Limit))
 		found := oneTenth
@@ -163,7 +164,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		lastRV := list.ResourceVersion
 		for {
 			list, err := client.List(opts)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred(), "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 			framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			Expect(len(list.Items)).To(BeNumerically("<=", opts.Limit))
 			Expect(list.ResourceVersion).To(Equal(lastRV))

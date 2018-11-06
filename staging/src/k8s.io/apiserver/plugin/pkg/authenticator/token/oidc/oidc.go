@@ -89,7 +89,7 @@ type Options struct {
 	UsernamePrefix string
 
 	// GroupsClaim, if specified, causes the OIDCAuthenticator to try to populate the user's
-	// groups with an ID Token field. If the GrouppClaim field is present in an ID Token the value
+	// groups with an ID Token field. If the GroupsClaim field is present in an ID Token the value
 	// must be a string or list of strings.
 	GroupsClaim string
 

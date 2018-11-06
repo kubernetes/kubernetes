@@ -8,13 +8,16 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "deployment.go",
         "framework.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/utils",
     deps = [
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

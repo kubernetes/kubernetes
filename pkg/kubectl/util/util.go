@@ -41,6 +41,7 @@ func ParseRFC3339(s string, nowFn func() metav1.Time) (metav1.Time, error) {
 	return metav1.Time{Time: t}, nil
 }
 
+// HashObject returns the hash of a Object hash by a Codec
 func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {
@@ -63,11 +64,11 @@ func ParseFileSource(source string) (keyName, filePath string, err error) {
 	case numSeparators == 0:
 		return path.Base(filepath.ToSlash(source)), source, nil
 	case numSeparators == 1 && strings.HasPrefix(source, "="):
-		return "", "", fmt.Errorf("key name for file path %v missing.", strings.TrimPrefix(source, "="))
+		return "", "", fmt.Errorf("key name for file path %v missing", strings.TrimPrefix(source, "="))
 	case numSeparators == 1 && strings.HasSuffix(source, "="):
-		return "", "", fmt.Errorf("file path for key name %v missing.", strings.TrimSuffix(source, "="))
+		return "", "", fmt.Errorf("file path for key name %v missing", strings.TrimSuffix(source, "="))
 	case numSeparators > 1:
-		return "", "", errors.New("Key names or file paths cannot contain '='.")
+		return "", "", errors.New("Key names or file paths cannot contain '='")
 	default:
 		components := strings.Split(source, "=")
 		return components[0], components[1], nil

@@ -21,12 +21,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -59,7 +56,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// Prepare the ClusterStatus for upload
 	// Gets the current cluster status
 	// TODO: use configmap locks on this object on the get before the update.
-	clusterStatus, err := getClusterStatus(client)
+	clusterStatus, err := configutil.GetClusterStatus(client)
 	if err != nil {
 		return err
 	}
@@ -128,23 +125,4 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			},
 		},
 	})
-}
-
-func getClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
-	obj := &kubeadmapi.ClusterStatus{}
-
-	// Read the ConfigMap from the cluster
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return obj, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Decode the file content  using the componentconfig Codecs that knows about all APIs
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configMap.Data[kubeadmconstants.ClusterStatusConfigMapKey]), obj); err != nil {
-		return nil, err
-	}
-	return obj, nil
 }

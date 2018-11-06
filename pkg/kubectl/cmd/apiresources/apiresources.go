@@ -77,7 +77,8 @@ func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *ApiResourcesO
 	}
 }
 
-func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdAPIResources creates the `api-resources` command
+func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{

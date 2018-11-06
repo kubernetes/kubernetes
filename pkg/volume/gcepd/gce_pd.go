@@ -284,6 +284,13 @@ func (plugin *gcePersistentDiskPlugin) ExpandVolumeDevice(
 	return updatedQuantity, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
+	return err
+}
+
+var _ volume.FSResizableVolumePlugin = &gcePersistentDiskPlugin{}
+
 func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())

@@ -68,13 +68,10 @@ import (
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
-	endpointsstorage "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -145,10 +142,10 @@ type ExtraConfig struct {
 	// service because this pkg is linked by out-of-tree projects
 	// like openshift which want to use the GenericAPIServer but also do
 	// more stuff.
-	ExtraServicePorts []api.ServicePort
+	ExtraServicePorts []apiv1.ServicePort
 	// Additional ports to be exposed on the GenericAPIServer endpoints
 	// Port names should align with ports defined in ExtraServicePorts
-	ExtraEndpointPorts []api.EndpointPort
+	ExtraEndpointPorts []apiv1.EndpointPort
 	// If non-zero, the "kubernetes" services uses this port as NodePort.
 	KubernetesServiceNodePort int
 
@@ -175,7 +172,6 @@ type ExtraConfig struct {
 	APIAudiences authenticator.Audiences
 
 	VersionedInformers informers.SharedInformerFactory
-	InternalInformers  internalinformers.SharedInformerFactory
 }
 
 type Config struct {
@@ -208,7 +204,7 @@ type Master struct {
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
-	endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
 }
 
@@ -217,6 +213,7 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
@@ -226,18 +223,8 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		glog.Fatalf("Error creating storage factory: %v", err)
 	}
-	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("endpoints"))
-	if err != nil {
-		glog.Fatalf("Error getting storage config: %v", err)
-	}
-	endpointsStorage := endpointsstorage.NewREST(generic.RESTOptions{
-		StorageConfig:           endpointConfig,
-		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 0,
-		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(api.Resource("endpoints")),
-	})
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
-	return reconcilers.NewLeaseEndpointReconciler(endpointsStorage.Store, masterLeases)
+	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
@@ -377,12 +364,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
-	m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
-		if c.ExtraConfig.InternalInformers != nil {
-			c.ExtraConfig.InternalInformers.Start(context.StopCh)
-		}
-		return nil
-	})
 
 	return m, nil
 }
@@ -394,7 +375,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	}
 
 	controllerName := "bootstrap-controller"
-	coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)

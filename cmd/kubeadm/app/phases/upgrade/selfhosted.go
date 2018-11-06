@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,7 +122,7 @@ func SelfHostedControlPlane(client clientset.Interface, waiter apiclient.Waiter,
 		if err := apiclient.TryRunCommand(func() error {
 
 			if _, err := client.AppsV1().DaemonSets(newDS.ObjectMeta.Namespace).Update(newDS); err != nil {
-				return fmt.Errorf("couldn't update self-hosted component's DaemonSet: %v", err)
+				return errors.Wrapf(err, "couldn't update self-hosted component's DaemonSet")
 			}
 			return nil
 		}, selfHostingFailureThreshold); err != nil {
@@ -248,7 +250,7 @@ func getCurrentControlPlaneComponentResources(client clientset.Interface) (map[s
 
 		// Make sure that there are only one Pod with this label selector; otherwise unexpected things can happen
 		if len(podList.Items) > 1 {
-			return nil, fmt.Errorf("too many pods with label selector %q found in the %s namespace", podLabelSelector, metav1.NamespaceSystem)
+			return nil, errors.Errorf("too many pods with label selector %q found in the %s namespace", podLabelSelector, metav1.NamespaceSystem)
 		}
 
 		// Get the component's DaemonSet object

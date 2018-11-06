@@ -198,7 +198,7 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 func (cont *GCEIngressController) ListTargetHttpProxies() []*compute.TargetHttpProxy {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	tpList := []*compute.TargetHttpProxy{}
-	l, err := gceCloud.ListTargetHttpProxies()
+	l, err := gceCloud.ListTargetHTTPProxies()
 	Expect(err).NotTo(HaveOccurred())
 	for _, tp := range l {
 		if cont.isOwned(tp.Name) {
@@ -211,7 +211,7 @@ func (cont *GCEIngressController) ListTargetHttpProxies() []*compute.TargetHttpP
 func (cont *GCEIngressController) ListTargetHttpsProxies() []*compute.TargetHttpsProxy {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	tpsList := []*compute.TargetHttpsProxy{}
-	l, err := gceCloud.ListTargetHttpsProxies()
+	l, err := gceCloud.ListTargetHTTPSProxies()
 	Expect(err).NotTo(HaveOccurred())
 	for _, tps := range l {
 		if cont.isOwned(tps.Name) {
@@ -259,7 +259,7 @@ func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
 func (cont *GCEIngressController) ListUrlMaps() []*compute.UrlMap {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	umList := []*compute.UrlMap{}
-	l, err := gceCloud.ListUrlMaps()
+	l, err := gceCloud.ListURLMaps()
 	Expect(err).NotTo(HaveOccurred())
 	for _, um := range l {
 		if cont.isOwned(um.Name) {
@@ -271,7 +271,7 @@ func (cont *GCEIngressController) ListUrlMaps() []*compute.UrlMap {
 
 func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
-	umList, err := gceCloud.ListUrlMaps()
+	umList, err := gceCloud.ListURLMaps()
 	if err != nil {
 		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
 			return msg
@@ -287,7 +287,7 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 		}
 		if del {
 			framework.Logf("Deleting url-map: %s", um.Name)
-			if err := gceCloud.DeleteUrlMap(um.Name); err != nil &&
+			if err := gceCloud.DeleteURLMap(um.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete url map %v\n", um.Name)
 			}
@@ -343,7 +343,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 
 func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
-	hcList, err := gceCloud.ListHttpHealthChecks()
+	hcList, err := gceCloud.ListHTTPHealthChecks()
 	if err != nil {
 		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
 			return msg
@@ -359,7 +359,7 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 		}
 		if del {
 			framework.Logf("Deleting http-health-check: %s", hc.Name)
-			if err := gceCloud.DeleteHttpHealthCheck(hc.Name); err != nil &&
+			if err := gceCloud.DeleteHTTPHealthCheck(hc.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete HTTP health check %v\n", hc.Name)
 			}

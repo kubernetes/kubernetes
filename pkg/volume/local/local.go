@@ -322,10 +322,9 @@ func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
 		spec.PersistentVolume.Spec.Local != nil {
 		if spec.PersistentVolume.Spec.Local.FSType != nil {
 			return *spec.PersistentVolume.Spec.Local.FSType, nil
-		} else {
-			// if the FSType is not set in local PV spec, setting it to default ("ext4")
-			return defaultFSType, nil
 		}
+		// if the FSType is not set in local PV spec, setting it to default ("ext4")
+		return defaultFSType, nil
 	}
 
 	return "", fmt.Errorf("spec does not reference a Local volume type")
@@ -573,7 +572,7 @@ type localVolumeUnmapper struct {
 var _ volume.BlockVolumeUnmapper = &localVolumeUnmapper{}
 
 // TearDownDevice will undo SetUpDevice procedure. In local PV, all of this already handled by operation_generator.
-func (u *localVolumeUnmapper) TearDownDevice(mapPath, devicePath string) error {
+func (u *localVolumeUnmapper) TearDownDevice(mapPath, _ string) error {
 	glog.V(4).Infof("local: TearDownDevice completed for: %s", mapPath)
 	return nil
 }

@@ -54,7 +54,7 @@ var (
 		username,
 		password,
 		secretNamespace,
-		sdcGuid string
+		sdcGUID string
 	}{
 		gateway:          "gateway",
 		sslEnabled:       "sslEnabled",
@@ -71,9 +71,9 @@ var (
 		readOnly:         "readOnly",
 		username:         "username",
 		password:         "password",
-		sdcGuid:          "sdcGuid",
+		sdcGUID:          "sdcGUID",
 	}
-	sdcGuidLabelName = "scaleio.sdcGuid"
+	sdcGUIDLabelName = "scaleio.sdcGUID"
 	sdcRootPath      = "/opt/emc/scaleio/sdc/bin"
 
 	secretNotFoundErr              = errors.New("secret not found")
@@ -232,30 +232,30 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	return nil
 }
 
-// attachSdcGuid injects the sdc guid node label value into config
-func attachSdcGuid(plug *sioPlugin, conf map[string]string) error {
-	guid, err := getSdcGuidLabel(plug)
+// attachSdcGUID injects the sdc guid node label value into config
+func attachSdcGUID(plug *sioPlugin, conf map[string]string) error {
+	guid, err := getSdcGUIDLabel(plug)
 	if err != nil {
 		return err
 	}
-	conf[confKey.sdcGuid] = guid
+	conf[confKey.sdcGUID] = guid
 	return nil
 }
 
-// getSdcGuidLabel fetches the scaleio.sdcGuid node label
+// getSdcGUIDLabel fetches the scaleio.sdcGuid node label
 // associated with the node executing this code.
-func getSdcGuidLabel(plug *sioPlugin) (string, error) {
+func getSdcGUIDLabel(plug *sioPlugin) (string, error) {
 	nodeLabels, err := plug.host.GetNodeLabels()
 	if err != nil {
 		return "", err
 	}
-	label, ok := nodeLabels[sdcGuidLabelName]
+	label, ok := nodeLabels[sdcGUIDLabelName]
 	if !ok {
-		glog.V(4).Info(log("node label %s not found", sdcGuidLabelName))
+		glog.V(4).Info(log("node label %s not found", sdcGUIDLabelName))
 		return "", nil
 	}
 
-	glog.V(4).Info(log("found node label %s=%s", sdcGuidLabelName, label))
+	glog.V(4).Info(log("found node label %s=%s", sdcGUIDLabelName, label))
 	return label, nil
 }
 
