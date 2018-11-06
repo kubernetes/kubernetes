@@ -43,13 +43,15 @@ var (
 		volHandle,
 		driverName,
 		nodeName,
-		attachmentID string
+		attachmentID,
+		sourceKind string
 	}{
 		"specVolID",
 		"volumeHandle",
 		"driverName",
 		"nodeName",
 		"attachmentID",
+		"sourceKind",
 	}
 	currentPodInfoMountVersion = "v1"
 )
@@ -109,19 +111,32 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 
-	csiSource, err := getCSISourceFromSpec(c.spec)
+	var (
+		driverName         = c.driverName
+		volumeHandle       = c.volumeID
+		readOnly           = c.readOnly
+		accessMode         = api.ReadWriteOnce
+		nodeName           = string(c.plugin.host.GetNodeName())
+		deviceMountPath    string
+		fsType             string
+		volumeInfo         map[string]string
+		volAttribs         map[string]string
+		nodePublishSecrets map[string]string
+		stageUnstageSet    bool
+	)
+
+	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
 	if err != nil {
 		klog.Error(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
 		return err
 	}
 
 	csi := c.csiClient
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiDefaultTimeout)
 	defer cancel()
 
 	// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
-	deviceMountPath := ""
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err = hasStageUnstageCapability(ctx, csi)
 	if err != nil {
 		klog.Error(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
 		return err
@@ -134,25 +149,59 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 			return err
 		}
 	}
-	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
-	if c.volumeInfo == nil {
-		nodeName := string(c.plugin.host.GetNodeName())
-		c.volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, c.volumeID, c.driverName, nodeName)
+
+	// if source is an inline CSIVolumeSource:
+	//   - if needed, provision
+	//   - then attach
+	//   - then continue below for remaining mount steps
+	// else check for SetUp of normal CSIPersistentVolumeSource
+	if c.plugin.inlineFeatureEnabled && volSrc != nil {
+		glog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource"))
+
+		// attachID, volHandle, err := c.setUpInline(volSource)
+		// if err != nil {
+		// 	return err
+		// }
+
+		if volSrc.VolumeHandle != nil {
+			volumeHandle = *volSrc.VolumeHandle
+		}
+		// TODO what should happen if handle is not provided?
+
+		if volSrc.FSType != nil {
+			fsType = *volSrc.FSType
+		}
+
+		volAttribs = volSrc.VolumeAttributes
+		glog.V(4).Info(log("mounter.SetUpAt getting PublishVolumeInfo"))
+		volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, volumeHandle, driverName, nodeName)
+		if err != nil {
+			glog.V(4).Info(log("mounter.SetUpAt failed to get VolumeInfo: %v", err))
+			return err
+		}
+
+		if volSrc.NodePublishSecretRef != nil {
+			secretName := volSrc.NodePublishSecretRef.Name
+			ns := c.pod.Namespace
+			nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, &api.SecretReference{Name: secretName, Namespace: ns})
+			if err != nil {
+				return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v", ns, secretName, err)
+			}
+		}
+		glog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource OK [driver:%d, volumeHandle:%s]", driverName, volumeHandle))
+	} else if pvSrc != nil {
+		// if source is a CSIPersistentVolumeSource (PV), prepare needed params (from PV)
+		glog.V(4).Info(log("mounter.SetUpAt from CSIPersistentVolumeSource"))
+		fsType = pvSrc.FSType
+		volAttribs = pvSrc.VolumeAttributes
+
+		// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
+		glog.V(4).Info(log("mounter.SetUpAt getting PublishVolumeInfo"))
+		c.volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, volumeHandle, driverName, nodeName)
 		if err != nil {
 			return err
 		}
-	}
-
-	attribs := csiSource.VolumeAttributes
-
-	nodePublishSecrets := map[string]string{}
-	if csiSource.NodePublishSecretRef != nil {
-		nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
-		if err != nil {
-			return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v",
-				csiSource.NodePublishSecretRef.Namespace, csiSource.NodePublishSecretRef.Name, err)
-		}
-	}
+		volumeInfo = c.volumeInfo
 
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -160,12 +209,23 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", dir))
+		if pvSrc.NodePublishSecretRef != nil {
+			nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, pvSrc.NodePublishSecretRef)
+			if err != nil {
+				return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v",
+					pvSrc.NodePublishSecretRef.Namespace, pvSrc.NodePublishSecretRef.Name, err)
+			}
+		}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
-	accessMode := api.ReadWriteOnce
-	if c.spec.PersistentVolume.Spec.AccessModes != nil {
-		accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
+		//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+		if c.spec.PersistentVolume.Spec.AccessModes != nil {
+			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
+		}
+	} else {
+		return errors.New("mounter.SetUpAt failed to get CSI volume source")
 	}
+
+	glog.V(4).Info(log("mounter.SetUpAt continuing with normal mount flow"))
 
 	// Inject pod information into volume_attributes
 	podAttrs, err := c.podAttributes()
@@ -174,25 +234,31 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	if podAttrs != nil {
-		if attribs == nil {
-			attribs = podAttrs
+		if volAttribs == nil {
+			volAttribs = podAttrs
 		} else {
 			for k, v := range podAttrs {
-				attribs[k] = v
+				volAttribs[k] = v
 			}
 		}
 	}
 
-	fsType := csiSource.FSType
+	// create target_dir before call to NodePublish
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		glog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
+		return err
+	}
+	glog.V(4).Info(log("created target path successfully [%s]", dir))
+
 	err = csi.NodePublishVolume(
 		ctx,
-		c.volumeID,
-		c.readOnly,
+		volumeHandle,
+		readOnly,
 		deviceMountPath,
 		dir,
 		accessMode,
-		c.volumeInfo,
-		attribs,
+		volumeInfo,
+		volAttribs,
 		nodePublishSecrets,
 		fsType,
 		c.spec.PersistentVolume.Spec.MountOptions,
@@ -306,7 +372,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	volID := c.volumeID
 	csi := c.csiClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiDefaultTimeout)
 	defer cancel()
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {

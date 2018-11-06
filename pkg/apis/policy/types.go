@@ -240,10 +240,6 @@ type PodSecurityPolicySpec struct {
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
 	// +optional
 	AllowedProcMountTypes []api.ProcMountType
-	// AllowedCSIDrivers is a whitelist of allowed CSI drivers.  This slice will be checked
-	// to verify which CSI driver is allowed to run in the cluster.
-	// +optional
-	AllowedCSIDrivers []AllowedCSIDriver
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy

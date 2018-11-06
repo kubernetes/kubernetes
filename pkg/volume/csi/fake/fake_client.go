@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/util/uuid"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
 )
@@ -229,13 +230,20 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 
 // ControllerClient represents a CSI Controller client
 type ControllerClient struct {
+	volumes          map[string]*csipb.Volume
 	nextCapabilities []*csipb.ControllerServiceCapability
 	nextErr          error
 }
 
 // NewControllerClient returns a ControllerClient
 func NewControllerClient() *ControllerClient {
-	return &ControllerClient{}
+	return &ControllerClient{
+		volumes: make(map[string]*csipb.Volume),
+	}
+}
+
+func (f *ControllerClient) GetControllerCreatedVolumes() map[string]*csipb.Volume {
+	return f.volumes
 }
 
 // SetNextError injects next expected error
@@ -272,11 +280,27 @@ func (f *ControllerClient) ControllerGetCapabilities(ctx context.Context, in *cs
 
 // CreateVolume implements csi method
 func (f *ControllerClient) CreateVolume(ctx context.Context, in *csipb.CreateVolumeRequest, opts ...grpc.CallOption) (*csipb.CreateVolumeResponse, error) {
-	return nil, nil
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	id := string(uuid.NewUUID())
+	vol := &csipb.Volume{
+		Id:            id,
+		CapacityBytes: in.CapacityRange.RequiredBytes,
+		ContentSource: in.GetVolumeContentSource(),
+	}
+
+	f.volumes[id] = vol
+
+	return &csipb.CreateVolumeResponse{
+		Volume: vol,
+	}, nil
 }
 
 // DeleteVolume implements csi method
 func (f *ControllerClient) DeleteVolume(ctx context.Context, in *csipb.DeleteVolumeRequest, opts ...grpc.CallOption) (*csipb.DeleteVolumeResponse, error) {
+	delete(f.volumes, in.VolumeId)
 	return nil, nil
 }
 
@@ -297,7 +321,15 @@ func (f *ControllerClient) ValidateVolumeCapabilities(ctx context.Context, in *c
 
 // ListVolumes implements csi method
 func (f *ControllerClient) ListVolumes(ctx context.Context, in *csipb.ListVolumesRequest, opts ...grpc.CallOption) (*csipb.ListVolumesResponse, error) {
-	return nil, nil
+	var entries []*csipb.ListVolumesResponse_Entry
+
+	for _, vol := range f.volumes {
+		entries = append(entries, &csipb.ListVolumesResponse_Entry{Volume: vol})
+	}
+
+	return &csipb.ListVolumesResponse{
+		Entries: entries,
+	}, nil
 }
 
 // GetCapacity implements csi method

@@ -29,6 +29,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -257,7 +258,6 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 		})
 	}
 }
-
 func TestMounterSetUp(t *testing.T) {
 	t.Run("WithCSIPodInfo", func(t *testing.T) {
 		MounterSetUpTests(t, true)
@@ -495,6 +495,38 @@ func getCSIDriver(name string, podInfoMountVersion *string, attachable *bool) *c
 		Spec: csiapi.CSIDriverSpec{
 			PodInfoOnMountVersion: podInfoMountVersion,
 			AttachRequired:        attachable,
+		},
+	}
+}
+
+func makeTestVolumeSource(name, driverName, volHandle string) *api.Volume {
+	readOnly := false
+	return &api.Volume{
+		Name: name,
+		VolumeSource: api.VolumeSource{
+			CSI: &api.CSIVolumeSource{
+				Driver:       driverName,
+				VolumeHandle: &volHandle,
+				ReadOnly:     &readOnly,
+			},
+		},
+	}
+}
+
+func makeTestPVC(name string, sizeGig int) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse(
+						fmt.Sprintf("%dGi", sizeGig),
+					),
+				},
+			},
 		},
 	}
 }

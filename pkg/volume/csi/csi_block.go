@@ -92,7 +92,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	klog.V(4).Infof(log("blockMapper.SetupDevice global device map path file set [%s]", globalMapPathBlockFile))
 
 	csi := m.csiClient
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiDefaultTimeout)
 	defer cancel()
 
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
@@ -197,7 +197,7 @@ func (m *csiBlockMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, vol
 	}
 
 	csi := m.csiClient
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiDefaultTimeout)
 	defer cancel()
 
 	globalMapPathBlockFile := devicePath
@@ -301,7 +301,7 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 	klog.V(4).Infof(log("unmapper.TearDownDevice(globalMapPath=%s; devicePath=%s)", globalMapPath, devicePath))
 
 	csi := m.csiClient
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiDefaultTimeout)
 	defer cancel()
 
 	// unmap global device map path

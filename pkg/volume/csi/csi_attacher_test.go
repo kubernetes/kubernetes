@@ -332,6 +332,53 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	}
 }
 
+func TestAttacherPostVolumeAttachment(t *testing.T) {
+	nodeName := "test-node"
+	testCases := []struct {
+		name       string
+		volID      string
+		attachID   string
+		isAttached bool
+		shouldFail bool
+	}{
+		{name: "attachment-ok", volID: "test-vol", isAttached: true, attachID: getAttachmentName("test-vol", testDriver, nodeName)},
+		{name: "missing-attachment", volID: "test-vol", isAttached: true, shouldFail: true},
+		{name: "attachment-timeout", volID: "test-vol", isAttached: false, attachID: getAttachmentName("test-vol", testDriver, nodeName), shouldFail: true},
+	}
+
+	for i, tc := range testCases {
+		plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
+		defer os.RemoveAll(tmpDir)
+
+		attacher, err := plug.NewAttacher()
+		if err != nil {
+			t.Fatalf("failed to create new attacher: %v", err)
+		}
+		csiAttacher := attacher.(*csiAttacher)
+
+		t.Logf("running test: %v", tc.name)
+		pvName := fmt.Sprintf("test-pv-%d", i)
+		var attachment *storage.VolumeAttachment
+		if len(tc.attachID) > 0 {
+			attachment = makeTestAttachment(tc.attachID, nodeName, pvName)
+		}
+
+		// go and watch/mark attachment as attached
+		go func() {
+			status := storage.VolumeAttachmentStatus{Attached: tc.isAttached}
+			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+		}()
+
+		_, err = csiAttacher.postVolumeAttachment(testDriver, tc.volID, attachment, time.Millisecond*100)
+		if tc.shouldFail && err == nil {
+			t.Fatalf("expected failure to attach, but err is nil")
+		}
+		if !tc.shouldFail && err != nil {
+			t.Fatalf("unexpected failure err: %v", err)
+		}
+	}
+}
+
 func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 	nodeName := "test-node"
 	testCases := []struct {
@@ -418,7 +465,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			}()
 		}
 
-		retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
+		retID, err := csiAttacher.waitForVolumeAttachment(testDriver, volID, attachID, tc.timeout)
 		if tc.shouldFail && err == nil {
 			t.Error("expecting failure, but err is nil")
 		}

@@ -67,6 +67,11 @@ type csiClient interface {
 	) error
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error)
+	CreateVolume(ctx context.Context,
+		volName string,
+		sizeInBytes int64,
+		createSecrets map[string]string,
+	) (*csipb.Volume, error)
 }
 
 // csiClient encapsulates all csi-plugin methods
@@ -286,6 +291,46 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 	}
 	_, err = nodeClient.NodeUnstageVolume(ctx, req)
 	return err
+}
+
+func (c *csiDriverClient) CreateVolume(
+	ctx context.Context,
+	volName string,
+	sizeInBytes int64,
+	creationSecrets map[string]string,
+) (*csipb.Volume, error) {
+	glog.V(4).Info(log("calling CreateVolume rpc [volHandle=%s,size=%d]", volName, sizeInBytes))
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	ctrlClient := csipb.NewControllerClient(conn)
+
+	volReq := &csipb.CreateVolumeRequest{
+		Name: volName,
+		//Parameters: options.Parameters,
+		ControllerCreateSecrets: creationSecrets,
+		VolumeCapabilities: []*csipb.VolumeCapability{
+			{
+				AccessType: &csipb.VolumeCapability_Mount{
+					Mount: &csipb.VolumeCapability_MountVolume{},
+				},
+				AccessMode: &csipb.VolumeCapability_AccessMode{
+					Mode: csipb.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+		},
+		CapacityRange: &csipb.CapacityRange{
+			RequiredBytes: int64(sizeInBytes),
+		},
+	}
+
+	resp, err := ctrlClient.CreateVolume(ctx, volReq)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Volume, nil
 }
 
 func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {

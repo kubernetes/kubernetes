@@ -21,20 +21,35 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"time"
 )
 
 const (
 	testInformerSyncPeriod  = 100 * time.Millisecond
 	testInformerSyncTimeout = 30 * time.Second
 )
+
+// backoffOptions returns a pre-configured "k8s.io/apimachinery/pkg/util/wait".Backoff
+// with the following values:
+//
+// Duration = time.Second * 10
+// Factor   = 1.2
+// Steps    = 10
+func defaultBackoff() wait.Backoff {
+	return wait.Backoff{
+		Duration: time.Second * 10,
+		Factor:   1.2,
+		Steps:    10,
+	}
+}
 
 func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {
 	credentials := map[string]string{}
@@ -46,7 +61,6 @@ func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretRef
 	for key, value := range secret.Data {
 		credentials[key] = string(value)
 	}
-
 	return credentials, nil
 }
 
@@ -87,6 +101,19 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 	}
 
 	return data, nil
+}
+
+func getSourceFromSpec(spec *volume.Spec) (*api.CSIVolumeSource, *api.CSIPersistentVolumeSource, error) {
+	if spec.Volume != nil &&
+		spec.Volume.CSI != nil {
+		return spec.Volume.CSI, nil, nil
+	}
+	if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.CSI != nil {
+		return nil, spec.PersistentVolume.Spec.CSI, nil
+	}
+
+	return nil, nil, fmt.Errorf("volume.Spec missing volume source")
 }
 
 func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {
