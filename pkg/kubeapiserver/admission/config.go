@@ -37,14 +37,15 @@ import (
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
-// AdmissionConfig holds the configuration for initializing the admission plugins
-type AdmissionConfig struct {
+// Config holds the configuration needed to for initialize the admission plugins
+type Config struct {
 	CloudConfigFile      string
 	LoopbackClientConfig *rest.Config
 	ExternalInformers    externalinformers.SharedInformerFactory
 }
 
-func (c *AdmissionConfig) New(proxyTransport *http.Transport, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, server.PostStartHookFunc, error) {
+// New sets up the plugins and admission start hooks needed for admission
+func (c *Config) New(proxyTransport *http.Transport, serviceResolver webhook.ServiceResolver) ([]admission.PluginInitializer, server.PostStartHookFunc, error) {
 	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, c.LoopbackClientConfig)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
 

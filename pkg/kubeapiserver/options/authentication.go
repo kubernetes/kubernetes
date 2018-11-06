@@ -292,8 +292,8 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.AuthenticatorConfig {
-	ret := kubeauthenticator.AuthenticatorConfig{
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.Config {
+	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
 	}
