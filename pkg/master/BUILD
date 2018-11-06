@@ -50,7 +50,6 @@ go_library(
         "//pkg/registry/batch/rest:go_default_library",
         "//pkg/registry/certificates/rest:go_default_library",
         "//pkg/registry/coordination/rest:go_default_library",
-        "//pkg/registry/core/endpoint/storage:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/rest:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",

@@ -18,7 +18,7 @@ limitations under the License.
 package reconcilers
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
+	corev1 "k8s.io/api/core/v1"
 	"net"
 )
 
@@ -34,8 +34,8 @@ type EndpointReconciler interface {
 	//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
 	//      endpoints for their {rw, ro} services.
 	//  * ReconcileEndpoints is called periodically from all apiservers.
-	ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error
-	StopReconciling(serviceName string, ip net.IP, endpointPorts []api.EndpointPort) error
+	ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error
+	StopReconciling(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error
 }
 
 // Type the reconciler type
