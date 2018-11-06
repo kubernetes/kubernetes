@@ -75,6 +75,12 @@ func (s *DelegatingAuthorizationOptions) WithAlwaysAllowGroups(groups ...string)
 	return s
 }
 
+// WithAlwaysAllowPaths appends the list of paths to AlwaysAllowPaths
+func (s *DelegatingAuthorizationOptions) WithAlwaysAllowPaths(paths ...string) *DelegatingAuthorizationOptions {
+	s.AlwaysAllowPaths = append(s.AlwaysAllowPaths, paths...)
+	return s
+}
+
 func (s *DelegatingAuthorizationOptions) Validate() []error {
 	allErrors := []error{}
 	return allErrors
