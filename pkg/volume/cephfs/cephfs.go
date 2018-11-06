@@ -349,19 +349,19 @@ func (cephfsVolume *cephfs) checkFuseVersion() (bool, error) {
 	command := exec.Command("ceph-fuse", "--version")
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("Ceph-fuse failed: %v\n", err)
+		return false, fmt.Errorf("ceph-fuse failed: %v", err)
 	}
 
 	arr := strings.Split(string(output), " ")
 	ver, err := strconv.Atoi(strings.Split(arr[2], ".")[0])
 	if err != nil {
-		return false, fmt.Errorf("Ceph-fuse failed: %v\n", err)
+		return false, fmt.Errorf("ceph-fuse failed: %v", err)
 	}
 	if ver >= 12 {
 		return false, nil
 	}
 
-	glog.V(4).Info("Ceph-fuse %d version is before Luminous.", ver)
+	glog.V(4).Infof("ceph-fuse version %d is before Luminous.", ver)
 	return true, nil
 }
 
@@ -429,8 +429,8 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	mountArgs = append(mountArgs, "--id")
 	mountArgs = append(mountArgs, cephfsVolume.id)
 
-	//check if ceph client is before luminous(not included). If true, add the quota arg.
-	if ok, err:= cephfsVolume.checkFuseVersion(); err == nil && ok {
+	//check if ceph-fuse client is before luminous(not included). If true, add the quota arg.
+	if ok, err := cephfsVolume.checkFuseVersion(); err == nil && ok {
 		mountArgs = append(mountArgs, "--client-quota")
 	}
 
