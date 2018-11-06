@@ -301,6 +301,11 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	// generate all the nested subcommands for invoking single phases
 	subcommands := map[string]*cobra.Command{}
 	e.visitAll(func(p *phaseRunner) error {
+		// skip hidden phases
+		if p.Hidden {
+			return nil
+		}
+
 		// creates nested phase subcommand
 		var phaseCmd = &cobra.Command{
 			Use:     strings.ToLower(p.Name),
