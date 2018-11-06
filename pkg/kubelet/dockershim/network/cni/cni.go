@@ -17,6 +17,7 @@ limitations under the License.
 package cni
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -28,6 +29,7 @@ import (
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -88,6 +90,18 @@ type cniBandwidthEntry struct {
 // cniIpRange maps to the standard CNI ip range Capability
 type cniIpRange struct {
 	Subnet string `json:"subnet"`
+}
+
+// cniDNSConfig maps to the windows CNI dns Capability.
+// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+// Note that dns capability is only used for Windows containers.
+type cniDNSConfig struct {
+	// List of DNS servers of the cluster.
+	Servers []string `json:"servers,omitempty"`
+	// List of DNS search domains of the cluster.
+	Searches []string `json:"searches,omitempty"`
+	// List of DNS options.
+	Options []string `json:"options,omitempty"`
 }
 
 func SplitDirs(dirs string) []string {
@@ -257,7 +271,7 @@ func (plugin *cniNetworkPlugin) Status() error {
 	return plugin.checkInitialized()
 }
 
-func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
+func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
 	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}
@@ -268,12 +282,12 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 
 	// Windows doesn't have loNetwork. It comes only with Linux
 	if plugin.loNetwork != nil {
-		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations); err != nil {
+		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations, options); err != nil {
 			return err
 		}
 	}
 
-	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations)
+	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations, options)
 	return err
 }
 
@@ -295,8 +309,8 @@ func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
 	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
 }
 
-func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (cnitypes.Result, error) {
-	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations)
+func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, options)
 	if err != nil {
 		glog.Errorf("Error adding network when building cni runtime conf: %v", err)
 		return nil, err
@@ -315,7 +329,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 }
 
 func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
-	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations)
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, nil)
 	if err != nil {
 		glog.Errorf("Error deleting network when building cni runtime conf: %v", err)
 		return err
@@ -335,7 +349,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	return nil
 }
 
-func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (*libcni.RuntimeConf, error) {
+func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (*libcni.RuntimeConf, error) {
 	rt := &libcni.RuntimeConf{
 		ContainerID: podSandboxID.ID,
 		NetNS:       podNetnsPath,
@@ -389,6 +403,18 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 
 	// Set the PodCIDR
 	rt.CapabilityArgs["ipRanges"] = [][]cniIpRange{{{Subnet: plugin.podCidr}}}
+
+	// Set dns capability args.
+	if dnsOptions, ok := options["dns"]; ok {
+		dnsConfig := runtimeapi.DNSConfig{}
+		err := json.Unmarshal([]byte(dnsOptions), &dnsConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal dns config %q: %v", dnsOptions, err)
+		}
+		if dnsParam := buildDNSCapabilities(&dnsConfig); dnsParam != nil {
+			rt.CapabilityArgs["dns"] = *dnsParam
+		}
+	}
 
 	return rt, nil
 }
