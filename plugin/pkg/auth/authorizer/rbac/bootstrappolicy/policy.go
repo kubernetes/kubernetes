@@ -237,6 +237,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(appsGroup).Resources("statefulsets",
+					"controllerrevisions",
 					"daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback",
 					"replicasets", "replicasets/scale").RuleOrDie(),
@@ -276,6 +277,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(appsGroup).Resources("statefulsets",
+					"controllerrevisions",
 					"daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback",
 					"replicasets", "replicasets/scale").RuleOrDie(),
@@ -308,6 +310,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets",
+					"controllerrevisions",
 					"daemonsets",
 					"deployments", "deployments/scale",
 					"replicasets", "replicasets/scale").RuleOrDie(),
