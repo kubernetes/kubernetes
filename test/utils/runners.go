@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -240,6 +241,18 @@ func (p PodDiff) String(ignorePhases sets.String) string {
 		}
 	}
 	return ret
+}
+
+// DeletedPods returns a slice of pods that were present at the beginning
+// and then disappeared.
+func (p PodDiff) DeletedPods() []string {
+	var deletedPods []string
+	for podName, podInfo := range p {
+		if podInfo.hostname == nonExist {
+			deletedPods = append(deletedPods, podName)
+		}
+	}
+	return deletedPods
 }
 
 // Diff computes a PodDiff given 2 lists of pods.
@@ -765,9 +778,8 @@ func (config *RCConfig) start() error {
 		pods := ps.List()
 		startupStatus := ComputeRCStartupStatus(pods, config.Replicas)
 
-		pods = startupStatus.Created
 		if config.CreatedPods != nil {
-			*config.CreatedPods = pods
+			*config.CreatedPods = startupStatus.Created
 		}
 		if !config.Silent {
 			config.RCConfigLog(startupStatus.String(config.Name))
@@ -787,16 +799,15 @@ func (config *RCConfig) start() error {
 			}
 			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
-		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
-			// This failure mode includes:
-			// kubelet is dead, so node controller deleted pods and rc creates more
-			//	- diagnose by noting the pod diff below.
-			// pod is unhealthy, so replication controller creates another to take its place
-			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
-			errorStr := fmt.Sprintf("Number of reported pods for %s changed: %d vs %d", config.Name, len(pods), len(oldPods))
-			config.RCConfigLog("%v, pods that changed since the last iteration:", errorStr)
-			config.RCConfigLog(Diff(oldPods, pods).String(sets.NewString()))
-			return fmt.Errorf(errorStr)
+
+		diff := Diff(oldPods, pods)
+		deletedPods := diff.DeletedPods()
+		if len(deletedPods) != 0 {
+			// There are some pods that have disappeared.
+			err := fmt.Errorf("%d pods disappeared for %s: %v", len(deletedPods), config.Name, strings.Join(deletedPods, ", "))
+			config.RCConfigLog(err.Error())
+			config.RCConfigLog(diff.String(sets.NewString()))
+			return err
 		}
 
 		if len(pods) > len(oldPods) || startupStatus.Running > oldRunning {
