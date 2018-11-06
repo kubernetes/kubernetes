@@ -110,7 +110,7 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 	tags := make(map[string]string)
 	tags["test-tag"] = "test-value"
 
-	expectedDiskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(
+	expectedDiskTypeURI := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(
 		diskTypeURITemplateRegional, gceProjectID, gceRegion, diskType)
 	expectedDescription := "{\"test-tag\":\"test-value\"}"
 
@@ -723,9 +723,9 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 	tagsStr string,
 	diskType string,
 	zones sets.String) error {
-	manager.createDiskCalled = true
-	diskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
 
+	manager.createDiskCalled = true
+	diskTypeURI := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
 	switch t := manager.targetAPI; t {
 	case targetStable:
 		diskToCreateV1 := &compute.Disk{
@@ -737,10 +737,6 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 		manager.diskToCreateStable = diskToCreateV1
 		manager.regionalDisks[diskToCreateV1.Name] = zones
 		return nil
-	case targetBeta:
-		return fmt.Errorf("regionalDisk CreateDisk op not supported in beta")
-	case targetAlpha:
-		return fmt.Errorf("regionalDisk CreateDisk op not supported in alpha")
 	default:
 		return fmt.Errorf("unexpected type: %T", t)
 	}
