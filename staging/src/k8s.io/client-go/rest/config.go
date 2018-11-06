@@ -402,8 +402,8 @@ func DefaultKubernetesUserAgent() string {
 // if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
 	const (
-		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+		tokenFile  = DefaultTokenFile
+		rootCAFile = DefaultRootCAFile
 	)
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {

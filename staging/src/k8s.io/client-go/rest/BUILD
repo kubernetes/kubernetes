@@ -49,6 +49,8 @@ go_library(
     srcs = [
         "client.go",
         "config.go",
+        "defaults_unix.go",
+        "defaults_windows.go",
         "plugin.go",
         "request.go",
         "transport.go",
