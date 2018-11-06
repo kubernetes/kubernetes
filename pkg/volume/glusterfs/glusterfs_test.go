@@ -66,7 +66,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{}}}}) {
 		t.Errorf("Expected false")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{Glusterfs: &v1.GlusterfsVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{Glusterfs: &v1.GlusterfsPersistentVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -160,7 +160,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Glusterfs: &v1.GlusterfsVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
+				Glusterfs: &v1.GlusterfsPersistentVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
 			},
 		},
 	}
@@ -181,7 +181,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Glusterfs: &v1.GlusterfsVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
+				Glusterfs: &v1.GlusterfsPersistentVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
