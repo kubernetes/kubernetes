@@ -96,9 +96,8 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
 		if !conflict {
 			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
-		} else {
-			return true, update.GetObject(), nil
 		}
+		return true, update.GetObject(), nil
 	})
 	if err := updater.UpdateStatefulSetStatus(set, &status); err != nil {
 		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
