@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:xenial
+FROM ubuntu:cosmic
 
-RUN apt-get update && apt-get install -y netbase nfs-common=1:1.2.8-9ubuntu12 glusterfs-client=3.7.6-1ubuntu1
+RUN apt-get update && apt-get install -y netbase nfs-common=1:1.3.4-2.2ubuntu3 glusterfs-client=4.1.2-1
 
 ENTRYPOINT ["/bin/mount"]
