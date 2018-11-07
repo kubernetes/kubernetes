@@ -23,7 +23,7 @@ import (
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
 func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
-	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
+	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing kubeconfig file.")
 }
 
 // AddKubeConfigDirFlag adds the --kubeconfig-dir flag to the given flagset

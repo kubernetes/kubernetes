@@ -398,7 +398,7 @@ func (d initData) KubeConfigDir() string {
 
 // KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
 func (d initData) KubeConfigPath() string {
-	return d.kubeconfigPath
+	return cmdutil.FindExistingKubeConfig(d.kubeconfigPath)
 }
 
 // ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
