@@ -49,18 +49,18 @@ call to Next. For example, to extract an HTML page's anchor text:
 	for {
 		tt := z.Next()
 		switch tt {
-		case ErrorToken:
+		case html.ErrorToken:
 			return z.Err()
-		case TextToken:
+		case html.TextToken:
 			if depth > 0 {
 				// emitBytes should copy the []byte it receives,
 				// if it doesn't process it immediately.
 				emitBytes(z.Text())
 			}
-		case StartTagToken, EndTagToken:
+		case html.StartTagToken, html.EndTagToken:
 			tn, _ := z.TagName()
 			if len(tn) == 1 && tn[0] == 'a' {
-				if tt == StartTagToken {
+				if tt == html.StartTagToken {
 					depth++
 				} else {
 					depth--
