@@ -360,20 +360,6 @@ func testSubPath(input *subPathTestInput) {
 		testReadFile(input.f, input.filePathInSubpath, input.pod, 0)
 	})
 
-	It("should fail for new directories when readOnly specified in the volumeSource [Slow]", func() {
-		if input.roVol == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", input.volType)
-		}
-
-		// Format the volume while it's writable
-		formatVolume(input.f, input.formatPod)
-
-		// Set volume source to read only
-		input.pod.Spec.Volumes[0].VolumeSource = *input.roVol
-		// Pod should fail
-		testPodFailSubpathError(input.f, input.pod, "")
-	})
-
 	// TODO: add a test case for the same disk with two partitions
 }
 
