@@ -23,6 +23,7 @@ import (
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
@@ -48,7 +49,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 	return kubeconfigutil.CreateWithToken(
 		clusterinfo.Server,
-		cfg.ClusterName,
+		kubeadmapiv1beta1.DefaultClusterName,
 		TokenUser,
 		clusterinfo.CertificateAuthorityData,
 		cfg.Discovery.TLSBootstrapToken,
@@ -61,9 +62,9 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	case cfg.Discovery.File != nil:
 		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
 		if isHTTPSURL(kubeConfigPath) {
-			return https.RetrieveValidatedConfigInfo(kubeConfigPath, cfg.ClusterName)
+			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta1.DefaultClusterName)
 		}
-		return file.RetrieveValidatedConfigInfo(kubeConfigPath, cfg.ClusterName)
+		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta1.DefaultClusterName)
 	case cfg.Discovery.BootstrapToken != nil:
 		return token.RetrieveValidatedConfigInfo(cfg)
 	default:

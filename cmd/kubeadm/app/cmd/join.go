@@ -600,6 +600,13 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 		return nil, nil, err
 	}
 
+	// Create the final KubeConfig file with the cluster name discovered after fetching the cluster configuration
+	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
+	tlsBootstrapCfg.Clusters = map[string]*clientcmdapi.Cluster{
+		initConfiguration.ClusterName: clusterinfo,
+	}
+	tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster = initConfiguration.ClusterName
+
 	// injects into the kubeadm configuration the information about the joining node
 	initConfiguration.NodeRegistration = cfg.NodeRegistration
 	initConfiguration.APIEndpoint = cfg.APIEndpoint

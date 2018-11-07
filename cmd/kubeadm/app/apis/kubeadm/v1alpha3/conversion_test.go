@@ -34,6 +34,12 @@ func TestJoinConfigurationConversion(t *testing.T) {
 			old:         &v1alpha3.JoinConfiguration{},
 			expectedErr: "",
 		},
+		"cluster name fails to be converted": {
+			old: &v1alpha3.JoinConfiguration{
+				ClusterName: "kubernetes",
+			},
+			expectedErr: "clusterName has been removed from JoinConfiguration and clusterName from ClusterConfiguration will be used instead. Please cleanup JoinConfiguration.ClusterName fields",
+		},
 		"feature gates fails to be converted": {
 			old: &v1alpha3.JoinConfiguration{
 				FeatureGates: map[string]bool{

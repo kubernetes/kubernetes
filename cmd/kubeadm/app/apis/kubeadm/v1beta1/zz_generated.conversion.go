@@ -662,7 +662,6 @@ func autoConvert_v1beta1_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Join
 	if err := Convert_v1beta1_Discovery_To_kubeadm_Discovery(&in.Discovery, &out.Discovery, s); err != nil {
 		return err
 	}
-	out.ClusterName = in.ClusterName
 	out.ControlPlane = in.ControlPlane
 	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err
@@ -683,7 +682,6 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(in *kube
 	if err := Convert_kubeadm_Discovery_To_v1beta1_Discovery(&in.Discovery, &out.Discovery, s); err != nil {
 		return err
 	}
-	out.ClusterName = in.ClusterName
 	out.ControlPlane = in.ControlPlane
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err

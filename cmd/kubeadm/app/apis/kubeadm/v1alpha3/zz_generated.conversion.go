@@ -495,7 +495,7 @@ func autoConvert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Joi
 	// WARNING: in.DiscoveryTimeout requires manual conversion: does not exist in peer-type
 	// WARNING: in.TLSBootstrapToken requires manual conversion: does not exist in peer-type
 	// WARNING: in.Token requires manual conversion: does not exist in peer-type
-	out.ClusterName = in.ClusterName
+	// WARNING: in.ClusterName requires manual conversion: does not exist in peer-type
 	// WARNING: in.DiscoveryTokenCACertHashes requires manual conversion: does not exist in peer-type
 	// WARNING: in.DiscoveryTokenUnsafeSkipCAVerification requires manual conversion: does not exist in peer-type
 	out.ControlPlane = in.ControlPlane
@@ -512,7 +512,6 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kub
 	}
 	out.CACertPath = in.CACertPath
 	// WARNING: in.Discovery requires manual conversion: does not exist in peer-type
-	out.ClusterName = in.ClusterName
 	out.ControlPlane = in.ControlPlane
 	if err := Convert_kubeadm_APIEndpoint_To_v1alpha3_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err

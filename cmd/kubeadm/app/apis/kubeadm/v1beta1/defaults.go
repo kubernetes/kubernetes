@@ -131,10 +131,6 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 		obj.CACertPath = DefaultCACertPath
 	}
 
-	if obj.ClusterName == "" {
-		obj.ClusterName = DefaultClusterName
-	}
-
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_APIEndpoint(&obj.APIEndpoint)
 	SetDefaults_Discovery(&obj.Discovery)

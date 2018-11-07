@@ -29,6 +29,10 @@ func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinCon
 		return err
 	}
 
+	if len(in.ClusterName) != 0 {
+		return errors.New("clusterName has been removed from JoinConfiguration and clusterName from ClusterConfiguration will be used instead. Please cleanup JoinConfiguration.ClusterName fields")
+	}
+
 	if len(in.FeatureGates) != 0 {
 		return errors.New("featureGates has been removed from JoinConfiguration and featureGates from ClusterConfiguration will be used instead. Please cleanup JoinConfiguration.FeatureGates fields")
 	}
