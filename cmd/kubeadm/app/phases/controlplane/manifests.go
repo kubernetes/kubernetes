@@ -19,6 +19,7 @@ package controlplane
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -153,14 +153,35 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	if cfg.Etcd.External != nil {
 		defaultArguments["etcd-servers"] = strings.Join(cfg.Etcd.External.Endpoints, ",")
 
-		// Use any user supplied etcd certificates
+		// Set the etcd certificates to the default locations.
+		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
+		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
+		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
+
+		// If they are defined in the configuration, use that value instead.
 		if cfg.Etcd.External.CAFile != "" {
 			defaultArguments["etcd-cafile"] = cfg.Etcd.External.CAFile
 		}
-		if cfg.Etcd.External.CertFile != "" && cfg.Etcd.External.KeyFile != "" {
+		if cfg.Etcd.External.CertFile != "" {
 			defaultArguments["etcd-certfile"] = cfg.Etcd.External.CertFile
+		}
+		if cfg.Etcd.External.KeyFile != "" {
 			defaultArguments["etcd-keyfile"] = cfg.Etcd.External.KeyFile
 		}
+
+		parsedURL, err := url.Parse(cfg.Etcd.External.Endpoints[0])
+		if err != nil {
+			glog.Warningf("error parsing external etcd url %q. Assuming certificates are necessary. Error: %v", cfg.Etcd.External.Endpoints[0], err)
+			parsedURL = &url.URL{Scheme: "https"}
+		}
+
+		// Delete certificate flags if we are not using TLS.
+		if parsedURL.Scheme == "http" {
+			delete(defaultArguments, "etcd-cafile")
+			delete(defaultArguments, "etcd-certfile")
+			delete(defaultArguments, "etcd-keyfile")
+		}
+
 	} else {
 		// Default to etcd static pod on localhost
 		defaultArguments["etcd-servers"] = fmt.Sprintf("https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort)

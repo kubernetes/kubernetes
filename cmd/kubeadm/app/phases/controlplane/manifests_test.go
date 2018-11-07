@@ -31,9 +31,8 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -627,6 +626,50 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--authorization-mode=Node,RBAC,Webhook",
 				"--advertise-address=1.2.3.4",
 				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
+				"--etcd-certfile=" + testCertsDir + "/apiserver-etcd-client.crt",
+				"--etcd-keyfile=" + testCertsDir + "/apiserver-etcd-client.key",
+			},
+		},
+		{
+			name: "external etcd with tls but unspecified certificates",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					CertificatesDir: testCertsDir,
+					Etcd: kubeadmapi.Etcd{
+						External: &kubeadmapi.ExternalEtcd{
+							Endpoints: []string{
+								"https://10.0.0.10:2379,https://10.0.0.11:2379",
+							},
+						},
+					},
+				},
+			},
+			expected: []string{
+				"kube-apiserver",
+				"--insecure-port=0",
+				"--enable-admission-plugins=NodeRestriction",
+				"--service-cluster-ip-range=",
+				"--service-account-key-file=" + testCertsDir + "/sa.pub",
+				"--client-ca-file=" + testCertsDir + "/ca.crt",
+				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
+				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
+				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
+				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
+				"--enable-bootstrap-token-auth=true",
+				"--secure-port=0",
+				"--allow-privileged=true",
+				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
+				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
+				"--requestheader-username-headers=X-Remote-User",
+				"--requestheader-group-headers=X-Remote-Group",
+				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--requestheader-allowed-names=front-proxy-client",
+				"--authorization-mode=Node,RBAC",
+				"--advertise-address=",
+				"--etcd-servers=https://10.0.0.10:2379,https://10.0.0.11:2379",
 				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
 				"--etcd-certfile=" + testCertsDir + "/apiserver-etcd-client.crt",
 				"--etcd-keyfile=" + testCertsDir + "/apiserver-etcd-client.key",
