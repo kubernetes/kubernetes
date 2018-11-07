@@ -27,15 +27,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
-	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
-
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 // TestValidOpenAPISpec verifies that the open api is added

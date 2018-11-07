@@ -110,6 +110,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 		objectMeta.SetInitializers(nil)
 	}
 
+	// Ensure managedFields state is removed unless ServerSideApply is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		oldMeta.SetManagedFields(nil)
+		objectMeta.SetManagedFields(nil)
+	}
+
 	strategy.PrepareForUpdate(ctx, obj, old)
 
 	// ClusterName is ignored and should not be saved

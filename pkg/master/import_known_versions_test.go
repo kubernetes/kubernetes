@@ -92,6 +92,10 @@ func ensureNoTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, pa
 		return
 	}
 
+	// Don't look at the same type multiple times
+	if containsType(parents, tp) {
+		return
+	}
 	parents = append(parents, tp)
 
 	switch tp.Kind() {
@@ -144,6 +148,10 @@ func ensureTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, pare
 		return
 	}
 
+	// Don't look at the same type multiple times
+	if containsType(parents, tp) {
+		return
+	}
 	parents = append(parents, tp)
 
 	switch tp.Kind() {
@@ -183,4 +191,14 @@ func ensureTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, pare
 			t.Logf("%s%v:", strings.Repeat("  ", i), tp)
 		}
 	}
+}
+
+// containsType returns true if s contains t, false otherwise
+func containsType(s []reflect.Type, t reflect.Type) bool {
+	for _, u := range s {
+		if t == u {
+			return true
+		}
+	}
+	return false
 }

@@ -450,3 +450,23 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 	}
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }
+
+func (u *Unstructured) GetManagedFields() map[string]metav1.VersionedFieldSet {
+	unstructuredManagedFields, _, _ := NestedMap(u.Object, "metadata", "managedFields")
+	if unstructuredManagedFields == nil {
+		return nil
+	}
+	managedFields := make(map[string]metav1.VersionedFieldSet, len(unstructuredManagedFields))
+	// TODO: convert from unstructured
+	return managedFields
+}
+
+func (u *Unstructured) SetManagedFields(managedFields map[string]metav1.VersionedFieldSet) {
+	if managedFields == nil {
+		RemoveNestedField(u.Object, "metadata", "managedFields")
+		return
+	}
+	unstructuredManagedFields := make(map[string]string, len(managedFields))
+	// TODO: convert to unstructured
+	u.setNestedMap(unstructuredManagedFields, "metadata", "managedFields")
+}
