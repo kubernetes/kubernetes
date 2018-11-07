@@ -17,11 +17,12 @@ limitations under the License.
 package phases
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -59,13 +60,13 @@ func NewEnableDynamicKubeletConfigPhase() workflow.Phase {
 		Long:    dynamicKubeletConfigLongDesc,
 		Example: dynamicKubeletConfigExample,
 		Hidden:  true,
-		Run:     EnableDynamicKubeletConfig,
+		Run:     runEnableDynamicKubeletConfig,
 	}
 }
 
-// EnableDynamicKubeletConfig enables dynamic kubelet configuration on node
+// runEnableDynamicKubeletConfig enables dynamic kubelet configuration on node
 // This feature is still in experimental state
-func EnableDynamicKubeletConfig(c workflow.RunData) error {
+func runEnableDynamicKubeletConfig(c workflow.RunData) error {
 	data, ok := c.(enableDynamicKubeletConfigData)
 	if !ok {
 		return errors.New("enable-dynamic-kubelet-config phase invoked with an invalid data struct")
@@ -80,11 +81,15 @@ func EnableDynamicKubeletConfig(c workflow.RunData) error {
 	if len(nodeName) == 0 {
 		return errors.New("NodeRegistration.Name is required for the enable-dynamic-kubelet-config phase")
 	}
+	if features.Enabled(cfg.FeatureGates, features.DynamicKubeletConfig) {
+		kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+		if err != nil {
+			return err
+		}
 
-	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
-	if err != nil {
-		return err
+		if err := kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion); err != nil {
+			return errors.Wrap(err, "error enabling dynamic kubelet configuration")
+		}
 	}
-
-	return kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
+	return nil
 }
