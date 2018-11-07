@@ -136,7 +136,11 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			Categories:   crd.Status.AcceptedNames.Categories,
 		})
 
-		if crd.Spec.Subresources != nil && crd.Spec.Subresources.Status != nil {
+		subresources, err := getSubresourcesForVersion(crd, version.Version)
+		if err != nil {
+			return err
+		}
+		if subresources != nil && subresources.Status != nil {
 			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
 				Name:       crd.Status.AcceptedNames.Plural + "/status",
 				Namespaced: crd.Spec.Scope == apiextensions.NamespaceScoped,
@@ -145,7 +149,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			})
 		}
 
-		if crd.Spec.Subresources != nil && crd.Spec.Subresources.Scale != nil {
+		if subresources != nil && subresources.Scale != nil {
 			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
 				Group:      autoscaling.GroupName,
 				Version:    "v1",
