@@ -352,8 +352,6 @@ func (m *FakeMetadata) GetMetadata(key string) (string, error) {
 				}
 			}
 		}
-
-		return "", nil
 	}
 
 	return "", nil
