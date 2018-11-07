@@ -28,18 +28,11 @@ import (
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	csicrd "k8s.io/csi-api/pkg/crd"
 )
 
 var (
@@ -62,25 +55,6 @@ func csiContainerImage(image string) string {
 		fullName += csiImageVersions[image]
 	}
 	return fullName
-}
-
-func createCSICRDs(c apiextensionsclient.Interface) {
-	By("Creating CSI CRDs")
-	crds := []*apiextensionsv1beta1.CustomResourceDefinition{
-		csicrd.CSIDriverCRD(),
-		csicrd.CSINodeInfoCRD(),
-	}
-
-	for _, crd := range crds {
-		_, err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
-		if err == nil {
-			continue
-		} else if !apierrs.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to check for existing of CSI CRD %q: %v", crd.Name, err)
-		}
-		_, err = c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-		framework.ExpectNoError(err, "Failed to create CSI CRD %q: %v", crd.Name, err)
-	}
 }
 
 func shredFile(filePath string) {

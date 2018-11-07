@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -60,13 +59,12 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-volumes")
 
 	var (
-		cancel    context.CancelFunc
-		cs        clientset.Interface
-		crdclient apiextensionsclient.Interface
-		csics     csiclient.Interface
-		ns        *v1.Namespace
-		node      v1.Node
-		config    framework.VolumeTestConfig
+		cancel context.CancelFunc
+		cs     clientset.Interface
+		csics  csiclient.Interface
+		ns     *v1.Namespace
+		node   v1.Node
+		config framework.VolumeTestConfig
 	)
 
 	BeforeEach(func() {
@@ -74,7 +72,6 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		cancel = c
 
 		cs = f.ClientSet
-		crdclient = f.APIExtensionsClientSet
 		csics = f.CSIClientSet
 		ns = f.Namespace
 
@@ -114,7 +111,6 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			ServerNodeName:    node.Name,
 			WaitForCompletion: true,
 		}
-		createCSICRDs(crdclient)
 	})
 
 	AfterEach(func() {
