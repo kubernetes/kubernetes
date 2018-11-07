@@ -51,9 +51,11 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "override",
+			expected: GetGenericImage(gcrPrefix, constants.HyperKube, expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
-				UnifiedControlPlaneImage: "override",
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+				UseHyperKubeImage: true,
 			},
 		},
 		{

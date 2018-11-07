@@ -41,7 +41,6 @@ networking:
   podSubnet: 10.148.0.0/16
   serviceSubnet: 10.196.0.0/12
 scheduler: {}
-unifiedControlPlaneImage: ""
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0

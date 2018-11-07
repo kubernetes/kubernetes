@@ -32,8 +32,8 @@ func GetGenericImage(prefix, image, tag string) string {
 
 // GetKubeControlPlaneImage generates and returns the image for the core Kubernetes components or returns the unified control plane image if specified
 func GetKubeControlPlaneImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
-	if cfg.UnifiedControlPlaneImage != "" {
-		return cfg.UnifiedControlPlaneImage
+	if cfg.UseHyperKubeImage {
+		image = constants.HyperKube
 	}
 	repoPrefix := cfg.GetControlPlaneImageRepository()
 	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)
@@ -56,10 +56,16 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 // GetAllImages returns a list of container images kubeadm expects to use on a control plane node
 func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs := []string{}
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeAPIServer, cfg))
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeControllerManager, cfg))
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeScheduler, cfg))
-	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeProxy, cfg))
+
+	// start with core kubernetes images
+	if cfg.UseHyperKubeImage {
+		imgs = append(imgs, GetKubeControlPlaneImage(constants.HyperKube, cfg))
+	} else {
+		imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeAPIServer, cfg))
+		imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeControllerManager, cfg))
+		imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeScheduler, cfg))
+		imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeProxy, cfg))
+	}
 
 	// pause, etcd and kube-dns are not available on the ci image repository so use the default image repository.
 	imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion))
