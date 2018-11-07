@@ -57,7 +57,7 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if len(apiAuds) > 0 {
-			req = req.WithContext(genericapirequest.WithAudiences(req.Context(), apiAuds))
+			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
 		if err != nil || !ok {

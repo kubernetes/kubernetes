@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -58,6 +59,10 @@ type Runner struct {
 	// a singleton in the InitData methods (thus avoiding to initialize data
 	// more than one time)
 	runData RunData
+
+	// cmdAdditionalFlags holds additional flags that could be added to the subcommands generated
+	// for each phase. Flags could be inherited from the parent command too
+	cmdAdditionalFlags *pflag.FlagSet
 
 	// phaseRunners is part of the internal state of the runner and provides
 	// a list of wrappers to phases composing the workflow with contextual
@@ -135,7 +140,7 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 		}
 		for _, f := range e.Options.FilterPhases {
 			if _, ok := phaseRunFlags[f]; !ok {
-				return phaseRunFlags, fmt.Errorf("invalid phase name: %s", f)
+				return phaseRunFlags, errors.Errorf("invalid phase name: %s", f)
 			}
 			phaseRunFlags[f] = true
 			for _, c := range phaseHierarchy[f] {
@@ -148,7 +153,7 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 	// to false and apply the same change to the underlying hierarchy
 	for _, f := range e.Options.SkipPhases {
 		if _, ok := phaseRunFlags[f]; !ok {
-			return phaseRunFlags, fmt.Errorf("invalid phase name: %s", f)
+			return phaseRunFlags, errors.Errorf("invalid phase name: %s", f)
 		}
 		phaseRunFlags[f] = false
 		for _, c := range phaseHierarchy[f] {
@@ -206,7 +211,7 @@ func (e *Runner) Run() error {
 			// Check the condition and returns if the condition isn't satisfied (or fails)
 			ok, err := p.RunIf(data)
 			if err != nil {
-				return fmt.Errorf("error execution run condition for phase %s: %v", p.generatedName, err)
+				return errors.Wrapf(err, "error execution run condition for phase %s", p.generatedName)
 			}
 
 			if !ok {
@@ -217,7 +222,7 @@ func (e *Runner) Run() error {
 		// Runs the phase action (if defined)
 		if p.Run != nil {
 			if err := p.Run(data); err != nil {
-				return fmt.Errorf("error execution phase %s: %v", p.generatedName, err)
+				return errors.Wrapf(err, "error execution phase %s", p.generatedName)
 			}
 		}
 
@@ -264,6 +269,16 @@ func (e *Runner) Help(cmdUse string) string {
 	return line
 }
 
+// SetPhaseSubcommandsAdditionalFlags allows to define flags to be added
+// to the subcommands generated for each phase (but not existing in the parent command).
+// Please note that this command needs to be done before BindToCommand.
+func (e *Runner) SetPhaseSubcommandsAdditionalFlags(fn func(*pflag.FlagSet)) {
+	// creates a new NewFlagSet
+	e.cmdAdditionalFlags = pflag.NewFlagSet("phaseAdditionalFlags", pflag.ContinueOnError)
+	// invokes the function that sets additional flags
+	fn(e.cmdAdditionalFlags)
+}
+
 // BindToCommand bind the Runner to a cobra command by altering
 // command help, adding phase related flags and by adding phases subcommands
 // Please note that this command needs to be done once all the phases are added to the Runner.
@@ -272,15 +287,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 		return
 	}
 
-	// alters the command description to show available phases
-	if cmd.Long != "" {
-		cmd.Long = fmt.Sprintf("%s\n\n%s\n", cmd.Long, e.Help(cmd.Use))
-	} else {
-		cmd.Long = fmt.Sprintf("%s\n\n%s\n", cmd.Short, e.Help(cmd.Use))
-	}
-
-	// adds phase related flags
-	cmd.Flags().StringSliceVar(&e.Options.SkipPhases, "skip-phases", nil, "List of phases to be skipped")
+	e.prepareForExecution()
 
 	// adds the phases subcommand
 	phaseCommand := &cobra.Command{
@@ -294,6 +301,11 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	// generate all the nested subcommands for invoking single phases
 	subcommands := map[string]*cobra.Command{}
 	e.visitAll(func(p *phaseRunner) error {
+		// skip hidden phases
+		if p.Hidden {
+			return nil
+		}
+
 		// creates nested phase subcommand
 		var phaseCmd = &cobra.Command{
 			Use:     strings.ToLower(p.Name),
@@ -310,10 +322,14 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			Args: cobra.NoArgs, // this forces cobra to fail if a wrong phase name is passed
 		}
 
-		// makes the new command inherits flags from the main command
-		cmd.LocalNonPersistentFlags().VisitAll(func(f *pflag.Flag) {
-			phaseCmd.Flags().AddFlag(f)
-		})
+		// makes the new command inherits local flags from the parent command
+		// Nb. global flags will be inherited automatically
+		inheritsFlags(cmd.Flags(), phaseCmd.Flags(), p.CmdFlags)
+
+		// If defined, additional flags for phases should be added as well
+		if e.cmdAdditionalFlags != nil {
+			inheritsFlags(e.cmdAdditionalFlags, phaseCmd.Flags(), p.CmdFlags)
+		}
 
 		// adds the command to parent
 		if p.level == 0 {
@@ -324,6 +340,32 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 
 		subcommands[p.generatedName] = phaseCmd
 		return nil
+	})
+
+	// alters the command description to show available phases
+	if cmd.Long != "" {
+		cmd.Long = fmt.Sprintf("%s\n\n%s\n", cmd.Long, e.Help(cmd.Use))
+	} else {
+		cmd.Long = fmt.Sprintf("%s\n\n%s\n", cmd.Short, e.Help(cmd.Use))
+	}
+
+	// adds phase related flags to the main command
+	cmd.Flags().StringSliceVar(&e.Options.SkipPhases, "skip-phases", nil, "List of phases to be skipped")
+}
+
+func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags []string) {
+	// If the list of flag to be inherited from the parent command is not defined, no flag is added
+	if cmdFlags == nil {
+		return
+	}
+
+	// add all the flags to be inherited to the target flagSet
+	sourceFlags.VisitAll(func(f *pflag.Flag) {
+		for _, c := range cmdFlags {
+			if f.Name == c {
+				targetFlags.AddFlag(f)
+			}
+		}
 	})
 }
 

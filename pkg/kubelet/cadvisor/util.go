@@ -76,5 +76,5 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 // UsingLegacyCadvisorStats returns true if container stats are provided by cadvisor instead of through the CRI
 func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 	return (runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
-		runtimeEndpoint == CrioSocket
+		runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
 }

@@ -1,0 +1,14 @@
+# Disable inheritance as this is an api owners file
+options:
+  no_parent_owners: true
+approvers:
+- api-approvers
+reviewers:
+- api-reviewers
+- deads2k
+- luxas
+- mtaufen
+- sttts
+- stewart-yu
+labels:
+- kind/api-change

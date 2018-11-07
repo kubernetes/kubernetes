@@ -280,6 +280,7 @@ message DeploymentSpec {
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
+  // +patchStrategy=retainKeys
   optional DeploymentStrategy strategy = 4;
 
   // Minimum number of seconds for which a newly created pod should be ready

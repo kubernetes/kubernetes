@@ -280,7 +280,6 @@ func (o TaintOptions) RunTaint() error {
 		if err != nil {
 			return err
 		}
-		outputObj = cmdutil.AsDefaultVersionedOrOriginal(outputObj, mapping)
 
 		printer, err := o.ToPrinter(operation)
 		if err != nil {

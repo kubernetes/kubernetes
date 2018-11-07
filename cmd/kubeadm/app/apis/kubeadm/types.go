@@ -81,33 +81,15 @@ type ClusterConfiguration struct {
 	// could be used for assigning a stable DNS to the control plane.
 	ControlPlaneEndpoint string
 
-	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
-	// default ones in form of <flagname>=<value>.
-	// TODO: This is temporary and ideally we would like to switch all components to
-	// use ComponentConfig + ConfigMaps.
-	APIServerExtraArgs map[string]string
-	// ControllerManagerExtraArgs is a set of extra flags to pass to the Controller Manager
-	// or override default ones in form of <flagname>=<value>
-	// TODO: This is temporary and ideally we would like to switch all components to
-	// use ComponentConfig + ConfigMaps.
-	ControllerManagerExtraArgs map[string]string
-	// SchedulerExtraArgs is a set of extra flags to pass to the Scheduler or override
-	// default ones in form of <flagname>=<value>
-	// TODO: This is temporary and ideally we would like to switch all components to
-	// use ComponentConfig + ConfigMaps.
-	SchedulerExtraArgs map[string]string
+	// APIServer contains extra settings for the API server control plane component
+	APIServer APIServer
 
-	// APIServerExtraVolumes is an extra set of host volumes mounted to the API server.
-	APIServerExtraVolumes []HostPathMount
-	// ControllerManagerExtraVolumes is an extra set of host volumes mounted to the
-	// Controller Manager.
-	ControllerManagerExtraVolumes []HostPathMount
-	// SchedulerExtraVolumes is an extra set of host volumes mounted to the scheduler.
-	SchedulerExtraVolumes []HostPathMount
+	// ControllerManager contains extra settings for the controller manager control plane component
+	ControllerManager ControlPlaneComponent
 
-	// APIServerCertSANs sets extra Subject Alternative Names for the API Server
-	// signing cert.
-	APIServerCertSANs []string
+	// Scheduler contains extra settings for the scheduler control plane component
+	Scheduler ControlPlaneComponent
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
 
@@ -131,6 +113,26 @@ type ClusterConfiguration struct {
 
 	// The cluster name
 	ClusterName string
+}
+
+// ControlPlaneComponent holds settings common to control plane component of the cluster
+type ControlPlaneComponent struct {
+	// ExtraArgs is an extra set of flags to pass to the control plane component.
+	ExtraArgs map[string]string
+
+	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
+	ExtraVolumes []HostPathMount
+}
+
+// APIServer holds settings necessary for API server deployments in the cluster
+type APIServer struct {
+	ControlPlaneComponent
+
+	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
+	CertSANs []string
+
+	// TimeoutForControlPlane controls the timeout that we use for API server to appear
+	TimeoutForControlPlane *metav1.Duration
 }
 
 // ComponentConfigs holds known internal ComponentConfig types for other components
@@ -323,10 +325,8 @@ type BootstrapTokenDiscovery struct {
 	// fetched from the master.
 	Token string
 
-	// APIServerEndpoints is a set of IPs or domain names to API servers from which info
-	// will be fetched. Currently we only pay attention to one API server but
-	// hope to support >1 in the future.
-	APIServerEndpoints []string
+	// APIServerEndpoint is an IP or domain name to the API server from which info will be fetched.
+	APIServerEndpoint string
 
 	// CACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
@@ -372,8 +372,8 @@ type HostPathMount struct {
 	HostPath string
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string
-	// Writable controls write access to the volume
-	Writable bool
+	// ReadOnly controls write access to the volume
+	ReadOnly bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
 }

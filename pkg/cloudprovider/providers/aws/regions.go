@@ -17,10 +17,12 @@ limitations under the License.
 package aws
 
 import (
+	"sync"
+
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	awscredentialprovider "k8s.io/kubernetes/pkg/credentialprovider/aws"
-	"sync"
 )
 
 // wellKnownRegions is the complete list of regions known to the AWS cloudprovider
@@ -46,6 +48,7 @@ var wellKnownRegions = [...]string{
 
 	// these are not registered in many / most accounts
 	"cn-north-1",
+	"cn-northwest-1",
 	"us-gov-west-1",
 }
 

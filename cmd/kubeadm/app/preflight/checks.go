@@ -557,7 +557,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 	return warns, nil
 }
 
-// KubernetesVersionCheck validates kubernetes and kubeadm versions
+// KubernetesVersionCheck validates Kubernetes and kubeadm versions
 type KubernetesVersionCheck struct {
 	KubeadmVersion    string
 	KubernetesVersion string
@@ -568,9 +568,9 @@ func (KubernetesVersionCheck) Name() string {
 	return "KubernetesVersion"
 }
 
-// Check validates kubernetes and kubeadm versions
+// Check validates Kubernetes and kubeadm versions
 func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
-	glog.V(1).Infoln("validating kubernetes and kubeadm version")
+	glog.V(1).Infoln("validating Kubernetes and kubeadm version")
 	// Skip this check for "super-custom builds", where apimachinery/the overall codebase version is not set.
 	if strings.HasPrefix(kubever.KubeadmVersion, "v0.0.0") {
 		return nil, nil
@@ -583,7 +583,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 
 	k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
 	if err != nil {
-		return nil, []error{fmt.Errorf("couldn't parse kubernetes version %q: %v", kubever.KubernetesVersion, err)}
+		return nil, []error{fmt.Errorf("couldn't parse Kubernetes version %q: %v", kubever.KubernetesVersion, err)}
 	}
 
 	// Checks if k8sVersion greater or equal than the first unsupported versions by current version of kubeadm,
@@ -592,7 +592,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 	//     thus setting the value to x.y.0-0 we are defining the very first patch - prereleases within x.y minor release.
 	firstUnsupportedVersion := versionutil.MustParseSemantic(fmt.Sprintf("%d.%d.%s", kadmVersion.Major(), kadmVersion.Minor()+1, "0-0"))
 	if k8sVersion.AtLeast(firstUnsupportedVersion) {
-		return []error{fmt.Errorf("kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
+		return []error{fmt.Errorf("Kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. Kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
 	}
 
 	return nil, nil
@@ -623,7 +623,7 @@ func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
 	if kubever.KubernetesVersion != "" {
 		k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
 		if err != nil {
-			return nil, []error{fmt.Errorf("couldn't parse kubernetes version %q: %v", kubever.KubernetesVersion, err)}
+			return nil, []error{fmt.Errorf("couldn't parse Kubernetes version %q: %v", kubever.KubernetesVersion, err)}
 		}
 		if kubeletVersion.Major() > k8sVersion.Major() || kubeletVersion.Minor() > k8sVersion.Minor() {
 			return nil, []error{fmt.Errorf("the kubelet version is higher than the control plane version. This is not a supported version skew and may lead to a malfunctional cluster. Kubelet version: %q Control plane version: %q", kubeletVersion, k8sVersion)}
@@ -900,6 +900,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
 			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
+			PortOpenCheck{port: kubeadmconstants.EtcdListenPeerPort},
 			DirAvailableCheck{Path: cfg.Etcd.Local.DataDir},
 		)
 	}
@@ -940,7 +941,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
-		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 	if !cfg.ControlPlane {
@@ -949,17 +949,15 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 
 	addIPv6Checks := false
 	if cfg.Discovery.BootstrapToken != nil {
-		for _, server := range cfg.Discovery.BootstrapToken.APIServerEndpoints {
-			ipstr, _, err := net.SplitHostPort(server)
-			if err == nil {
-				checks = append(checks,
-					HTTPProxyCheck{Proto: "https", Host: ipstr},
-				)
-				if !addIPv6Checks {
-					if ip := net.ParseIP(ipstr); ip != nil {
-						if ip.To4() == nil && ip.To16() != nil {
-							addIPv6Checks = true
-						}
+		ipstr, _, err := net.SplitHostPort(cfg.Discovery.BootstrapToken.APIServerEndpoint)
+		if err == nil {
+			checks = append(checks,
+				HTTPProxyCheck{Proto: "https", Host: ipstr},
+			)
+			if !addIPv6Checks {
+				if ip := net.ParseIP(ipstr); ip != nil {
+					if ip.To4() == nil && ip.To16() != nil {
+						addIPv6Checks = true
 					}
 				}
 			}
@@ -969,6 +967,20 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+		)
+	}
+
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// RunOptionalJoinNodeChecks executes all individual, applicable to node configuration dependant checks
+func RunOptionalJoinNodeChecks(execer utilsexec.Interface, initCfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+	checks := []Checker{}
+
+	// Check ipvs required kernel module if we use ipvs kube-proxy mode
+	if initCfg.ComponentConfigs.KubeProxy != nil && initCfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+		checks = append(checks,
+			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)
 	}
 

@@ -38,8 +38,8 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
-	gce := simpleFakeGCECloud(vals)
+func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
+	gce := NewFakeGCECloud(vals)
 
 	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
 	gce.nodeInformerSynced = func() bool { return true }
@@ -88,7 +88,7 @@ var (
 	}
 )
 
-var providerIdRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
+var providerIDRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
 
 func getProjectAndZone() (string, string, error) {
 	result, err := metadata.Get("instance/zone")
@@ -107,10 +107,10 @@ func getProjectAndZone() (string, string, error) {
 	return projectID, zone, nil
 }
 
-func (gce *GCECloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
+func (g *Cloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
 	msg := fmt.Sprintf("Firewall change required by network admin: `%v`", cmd)
-	if gce.eventRecorder != nil && svc != nil {
-		gce.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
+	if g.eventRecorder != nil && svc != nil {
+		g.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
 	}
 }
 
@@ -120,13 +120,13 @@ func FirewallToGCloudCreateCmd(fw *compute.Firewall, projectID string) string {
 	return fmt.Sprintf("gcloud compute firewall-rules create %v --network %v %v", fw.Name, getNameFromLink(fw.Network), args)
 }
 
-// FirewallToGCloudCreateCmd generates a gcloud command to update a firewall to specified params
+// FirewallToGCloudUpdateCmd generates a gcloud command to update a firewall to specified params
 func FirewallToGCloudUpdateCmd(fw *compute.Firewall, projectID string) string {
 	args := firewallToGcloudArgs(fw, projectID)
 	return fmt.Sprintf("gcloud compute firewall-rules update %v %v", fw.Name, args)
 }
 
-// FirewallToGCloudCreateCmd generates a gcloud command to delete a firewall to specified params
+// FirewallToGCloudDeleteCmd generates a gcloud command to delete a firewall to specified params
 func FirewallToGCloudDeleteCmd(fwName, projectID string) string {
 	return fmt.Sprintf("gcloud compute firewall-rules delete %v --project %v", fwName, projectID)
 }
@@ -205,7 +205,7 @@ func isInUsedByError(err error) bool {
 // A providerID is build out of '${ProviderName}://${project-id}/${zone}/${instance-name}'
 // See cloudprovider.GetInstanceProviderID.
 func splitProviderID(providerID string) (project, zone, instance string, err error) {
-	matches := providerIdRE.FindStringSubmatch(providerID)
+	matches := providerIDRE.FindStringSubmatch(providerID)
 	if len(matches) != 4 {
 		return "", "", "", errors.New("error splitting providerID")
 	}

@@ -715,12 +715,6 @@ func TestVolumeProvision(t *testing.T) {
 			boundPvcs:       []*testPVC{{"pvc-w-canbind", classWait, ""}},
 			provisionedPvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
 		},
-		"one immediate pvc prebound, one wait provisioned": {
-			pod:             makePod("pod-i-pvc-prebound-w-provisioned", config.ns, []string{"pvc-i-prebound", "pvc-canprovision"}),
-			pvs:             []*testPV{{"pv-i-pvc-prebound", classImmediate, "", node1}},
-			boundPvcs:       []*testPVC{{"pvc-i-prebound", classImmediate, "pv-i-pvc-prebound"}},
-			provisionedPvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
-		},
 		"one immediate pv prebound, one wait provisioned": {
 			pod:             makePod("pod-i-pv-prebound-w-provisioned", config.ns, []string{"pvc-i-pv-prebound", "pvc-canprovision"}),
 			pvs:             []*testPV{{"pv-i-prebound", classImmediate, "pvc-i-pv-prebound", node1}},

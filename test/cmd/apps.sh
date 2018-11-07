@@ -299,7 +299,7 @@ run_deployment_tests() {
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1000000 - should be no-op
-  kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]}"
+  ! kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to last revision
   kubectl rollout undo deployment nginx "${kube_flags[@]}"

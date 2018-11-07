@@ -32,6 +32,8 @@ var (
 		"http://metadata.google.internal",
 		"http://169.254.169.254/",
 		"http://metadata.google.internal/",
+		"http://metadata.google.internal/0.1",
+		"http://metadata.google.internal/0.1/",
 		"http://metadata.google.internal/computeMetadata",
 		"http://metadata.google.internal/computeMetadata/v1",
 		// Allowed API versions.
@@ -44,8 +46,6 @@ var (
 	}
 	legacySuccessEndpoints = []string{
 		// Discovery
-		"http://metadata.google.internal/0.1",
-		"http://metadata.google.internal/0.1/",
 		"http://metadata.google.internal/0.1/meta-data",
 		"http://metadata.google.internal/computeMetadata/v1beta1",
 		// Allowed API versions.

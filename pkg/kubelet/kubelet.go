@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
@@ -777,7 +776,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		glog.Warning("Mount propagation feature gate has been deprecated and will be removed in the next release")
+		return nil, fmt.Errorf("mount propagation feature gate has been deprecated and will be removed in 1.14")
 	}
 
 	klet.volumePluginMgr, err =
@@ -1802,7 +1801,7 @@ func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 // state every sync-frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
-	// The resyncTicker wakes up kubelet to checks if there are any pod workers
+	// The syncTicker wakes up kubelet to checks if there are any pod workers
 	// that need to be sync'd. A one-second period is sufficient because the
 	// sync interval is defaulted to 10s.
 	syncTicker := time.NewTicker(time.Second)

@@ -17,11 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -125,7 +125,7 @@ func runDiff(flags *diffFlags, args []string) error {
 			return err
 		}
 		if path == "" {
-			return fmt.Errorf("empty manifest path")
+			return errors.New("empty manifest path")
 		}
 		existingManifest, err := ioutil.ReadFile(path)
 		if err != nil {

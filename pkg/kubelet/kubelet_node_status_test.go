@@ -234,14 +234,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
-							Type:               v1.NodeOutOfDisk,
-							Status:             v1.ConditionFalse,
-							Reason:             "KubeletHasSufficientDisk",
-							Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-							LastHeartbeatTime:  metav1.Time{},
-							LastTransitionTime: metav1.Time{},
-						},
-						{
 							Type:               v1.NodeMemoryPressure,
 							Status:             v1.ConditionFalse,
 							Reason:             "KubeletHasSufficientMemory",
@@ -317,7 +309,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			assert.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
 				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
 				updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 				updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
@@ -359,14 +351,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
@@ -427,14 +411,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
@@ -640,14 +616,6 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,

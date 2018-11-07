@@ -691,7 +691,6 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 			return nil, err
 		}
 	}
-	actualObj = cmdutil.AsDefaultVersionedOrOriginal(actualObj, mapping)
 
 	return &RunObject{
 		Object:  actualObj,

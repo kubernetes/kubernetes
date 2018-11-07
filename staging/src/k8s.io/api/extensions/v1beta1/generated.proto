@@ -22,7 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.extensions.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -54,31 +53,6 @@ message AllowedHostPath {
   // when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
   // +optional
   optional bool readOnly = 2;
-}
-
-message CustomMetricCurrentStatus {
-  // Custom Metric name.
-  optional string name = 1;
-
-  // Custom Metric value (average).
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
-}
-
-message CustomMetricCurrentStatusList {
-  repeated CustomMetricCurrentStatus items = 1;
-}
-
-// Alpha-level support for Custom Metrics in HPA (as annotations).
-message CustomMetricTarget {
-  // Custom Metric name.
-  optional string name = 1;
-
-  // Custom Metric value (average).
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
-}
-
-message CustomMetricTargetList {
-  repeated CustomMetricTarget items = 1;
 }
 
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for

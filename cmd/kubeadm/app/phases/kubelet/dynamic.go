@@ -19,6 +19,8 @@ package kubelet
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -39,7 +41,7 @@ func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kub
 
 	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("couldn't get the kubelet configuration ConfigMap: %v", err)
+		return errors.Wrap(err, "couldn't get the kubelet configuration ConfigMap")
 	}
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.

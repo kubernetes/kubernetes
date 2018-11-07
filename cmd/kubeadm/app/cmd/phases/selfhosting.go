@@ -95,7 +95,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			// Gets the kubernetes client
+			// Gets the Kubernetes client
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)

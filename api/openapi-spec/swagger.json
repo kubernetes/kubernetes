@@ -1300,7 +1300,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -1833,7 +1832,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -2366,7 +2364,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -2899,7 +2896,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -3432,7 +3428,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -4139,7 +4134,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -6020,7 +6014,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -6553,7 +6546,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -7434,7 +7426,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -8141,7 +8132,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -8674,7 +8664,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -9121,7 +9110,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -10088,7 +10076,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -10848,7 +10835,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -12143,7 +12129,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -18333,7 +18318,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -19099,7 +19083,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -19616,7 +19599,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -20631,7 +20613,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -21596,7 +21577,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -22528,7 +22508,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -23813,7 +23792,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -24346,7 +24324,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -25053,7 +25030,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -25934,7 +25910,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -26815,7 +26790,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -29825,7 +29799,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -30358,7 +30331,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -31337,7 +31309,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -33675,7 +33646,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -34208,7 +34178,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -34915,7 +34884,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -35796,7 +35764,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -36677,7 +36644,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -39504,7 +39470,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -41449,7 +41414,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -42629,7 +42593,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -43809,7 +43772,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -45022,7 +44984,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -46202,7 +46163,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -47382,7 +47342,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -48483,7 +48442,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -49637,7 +49595,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -50676,7 +50633,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -51923,7 +51879,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -52630,7 +52585,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -53609,7 +53563,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -54316,7 +54269,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -54849,7 +54801,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -56000,7 +55951,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -58591,7 +58541,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -59630,7 +59579,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -60433,7 +60381,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -61552,7 +61499,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -62053,7 +61999,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -62562,7 +62507,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -63079,7 +63023,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -64933,7 +64876,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -65434,7 +65376,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -65943,7 +65884,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -66460,7 +66400,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -68314,7 +68253,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -68815,7 +68753,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -69324,7 +69261,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -69841,7 +69777,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -71744,7 +71679,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -72510,7 +72444,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -73317,7 +73250,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -74348,7 +74280,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -75114,7 +75045,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -75880,7 +75810,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -76397,7 +76326,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -77381,7 +77309,7 @@
       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1beta1.ServiceReference"
      },
      "url": {
-      "description": "`url` gives the location of the webhook, in standard URL form (`[scheme://]host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
+      "description": "`url` gives the location of the webhook, in standard URL form (`scheme://host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
       "type": "string"
      }
     }
@@ -77796,6 +77724,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.apps.v1.DeploymentStrategy"
      },
      "template": {
@@ -78516,6 +78445,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStrategy"
      },
      "template": {
@@ -79301,6 +79231,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DeploymentStrategy"
      },
      "template": {
@@ -79985,7 +79916,7 @@
       "$ref": "#/definitions/io.k8s.api.auditregistration.v1alpha1.ServiceReference"
      },
      "url": {
-      "description": "`url` gives the location of the webhook, in standard URL form (`[scheme://]host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
+      "description": "`url` gives the location of the webhook, in standard URL form (`scheme://host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
       "type": "string"
      }
     }
@@ -91892,6 +91823,22 @@
      }
     }
    },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion": {
+    "description": "CustomResourceConversion describes how to convert different versions of a CR.",
+    "required": [
+     "strategy"
+    ],
+    "properties": {
+     "strategy": {
+      "description": "`strategy` specifies the conversion strategy. Allowed values are: - `None`: The converter only change the apiVersion and would not touch any other field in the CR. - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information is needed for this option.",
+      "type": "string"
+     },
+     "webhookClientConfig": {
+      "description": "`webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`. This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.WebhookClientConfig"
+     }
+    }
+   },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition": {
     "description": "CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format \u003c.spec.name\u003e.\u003c.spec.group\u003e.",
     "required": [
@@ -92042,6 +91989,10 @@
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
       }
      },
+     "conversion": {
+      "description": "`conversion` defines conversion settings for the CRD.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion"
+     },
      "group": {
       "description": "Group is the group this resource belongs in",
       "type": "string"
@@ -92104,6 +92055,7 @@
     }
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion": {
+    "description": "CustomResourceDefinitionVersion describes a version for CRD.",
     "required": [
      "name",
      "served",
@@ -92341,6 +92293,45 @@
    },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray": {
     "description": "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array."
+   },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ServiceReference": {
+    "description": "ServiceReference holds a reference to Service.legacy.k8s.io",
+    "required": [
+     "namespace",
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "`name` is the name of the service. Required",
+      "type": "string"
+     },
+     "namespace": {
+      "description": "`namespace` is the namespace of the service. Required",
+      "type": "string"
+     },
+     "path": {
+      "description": "`path` is an optional URL path which will be sent in any request to this service.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.WebhookClientConfig": {
+    "description": "WebhookClientConfig contains the information to make a TLS connection with the webhook. It has the same field as admissionregistration.v1beta1.WebhookClientConfig.",
+    "properties": {
+     "caBundle": {
+      "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
+      "type": "string",
+      "format": "byte"
+     },
+     "service": {
+      "description": "`service` is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.\n\nPort 443 will be used if it is open, otherwise it is an error.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ServiceReference"
+     },
+     "url": {
+      "description": "`url` gives the location of the webhook, in standard URL form (`scheme://host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
+      "type": "string"
+     }
+    }
    },
    "io.k8s.apimachinery.pkg.api.resource.Quantity": {
     "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and Int64() accessors.\n\nThe serialization format is:\n\n\u003cquantity\u003e        ::= \u003csignedNumber\u003e\u003csuffix\u003e\n  (Note that \u003csuffix\u003e may be empty, from the \"\" case in \u003cdecimalSI\u003e.)\n\u003cdigit\u003e           ::= 0 | 1 | ... | 9 \u003cdigits\u003e          ::= \u003cdigit\u003e | \u003cdigit\u003e\u003cdigits\u003e \u003cnumber\u003e          ::= \u003cdigits\u003e | \u003cdigits\u003e.\u003cdigits\u003e | \u003cdigits\u003e. | .\u003cdigits\u003e \u003csign\u003e            ::= \"+\" | \"-\" \u003csignedNumber\u003e    ::= \u003cnumber\u003e | \u003csign\u003e\u003cnumber\u003e \u003csuffix\u003e          ::= \u003cbinarySI\u003e | \u003cdecimalExponent\u003e | \u003cdecimalSI\u003e \u003cbinarySI\u003e        ::= Ki | Mi | Gi | Ti | Pi | Ei\n  (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\u003cdecimalSI\u003e       ::= m | \"\" | k | M | G | T | P | E\n  (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\u003cdecimalExponent\u003e ::= \"e\" \u003csignedNumber\u003e | \"E\" \u003csignedNumber\u003e\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n  a. No precision is lost\n  b. No fractional digits will be emitted\n  c. The exponent (or suffix) is as large as possible.\nThe sign will be omitted unless the number is negative.\n\nExamples:\n  1.5 will be serialized as \"1500m\"\n  1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
@@ -93098,7 +93089,7 @@
     }
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference": {
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
     "required": [
      "apiVersion",
      "kind",

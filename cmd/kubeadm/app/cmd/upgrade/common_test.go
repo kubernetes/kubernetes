@@ -43,12 +43,14 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
+	controllerManager: {}
 	etcd:
 	  local:
 	    dataDir: /some/path
@@ -60,6 +62,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: ""
+	scheduler: {}
 	unifiedControlPlaneImage: ""
 `),
 		},
@@ -76,12 +79,14 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta1
 	auditPolicy:
 	  logDir: ""
 	  path: ""
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
+	controllerManager: {}
 	etcd:
 	  external:
 	    caFile: ""
@@ -96,6 +101,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
+	scheduler: {}
 	unifiedControlPlaneImage: ""
 `),
 		},

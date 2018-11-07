@@ -49,6 +49,12 @@ type Phase struct {
 	// before executing the phase action.
 	// If this function return nil, the phase action is always executed.
 	RunIf func(data RunData) (bool, error)
+
+	// CmdFlags defines the list of flags that should be assigned to the cobra command generated
+	// for this phase; flags are inherited from the parent command or defined as additional flags
+	// in the phase runner. If the values is not set or empty, no flags will be assigned to the command
+	// Nb. global flags are automatically inherited by nested cobra command
+	CmdFlags []string
 }
 
 // AppendPhase adds the given phase to the nested, ordered sequence of phases.

@@ -284,10 +284,10 @@ func getDiskByIDPaths(pdName string, partition string) []string {
 }
 
 // Return cloud provider
-func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.GCECloud, error) {
+func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.Cloud, error) {
 	var err error
 	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		gceCloudProvider, ok := cloudProvider.(*gcecloud.GCECloud)
+		gceCloudProvider, ok := cloudProvider.(*gcecloud.Cloud)
 		if !ok || gceCloudProvider == nil {
 			// Retry on error. See issue #11321
 			glog.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)

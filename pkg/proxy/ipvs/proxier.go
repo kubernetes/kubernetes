@@ -157,19 +157,13 @@ var ipsetWithIptablesChain = []struct {
 	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst", "sctp"},
 }
 
-var ipvsModules = []string{
-	"ip_vs",
-	"ip_vs_rr",
-	"ip_vs_wrr",
-	"ip_vs_sh",
-	"nf_conntrack_ipv4",
-}
-
 // In IPVS proxy mode, the following flags need to be set
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
 const sysctlForward = "net/ipv4/ip_forward"
+const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
+const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
@@ -326,6 +320,20 @@ func NewProxier(ipt utiliptables.Interface,
 		}
 	}
 
+	// Set the arp_ignore sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
+		if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
+		}
+	}
+
+	// Set the arp_announce sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
+		if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
+		}
+	}
+
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
@@ -438,14 +446,12 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 // GetModules returns all installed kernel modules.
 func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	// Check whether IPVS required kernel modules are built-in
-	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	b, err := ioutil.ReadFile(kernelVersionFile)
+	kernelVersion, ipvsModules, err := utilipvs.GetKernelVersionAndIPVSMods(handle.executor)
 	if err != nil {
-		glog.Errorf("Failed to read file %s with error %v", kernelVersionFile, err)
+		return nil, err
 	}
-	kernelVersion := strings.TrimSpace(string(b))
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
-	b, err = ioutil.ReadFile(builtinModsFilePath)
+	b, err := ioutil.ReadFile(builtinModsFilePath)
 	if err != nil {
 		glog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
 	}
@@ -486,11 +492,26 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	}
 	wantModules := sets.NewString()
 	loadModules := sets.NewString()
+	linuxKernelHandler := NewLinuxKernelHandler()
+	_, ipvsModules, _ := utilipvs.GetKernelVersionAndIPVSMods(linuxKernelHandler.executor)
 	wantModules.Insert(ipvsModules...)
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).UnsortedList()
-	if len(modules) != 0 {
-		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", modules)
+	var missingMods []string
+	ConntrackiMissingCounter := 0
+	for _, mod := range modules {
+		if strings.Contains(mod, "nf_conntrack") {
+			ConntrackiMissingCounter++
+		} else {
+			missingMods = append(missingMods, mod)
+		}
+	}
+	if ConntrackiMissingCounter == 2 {
+		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
+	}
+
+	if len(missingMods) != 0 {
+		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
 	}
 
 	// Check ipset version

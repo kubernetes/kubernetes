@@ -25,7 +25,7 @@ import (
 	"strconv"
 	libstrings "strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	defaultStorageAccountType       = storage.StandardLRS
+	defaultStorageAccountType       = compute.StandardLRS
 	defaultAzureDiskKind            = v1.AzureManagedDisk
 	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingNone
 )
@@ -124,13 +124,13 @@ func normalizeKind(kind string) (v1.AzureDataDiskKind, error) {
 	return v1.AzureDataDiskKind(kind), nil
 }
 
-func normalizeStorageAccountType(storageAccountType string) (storage.SkuName, error) {
+func normalizeStorageAccountType(storageAccountType string) (compute.DiskStorageAccountTypes, error) {
 	if storageAccountType == "" {
 		return defaultStorageAccountType, nil
 	}
 
-	sku := storage.SkuName(storageAccountType)
-	supportedSkuNames := storage.PossibleSkuNameValues()
+	sku := compute.DiskStorageAccountTypes(storageAccountType)
+	supportedSkuNames := compute.PossibleDiskStorageAccountTypesValues()
 	for _, s := range supportedSkuNames {
 		if sku == s {
 			return sku, nil

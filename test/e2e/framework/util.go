@@ -394,6 +394,12 @@ func SkipUnlessSecretExistsAfterWait(c clientset.Interface, name, namespace stri
 	Logf("Secret %v in namespace %v found after duration %v", name, namespace, time.Since(start))
 }
 
+func SkipUnlessTaintBasedEvictionsEnabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
+		Skipf("Only supported when %v feature is enabled", features.TaintBasedEvictions)
+	}
+}
+
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {
@@ -3167,15 +3173,29 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 // and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
 // when the pod is inactvie.
 func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+	var activePods []*v1.Pod
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
+		activePods = nil
 		for _, pod := range pods {
 			if controller.IsPodActive(pod) {
-				return false, nil
+				activePods = append(activePods, pod)
 			}
+		}
+
+		if len(activePods) != 0 {
+			return false, nil
 		}
 		return true, nil
 	})
+
+	if err == wait.ErrWaitTimeout {
+		for _, pod := range activePods {
+			Logf("Pod %q running on %q is still active", pod.ObjectMeta.Name, pod.Spec.NodeName)
+		}
+		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].ObjectMeta.Name, activePods[0].Spec.NodeName)
+	}
+	return err
 }
 
 // waitForPodsGone waits until there are no pods left in the PodStore.
@@ -3895,7 +3915,7 @@ func ParseKVLines(output, key string) string {
 func RestartKubeProxy(host string) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartKubeProxy: %s", TestContext.Provider)
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
 	Logf("Killing kube-proxy on node %v", host)
@@ -3932,7 +3952,7 @@ func RestartKubelet(host string) error {
 	// TODO: Make it work for all providers and distros.
 	supportedProviders := []string{"gce", "aws", "vsphere"}
 	if !ProviderIs(supportedProviders...) {
-		return fmt.Errorf("unsupported provider: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
+		return fmt.Errorf("unsupported provider for RestartKubelet: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
 	}
 	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
 		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
@@ -3988,7 +4008,7 @@ func WaitForKubeletUp(host string) error {
 func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartApiserver: %s", TestContext.Provider)
 	}
 	if ProviderIs("gce", "aws") {
 		initialRestartCount, err := getApiserverRestartCount(cs)
@@ -4011,7 +4031,7 @@ func RestartApiserver(cs clientset.Interface) error {
 
 func sshRestartMaster() error {
 	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for sshRestartMaster: %s", TestContext.Provider)
 	}
 	var command string
 	if ProviderIs("gce") {
@@ -4077,7 +4097,7 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
 	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", TestContext.Provider)
 	}
 	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
 		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
@@ -5196,4 +5216,18 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 		}
 	}
 	return zones, nil
+}
+
+// WaitForNodeHasTaintOrNot waits for a taint to be added/removed from the node until timeout occurs, whichever comes first.
+func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.Taint, wantTrue bool, timeout time.Duration) error {
+	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+		has, err := NodeHasTaint(c, nodeName, taint)
+		if err != nil {
+			return false, fmt.Errorf("failed to check taint %s on node %s or not", taint.ToString(), nodeName)
+		}
+		return has == wantTrue, nil
+	}); err != nil {
+		return fmt.Errorf("expect node %v to have taint = %v within %v: %v", nodeName, wantTrue, timeout, err)
+	}
+	return nil
 }

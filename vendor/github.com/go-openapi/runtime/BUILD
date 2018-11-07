@@ -10,6 +10,7 @@ go_library(
         "client_response.go",
         "constants.go",
         "discard.go",
+        "file.go",
         "headers.go",
         "interfaces.go",
         "json.go",

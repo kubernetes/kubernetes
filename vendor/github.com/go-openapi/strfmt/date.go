@@ -16,39 +16,31 @@ package strfmt
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
-	"regexp"
 	"time"
 
+	"github.com/globalsign/mgo/bson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
 )
 
 func init() {
 	d := Date{}
+	// register this format in the default registry
 	Default.Add("date", &d, IsDate)
 }
 
 // IsDate returns true when the string is a valid date
 func IsDate(str string) bool {
-	matches := rxDate.FindAllStringSubmatch(str, -1)
-	if len(matches) == 0 || len(matches[0]) == 0 {
-		return false
-	}
-	m := matches[0]
-	return !(m[2] < "01" || m[2] > "12" || m[3] < "01" || m[3] > "31")
+	_, err := time.Parse(RFC3339FullDate, str)
+	return err == nil
 }
 
 const (
 	// RFC3339FullDate represents a full-date as specified by RFC3339
 	// See: http://goo.gl/xXOvVd
 	RFC3339FullDate = "2006-01-02"
-	// DatePattern pattern to match for the date format from http://tools.ietf.org/html/rfc3339#section-5.6
-	DatePattern = `^([0-9]{4})-([0-9]{2})-([0-9]{2})`
-)
-
-var (
-	rxDate = regexp.MustCompile(DatePattern)
 )
 
 // Date represents a date from the API
@@ -99,32 +91,60 @@ func (d *Date) Scan(raw interface{}) error {
 
 // Value converts Date to a primitive value ready to written to a database.
 func (d Date) Value() (driver.Value, error) {
-	return driver.Value(d), nil
+	return driver.Value(d.String()), nil
 }
 
-func (t Date) MarshalJSON() ([]byte, error) {
+// MarshalJSON returns the Date as JSON
+func (d Date) MarshalJSON() ([]byte, error) {
 	var w jwriter.Writer
-	t.MarshalEasyJSON(&w)
+	d.MarshalEasyJSON(&w)
 	return w.BuildBytes()
 }
 
-func (t Date) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(time.Time(t).Format(RFC3339FullDate))
+// MarshalEasyJSON writes the Date to a easyjson.Writer
+func (d Date) MarshalEasyJSON(w *jwriter.Writer) {
+	w.String(time.Time(d).Format(RFC3339FullDate))
 }
 
-func (t *Date) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON sets the Date from JSON
+func (d *Date) UnmarshalJSON(data []byte) error {
+	if string(data) == jsonNull {
+		return nil
+	}
 	l := jlexer.Lexer{Data: data}
-	t.UnmarshalEasyJSON(&l)
+	d.UnmarshalEasyJSON(&l)
 	return l.Error()
 }
 
-func (t *Date) UnmarshalEasyJSON(in *jlexer.Lexer) {
+// UnmarshalEasyJSON sets the Date from a easyjson.Lexer
+func (d *Date) UnmarshalEasyJSON(in *jlexer.Lexer) {
 	if data := in.String(); in.Ok() {
 		tt, err := time.Parse(RFC3339FullDate, data)
 		if err != nil {
 			in.AddError(err)
 			return
 		}
-		*t = Date(tt)
+		*d = Date(tt)
 	}
+}
+
+// GetBSON returns the Date as a bson.M{} map.
+func (d *Date) GetBSON() (interface{}, error) {
+	return bson.M{"data": d.String()}, nil
+}
+
+// SetBSON sets the Date from raw bson data
+func (d *Date) SetBSON(raw bson.Raw) error {
+	var m bson.M
+	if err := raw.Unmarshal(&m); err != nil {
+		return err
+	}
+
+	if data, ok := m["data"].(string); ok {
+		rd, err := time.Parse(RFC3339FullDate, data)
+		*d = Date(rd)
+		return err
+	}
+
+	return errors.New("couldn't unmarshal bson raw value as Date")
 }

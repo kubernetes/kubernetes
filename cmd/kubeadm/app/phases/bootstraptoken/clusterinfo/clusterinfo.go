@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +47,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	glog.V(1).Infoln("[bootstraptoken] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
 	if err != nil {
-		return fmt.Errorf("failed to load admin kubeconfig [%v]", err)
+		return errors.Wrap(err, "failed to load admin kubeconfig")
 	}
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster

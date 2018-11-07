@@ -37,7 +37,7 @@ import (
 	"vbom.ml/util/sortorder"
 )
 
-// Sorting printer sorts list types before delegating to another printer.
+// SortingPrinter sorts list types before delegating to another printer.
 // Non-list types are simply passed through
 type SortingPrinter struct {
 	SortField string
@@ -296,7 +296,8 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	return less
 }
 
-// Returns the starting (original) position of a particular index.  e.g. If OriginalPosition(0) returns 5 than the
+// OriginalPosition returns the starting (original) position of a particular index.
+// e.g. If OriginalPosition(0) returns 5 than the
 // the item currently at position 0 was at position 5 in the original unsorted array.
 func (r *RuntimeSort) OriginalPosition(ix int) int {
 	if ix < 0 || ix > len(r.origPosition) {
@@ -306,8 +307,9 @@ func (r *RuntimeSort) OriginalPosition(ix int) int {
 }
 
 type TableSorter struct {
-	field string
-	obj   *metav1beta1.Table
+	field      string
+	obj        *metav1beta1.Table
+	parsedRows [][][]reflect.Value
 }
 
 func (t *TableSorter) Len() int {
@@ -319,32 +321,8 @@ func (t *TableSorter) Swap(i, j int) {
 }
 
 func (t *TableSorter) Less(i, j int) bool {
-	iObj := t.obj.Rows[i].Object.Object
-	jObj := t.obj.Rows[j].Object.Object
-
-	var iValues [][]reflect.Value
-	var jValues [][]reflect.Value
-	var err error
-
-	parser := jsonpath.New("sorting").AllowMissingKeys(true)
-	err = parser.Parse(t.field)
-	if err != nil {
-		glog.Fatalf("sorting error: %v\n", err)
-	}
-
-	// TODO(juanvallejo): this is expensive for very large sets.
-	// To improve runtime complexity, build an array which contains all
-	// resolved fields, and sort that instead.
-	iValues, err = findJSONPathResults(parser, iObj)
-	if err != nil {
-		glog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, t.field, err)
-	}
-
-	jValues, err = findJSONPathResults(parser, jObj)
-	if err != nil {
-		glog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, t.field, err)
-	}
-
+	iValues := t.parsedRows[i]
+	jValues := t.parsedRows[j]
 	if len(iValues) == 0 || len(iValues[0]) == 0 || len(jValues) == 0 || len(jValues[0]) == 0 {
 		glog.Fatalf("couldn't find any field with path %q in the list of objects", t.field)
 	}
@@ -354,7 +332,7 @@ func (t *TableSorter) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		glog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, iObj, iField.Kind().String(), err)
+		glog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
 	}
 	return less
 }
@@ -365,16 +343,31 @@ func (t *TableSorter) Sort() error {
 }
 
 func NewTableSorter(table *metav1beta1.Table, field string) *TableSorter {
+	var parsedRows [][][]reflect.Value
+
+	parser := jsonpath.New("sorting").AllowMissingKeys(true)
+	err := parser.Parse(field)
+	if err != nil {
+		glog.Fatalf("sorting error: %v\n", err)
+	}
+
+	for i := range table.Rows {
+		parsedRow, err := findJSONPathResults(parser, table.Rows[i].Object.Object)
+		if err != nil {
+			glog.Fatalf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
+		}
+		parsedRows = append(parsedRows, parsedRow)
+	}
+
 	return &TableSorter{
-		obj:   table,
-		field: field,
+		obj:        table,
+		field:      field,
+		parsedRows: parsedRows,
 	}
 }
-
 func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
 	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
 		return parser.FindResults(unstructuredObj.Object)
 	}
-
 	return parser.FindResults(reflect.ValueOf(from).Elem().Interface())
 }

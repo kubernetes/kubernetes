@@ -42,7 +42,9 @@ func TokenSourceWrapTransport(ts oauth2.TokenSource) func(http.RoundTripper) htt
 	}
 }
 
-func newCachedPathTokenSource(path string) oauth2.TokenSource {
+// NewCachedFileTokenSource returns a oauth2.TokenSource reads a token from a
+// file at a specified path and periodically reloads it.
+func NewCachedFileTokenSource(path string) oauth2.TokenSource {
 	return &cachingTokenSource{
 		now:    time.Now,
 		leeway: 1 * time.Minute,
