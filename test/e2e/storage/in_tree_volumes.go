@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -51,6 +52,10 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
+}
+
+func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
+	return patterns
 }
 
 // This executes testSuites for in-tree volumes.
@@ -86,7 +91,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 				driver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, config, driver, testSuites)
+			testsuites.RunTestSuite(f, config, driver, testSuites, intreeTunePattern)
 		})
 	}
 })
