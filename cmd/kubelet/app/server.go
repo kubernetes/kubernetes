@@ -871,9 +871,9 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	if s.BootstrapKubeconfig != "" || len(s.KubeConfig) > 0 {
 		return kubeconfigClientConfig(s)
-	} else {
-		return nil, fmt.Errorf("createClientConfig called in standalone mode")
 	}
+	return nil, fmt.Errorf("createClientConfig called in standalone mode")
+
 }
 
 // createAPIServerClientConfig generates a client.Config from command line flags
