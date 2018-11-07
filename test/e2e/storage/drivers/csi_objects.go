@@ -17,7 +17,7 @@ limitations under the License.
 // This file is used to deploy the CSI hostPath plugin
 // More Information: https://github.com/kubernetes-csi/drivers/tree/master/pkg/hostpath
 
-package storage
+package drivers
 
 import (
 	"flag"
