@@ -27,6 +27,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "non_zero.go",
         "topologies.go",
     ],

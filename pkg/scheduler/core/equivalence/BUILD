@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["eqivalence.go"],
+    srcs = [
+        "doc.go",
+        "eqivalence.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/core/equivalence",
     visibility = ["//visibility:public"],
     deps = [

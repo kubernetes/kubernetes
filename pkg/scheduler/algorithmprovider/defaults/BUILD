@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["defaults.go"],
+    srcs = [
+        "defaults.go",
+        "doc.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults",
     deps = [
         "//pkg/features:go_default_library",

@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cache.go",
+        "doc.go",
         "interface.go",
         "node_tree.go",
     ],

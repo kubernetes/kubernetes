@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "csi_volume_predicate.go",
+        "doc.go",
         "error.go",
         "metadata.go",
         "predicates.go",

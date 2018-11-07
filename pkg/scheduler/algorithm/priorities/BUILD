@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "balanced_resource_allocation.go",
+        "doc.go",
         "image_locality.go",
         "interpod_affinity.go",
         "least_requested.go",
