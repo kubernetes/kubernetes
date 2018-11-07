@@ -262,8 +262,8 @@ func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { 
 func (_ *fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
 func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
 func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
-func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
-	return nil, nil, nil
+func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, *statsapi.DiskIoStats, error) {
+	return nil, nil, nil, nil
 }
 func (_ *fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	return nil, nil

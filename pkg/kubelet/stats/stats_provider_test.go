@@ -59,6 +59,12 @@ const (
 	offsetFsTotalUsageBytes
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
+	offsetRead
+	offsetWrite
+	offsetSync
+	offsetAsync
+	offsetTotal
+	offsetCount
 )
 
 var (
@@ -87,12 +93,13 @@ func TestGetCgroupStats(t *testing.T) {
 	mockCadvisor.On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
 
 	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
-	cs, ns, err := provider.GetCgroupStats(cgroupName, updateStats)
+	cs, ns, ds, err := provider.GetCgroupStats(cgroupName, updateStats)
 	assert.NoError(err)
 
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
 	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
 	checkNetworkStats(t, "", containerInfoSeed, ns)
+	checkDiskIoStats(t, "", containerInfoSeed, ds)
 
 	assert.Equal(cgroupName, cs.Name)
 	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
@@ -454,6 +461,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 		HasCpu:       true,
 		HasMemory:    true,
 		HasNetwork:   true,
+		HasDiskIo:    true,
 		Labels:       labels,
 		Memory: cadvisorapiv2.MemorySpec{
 			Limit: unlimitedMemory,
@@ -491,6 +499,144 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				RxErrors: 100,
 				TxBytes:  100,
 				TxErrors: 100,
+			}},
+		},
+		DiskIo: &cadvisorapiv1.DiskIoStats{
+			IoServiceBytes: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Read":  uint64(seed + offsetRead),
+					"Write": uint64(seed + offsetWrite),
+					"Sync":  uint64(seed + offsetSync),
+					"Async": uint64(seed + offsetAsync),
+					"Total": uint64(seed + offsetTotal),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Read":  100,
+					"Write": 100,
+					"Sync":  100,
+					"Async": 100,
+					"Total": 100,
+				},
+			}},
+			IoServiced: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Read":  uint64(seed + offsetRead),
+					"Write": uint64(seed + offsetWrite),
+					"Sync":  uint64(seed + offsetSync),
+					"Async": uint64(seed + offsetAsync),
+					"Total": uint64(seed + offsetTotal),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Read":  100,
+					"Write": 100,
+					"Sync":  100,
+					"Async": 100,
+					"Total": 100,
+				},
+			}},
+			IoQueued: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Read":  uint64(seed + offsetRead),
+					"Write": uint64(seed + offsetWrite),
+					"Sync":  uint64(seed + offsetSync),
+					"Async": uint64(seed + offsetAsync),
+					"Total": uint64(seed + offsetTotal),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Read":  100,
+					"Write": 100,
+					"Sync":  100,
+					"Async": 100,
+					"Total": 100,
+				},
+			}},
+			Sectors: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Count": uint64(seed + offsetCount),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Count": 100,
+				},
+			}},
+			IoServiceTime: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Read":  uint64(seed + offsetRead),
+					"Write": uint64(seed + offsetWrite),
+					"Sync":  uint64(seed + offsetSync),
+					"Async": uint64(seed + offsetAsync),
+					"Total": uint64(seed + offsetTotal),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Read":  100,
+					"Write": 100,
+					"Sync":  100,
+					"Async": 100,
+					"Total": 100,
+				},
+			}},
+			IoWaitTime: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Read":  uint64(seed + offsetRead),
+					"Write": uint64(seed + offsetWrite),
+					"Sync":  uint64(seed + offsetSync),
+					"Async": uint64(seed + offsetAsync),
+					"Total": uint64(seed + offsetTotal),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Read":  100,
+					"Write": 100,
+					"Sync":  100,
+					"Async": 100,
+					"Total": 100,
+				},
+			}},
+			IoMerged: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Read":  uint64(seed + offsetRead),
+					"Write": uint64(seed + offsetWrite),
+					"Sync":  uint64(seed + offsetSync),
+					"Async": uint64(seed + offsetAsync),
+					"Total": uint64(seed + offsetTotal),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Read":  100,
+					"Write": 100,
+					"Sync":  100,
+					"Async": 100,
+					"Total": 100,
+				},
+			}},
+			IoTime: []cadvisorapiv1.PerDiskStats{{
+				Device: "dev/sda",
+				Stats: map[string]uint64{
+					"Count": uint64(seed + offsetCount),
+				},
+			}, {
+				Device: "dev/sdb",
+				Stats: map[string]uint64{
+					"Count": 100,
+				},
 			}},
 		},
 		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
@@ -619,6 +765,77 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
 
+}
+
+func checkDiskIoStats(t *testing.T, label string, seed int, stats *statsapi.DiskIoStats) {
+	assert.NotNil(t, stats)
+	assert.EqualValues(t, "dev/sda", stats.DiskIo.IoServiceBytes[0].Device, "device name is not dev/sda")
+	assert.EqualValues(t, seed+offsetRead, stats.DiskIo.IoServiceBytes[0].Stats["Read"], label+"DiskIo.IoServiceBytes.Read")
+	assert.EqualValues(t, seed+offsetWrite, stats.DiskIo.IoServiceBytes[0].Stats["Write"], label+"DiskIo.IoServiceBytes.Write")
+	assert.EqualValues(t, seed+offsetSync, stats.DiskIo.IoServiceBytes[0].Stats["Sync"], label+"DiskIo.IoServiceBytes.Sync")
+	assert.EqualValues(t, seed+offsetAsync, stats.DiskIo.IoServiceBytes[0].Stats["Async"], label+"DiskIo.IoServiceBytes.Async")
+	assert.EqualValues(t, seed+offsetTotal, stats.DiskIo.IoServiceBytes[0].Stats["Total"], label+"DiskIo.IoServiceBytes.Total")
+	assert.EqualValues(t, seed+offsetRead, stats.DiskIo.IoServiced[0].Stats["Read"], label+"DiskIo.IoServiced.Read")
+	assert.EqualValues(t, seed+offsetWrite, stats.DiskIo.IoServiced[0].Stats["Write"], label+"DiskIo.IoServiced.Write")
+	assert.EqualValues(t, seed+offsetSync, stats.DiskIo.IoServiced[0].Stats["Sync"], label+"DiskIo.IoServiced.Sync")
+	assert.EqualValues(t, seed+offsetAsync, stats.DiskIo.IoServiced[0].Stats["Async"], label+"DiskIo.IoServiced.Async")
+	assert.EqualValues(t, seed+offsetTotal, stats.DiskIo.IoServiced[0].Stats["Total"], label+"DiskIo.IoServiced.Total")
+	assert.EqualValues(t, seed+offsetRead, stats.DiskIo.IoQueued[0].Stats["Read"], label+"DiskIo.IoQueued.Read")
+	assert.EqualValues(t, seed+offsetWrite, stats.DiskIo.IoQueued[0].Stats["Write"], label+"DiskIo.IoQueued.Write")
+	assert.EqualValues(t, seed+offsetSync, stats.DiskIo.IoQueued[0].Stats["Sync"], label+"DiskIo.IoQueued.Sync")
+	assert.EqualValues(t, seed+offsetAsync, stats.DiskIo.IoQueued[0].Stats["Async"], label+"DiskIo.IoQueued.Async")
+	assert.EqualValues(t, seed+offsetTotal, stats.DiskIo.IoQueued[0].Stats["Total"], label+"DiskIo.IoQueued.Total")
+	assert.EqualValues(t, seed+offsetCount, stats.DiskIo.Sectors[0].Stats["Count"], label+"DiskIo.Sectors.Count")
+	assert.EqualValues(t, seed+offsetRead, stats.DiskIo.IoServiceTime[0].Stats["Read"], label+"DiskIo.IoServiceTime.Read")
+	assert.EqualValues(t, seed+offsetWrite, stats.DiskIo.IoServiceTime[0].Stats["Write"], label+"DiskIo.IoServiceTime.Write")
+	assert.EqualValues(t, seed+offsetSync, stats.DiskIo.IoServiceTime[0].Stats["Sync"], label+"DiskIo.IoServiceTime.Sync")
+	assert.EqualValues(t, seed+offsetAsync, stats.DiskIo.IoServiceTime[0].Stats["Async"], label+"DiskIo.IoServiceTime.Async")
+	assert.EqualValues(t, seed+offsetTotal, stats.DiskIo.IoServiceTime[0].Stats["Total"], label+"DiskIo.IoServiceTime.Total")
+	assert.EqualValues(t, seed+offsetRead, stats.DiskIo.IoWaitTime[0].Stats["Read"], label+"DiskIo.IoWaitTime.Read")
+	assert.EqualValues(t, seed+offsetWrite, stats.DiskIo.IoWaitTime[0].Stats["Write"], label+"DiskIo.IoWaitTime.Write")
+	assert.EqualValues(t, seed+offsetSync, stats.DiskIo.IoWaitTime[0].Stats["Sync"], label+"DiskIo.IoWaitTime.Sync")
+	assert.EqualValues(t, seed+offsetAsync, stats.DiskIo.IoWaitTime[0].Stats["Async"], label+"DiskIo.IoWaitTime.Async")
+	assert.EqualValues(t, seed+offsetTotal, stats.DiskIo.IoWaitTime[0].Stats["Total"], label+"DiskIo.IoWaitTime.Total")
+	assert.EqualValues(t, seed+offsetRead, stats.DiskIo.IoMerged[0].Stats["Read"], label+"DiskIo.IoMerged.Read")
+	assert.EqualValues(t, seed+offsetWrite, stats.DiskIo.IoMerged[0].Stats["Write"], label+"DiskIo.IoMerged.Write")
+	assert.EqualValues(t, seed+offsetSync, stats.DiskIo.IoMerged[0].Stats["Sync"], label+"DiskIo.IoMerged.Sync")
+	assert.EqualValues(t, seed+offsetAsync, stats.DiskIo.IoMerged[0].Stats["Async"], label+"DiskIo.IoMerged.Async")
+	assert.EqualValues(t, seed+offsetTotal, stats.DiskIo.IoMerged[0].Stats["Total"], label+"DiskIo.IoMerged.Total")
+	assert.EqualValues(t, seed+offsetCount, stats.DiskIo.IoTime[0].Stats["Count"], label+"DiskIo.IoTime.Count")
+
+	assert.EqualValues(t, "dev/sdb", stats.DiskIo.IoServiceBytes[1].Device, "device name is not dev/sdb")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceBytes[1].Stats["Read"], label+"DiskIo.Read")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceBytes[1].Stats["Write"], label+"DiskIo.IoServiceBytes.Write")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceBytes[1].Stats["Sync"], label+"DiskIo.IoServiceBytes.Sync")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceBytes[1].Stats["Async"], label+"DiskIo.IoServiceBytes.Async")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceBytes[1].Stats["Total"], label+"DiskIo.IoServiceBytes.Total")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiced[1].Stats["Read"], label+"DiskIo.IoServiced.Read")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiced[1].Stats["Write"], label+"DiskIo.IoServiced.Write")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiced[1].Stats["Sync"], label+"DiskIo.IoServiced.Sync")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiced[1].Stats["Async"], label+"DiskIo.IoServiced.Async")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiced[1].Stats["Total"], label+"DiskIo.IoServiced.Total")
+	assert.EqualValues(t, 100, stats.DiskIo.IoQueued[1].Stats["Read"], label+"DiskIo.IoQueued.Read")
+	assert.EqualValues(t, 100, stats.DiskIo.IoQueued[1].Stats["Write"], label+"DiskIo.IoQueued.Write")
+	assert.EqualValues(t, 100, stats.DiskIo.IoQueued[1].Stats["Sync"], label+"DiskIo.IoQueued.Sync")
+	assert.EqualValues(t, 100, stats.DiskIo.IoQueued[1].Stats["Async"], label+"DiskIo.IoQueued.Async")
+	assert.EqualValues(t, 100, stats.DiskIo.IoQueued[1].Stats["Total"], label+"DiskIo.IoQueued.Total")
+	assert.EqualValues(t, 100, stats.DiskIo.Sectors[1].Stats["Count"], label+"DiskIo.Sectors.Count")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceTime[1].Stats["Read"], label+"DiskIo.IoServiceTime.Read")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceTime[1].Stats["Write"], label+"DiskIo.IoServiceTime.Write")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceTime[1].Stats["Sync"], label+"DiskIo.IoServiceTime.Sync")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceTime[1].Stats["Async"], label+"DiskIo.IoServiceTime.Async")
+	assert.EqualValues(t, 100, stats.DiskIo.IoServiceTime[1].Stats["Total"], label+"DiskIo.IoServiceTime.Total")
+	assert.EqualValues(t, 100, stats.DiskIo.IoWaitTime[1].Stats["Read"], label+"DiskIo.IoWaitTime.Read")
+	assert.EqualValues(t, 100, stats.DiskIo.IoWaitTime[1].Stats["Write"], label+"DiskIo.IoWaitTime.Write")
+	assert.EqualValues(t, 100, stats.DiskIo.IoWaitTime[1].Stats["Sync"], label+"DiskIo.IoWaitTime.Sync")
+	assert.EqualValues(t, 100, stats.DiskIo.IoWaitTime[1].Stats["Async"], label+"DiskIo.IoWaitTime.Async")
+	assert.EqualValues(t, 100, stats.DiskIo.IoWaitTime[1].Stats["Total"], label+"DiskIo.IoWaitTime.Total")
+	assert.EqualValues(t, 100, stats.DiskIo.IoMerged[1].Stats["Read"], label+"DiskIo.IoMerged.Read")
+	assert.EqualValues(t, 100, stats.DiskIo.IoMerged[1].Stats["Write"], label+"DiskIo.IoMerged.Write")
+	assert.EqualValues(t, 100, stats.DiskIo.IoMerged[1].Stats["Sync"], label+"DiskIo.IoMerged.Sync")
+	assert.EqualValues(t, 100, stats.DiskIo.IoMerged[1].Stats["Async"], label+"DiskIo.IoMerged.Async")
+	assert.EqualValues(t, 100, stats.DiskIo.IoMerged[1].Stats["Total"], label+"DiskIo.IoMerged.Total")
+	assert.EqualValues(t, 100, stats.DiskIo.IoTime[1].Stats["Count"], label+"DiskIo.IoTime.Count")
 }
 
 func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {

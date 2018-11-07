@@ -33,7 +33,7 @@ type StatsProvider struct {
 }
 
 // GetCgroupStats provides a mock function with given fields: cgroupName, updateStats
-func (_m *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
+func (_m *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, *v1alpha1.DiskIoStats, error) {
 	ret := _m.Called(cgroupName, updateStats)
 
 	var r0 *v1alpha1.ContainerStats
@@ -54,14 +54,23 @@ func (_m *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v
 		}
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(string, bool) error); ok {
+	var r2 *v1alpha1.DiskIoStats
+	if rf, ok := ret.Get(2).(func(string, bool) *v1alpha1.DiskIoStats); ok {
 		r2 = rf(cgroupName, updateStats)
 	} else {
-		r2 = ret.Error(2)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(*v1alpha1.DiskIoStats)
+		}
 	}
 
-	return r0, r1, r2
+	var r3 error
+	if rf, ok := ret.Get(3).(func(string, bool) error); ok {
+		r3 = rf(cgroupName, updateStats)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }
 
 // GetCgroupCPUAndMemoryStats provides a mock function with given fields: cgroupName, updateStats

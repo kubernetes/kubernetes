@@ -51,7 +51,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}
 	nodeConfig := sp.provider.GetNodeConfig()
-	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
+	rootStats, networkStats, diskIoStats, err := sp.provider.GetCgroupStats("/", updateStats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 	}
@@ -82,6 +82,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
 		Rlimit:           rlimit,
 		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+		DiskIo:           diskIoStats,
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,

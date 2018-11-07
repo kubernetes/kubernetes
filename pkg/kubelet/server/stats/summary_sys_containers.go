@@ -40,7 +40,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 		if cont.name == "" {
 			continue
 		}
-		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
+		s, _, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
 			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
 			continue

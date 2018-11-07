@@ -182,6 +182,23 @@ func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) 
 	return &iStats
 }
 
+func cadvisorInfoToDiskIoStats(name string, info *cadvisorapiv2.ContainerInfo) *statsapi.DiskIoStats {
+	if !info.Spec.HasDiskIo {
+		return nil
+	}
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return nil
+	}
+
+	dStats := statsapi.DiskIoStats{
+		Time:   metav1.NewTime(cstat.Timestamp),
+		DiskIo: cstat.DiskIo,
+	}
+	return &dStats
+
+}
+
 // cadvisorInfoToUserDefinedMetrics returns the statsapi.UserDefinedMetric
 // converted from the container info from cadvisor.
 func cadvisorInfoToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []statsapi.UserDefinedMetric {

@@ -60,12 +60,13 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	cgroupStatsMap := map[string]struct {
 		cs *statsapi.ContainerStats
 		ns *statsapi.NetworkStats
+		ds *statsapi.DiskIoStats
 	}{
-		"/":        {cs: getContainerStats(), ns: getNetworkStats()},
-		"/runtime": {cs: getContainerStats(), ns: getNetworkStats()},
-		"/misc":    {cs: getContainerStats(), ns: getNetworkStats()},
-		"/kubelet": {cs: getContainerStats(), ns: getNetworkStats()},
-		"/pods":    {cs: getContainerStats(), ns: getNetworkStats()},
+		"/":        {cs: getContainerStats(), ns: getNetworkStats(), ds: getDiskIoStats()},
+		"/runtime": {cs: getContainerStats(), ns: getNetworkStats(), ds: getDiskIoStats()},
+		"/misc":    {cs: getContainerStats(), ns: getNetworkStats(), ds: getDiskIoStats()},
+		"/kubelet": {cs: getContainerStats(), ns: getNetworkStats(), ds: getDiskIoStats()},
+		"/pods":    {cs: getContainerStats(), ns: getNetworkStats(), ds: getDiskIoStats()},
 	}
 
 	mockStatsProvider := new(statstest.StatsProvider)
@@ -77,11 +78,11 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		On("ImageFsStats").Return(imageFsStats, nil).
 		On("RootFsStats").Return(rootFsStats, nil).
 		On("RlimitStats").Return(rlimitStats, nil).
-		On("GetCgroupStats", "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).
-		On("GetCgroupStats", "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil).
-		On("GetCgroupStats", "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil).
-		On("GetCgroupStats", "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil).
-		On("GetCgroupStats", "/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
+		On("GetCgroupStats", "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, cgroupStatsMap["/"].ds, nil).
+		On("GetCgroupStats", "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, cgroupStatsMap["/runtime"].ds, nil).
+		On("GetCgroupStats", "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, cgroupStatsMap["/misc"].ds, nil).
+		On("GetCgroupStats", "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, cgroupStatsMap["/kubelet"].ds, nil).
+		On("GetCgroupStats", "/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, cgroupStatsMap["/pods"].ds, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
 	summary, err := provider.Get(true)
@@ -92,6 +93,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
+	assert.Equal(summary.Node.DiskIo, cgroupStatsMap["/"].ds)
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
 
@@ -243,6 +245,13 @@ func getNetworkStats() *statsapi.NetworkStats {
 func getRlimitStats() *statsapi.RlimitStats {
 	f := fuzz.New().NilChance(0)
 	v := &statsapi.RlimitStats{}
+	f.Fuzz(v)
+	return v
+}
+
+func getDiskIoStats() *statsapi.DiskIoStats {
+	f := fuzz.New().NilChance(0)
+	v := &statsapi.DiskIoStats{}
 	f.Fuzz(v)
 	return v
 }

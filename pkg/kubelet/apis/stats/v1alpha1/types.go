@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -59,6 +60,9 @@ type NodeStats struct {
 	// Stats about the rlimit of system.
 	// +optional
 	Rlimit *RlimitStats `json:"rlimit,omitempty"`
+	// stats pertaining to diskio resources.
+	// +optional
+	DiskIo *DiskIoStats `json:"diskio,omitempty"`
 }
 
 // RlimitStats are stats rlimit of OS.
@@ -292,6 +296,13 @@ type FsStats struct {
 	// This may not equal Inodes - InodesFree because this filesystem may share inodes with other "filesystems"
 	// e.g. For ContainerStats.Rootfs, this is the inodes used only by that container, and does not count inodes used by other containers.
 	InodesUsed *uint64 `json:"inodesUsed,omitempty"`
+}
+
+// DiskIoStats contains data about DiskIO
+type DiskIoStats struct {
+	// The time at which these stats were updated.
+	Time   metav1.Time                `json:"time"`
+	DiskIo *cadvisorapiv1.DiskIoStats `json:"diskio,omitempty"`
 }
 
 // UserDefinedMetricType defines how the metric should be interpreted by the user.

@@ -96,15 +96,16 @@ type rlimitStatsProvider interface {
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
 // this function doesn't generate filesystem stats.
-func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, *statsapi.DiskIoStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
+		return nil, nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
 	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(cgroupName, info)
-	return s, n, nil
+	d := cadvisorInfoToDiskIoStats(cgroupName, info)
+	return s, n, d, nil
 }
 
 // GetCgroupCPUAndMemoryStats returns the CPU and memory stats of the cgroup with the cgroupName. Note that
