@@ -18,6 +18,7 @@ package network
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -172,17 +173,27 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		By("Checking well known ports on master and nodes are not exposed externally")
 		nodeAddrs := framework.NodeAddresses(nodes, v1.NodeExternalIP)
-		Expect(len(nodeAddrs)).NotTo(BeZero())
-		masterAddr := framework.GetMasterAddress(cs)
-		flag, _ := framework.TestNotReachableHTTPTimeout(masterAddr, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout)
-		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(masterAddr, ports.SchedulerPort, gce.FirewallTestTcpTimeout)
-		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout)
-		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, gce.FirewallTestTcpTimeout)
-		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, gce.FirewallTestTcpTimeout)
-		Expect(flag).To(BeTrue())
+		if len(nodeAddrs) == 0 {
+			framework.Failf("did not find any node addresses")
+		}
+
+		masterAddresses := framework.GetAllMasterAddresses(cs)
+		for _, masterAddress := range masterAddresses {
+			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, ports.SchedulerPort, gce.FirewallTestTcpTimeout)
+		}
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, gce.FirewallTestTcpTimeout)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, gce.FirewallTestTcpTimeout)
 	})
 })
+
+func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
+	unreachable, err := framework.TestNotReachableHTTPTimeout(ip, port, timeout)
+	if err != nil {
+		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, err)
+	}
+	if !unreachable {
+		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
+	}
+}
