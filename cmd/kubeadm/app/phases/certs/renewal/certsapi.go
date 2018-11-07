@@ -17,7 +17,6 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -70,7 +69,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		return nil, nil, errors.Wrap(err, "couldn't create new private key")
 	}
 
-	csr, err := x509.CreateCertificateRequest(rand.Reader, reqTmp, key)
+	csr, err := certutil.MakeCSRFromTemplate(key, reqTmp)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
