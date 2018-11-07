@@ -86,11 +86,6 @@ type codec struct {
 // successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
 // into that matches the serialized version.
 func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	versioned, isVersioned := into.(*runtime.VersionedObjects)
-	if isVersioned {
-		into = versioned.Last()
-	}
-
 	// If the into object is unstructured and expresses an opinion about its group/version,
 	// create a new instance of the type so we always exercise the conversion path (skips short-circuiting on `into == obj`)
 	decodeInto := into
@@ -115,22 +110,11 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	if into != nil {
 		// perform defaulting if requested
 		if c.defaulter != nil {
-			// create a copy to ensure defaulting is not applied to the original versioned objects
-			if isVersioned {
-				versioned.Objects = []runtime.Object{obj.DeepCopyObject()}
-			}
 			c.defaulter.Default(obj)
-		} else {
-			if isVersioned {
-				versioned.Objects = []runtime.Object{obj}
-			}
 		}
 
 		// Short-circuit conversion if the into object is same object
 		if into == obj {
-			if isVersioned {
-				return versioned, gvk, nil
-			}
 			return into, gvk, nil
 		}
 
@@ -138,17 +122,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 			return nil, gvk, err
 		}
 
-		if isVersioned {
-			versioned.Objects = append(versioned.Objects, into)
-			return versioned, gvk, nil
-		}
 		return into, gvk, nil
-	}
-
-	// Convert if needed.
-	if isVersioned {
-		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
-		versioned.Objects = []runtime.Object{obj.DeepCopyObject()}
 	}
 
 	// perform defaulting if requested
@@ -159,12 +133,6 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	out, err := c.convertor.ConvertToVersion(obj, c.decodeVersion)
 	if err != nil {
 		return nil, gvk, err
-	}
-	if isVersioned {
-		if versioned.Last() != out {
-			versioned.Objects = append(versioned.Objects, out)
-		}
-		return versioned, gvk, nil
 	}
 	return out, gvk, nil
 }

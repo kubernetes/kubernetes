@@ -93,23 +93,6 @@ var _ recognizer.RecognizingDecoder = &Serializer{}
 // not fully qualified with kind/version/group, the type of the into will be used to alter the returned gvk. On success or most
 // errors, the method will return the calculated schema kind.
 func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	if versioned, ok := into.(*runtime.VersionedObjects); ok {
-		into = versioned.Last()
-		obj, actual, err := s.Decode(originalData, gvk, into)
-		if err != nil {
-			return nil, actual, err
-		}
-		// the last item in versioned becomes into, so if versioned was not originally empty we reset the object
-		// array so the first position is the decoded object and the second position is the outermost object.
-		// if there were no objects in the versioned list passed to us, only add ourselves.
-		if into != nil && into != obj {
-			versioned.Objects = []runtime.Object{obj, into}
-		} else {
-			versioned.Objects = []runtime.Object{obj}
-		}
-		return versioned, actual, err
-	}
-
 	prefixLen := len(s.prefix)
 	switch {
 	case len(originalData) == 0:
@@ -330,20 +313,6 @@ var _ runtime.Serializer = &RawSerializer{}
 func (s *RawSerializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	if into == nil {
 		return nil, nil, fmt.Errorf("this serializer requires an object to decode into: %#v", s)
-	}
-
-	if versioned, ok := into.(*runtime.VersionedObjects); ok {
-		into = versioned.Last()
-		obj, actual, err := s.Decode(originalData, gvk, into)
-		if err != nil {
-			return nil, actual, err
-		}
-		if into != nil && into != obj {
-			versioned.Objects = []runtime.Object{obj, into}
-		} else {
-			versioned.Objects = []runtime.Object{obj}
-		}
-		return versioned, actual, err
 	}
 
 	if len(originalData) == 0 {
