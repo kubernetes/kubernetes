@@ -67,7 +67,10 @@ func NewCgroupName(base CgroupName, components ...string) CgroupName {
 			panic(fmt.Errorf("invalid character in component [%q] of CgroupName", component))
 		}
 	}
-	return CgroupName(append(base, components...))
+	// copy data from the base cgroup to eliminate cases where CgroupNames share underlying slices.  See #68416
+	baseCopy := make([]string, len(base))
+	copy(baseCopy, base)
+	return CgroupName(append(baseCopy, components...))
 }
 
 func escapeSystemdCgroupName(part string) string {
