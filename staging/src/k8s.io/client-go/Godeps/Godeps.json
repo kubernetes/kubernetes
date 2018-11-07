@@ -148,11 +148,11 @@
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
-			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+			"Rev": "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
-			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+			"Rev": "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
