@@ -41,7 +41,7 @@ const (
 	// CustomResourceSubresources defines the subresources for CustomResources
 	CustomResourceSubresources utilfeature.Feature = "CustomResourceSubresources"
 
-	// owner: @mbohlool
+	// owner: @mbohlool, @roycaihw
 	// alpha: v1.13
 	//
 	// CustomResourceWebhookConversion defines the webhook conversion for Custom Resources.
