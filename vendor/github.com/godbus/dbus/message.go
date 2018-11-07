@@ -22,6 +22,13 @@ const (
 	// FlagNoAutoStart signals that the message bus should not automatically
 	// start an application when handling this message.
 	FlagNoAutoStart
+	// FlagAllowInteractiveAuthorization may be set on a method call
+	// message to inform the receiving side that the caller is prepared
+	// to wait for interactive authorization, which might take a
+	// considerable time to complete. For instance, if this flag is set,
+	// it would be appropriate to query the user for passwords or
+	// confirmation via Polkit or a similar framework.
+	FlagAllowInteractiveAuthorization
 )
 
 // Type represents the possible types of a D-Bus message.
@@ -248,7 +255,7 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 // IsValid checks whether msg is a valid message and returns an
 // InvalidMessageError if it is not.
 func (msg *Message) IsValid() error {
-	if msg.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected) != 0 {
+	if msg.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected|FlagAllowInteractiveAuthorization) != 0 {
 		return InvalidMessageError("invalid flags")
 	}
 	if msg.Type == 0 || msg.Type >= typeMax {
