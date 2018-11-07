@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package comparer
+package debugger
 
 import (
 	"sort"
@@ -35,21 +35,6 @@ type CacheComparer struct {
 	PodLister  corelisters.PodLister
 	Cache      schedulerinternalcache.Cache
 	PodQueue   internalqueue.SchedulingQueue
-}
-
-// New creates a CacheComparer.
-func New(
-	nodeLister corelisters.NodeLister,
-	podLister corelisters.PodLister,
-	cache schedulerinternalcache.Cache,
-	podQueue internalqueue.SchedulingQueue,
-) *CacheComparer {
-	return &CacheComparer{
-		NodeLister: nodeLister,
-		PodLister:  podLister,
-		Cache:      cache,
-		PodQueue:   podQueue,
-	}
 }
 
 // Compare compares the nodes and pods of NodeLister with Cache.Snapshot.

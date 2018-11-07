@@ -2,8 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["comparer.go"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/internal/cache/comparer",
+    srcs = [
+        "comparer.go",
+        "debugger.go",
+        "dumper.go",
+    ],
+    importpath = "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger",
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
         "//pkg/scheduler/cache:go_default_library",
