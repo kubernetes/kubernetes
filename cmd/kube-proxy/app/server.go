@@ -199,9 +199,8 @@ func (o *Options) Complete() error {
 	if len(o.ConfigFile) > 0 {
 		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
 			return err
-		} else {
-			o.config = c
 		}
+		o.config = c
 	}
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
@@ -468,7 +467,7 @@ func (s *ProxyServer) Run() error {
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
 		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
 		if encounteredError {
-			return errors.New("encountered an error while tearing down rules.")
+			return errors.New("encountered an error while tearing down rules")
 		}
 		return nil
 	}
