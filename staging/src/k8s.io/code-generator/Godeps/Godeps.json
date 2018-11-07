@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/code-generator",
 	"GoVersion": "go1.11",
-	"GodepVersion": "v80",
+	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"./..."
 	],
