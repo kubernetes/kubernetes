@@ -454,13 +454,7 @@ kube::util::ensure_godep_version() {
     return
   fi
 
-  # If GODEP is in the path, then use it.
-  if [[ "$(godep version 2>/dev/null)" == *"godep ${godep_target_version}"* ]]; then
-    export KUBE_GODEP="$(which godep)"
-    kube::log::status "Using ${KUBE_GODEP}"
-    return
-  fi
-
+  # Otherwise, install forked godep
   kube::log::status "Installing godep version ${godep_target_version}"
   # Run in hermetic GOPATH
   kube::golang::setup_env
@@ -468,6 +462,7 @@ kube::util::ensure_godep_version() {
   export KUBE_GODEP="${KUBE_GOPATH}/bin/godep"
   kube::log::status "Installed ${KUBE_GODEP}"
 
+  # Verify that the installed godep from fork is what we expect
   if [[ "$(${KUBE_GODEP:?} version 2>/dev/null)" != *"godep ${godep_target_version}"* ]]; then
     kube::log::error "Expected godep ${godep_target_version} from ${KUBE_GODEP}, got $(${KUBE_GODEP:?} version)"
     return 1

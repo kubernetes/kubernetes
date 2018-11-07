@@ -51,7 +51,6 @@ function cleanup {
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
-  export GODEP=""
 }
 trap cleanup EXIT
 
