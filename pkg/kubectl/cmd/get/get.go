@@ -314,11 +314,14 @@ type RuntimeSorter struct {
 }
 
 func (r *RuntimeSorter) Sort() error {
-	if len(r.objects) <= 1 {
-		// a list is only considered "sorted" if there are 0 or 1 items in it
-		// AND (if 1 item) the item is not a Table object
+	// a list is only considered "sorted" if there are 0 or 1 items in it
+	// AND (if 1 item) the item is not a Table object
+	if len(r.objects) == 0 {
+		return nil
+	}
+	if len(r.objects) == 1 {
 		_, isTable := r.objects[0].(*metav1beta1.Table)
-		if len(r.objects) == 0 || !isTable {
+		if !isTable {
 			return nil
 		}
 	}
