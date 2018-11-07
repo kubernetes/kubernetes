@@ -148,10 +148,32 @@ func TestCheckerNames(t *testing.T) {
 	for _, tc := range testCases {
 		result := checkerNames(tc.have...)
 		t.Run(tc.desc, func(t *testing.T) {
-			if reflect.DeepEqual(tc.want, result) {
+			if !reflect.DeepEqual(tc.want, result) {
 				t.Errorf("want %#v, got %#v", tc.want, result)
 			}
 		})
 	}
+}
 
+func TestFormatQuoted(t *testing.T) {
+	n1 := "n1"
+	n2 := "n2"
+	testCases := []struct {
+		desc     string
+		names    []string
+		expected string
+	}{
+		{"empty", []string{}, ""},
+		{"single name", []string{n1}, "\"n1\""},
+		{"two names", []string{n1, n2}, "\"n1\",\"n2\""},
+		{"two names, reverse order", []string{n2, n1}, "\"n2\",\"n1\""},
+	}
+	for _, tc := range testCases {
+		result := formatQuoted(tc.names...)
+		t.Run(tc.desc, func(t *testing.T) {
+			if result != tc.expected {
+				t.Errorf("expected %#v, got %#v", tc.expected, result)
+			}
+		})
+	}
 }
