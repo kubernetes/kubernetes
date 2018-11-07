@@ -204,7 +204,10 @@ type Master struct {
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
-	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient, err := corev1client.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		glog.Fatalf("fail to create endpoint client for master count reconciler: %v", err)
+	}
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
 }
 
@@ -213,7 +216,10 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
-	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient, err := corev1client.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		glog.Fatalf("fail to create endpoint client for master lease reconciler: %v", err)
+	}
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {

@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -417,15 +418,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	for _, test := range reconcileTests {
 		fakeLeases := newFakeLeases()
 		fakeLeases.SetKeys(test.endpointKeys)
-		clientset := fake.NewSimpleClientset()
+		var endpoints []runtime.Object
 		if test.endpoints != nil {
-			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
-					t.Errorf("case %q: unexpected error: %v", test.testName, err)
-					continue
-				}
+			endpoints = make([]runtime.Object, len(test.endpoints.Items))
+			for i := range test.endpoints.Items {
+				endpoints[i] = &test.endpoints.Items[i]
 			}
 		}
+		clientset := fake.NewSimpleClientset(endpoints...)
 		r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
 		err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
@@ -517,15 +517,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeLeases := newFakeLeases()
 			fakeLeases.SetKeys(test.endpointKeys)
-			clientset := fake.NewSimpleClientset()
+			var endpoints []runtime.Object
 			if test.endpoints != nil {
-				for _, ep := range test.endpoints.Items {
-					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
-						t.Errorf("case %q: unexpected error: %v", test.testName, err)
-						continue
-					}
+				endpoints = make([]runtime.Object, len(test.endpoints.Items))
+				for i := range test.endpoints.Items {
+					endpoints[i] = &test.endpoints.Items[i]
 				}
 			}
+			clientset := fake.NewSimpleClientset(endpoints...)
 			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 			if err != nil {
@@ -619,13 +618,14 @@ func TestLeaseStopReconciling(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeLeases := newFakeLeases()
 			fakeLeases.SetKeys(test.endpointKeys)
-			clientset := fake.NewSimpleClientset()
-			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
-					t.Errorf("case %q: unexpected error: %v", test.testName, err)
-					continue
+			var endpoints []runtime.Object
+			if test.endpoints != nil {
+				endpoints = make([]runtime.Object, len(test.endpoints.Items))
+				for i := range test.endpoints.Items {
+					endpoints[i] = &test.endpoints.Items[i]
 				}
 			}
+			clientset := fake.NewSimpleClientset(endpoints...)
 			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
 			err := r.StopReconciling(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
 			if err != nil {
