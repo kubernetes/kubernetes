@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilsexec "k8s.io/utils/exec"
 
+	pkgerrors "github.com/pkg/errors"
 	"k8s.io/klog"
 )
 
@@ -47,12 +48,13 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []err
 	kernelVersion, ipvsModules, err := GetKernelVersionAndIPVSMods(r.Executor)
 	if err != nil {
 		errors = append(errors, err)
+		return nil, errors
 	}
 
 	// Find out loaded kernel modules
 	out, err := r.Executor.Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
 	if err != nil {
-		errors = append(errors, fmt.Errorf("error getting installed ipvs required kernel modules: %v(%s)", err, out))
+		errors = append(errors, pkgerrors.Wrapf(err, "error getting installed ipvs required kernel modules: %s", out))
 		return nil, errors
 	}
 	mods := strings.Split(string(out), "\n")
@@ -63,29 +65,46 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []err
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).UnsortedList()
 
-	// Check builtin modules exist or not
-	if len(modules) != 0 {
-		builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
-		out, err := r.Executor.Command("cut", "-f1", "-d", " ", builtinModsFilePath).CombinedOutput()
-		if err != nil {
-			errors = append(errors, fmt.Errorf("error getting required builtin kernel modules: %v(%s)", err, out))
-			return nil, errors
-		}
+	if len(modules) == 0 {
+		return nil, nil
+	}
 
-		builtInModules := sets.NewString()
-		for _, builtInMode := range ipvsModules {
-			match, _ := regexp.Match(builtInMode+".ko", out)
-			if !match {
-				builtInModules.Insert(string(builtInMode))
-			}
-		}
-		if len(builtInModules) != 0 {
-			warnings = append(warnings, fmt.Errorf(
-				"the IPVS proxier will not be used, because the following required kernel modules are not loaded: %v or no builtin kernel ipvs support: %v\n"+
-					"you can solve this problem with following methods:\n 1. Run 'modprobe -- ' to load missing kernel modules;\n"+
-					"2. Provide the missing builtin kernel ipvs support\n", modules, builtInModules))
+	// Check if loadable modules are installed
+	var missingModules []string
+	for _, module := range modules {
+		out, err = r.Executor.Command("modinfo", module).CombinedOutput()
+		if err != nil {
+			warnings = append(warnings, pkgerrors.Wrapf(err, "error getting module info for %q; output: %s", module, strings.TrimSpace(string(out))))
+			missingModules = append(missingModules, module)
 		}
 	}
 
-	return warnings, errors
+	if len(missingModules) == 0 {
+		return warnings, nil
+	}
+
+	// Check if builtin modules exist
+	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
+	out, err = r.Executor.Command("cut", "-f1", "-d", " ", builtinModsFilePath).CombinedOutput()
+	if err != nil {
+		errors = append(errors, pkgerrors.Wrapf(err, "error getting required builtin kernel modules: %s", out))
+		return warnings, errors
+	}
+
+	var missingBuiltins []string
+	for _, module := range missingModules {
+		match, _ := regexp.Match(module+".ko", out)
+		if !match {
+			missingBuiltins = append(missingBuiltins, module)
+		}
+	}
+
+	if len(missingBuiltins) != 0 {
+		warnings = append(warnings, pkgerrors.Errorf(
+			"the IPVS proxier will not be used, because the following required kernel modules are not loaded or found: %v\n"+
+				"You can solve this problem by providing builtin or loadable kernel IPVS support\n", missingBuiltins))
+		return warnings, nil
+	}
+
+	return warnings, nil
 }
