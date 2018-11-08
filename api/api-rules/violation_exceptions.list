@@ -171,3 +171,4 @@ API rule violation: names_match,k8s.io/kubernetes/cmd/cloud-controller-manager/a
 API rule violation: names_match,k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,ServiceController
 API rule violation: names_match,k8s.io/metrics/pkg/apis/custom_metrics/v1beta1,MetricValue,WindowSeconds
 API rule violation: names_match,k8s.io/metrics/pkg/apis/external_metrics/v1beta1,ExternalMetricValue,WindowSeconds
+API rule violation: omitempty_match_case,k8s.io/api/core/v1,SecurityContext,SeccompProfile
