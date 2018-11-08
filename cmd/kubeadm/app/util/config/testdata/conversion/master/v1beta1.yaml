@@ -31,10 +31,6 @@ apiServer:
     name: WritableVolume
   timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta1
-auditPolicy:
-  logDir: /var/log/kubernetes/audit
-  logMaxAge: 2
-  path: ""
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""

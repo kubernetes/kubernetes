@@ -48,9 +48,6 @@ func TestPrintConfiguration(t *testing.T) {
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta1
-	auditPolicy:
-	  logDir: ""
-	  path: ""
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
 	controllerManager: {}
@@ -87,9 +84,6 @@ func TestPrintConfiguration(t *testing.T) {
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta1
-	auditPolicy:
-	  logDir: ""
-	  path: ""
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
 	controllerManager: {}

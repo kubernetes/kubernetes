@@ -56,6 +56,35 @@ func TestJoinConfigurationConversion(t *testing.T) {
 	}
 }
 
+func TestInitConfigurationConversion(t *testing.T) {
+	testcases := map[string]struct {
+		old         *InitConfiguration
+		expectedErr bool
+	}{
+		"conversion succeeds": {
+			old:         &InitConfiguration{},
+			expectedErr: false,
+		},
+		"feature gates fails to be converted": {
+			old: &InitConfiguration{
+				ClusterConfiguration: ClusterConfiguration{
+					AuditPolicyConfiguration: AuditPolicyConfiguration{
+						Path: "test",
+					},
+				},
+			},
+			expectedErr: true,
+		},
+	}
+	for _, tc := range testcases {
+		internal := &kubeadm.InitConfiguration{}
+		err := Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(tc.old, internal, nil)
+		if (err != nil) != tc.expectedErr {
+			t.Errorf("no error was expected but '%s' was found", err)
+		}
+	}
+}
+
 func TestConvertToUseHyperKubeImage(t *testing.T) {
 	tests := []struct {
 		desc              string

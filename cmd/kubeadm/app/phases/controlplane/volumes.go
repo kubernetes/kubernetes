@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -46,7 +45,6 @@ var caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates",
 func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) controlPlaneHostPathMounts {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
-	hostPathFile := v1.HostPathFile
 	mounts := newControlPlaneHostPathMounts()
 
 	// HostPath volumes for the API Server
@@ -55,12 +53,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) con
 	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
 	// Read-only mount for the ca certs (/etc/ssl/certs) directory
 	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
-	if features.Enabled(cfg.FeatureGates, features.Auditing) {
-		// Read-only mount for the audit policy file.
-		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeAuditPolicyVolumeName, cfg.AuditPolicyConfiguration.Path, kubeadmconstants.GetStaticPodAuditPolicyFile(), true, &hostPathFile)
-		// Write mount for the audit logs.
-		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeAuditPolicyLogVolumeName, cfg.AuditPolicyConfiguration.LogDir, kubeadmconstants.StaticPodAuditPolicyLogDir, false, &hostPathDirectoryOrCreate)
-	}
+
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
 	if cfg.Etcd.External != nil {
 		etcdVols, etcdVolMounts := getEtcdCertVolumes(cfg.Etcd.External, cfg.CertificatesDir)
