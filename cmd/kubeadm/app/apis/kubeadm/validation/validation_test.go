@@ -603,11 +603,10 @@ func TestValidateFeatureGates(t *testing.T) {
 		featureGates featureFlag
 		expected     bool
 	}{
-		{featureFlag{"SelfHosting": true}, true},
-		{featureFlag{"SelfHosting": false}, true},
-		{featureFlag{"StoreCertsInSecrets": true}, true},
-		{featureFlag{"StoreCertsInSecrets": false}, true},
-		{featureFlag{"Foo": true}, false},
+		{featureFlag{"Unknown": true}, false},
+		{featureFlag{"Unknown": false}, false},
+		{featureFlag{"CoreDNS": true}, true},
+		{featureFlag{"CoreDNS": false}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateFeatureGates(rt.featureGates, nil)

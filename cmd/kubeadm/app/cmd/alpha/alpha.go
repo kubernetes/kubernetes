@@ -25,7 +25,7 @@ import (
 )
 
 // NewCmdAlpha returns "kubeadm alpha" command.
-func NewCmdAlpha(out io.Writer) *cobra.Command {
+func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: "Kubeadm experimental sub-commands",
@@ -35,6 +35,7 @@ func NewCmdAlpha(out io.Writer) *cobra.Command {
 	cmd.AddCommand(newCmdKubeletUtility())
 	cmd.AddCommand(newCmdKubeConfigUtility(out))
 	cmd.AddCommand(newCmdPreFlightUtility())
+	cmd.AddCommand(NewCmdSelfhosting(in))
 
 	// TODO: This command should be removed as soon as the kubeadm init phase refactoring is completed.
 	//		 current phases implemented as cobra.Commands should become workflow.Phases, while other utilities
@@ -54,7 +55,6 @@ func newCmdPhase(out io.Writer) *cobra.Command {
 	cmd.AddCommand(phases.NewCmdAddon())
 	cmd.AddCommand(phases.NewCmdBootstrapToken())
 	cmd.AddCommand(phases.NewCmdMarkMaster())
-	cmd.AddCommand(phases.NewCmdSelfhosting())
 
 	return cmd
 }

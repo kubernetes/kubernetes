@@ -33,7 +33,6 @@ import (
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -57,18 +56,16 @@ const (
 // 8. In order to avoid race conditions, we have to make sure that static pod is deleted correctly before we continue
 //      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
-func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.InitConfiguration, client clientset.Interface, waiter apiclient.Waiter, dryRun bool) error {
+func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.InitConfiguration, client clientset.Interface, waiter apiclient.Waiter, dryRun bool, certsInSecrets bool) error {
 	glog.V(1).Infoln("creating self hosted control plane")
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
 	// Here the map of different mutators to use for the control plane's PodSpec is stored
 	glog.V(1).Infoln("getting mutators")
-	mutators := GetMutatorsFromFeatureGates(cfg.FeatureGates)
+	mutators := GetMutatorsFromFeatureGates(certsInSecrets)
 
-	// Some extra work to be done if we should store the control plane certificates in Secrets
-	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
-
+	if certsInSecrets {
 		// Upload the certificates and kubeconfig files from disk to the cluster as Secrets
 		if err := uploadTLSSecrets(client, cfg.CertificatesDir); err != nil {
 			return err

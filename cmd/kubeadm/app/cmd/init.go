@@ -50,7 +50,7 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
-	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
+	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -462,7 +462,7 @@ func runInit(i *initData, out io.Writer) error {
 
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
-	certsDirToWriteTo, kubeConfigDir, manifestDir, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
+	certsDirToWriteTo, kubeConfigDir, _, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
 		return errors.Wrap(err, "error getting directories to use")
 	}
@@ -479,11 +479,17 @@ func runInit(i *initData, out io.Writer) error {
 		return errors.Wrap(err, "failed to create client")
 	}
 
-	// TODO: NewControlPlaneWaiter should be converted to private after the self-hosting phase is removed.
-	timeout := i.cfg.ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
-	waiter, err := phases.NewControlPlaneWaiter(i.dryRun, timeout, client, i.outputWriter)
-	if err != nil {
-		return errors.Wrap(err, "failed to create waiter")
+	// Upload currently used configuration to the cluster
+	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
+	// depend on centralized information from this source in the future
+	glog.V(1).Infof("[init] uploading currently used configuration to the cluster")
+	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
+		return errors.Wrap(err, "error uploading configuration")
+	}
+
+	glog.V(1).Infof("[init] creating kubelet configuration configmap")
+	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
+		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
@@ -558,17 +564,6 @@ func runInit(i *initData, out io.Writer) error {
 	glog.V(1).Infof("[init] ensuring proxy addon")
 	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error ensuring proxy addon")
-	}
-
-	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
-	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
-		glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
-		// Temporary control plane is up, now we create our self hosted control
-		// plane components and remove the static manifests:
-		fmt.Println("[self-hosted] creating self-hosted control plane")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
-			return errors.Wrap(err, "error creating self hosted control plane")
-		}
 	}
 
 	// Exit earlier if we're dryrunning

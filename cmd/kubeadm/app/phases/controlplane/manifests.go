@@ -176,10 +176,6 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		}
 	}
 
-	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
-		defaultArguments["endpoint-reconciler-type"] = kubeadmconstants.LeaseEndpointReconcilerType
-	}
-
 	if features.Enabled(cfg.FeatureGates, features.DynamicKubeletConfig) {
 		defaultArguments["feature-gates"] = "DynamicKubeletConfig=true"
 	}
