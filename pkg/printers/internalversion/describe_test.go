@@ -982,7 +982,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						Glusterfs: &api.GlusterfsVolumeSource{},
+						Glusterfs: &api.GlusterfsPersistentVolumeSource{},
 					},
 				},
 			},

@@ -84125,6 +84125,31 @@
      }
     }
    },
+   "io.k8s.api.core.v1.GlusterfsPersistentVolumeSource": {
+    "description": "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "string"
+     },
+     "endpointsNamespace": {
+      "description": "EndpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "string"
+     },
+     "path": {
+      "description": "Path is the Glusterfs volume path. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "boolean"
+     }
+    }
+   },
    "io.k8s.api.core.v1.GlusterfsVolumeSource": {
     "description": "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
     "required": [
@@ -85424,7 +85449,7 @@
      },
      "glusterfs": {
       "description": "Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod. Provisioned by an admin. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
-      "$ref": "#/definitions/io.k8s.api.core.v1.GlusterfsVolumeSource"
+      "$ref": "#/definitions/io.k8s.api.core.v1.GlusterfsPersistentVolumeSource"
      },
      "hostPath": {
       "description": "HostPath represents a directory on the host. Provisioned by a developer or tester. This is useful for single-node development and testing only! On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",

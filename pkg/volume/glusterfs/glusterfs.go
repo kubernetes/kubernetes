@@ -106,15 +106,30 @@ func (plugin *glusterfsPlugin) GetPluginName() string {
 }
 
 func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	var endpointName string
+	var endpointsNsPtr *string
+
+	volPath, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(
-		"%v:%v",
-		volumeSource.EndpointsName,
-		volumeSource.Path), nil
+	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
+		endpointName = spec.Volume.Glusterfs.EndpointsName
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Glusterfs != nil {
+		endpointName = spec.PersistentVolume.Spec.Glusterfs.EndpointsName
+		endpointsNsPtr = spec.PersistentVolume.Spec.Glusterfs.EndpointsNamespace
+		if endpointsNsPtr != nil && *endpointsNsPtr != "" {
+			return fmt.Sprintf("%v:%v:%v", endpointName, *endpointsNsPtr, volPath), nil
+		}
+		return "", fmt.Errorf("invalid endpointsnamespace in provided glusterfs PV spec")
+
+	} else {
+		return "", fmt.Errorf("unable to fetch required parameters from provided glusterfs spec")
+	}
+
+	return fmt.Sprintf("%v:%v", endpointName, volPath), nil
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -147,19 +162,17 @@ func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	source, _, err := getVolumeSource(spec)
+	epName, epNamespace, err := plugin.getEndpointNameAndNamespace(spec, pod.Namespace)
 	if err != nil {
-		glog.Errorf("failed to get gluster volumesource: %v", err)
 		return nil, err
 	}
-	epName := source.EndpointsName
-	// PVC/POD is in same namespace.
-	podNs := pod.Namespace
+
 	kubeClient := plugin.host.GetKubeClient()
 	if kubeClient == nil {
 		return nil, fmt.Errorf("failed to get kube client to initialize mounter")
 	}
-	ep, err := kubeClient.CoreV1().Endpoints(podNs).Get(epName, metav1.GetOptions{})
+	ep, err := kubeClient.Core().Endpoints(epNamespace).Get(epName, metav1.GetOptions{})
+
 	if err != nil {
 		glog.Errorf("failed to get endpoint %s: %v", epName, err)
 		return nil, err
@@ -168,8 +181,38 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
+func (plugin *glusterfsPlugin) getEndpointNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
+	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
+		endpoints := spec.Volume.Glusterfs.EndpointsName
+		if endpoints == "" {
+			return "", "", fmt.Errorf("no glusterFS endpoint specified")
+		}
+		return endpoints, defaultNamespace, nil
+
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Glusterfs != nil {
+		endpoints := spec.PersistentVolume.Spec.Glusterfs.EndpointsName
+		endpointsNs := defaultNamespace
+
+		overriddenNs := spec.PersistentVolume.Spec.Glusterfs.EndpointsNamespace
+		if overriddenNs != nil {
+			if len(*overriddenNs) > 0 {
+				endpointsNs = *overriddenNs
+			} else {
+				return "", "", fmt.Errorf("endpointnamespace field set, but no endpointnamespace specified")
+			}
+		}
+		return endpoints, endpointsNs, nil
+	}
+	return "", "", fmt.Errorf("Spec does not reference a GlusterFS volume type")
+
+}
 func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endpoints, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
-	source, readOnly, _ := getVolumeSource(spec)
+	volPath, readOnly, err := getVolumeInfo(spec)
+	if err != nil {
+		glog.Errorf("failed to get volumesource : %v", err)
+		return nil, err
+	}
 	return &glusterfsMounter{
 		glusterfs: &glusterfs{
 			volName:         spec.Name(),
@@ -179,7 +222,7 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, strings.EscapeQualifiedNameForDisk(glusterfsPluginName), spec.Name())),
 		},
 		hosts:        ep,
-		path:         source.Path,
+		path:         volPath,
 		readOnly:     readOnly,
 		mountOptions: volutil.MountOptionFromSpec(spec),
 	}, nil
@@ -411,15 +454,16 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 }
 
-func getVolumeSource(spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool, error) {
+//getVolumeInfo returns 'path' and 'readonly' field values from the provided glusterfs spec.
+func getVolumeInfo(spec *volume.Spec) (string, bool, error) {
 	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
-		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly, nil
+		return spec.Volume.Glusterfs.Path, spec.Volume.Glusterfs.ReadOnly, nil
+
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.Glusterfs != nil {
-		return spec.PersistentVolume.Spec.Glusterfs, spec.ReadOnly, nil
+		return spec.PersistentVolume.Spec.Glusterfs.Path, spec.ReadOnly, nil
 	}
-
-	return nil, false, fmt.Errorf("Spec does not reference a Glusterfs volume type")
+	return "", false, fmt.Errorf("Spec does not reference a Glusterfs volume type")
 }
 
 func (plugin *glusterfsPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -778,7 +822,7 @@ func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTop
 	return pv, nil
 }
 
-func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
+func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersistentVolumeSource, size int, volID string, err error) {
 	var clusterIDs []string
 	customVolumeName := ""
 	epServiceName := ""
@@ -849,10 +893,11 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 	}
 	glog.V(3).Infof("dynamic endpoint %v and service %v ", endpoint, service)
-	return &v1.GlusterfsVolumeSource{
-		EndpointsName: endpoint.Name,
-		Path:          volume.Name,
-		ReadOnly:      false,
+	return &v1.GlusterfsPersistentVolumeSource{
+		EndpointsName:      endpoint.Name,
+		EndpointsNamespace: &epNamespace,
+		Path:               volume.Name,
+		ReadOnly:           false,
 	}, sz, volID, nil
 }
 
