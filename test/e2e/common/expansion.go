@@ -33,6 +33,8 @@ import (
 var _ = framework.KubeDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
+	// All VariableExpansion Conformance test can be run on Windows
+
 	/*
 		Release : v1.9
 		Testname: Environment variables, expansion
@@ -70,6 +72,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("env composition", pod, 0, []string{
 			"FOO=foo-value",
@@ -107,6 +110,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("substitution in container's command", pod, 0, []string{
 			"test-value",
@@ -143,6 +147,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("substitution in container's args", pod, 0, []string{
 			"test-value",
