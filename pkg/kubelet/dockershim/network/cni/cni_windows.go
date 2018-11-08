@@ -43,7 +43,13 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	result, err := plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil, nil)
+	// For CNI plugins that support it, flag that, even if the pod has not been networked, we only want the CNI
+	// plugin to do a lookup.  This avoids re-networking a pod that we're currently deleting.
+	// TODO Once it's supported, we could use CNI CHECK here.
+	// TODO Once it's supported, we can switch to HNS namespace lookup here.
+	options := map[string]string{"lookupOnly": "true"}
+	result, err := plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil,
+		options)
 
 	glog.V(5).Infof("GetPodNetworkStatus result %+v", result)
 	if err != nil {

@@ -416,5 +416,12 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 		}
 	}
 
+	// On Windows, kubelet needs a way to look up the pod IP but the HNS API doesn't expose a way
+	// to do that.  Until we have CNI CHECK, expose a flag to let the CNI plugin know not to
+	// re-network the pod.
+	if options["lookupOnly"] == "true" {
+		rt.CapabilityArgs["lookupOnly"] = true
+	}
+
 	return rt, nil
 }
