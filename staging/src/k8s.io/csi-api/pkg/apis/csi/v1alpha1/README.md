@@ -14,10 +14,11 @@ cluster and it is registered through the Kubelet device registration mechanism.
 
 ## Who updates CSIDriverInfo Spec and when
 
-The CSIDriverInfoSpec ror a driver is created upon installation of the CSI
+The CSIDriverInfoSpec for a driver is created upon installation of the CSI
 Driver to the cluster and it is registered through the Kubelet device
 registration mechanism. The spec is populated with information about the driver
-through the nodeinfomanager and will remain unchanged from then on.
+through the nodeinfomanager (inside Kubelet) and will remain unchanged from then
+on.
 
 ## Who updates Status and when
 
