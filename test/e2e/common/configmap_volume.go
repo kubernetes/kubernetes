@@ -39,7 +39,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
+
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doConfigMapE2EWithoutMappings(f, 0, 0, nil, nodeSelector)
 	})
 
 	/*
@@ -49,12 +51,18 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
 		defaultMode := int32(0400)
-		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
+		// Windows doesn't support setting mode. Since tests set permissions Unix style,
+		// there is no dirrect correspondance to Windows permissions.
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode, nodeSelector)
 	})
 
 	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [NodeFeature:FSGroup]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
+		// Windows doesn't support setting mode. Since tests set permissions Unix style,
+		// there is no dirrect correspondance to Windows permissions.
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode, nodeSelector)
 	})
 
 	/*
@@ -63,11 +71,13 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
-		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
+		// Windows doesn't support security context
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doConfigMapE2EWithoutMappings(f, 1000, 0, nil, nodeSelector)
 	})
 
 	It("should be consumable from pods in volume as non-root with FSGroup [NodeFeature:FSGroup]", func() {
-		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
+		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil, nil)
 	})
 
 	/*
@@ -76,7 +86,8 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doConfigMapE2EWithMappings(f, 0, 0, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doConfigMapE2EWithMappings(f, 0, 0, nil, nodeSelector)
 	})
 
 	/*
@@ -86,7 +97,10 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [NodeConformance]", func() {
 		mode := int32(0400)
-		doConfigMapE2EWithMappings(f, 0, 0, &mode)
+		// Windows doesn't support setting mode. Since tests set permissions Unix style,
+		// there is no dirrect correspondance to Windows permissions.
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doConfigMapE2EWithMappings(f, 0, 0, &mode, nodeSelector)
 	})
 
 	/*
@@ -95,11 +109,13 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
-		doConfigMapE2EWithMappings(f, 1000, 0, nil)
+		// Windows doesn't support security context
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doConfigMapE2EWithMappings(f, 1000, 0, nil, nodeSelector)
 	})
 
 	It("should be consumable from pods in volume with mappings as non-root with FSGroup [NodeFeature:FSGroup]", func() {
-		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
+		doConfigMapE2EWithMappings(f, 1000, 1001, nil, nil)
 	})
 
 	/*
@@ -166,6 +182,8 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
@@ -265,6 +283,8 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
@@ -423,6 +443,8 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
@@ -534,6 +556,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"content of file \"/etc/configmap-volume/data-1\": value-1",
@@ -556,7 +579,7 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	}
 }
 
-func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
+func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32, nodeSelector map[string]string) {
 	userID := int64(uid)
 	groupID := int64(fsGroup)
 
@@ -609,6 +632,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 			},
 			RestartPolicy:                 v1.RestartPolicyNever,
 			TerminationGracePeriodSeconds: &one,
+			NodeSelector:                  nodeSelector,
 		},
 	}
 
@@ -635,7 +659,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 	f.TestContainerOutput("consume configMaps", pod, 0, output)
 }
 
-func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
+func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32, nodeSelector map[string]string) {
 	userID := int64(uid)
 	groupID := int64(fsGroup)
 
@@ -695,6 +719,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 			},
 			RestartPolicy:                 v1.RestartPolicyNever,
 			TerminationGracePeriodSeconds: &one,
+			NodeSelector:                  nodeSelector,
 		},
 	}
 
