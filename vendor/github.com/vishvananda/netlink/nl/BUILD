@@ -26,7 +26,6 @@ go_library(
             "mpls_linux.go",
             "nl_linux.go",
             "route_linux.go",
-            "seg6_linux.go",
             "tc_linux.go",
             "xfrm_linux.go",
             "xfrm_monitor_linux.go",
@@ -58,7 +57,6 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),
