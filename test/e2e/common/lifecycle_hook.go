@@ -58,9 +58,11 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				},
 			},
 		}
+
 		BeforeEach(func() {
 			podClient = f.PodClient()
 			By("create the container to handle the HTTPGet hook request.")
+			podHandleHookRequest.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 			newPod := podClient.CreateSync(podHandleHookRequest)
 			targetIP = newPod.Status.PodIP
 		})
@@ -98,6 +100,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-exec-hook", imageutils.GetE2EImage(imageutils.Hostexec), lifecycle)
+			podWithHook.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 			testPodWithHook(podWithHook)
 		})
 		/*
@@ -114,6 +117,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Hostexec), lifecycle)
+			podWithHook.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 			testPodWithHook(podWithHook)
 		})
 		/*
@@ -132,6 +136,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 			testPodWithHook(podWithHook)
 		})
 		/*
@@ -150,6 +155,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 			testPodWithHook(podWithHook)
 		})
 	})
