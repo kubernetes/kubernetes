@@ -112,6 +112,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 		config:   dInfo.Config,
 		fsGroup:  fsGroup,
 		resource: resource,
+		fsType:   pattern.FsType,
 		tests: []framework.VolumeTest{
 			{
 				Volume: *volSource,
@@ -161,6 +162,7 @@ type volumesTestInput struct {
 	name     string
 	config   framework.VolumeTestConfig
 	fsGroup  *int64
+	fsType   string
 	tests    []framework.VolumeTest
 	resource genericVolumeTestResource
 }
@@ -175,7 +177,7 @@ func testVolumes(input *volumesTestInput) {
 
 		volumeTest := input.tests
 		framework.InjectHtml(cs, input.config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
-		framework.TestVolumeClient(cs, input.config, input.fsGroup, input.tests)
+		framework.TestVolumeClient(cs, input.config, input.fsGroup, input.fsType, input.tests)
 	})
 	It("should allow exec of files on the volume", func() {
 		f := input.f
