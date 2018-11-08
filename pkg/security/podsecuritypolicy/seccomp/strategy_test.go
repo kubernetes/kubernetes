@@ -178,24 +178,24 @@ func TestNewStrategy(t *testing.T) {
 		internalStrat, _ := s.(*seccompStrategy)
 
 		if internalStrat.allowAnyProfile != v.expectedAllowAny {
-			t.Errorf("%s expected allowAnyProfile to be %t but found %t", k, v.expectedAllowAny, internalStrat.allowAnyProfile)
+			t.Errorf("'%s' expected allowAnyProfile to be '%t' but found '%t'", k, v.expectedAllowAny, internalStrat.allowAnyProfile)
 		}
 		if internalStrat.allowedProfilesString != v.expectedAllowedProfilesString {
-			t.Errorf("%s expected allowedProfilesString to be %s but found %s", k, v.expectedAllowedProfilesString, internalStrat.allowedProfilesString)
+			t.Errorf("'%s' expected allowedProfilesString to be '%s' but found '%s'", k, v.expectedAllowedProfilesString, internalStrat.allowedProfilesString)
 		}
 		if v.expectedDefaultProfile != nil {
 			if internalStrat.defaultProfile == nil {
-				t.Errorf("%s expected defaultProfile to be %s but found <nil>", k, *v.expectedDefaultProfile)
+				t.Errorf("'%s' expected defaultProfile to be '%s' but found '<nil>'", k, *v.expectedDefaultProfile)
 			} else if *internalStrat.defaultProfile != *v.expectedDefaultProfile {
-				t.Errorf("%s expected defaultProfile to be %s but found %s", k, *v.expectedDefaultProfile, *internalStrat.defaultProfile)
+				t.Errorf("'%s' expected defaultProfile to be '%s' but found '%s'", k, *v.expectedDefaultProfile, *internalStrat.defaultProfile)
 			}
 		}
 		if v.expectedDefaultProfile == nil && internalStrat.defaultProfile != nil {
-			t.Errorf("%s expected defaultProfile to be <nil> but found %s", k, *internalStrat.defaultProfile)
+			t.Errorf("'%s' expected defaultProfile to be '<nil>' but found '%s'", k, *internalStrat.defaultProfile)
 		}
 
 		if !reflect.DeepEqual(v.expectedAllowedProfiles, internalStrat.allowedProfiles) {
-			t.Errorf("%s expected expectedAllowedProfiles to be %#v but found %#v", k, v.expectedAllowedProfiles, internalStrat.allowedProfiles)
+			t.Errorf("'%s' expected expectedAllowedProfiles to be '%#v' but found '%#v'", k, v.expectedAllowedProfiles, internalStrat.allowedProfiles)
 		}
 	}
 }
@@ -334,18 +334,18 @@ func TestGenerate(t *testing.T) {
 		s := NewSeccompStrategy(policy)
 		actual, err := s.Generate(pod, &pod.Spec.Containers[0])
 		if err != nil {
-			t.Errorf("%s received error during generation %#v", k, err)
+			t.Errorf("'%s' received error during generation '%#v'", k, err)
 			continue
 		}
 		if v.expectedProfile != nil {
 			if actual == nil {
-				t.Errorf("%s expected profile to be %s but found <nil>", k, *v.expectedProfile)
+				t.Errorf("'%s' expected profile to be '%s' but found '<nil>'", k, *v.expectedProfile)
 			} else if *actual != *v.expectedProfile {
-				t.Errorf("%s expected defaultProfile to be %s but found %s", k, *v.expectedProfile, *actual)
+				t.Errorf("'%s' expected defaultProfile to be '%s' but found '%s'", k, *v.expectedProfile, *actual)
 			}
 		}
 		if v.expectedProfile == nil && actual != nil {
-			t.Errorf("%s expected defaultProfile to be <nil> but found %s", k, *actual)
+			t.Errorf("'%s' expected defaultProfile to be '<nil>' but found '%s'", k, *actual)
 		}
 	}
 }
@@ -461,16 +461,16 @@ func TestValidatePod(t *testing.T) {
 		s := NewSeccompStrategy(policy)
 		errs := s.ValidatePod(pod, nil)
 		if v.expectedError == "" && len(errs) != 0 {
-			t.Errorf("%s expected no errors but received %#v", k, errs.ToAggregate().Error())
+			t.Errorf("'%s' expected no errors but received '%#v'", k, errs.ToAggregate().Error())
 		}
 		if v.expectedError != "" && len(errs) == 0 {
-			t.Errorf("%s expected error %s but received none", k, v.expectedError)
+			t.Errorf("'%s' expected error '%s' but received 'none'", k, v.expectedError)
 		}
 		if v.expectedError != "" && len(errs) > 1 {
-			t.Errorf("%s received multiple errors: %s", k, errs.ToAggregate().Error())
+			t.Errorf("'%s' received multiple errors: '%s'", k, errs.ToAggregate().Error())
 		}
 		if v.expectedError != "" && len(errs) == 1 && !strings.Contains(errs.ToAggregate().Error(), v.expectedError) {
-			t.Errorf("%s expected error %s but received %s", k, v.expectedError, errs.ToAggregate().Error())
+			t.Errorf("'%s' expected error '%s' but received '%s'", k, v.expectedError, errs.ToAggregate().Error())
 		}
 	}
 }
@@ -621,7 +621,7 @@ func TestValidateContainer(t *testing.T) {
 			t.Errorf("'%s' expected no errors but received '%#v'", k, errs.ToAggregate().Error())
 		}
 		if v.expectedError != "" && len(errs) == 0 {
-			t.Errorf("'%s' expected error '%s' but received none", k, v.expectedError)
+			t.Errorf("'%s' expected error '%s' but received 'none'", k, v.expectedError)
 		}
 		if v.expectedError != "" && len(errs) > 1 {
 			t.Errorf("'%s' received multiple errors: '%s'", k, errs.ToAggregate().Error())
