@@ -63,7 +63,7 @@ func testFlexVolume(driver string, cs clientset.Interface, config framework.Volu
 			ExpectedContent: "Hello from flexvolume!",
 		},
 	}
-	framework.TestVolumeClient(cs, config, nil, tests)
+	framework.TestVolumeClient(cs, config, nil, "" /* fsType */, tests)
 
 	framework.VolumeTestCleanup(f, config)
 }

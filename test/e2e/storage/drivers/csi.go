@@ -312,6 +312,9 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
+	if fsType != "" {
+		parameters["fsType"] = fsType
+	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
@@ -412,6 +415,9 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
+	if fsType != "" {
+		parameters["fsType"] = fsType
+	}
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
