@@ -48,7 +48,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide podname only [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/podname")
-
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		})
@@ -63,6 +63,8 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
+		// Windows does not support mode being set as permissions on Windows don't have Unix style equivalent
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--------",
@@ -78,6 +80,8 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
+		// Windows does not support mode being set as permissions on Windows don't have Unix style equivalent
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--------",
@@ -125,6 +129,8 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 
 		podName := "labelsupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForUpdateTest(podName, labels, map[string]string{}, "/etc/podinfo/labels")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		containerName := "client-container"
 		By("Creating the pod")
 		podClient.CreateSync(pod)
@@ -155,6 +161,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		annotations["builder"] = "bar"
 		podName := "annotationupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForUpdateTest(podName, map[string]string{}, annotations, "/etc/podinfo/annotations")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		containerName := "client-container"
 		By("Creating the pod")
@@ -187,6 +194,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide container's cpu limit [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_limit")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("2\n"),
@@ -201,6 +209,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide container's memory limit [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("67108864\n"),
@@ -215,6 +224,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide container's cpu request [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_request")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("1\n"),
@@ -229,6 +239,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide container's memory request [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_request")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("33554432\n"),
@@ -243,6 +254,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide node allocatable (cpu) as default cpu limit if the limit is not set [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/podinfo/cpu_limit")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
@@ -255,6 +267,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	framework.ConformanceIt("should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/podinfo/memory_limit")
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
