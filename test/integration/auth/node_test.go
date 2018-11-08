@@ -420,11 +420,22 @@ func TestNodeAuthorizer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "com.example.csi/driver1",
-						NodeID:       "com.example.csi/node1",
-						TopologyKeys: []string{"com.example.csi/zone"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "com.example.csi/driver1",
+							NodeID:       "com.example.csi/node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "com.example.csi/driver1",
+							Available:             true,
+							VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+						},
 					},
 				},
 			}
@@ -438,11 +449,18 @@ func TestNodeAuthorizer(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			nodeInfo.CSIDrivers = []csiv1alpha1.CSIDriverInfo{
+			nodeInfo.Spec.Drivers = []csiv1alpha1.CSIDriverInfoSpec{
 				{
-					Driver:       "com.example.csi/driver1",
+					Name:         "com.example.csi/driver1",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
+				},
+			}
+			nodeInfo.Status.Drivers = []csiv1alpha1.CSIDriverInfoStatus{
+				{
+					Name:                  "com.example.csi/driver1",
+					Available:             true,
+					VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
 				},
 			}
 			_, err = client.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
