@@ -23,7 +23,9 @@ import (
 	coordv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 
+	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -31,33 +33,41 @@ import (
 )
 
 var _ = framework.KubeDescribe("[Feature:NodeLease][NodeAlphaFeature:NodeLease]", func() {
+	var nodeName string
 	f := framework.NewDefaultFramework("node-lease-test")
+
+	BeforeEach(func() {
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		Expect(len(nodes.Items)).NotTo(BeZero())
+		nodeName = nodes.Items[0].ObjectMeta.Name
+	})
+
 	Context("when the NodeLease feature is enabled", func() {
-		It("the Kubelet should create and update a lease in the kube-node-lease namespace", func() {
+		It("the kubelet should create and update a lease in the kube-node-lease namespace", func() {
 			leaseClient := f.ClientSet.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
 			var (
 				err   error
 				lease *coordv1beta1.Lease
 			)
-			// check that lease for this Kubelet exists in the kube-node-lease namespace
+			By("check that lease for this Kubelet exists in the kube-node-lease namespace")
 			Eventually(func() error {
-				lease, err = leaseClient.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				lease, err = leaseClient.Get(nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(BeNil())
 			// check basic expectations for the lease
-			Expect(expectLease(lease)).To(BeNil())
-			// ensure that at least one lease renewal happens within the
-			// lease duration by checking for a change to renew time
+			Expect(expectLease(lease, nodeName)).To(BeNil())
+
+			By("check that node lease is updated at least once within the lease duration")
 			Eventually(func() error {
-				newLease, err := leaseClient.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				newLease, err := leaseClient.Get(nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
 				// check basic expectations for the latest lease
-				if err := expectLease(newLease); err != nil {
+				if err := expectLease(newLease, nodeName); err != nil {
 					return err
 				}
 				// check that RenewTime has been updated on the latest lease
@@ -68,12 +78,76 @@ var _ = framework.KubeDescribe("[Feature:NodeLease][NodeAlphaFeature:NodeLease]"
 				}
 				return nil
 			}, time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second,
-				time.Duration(*lease.Spec.LeaseDurationSeconds/3)*time.Second)
+				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second)
+		})
+
+		It("the kubelet should report node status infrequently", func() {
+			By("wait until node is ready")
+			framework.WaitForNodeToBeReady(f.ClientSet, nodeName, 5*time.Minute)
+
+			By("wait until there is node lease")
+			var err error
+			var lease *coordv1beta1.Lease
+			Eventually(func() error {
+				lease, err = f.ClientSet.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease).Get(nodeName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 5*time.Minute, 5*time.Second).Should(BeNil())
+			// check basic expectations for the lease
+			Expect(expectLease(lease, nodeName)).To(BeNil())
+			leaseDuration := time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second
+
+			By("verify NodeStatus report period is longer than lease duration")
+			// NodeStatus is reported from node to master when there is some change or
+			// enough time has passed. So for here, keep checking the time diff
+			// between 2 NodeStatus report, until it is longer than lease duration (
+			// the same as nodeMonitorGracePeriod).
+			heartbeatTime := getNextReadyConditionHeartbeatTime(f.ClientSet, nodeName, metav1.Time{})
+			Eventually(func() error {
+				nextHeartbeatTime := getNextReadyConditionHeartbeatTime(f.ClientSet, nodeName, heartbeatTime)
+
+				if nextHeartbeatTime.Time.After(heartbeatTime.Time.Add(leaseDuration)) {
+					return nil
+				}
+				heartbeatTime = nextHeartbeatTime
+				return fmt.Errorf("node status report period is shorter than lease duration")
+
+				// Enter next round immediately.
+			}, 5*time.Minute, time.Nanosecond).Should(BeNil())
+
+			By("verify node is still in ready status even though node status report is infrequent")
+			// This check on node status is only meaningful when this e2e test is
+			// running as cluster e2e test, because node e2e test does not create and
+			// run controller manager, i.e., no node lifecycle controller.
+			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			Expect(err).To(BeNil())
+			_, readyCondition := v1node.GetNodeCondition(&node.Status, corev1.NodeReady)
+			Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
 		})
 	})
 })
 
-func expectLease(lease *coordv1beta1.Lease) error {
+func getNextReadyConditionHeartbeatTime(clientSet clientset.Interface, nodeName string, prevHeartbeatTime metav1.Time) metav1.Time {
+	var newHeartbeatTime metav1.Time
+	Eventually(func() error {
+		node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		_, readyCondition := v1node.GetNodeCondition(&node.Status, corev1.NodeReady)
+		Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
+		newHeartbeatTime = readyCondition.LastHeartbeatTime
+		if prevHeartbeatTime.Before(&newHeartbeatTime) {
+			return nil
+		}
+		return fmt.Errorf("heartbeat has not changed yet")
+	}, 5*time.Minute, 5*time.Second).Should(BeNil())
+	return newHeartbeatTime
+}
+
+func expectLease(lease *coordv1beta1.Lease, nodeName string) error {
 	// expect values for HolderIdentity, LeaseDurationSeconds, and RenewTime
 	if lease.Spec.HolderIdentity == nil {
 		return fmt.Errorf("Spec.HolderIdentity should not be nil")
@@ -85,8 +159,8 @@ func expectLease(lease *coordv1beta1.Lease) error {
 		return fmt.Errorf("Spec.RenewTime should not be nil")
 	}
 	// ensure that the HolderIdentity matches the node name
-	if *lease.Spec.HolderIdentity != framework.TestContext.NodeName {
-		return fmt.Errorf("Spec.HolderIdentity (%v) should match the node name (%v)", *lease.Spec.HolderIdentity, framework.TestContext.NodeName)
+	if *lease.Spec.HolderIdentity != nodeName {
+		return fmt.Errorf("Spec.HolderIdentity (%v) should match the node name (%v)", *lease.Spec.HolderIdentity, nodeName)
 	}
 	return nil
 }

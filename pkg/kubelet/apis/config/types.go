@@ -151,10 +151,16 @@ type KubeletConfiguration struct {
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
-	// status to master. Note: be cautious when changing the constant, it
-	// must work with nodeMonitorGracePeriod in nodecontroller.
+	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
+	// status. If node lease feature is not enabled, it is also the frequency that
+	// kubelet posts node status to master. In that case, be cautious when
+	// changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency metav1.Duration
+	// nodeStatusReportFrequency is the frequency that kubelet posts node
+	// status to master if node status does not change. Kubelet will ignore this
+	// frequency and post node status immediately if any change is detected. It is
+	// only used when node lease feature is enabled.
+	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
 	// imageMinimumGCAge is the minimum age for an unused image before it is
