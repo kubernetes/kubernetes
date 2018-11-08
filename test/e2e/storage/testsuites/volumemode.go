@@ -78,13 +78,13 @@ func createVolumeModeTestInput(pattern testpatterns.TestPattern, resource volume
 		testVolType:      pattern.VolType,
 		nodeName:         dInfo.Config.ClientNodeName,
 		volMode:          pattern.VolMode,
-		isBlockSupported: dInfo.IsBlockSupported,
+		isBlockSupported: dInfo.Capabilities[drivers.CapBlock],
 	}
 }
 
 func getVolumeModeTestFunc(pattern testpatterns.TestPattern, driver drivers.TestDriver) func(*volumeModeTestInput) {
 	dInfo := driver.GetDriverInfo()
-	isBlockSupported := dInfo.IsBlockSupported
+	isBlockSupported := dInfo.Capabilities[drivers.CapBlock]
 	volMode := pattern.VolMode
 	volType := pattern.VolType
 

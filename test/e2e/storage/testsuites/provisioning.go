@@ -187,7 +187,7 @@ func testProvisioning(input *provisioningTestInput) {
 	})
 
 	It("should create and delete block persistent volumes", func() {
-		if !input.dInfo.IsBlockSupported {
+		if !input.dInfo.Capabilities[drivers.CapBlock] {
 			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
 		}
 		block := v1.PersistentVolumeBlock
