@@ -120,6 +120,10 @@ type FakeExtender struct {
 	cachedNodeNameToInfo map[string]*schedulercache.NodeInfo
 }
 
+func (f *FakeExtender) Name() string {
+	return "FakeExtender"
+}
+
 func (f *FakeExtender) IsIgnorable() bool {
 	return f.ignorable
 }
