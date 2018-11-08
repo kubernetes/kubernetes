@@ -367,6 +367,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
 	schemaReferenceObj := &examplev1.Pod{}
+	hubVersion := example.SchemeGroupVersion
 
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
@@ -438,6 +439,8 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			unsafeConvertor: convertor,
 			kind:            kind,
 			resource:        resource,
+
+			hubGroupVersion: hubVersion,
 
 			createValidation: rest.ValidateAllObjectFunc,
 			updateValidation: admissionValidation,

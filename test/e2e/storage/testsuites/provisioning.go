@@ -41,6 +41,7 @@ type StorageClassTest struct {
 	Name               string
 	CloudProviders     []string
 	Provisioner        string
+	StorageClassName   string
 	Parameters         map[string]string
 	DelayBinding       bool
 	ClaimSize          string
@@ -150,7 +151,7 @@ func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, patt
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = "2Gi"
+			p.claimSize = "5Gi"
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
@@ -183,19 +184,6 @@ func testProvisioning(input *provisioningTestInput) {
 
 		input.sc.MountOptions = input.dInfo.SupportedMountOption.Union(input.dInfo.RequiredMountOption).List()
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-	})
-
-	It("should provision storage with non-default reclaim policy Retain", func() {
-		retain := v1.PersistentVolumeReclaimRetain
-		input.sc.ReclaimPolicy = &retain
-		pv := TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-
-		By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
-		framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, input.cs, pv.Name, 1*time.Second, 30*time.Second))
-
-		By(fmt.Sprintf("deleting the PV %q", pv.Name))
-		framework.ExpectNoError(framework.DeletePersistentVolume(input.cs, pv.Name), "Failed to delete PV ", pv.Name)
-		framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(input.cs, pv.Name, 1*time.Second, 30*time.Second))
 	})
 
 	It("should create and delete block persistent volumes [Feature:BlockVolume]", func() {
@@ -292,6 +280,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			// Get entry, get mount options at 6th word, replace brackets with commas
 			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 		}
+		command += " || (mount | grep 'on /mnt/test'; false)"
 		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command)
 
 		By("checking the created volume is readable and retains data")
@@ -361,6 +350,12 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command 
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
+		body, err := c.CoreV1().Pods(ns).GetLogs(pod.Name, &v1.PodLogOptions{}).Do().Raw()
+		if err != nil {
+			framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
+		} else {
+			framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
+		}
 		framework.DeletePodOrFail(c, ns, pod.Name)
 	}()
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))

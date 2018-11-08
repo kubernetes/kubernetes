@@ -26,6 +26,7 @@ reviewers:
   - timothysc
   - zmerlynn
   - vishh
+  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
@@ -56,5 +57,6 @@ approvers:
   - timothysc
   - zmerlynn
   - vishh
+  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
 labels:
 - sig/testing

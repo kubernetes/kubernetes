@@ -159,7 +159,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					URL: strPtr("example.com/k8s/webhook"),
 				},
 			},
-			expectedError: `webhook.clientConfig.url: Required value: exactly one of url or service is required`,
+			expectedError: `webhook.clientConfig: Required value: exactly one of url or service is required`,
 		},
 		{
 			name: "blank URL",

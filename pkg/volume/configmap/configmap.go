@@ -30,7 +30,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-// ProbeVolumePlugin is the entry point for plugin detection in a package.
+// ProbeVolumePlugins is the entry point for plugin detection in a package.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&configMapPlugin{}}
 }
@@ -260,7 +260,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-// Note: this function is exported so that it can be called from the projection volume driver
+// MakePayload function is exported so that it can be called from the projection volume driver
 func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")

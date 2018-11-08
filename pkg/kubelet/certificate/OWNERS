@@ -1,7 +1,7 @@
-reviewers:
-- mikedanese
-- liggitt
-- awly
 approvers:
-- mikedanese
-- liggitt
+- sig-auth-certificates-approvers
+reviewers:
+- sig-auth-certificates-reviewers
+labels:
+- sig/auth
+

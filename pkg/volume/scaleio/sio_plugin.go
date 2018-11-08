@@ -36,6 +36,7 @@ type sioPlugin struct {
 	volumeMtx keymutex.KeyMutex
 }
 
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	p := &sioPlugin{
 		host: nil,

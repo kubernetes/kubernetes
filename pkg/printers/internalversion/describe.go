@@ -774,6 +774,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printFlexVolumeSource(volume.VolumeSource.FlexVolume, w)
 		case volume.VolumeSource.Flocker != nil:
 			printFlockerVolumeSource(volume.VolumeSource.Flocker, w)
+		case volume.VolumeSource.Projected != nil:
+			printProjectedVolumeSource(volume.VolumeSource.Projected, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -835,6 +837,26 @@ func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w PrefixWr
 		"    Name:\t%v\n"+
 		"    Optional:\t%v\n",
 		configMap.Name, optional)
+}
+
+func printProjectedVolumeSource(projected *api.ProjectedVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
+	for _, source := range projected.Sources {
+		if source.Secret != nil {
+			w.Write(LEVEL_2, "SecretName:\t%v\n"+
+				"    SecretOptionalName:\t%v\n",
+				source.Secret.Name, source.Secret.Optional)
+		} else if source.DownwardAPI != nil {
+			w.Write(LEVEL_2, "DownwardAPI:\ttrue\n")
+		} else if source.ConfigMap != nil {
+			w.Write(LEVEL_2, "ConfigMapName:\t%v\n"+
+				"    ConfigMapOptional:\t%v\n",
+				source.ConfigMap.Name, source.ConfigMap.Optional)
+		} else if source.ServiceAccountToken != nil {
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
+				source.ServiceAccountToken.ExpirationSeconds)
+		}
+	}
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, w PrefixWriter) {
@@ -1872,7 +1894,7 @@ type ReplicaSetDescriber struct {
 }
 
 func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	rsc := d.Extensions().ReplicaSets(namespace)
+	rsc := d.Apps().ReplicaSets(namespace)
 	pc := d.Core().Pods(namespace)
 
 	rs, err := rsc.Get(name, metav1.GetOptions{})
@@ -1895,7 +1917,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
 }
 
-func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
+func describeReplicaSet(rs *apps.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
@@ -2085,7 +2107,7 @@ type DaemonSetDescriber struct {
 }
 
 func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	dc := d.Extensions().DaemonSets(namespace)
+	dc := d.Apps().DaemonSets(namespace)
 	pc := d.Core().Pods(namespace)
 
 	daemon, err := dc.Get(name, metav1.GetOptions{})
@@ -2110,7 +2132,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *apps.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
@@ -3129,7 +3151,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	w.Write(LEVEL_1, "Resource\tRequests\tLimits\n")
 	w.Write(LEVEL_1, "--------\t--------\t------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
-	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
+	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
+		reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory], reqs[api.ResourceEphemeralStorage], limits[api.ResourceEphemeralStorage]
 	fractionCpuReqs := float64(0)
 	fractionCpuLimits := float64(0)
 	if allocatable.Cpu().MilliValue() != 0 {
@@ -3142,10 +3165,18 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
 	}
+	fractionEphemeralStorageReqs := float64(0)
+	fractionEphemeralStorageLimits := float64(0)
+	if allocatable.StorageEphemeral().Value() != 0 {
+		fractionEphemeralStorageReqs = float64(ephemeralstorageReqs.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
+		fractionEphemeralStorageLimits = float64(ephemeralstorageLimits.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
+	}
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		api.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		api.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
+		api.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
 	extResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
 		if !helper.IsStandardContainerResourceName(string(resource)) && resource != api.ResourcePods {
@@ -3224,8 +3255,8 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	internalDeployment := &extensions.Deployment{}
-	if err := legacyscheme.Scheme.Convert(d, internalDeployment, extensions.SchemeGroupVersion); err != nil {
+	internalDeployment := &apps.Deployment{}
+	if err := legacyscheme.Scheme.Convert(d, internalDeployment, apps.SchemeGroupVersion); err != nil {
 		return "", err
 	}
 
@@ -3237,7 +3268,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	return describeDeployment(d, selector, internalDeployment, events, dd)
 }
 
-func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
+func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *apps.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)

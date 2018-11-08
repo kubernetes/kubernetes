@@ -25,21 +25,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
-readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
-readonly COREDNS_AUTOSCALER="Deployment/coredns"
-readonly KUBEDNS_AUTOSCALER="Deployment/kube-dns"
-
-# Resource requests of master components.
-KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
-KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
-
-# Use --retry-connrefused opt only if it's supported by curl.
-CURL_RETRY_CONNREFUSED=""
-if curl --help | grep -q -- '--retry-connrefused'; then
-  CURL_RETRY_CONNREFUSED='--retry-connrefused'
-fi
-
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -843,6 +828,13 @@ rules:
     resources:
       - group: "" # core
         resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+  - level: None
+    users: ["cluster-autoscaler"]
+    verbs: ["get", "update"]
+    namespaces: ["kube-system"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps", "endpoints"]
   # Don't log HPA fetching metrics.
   - level: None
     users:
@@ -1273,10 +1265,12 @@ EOF
 # Create the log file and set its properties.
 #
 # $1 is the file to create.
+# $2: the log owner uid to set for the log file.
+# $3: the log owner gid to set for the log file.
 function prepare-log-file {
   touch $1
   chmod 644 $1
-  chown "${LOG_OWNER_USER:-root}":"${LOG_OWNER_GROUP:-root}" $1
+  chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" $1
 }
 
 # Prepares parameters for kube-proxy manifest.
@@ -2580,6 +2574,9 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
+  if [[ "${FEATURE_GATES:-}" =~ "CSIDriverRegistry=true" || "${FEATURE_GATES:-}" =~ "CSINodeInfo=true" ]]; then
+    setup-addon-manifests "addons" "storage-crds"
+  fi
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
   fi
@@ -2748,6 +2745,21 @@ EOF
 function main() {
   echo "Start to configure instance for kubernetes"
 
+  readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
+  readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
+  readonly COREDNS_AUTOSCALER="Deployment/coredns"
+  readonly KUBEDNS_AUTOSCALER="Deployment/kube-dns"
+
+  # Resource requests of master components.
+  KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
+  KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
+
+  # Use --retry-connrefused opt only if it's supported by curl.
+  CURL_RETRY_CONNREFUSED=""
+  if curl --help | grep -q -- '--retry-connrefused'; then
+    CURL_RETRY_CONNREFUSED='--retry-connrefused'
+  fi
+
   KUBE_HOME="/home/kubernetes"
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
@@ -2839,9 +2851,6 @@ function main() {
   echo "Done for the configuration for kubernetes"
 }
 
-# use --source-only to test functions defined in this script.
-if [[ "$#" -eq 1 && "${1}" == "--source-only" ]]; then
-   :
-else
-   main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
 fi

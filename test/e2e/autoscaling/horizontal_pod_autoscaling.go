@@ -102,7 +102,7 @@ type HPAScaleTest struct {
 	targetCPUUtilizationPercent int32
 	minPods                     int32
 	maxPods                     int32
-	firstScale                  int32
+	firstScale                  int
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
 	secondScale                 int32
@@ -120,9 +120,10 @@ func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc
 	defer rc.CleanUp()
 	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
-	rc.WaitForReplicas(int(scaleTest.firstScale), timeToWait)
+
+	rc.WaitForReplicas(scaleTest.firstScale, timeToWait)
 	if scaleTest.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicas(int(scaleTest.firstScale), scaleTest.firstScaleStasis)
+		rc.EnsureDesiredReplicasInRange(scaleTest.firstScale, scaleTest.firstScale+1, scaleTest.firstScaleStasis, hpa.Name)
 	}
 	if scaleTest.cpuBurst > 0 && scaleTest.secondScale > 0 {
 		rc.ConsumeCPU(scaleTest.cpuBurst)
@@ -137,14 +138,14 @@ func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc 
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    1,
-		totalInitialCPUUsage:        500,
-		perPodCPURequest:            1000,
+		totalInitialCPUUsage:        250,
+		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 20,
 		minPods:                     1,
 		maxPods:                     5,
 		firstScale:                  3,
 		firstScaleStasis:            stasis,
-		cpuBurst:                    1400,
+		cpuBurst:                    700,
 		secondScale:                 5,
 	}
 	scaleTest.run(name, kind, rc, f)
@@ -157,8 +158,8 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, r
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        650,
-		perPodCPURequest:            1000,
+		totalInitialCPUUsage:        325,
+		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,
 		maxPods:                     5,

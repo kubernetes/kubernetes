@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -150,7 +151,8 @@ func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 		}
 
 		nodeClient := kubeClient.CoreV1().Nodes()
-		node, err := nodeClient.Get(string(nim.nodeName), metav1.GetOptions{})
+		originalNode, err := nodeClient.Get(string(nim.nodeName), metav1.GetOptions{})
+		node := originalNode.DeepCopy()
 		if err != nil {
 			return err // do not wrap error
 		}
@@ -166,7 +168,9 @@ func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 		}
 
 		if needUpdate {
-			_, updateErr := nodeClient.Update(node)
+			// PatchNodeStatus can update both node's status and labels or annotations
+			// Updating status by directly updating node does not work
+			_, _, updateErr := nodeutil.PatchNodeStatus(kubeClient.CoreV1(), types.NodeName(node.Name), originalNode, node)
 			return updateErr // do not wrap error
 		}
 

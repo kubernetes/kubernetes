@@ -18,12 +18,15 @@ package config
 
 import (
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -99,7 +102,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// gets ClusterConfiguration from kubeadm-config
 	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
 	if !ok {
-		return nil, fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
+		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
 		return nil, err
@@ -142,7 +145,7 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 
 	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
 	if !ok {
-		return fmt.Errorf("Node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+		return errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
 	}
 
 	// returns the nodeRegistration attributes
@@ -182,7 +185,7 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 			return "", err
 		}
 	} else {
-		return "", errors.New("Invalid kubelet.conf. X509 certificate expected")
+		return "", errors.New("invalid kubelet.conf. X509 certificate expected")
 	}
 
 	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
@@ -196,12 +199,8 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 // getAPIEndpoint returns the APIEndpoint for the current node
 func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
 	// gets the ClusterStatus from kubeadm-config
-	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
-	if !ok {
-		return fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)
-	}
-	clusterStatus := &kubeadmapi.ClusterStatus{}
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterStatusData), clusterStatus); err != nil {
+	clusterStatus, err := unmarshalClusterStatus(data)
+	if err != nil {
 		return err
 	}
 
@@ -227,8 +226,39 @@ func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubea
 		}
 
 		if ok := registration.SetToInternalConfig(obj, clusterConfiguration); !ok {
-			return fmt.Errorf("couldn't save componentconfig value for kind %q", string(kind))
+			return errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 		}
 	}
 	return nil
+}
+
+// GetClusterStatus returns the kubeadm cluster status read from the kubeadm-config ConfigMap
+func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return &kubeadmapi.ClusterStatus{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	clusterStatus, err := unmarshalClusterStatus(configMap.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return clusterStatus, nil
+}
+
+func unmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
+	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
+	if !ok {
+		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)
+	}
+	clusterStatus := &kubeadmapi.ClusterStatus{}
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterStatusData), clusterStatus); err != nil {
+		return nil, err
+	}
+
+	return clusterStatus, nil
 }

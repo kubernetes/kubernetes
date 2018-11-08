@@ -208,13 +208,16 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 			return
 		}
 
-		// Filter PVCs for which the corresponding volume plugins don't allow expansion.
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 		volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 		if err != nil || volumePlugin == nil {
 			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
 				"waiting for an external controller to process this PVC")
-			expc.recorder.Event(newPVC, v1.EventTypeNormal, events.ExternalExpanding,
+			eventType := v1.EventTypeNormal
+			if err != nil {
+				eventType = v1.EventTypeWarning
+			}
+			expc.recorder.Event(newPVC, eventType, events.ExternalExpanding,
 				fmt.Sprintf("Ignoring the PVC: %v.", err))
 			glog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
 				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, err)
@@ -311,6 +314,12 @@ func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*
 func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 		return nil, fmt.Errorf("GetServiceAccountToken unsupported in expandController")
+	}
+}
+
+func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {
+		glog.Errorf("DeleteServiceAccountToken unsupported in expandController")
 	}
 }
 

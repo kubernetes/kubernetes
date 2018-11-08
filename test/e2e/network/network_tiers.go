@@ -222,7 +222,7 @@ func clearNetworkTier(svc *v1.Service) {
 
 // TODO: add retries if this turns out to be flaky.
 // TODO(#51665): remove this helper function once Network Tiers becomes beta.
-func reserveAlphaRegionalAddress(cloud *gcecloud.GCECloud, name string, netTier cloud.NetworkTier) (string, error) {
+func reserveAlphaRegionalAddress(cloud *gcecloud.Cloud, name string, netTier cloud.NetworkTier) (string, error) {
 	alphaAddr := &computealpha.Address{
 		Name:        name,
 		NetworkTier: netTier.ToGCEValue(),

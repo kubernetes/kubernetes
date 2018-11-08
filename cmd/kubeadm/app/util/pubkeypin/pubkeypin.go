@@ -22,8 +22,9 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"fmt"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -46,7 +47,7 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 	for _, pubKeyHash := range pubKeyHashes {
 		parts := strings.Split(pubKeyHash, ":")
 		if len(parts) != 2 {
-			return fmt.Errorf("invalid public key hash, expected \"format:value\"")
+			return errors.New("invalid public key hash, expected \"format:value\"")
 		}
 		format, value := parts[0], parts[1]
 
@@ -54,7 +55,7 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 		case "sha256":
 			return s.allowSHA256(value)
 		default:
-			return fmt.Errorf("unknown hash format %q", format)
+			return errors.Errorf("unknown hash format %q", format)
 		}
 	}
 	return nil
@@ -65,7 +66,7 @@ func (s *Set) Check(certificate *x509.Certificate) error {
 	if s.checkSHA256(certificate) {
 		return nil
 	}
-	return fmt.Errorf("public key %s not pinned", Hash(certificate))
+	return errors.Errorf("public key %s not pinned", Hash(certificate))
 }
 
 // Empty returns true if the Set contains no pinned public keys.
@@ -86,7 +87,7 @@ func (s *Set) allowSHA256(hash string) error {
 	// validate that the hash is the right length to be a full SHA-256 hash
 	hashLength := hex.DecodedLen(len(hash))
 	if hashLength != sha256.Size {
-		return fmt.Errorf("expected a %d byte SHA-256 hash, found %d bytes", sha256.Size, hashLength)
+		return errors.Errorf("expected a %d byte SHA-256 hash, found %d bytes", sha256.Size, hashLength)
 	}
 
 	// validate that the hash is valid hex

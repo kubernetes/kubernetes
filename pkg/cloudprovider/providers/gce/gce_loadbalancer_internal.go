@@ -35,21 +35,21 @@ const (
 	allInstances = "ALL"
 )
 
-func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
 		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
 	}
 	scheme := cloud.SchemeInternal
-	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, svc)
+	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
-	backendServiceLink := gce.getBackendServiceLink(backendServiceName)
+	backendServiceLink := g.getBackendServiceLink(backendServiceName)
 
 	// Ensure instance groups exist and nodes are assigned to groups
 	igName := makeInstanceGroupName(clusterID)
-	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
+	igLinks, err := g.ensureInternalInstanceGroups(igName, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -58,14 +58,14 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	var existingBackendService *compute.BackendService
 	if existingFwdRule != nil && existingFwdRule.BackendService != "" {
 		existingBSName := getNameFromLink(existingFwdRule.BackendService)
-		if existingBackendService, err = gce.GetRegionBackendService(existingBSName, gce.region); err != nil && !isNotFound(err) {
+		if existingBackendService, err = g.GetRegionBackendService(existingBSName, g.region); err != nil && !isNotFound(err) {
 			return nil, err
 		}
 	}
 
 	// Lock the sharedResourceLock to prevent any deletions of shared resources while assembling shared resources here
-	gce.sharedResourceLock.Lock()
-	defer gce.sharedResourceLock.Unlock()
+	g.sharedResourceLock.Lock()
+	defer g.sharedResourceLock.Unlock()
 
 	// Ensure health check exists before creating the backend service. The health check is shared
 	// if externalTrafficPolicy=Cluster.
@@ -76,7 +76,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		// Service requires a special health check, retrieve the OnlyLocal port & path
 		hcPath, hcPort = v1_service.GetServiceHealthCheckPathPort(svc)
 	}
-	hc, err := gce.ensureInternalHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
+	hc, err := g.ensureInternalHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 
 	// If the ILB already exists, continue using the subnet that it's already using.
 	// This is to support existing ILBs that were setup using the wrong subnet.
-	subnetworkURL := gce.SubnetworkURL()
+	subnetworkURL := g.SubnetworkURL()
 	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
 		// external LBs have an empty Subnetwork field.
 		subnetworkURL = existingFwdRule.Subnetwork
@@ -96,8 +96,8 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
-	if !gce.IsLegacyNetwork() {
-		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
+	if !g.IsLegacyNetwork() {
+		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
@@ -106,7 +106,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	}
 
 	// Ensure firewall rules if necessary
-	if err = gce.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
+	if err = g.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
 		return nil, err
 	}
 
@@ -125,20 +125,20 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	if subnetworkURL != "" {
 		expectedFwdRule.Subnetwork = subnetworkURL
 	} else {
-		expectedFwdRule.Network = gce.networkURL
+		expectedFwdRule.Network = g.networkURL
 	}
 
 	fwdRuleDeleted := false
 	if existingFwdRule != nil && !fwdRuleEqual(existingFwdRule, expectedFwdRule) {
 		glog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
-		if err = ignoreNotFound(gce.DeleteRegionForwardingRule(loadBalancerName, gce.region)); err != nil {
+		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
 		}
 		fwdRuleDeleted = true
 	}
 
 	bsDescription := makeBackendServiceDescription(nm, sharedBackend)
-	err = gce.ensureInternalBackendService(backendServiceName, bsDescription, svc.Spec.SessionAffinity, scheme, protocol, igLinks, hc.SelfLink)
+	err = g.ensureInternalBackendService(backendServiceName, bsDescription, svc.Spec.SessionAffinity, scheme, protocol, igLinks, hc.SelfLink)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	// If we previously deleted the forwarding rule or it never existed, finally create it.
 	if fwdRuleDeleted || existingFwdRule == nil {
 		glog.V(2).Infof("ensureInternalLoadBalancer(%v): creating forwarding rule", loadBalancerName)
-		if err = gce.CreateRegionForwardingRule(expectedFwdRule, gce.region); err != nil {
+		if err = g.CreateRegionForwardingRule(expectedFwdRule, g.region); err != nil {
 			return nil, err
 		}
 		glog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", loadBalancerName)
@@ -154,7 +154,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 
 	// Delete the previous internal load balancer resources if necessary
 	if existingBackendService != nil {
-		gce.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
+		g.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
 	}
 
 	if addrMgr != nil {
@@ -165,7 +165,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	}
 
 	// Get the most recent forwarding rule for the address.
-	updatedFwdRule, err := gce.GetRegionForwardingRule(loadBalancerName, gce.region)
+	updatedFwdRule, err := g.GetRegionForwardingRule(loadBalancerName, g.region)
 	if err != nil {
 		return nil, err
 	}
@@ -175,11 +175,11 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	return status, nil
 }
 
-func (gce *GCECloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName string, existingBackendService *compute.BackendService, expectedBSName, expectedHCName string) {
+func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName string, existingBackendService *compute.BackendService, expectedBSName, expectedHCName string) {
 	// If a new backend service was created, delete the old one.
 	if existingBackendService.Name != expectedBSName {
 		glog.V(2).Infof("clearPreviousInternalResources(%v): expected backend service %q does not match previous %q - deleting backend service", loadBalancerName, expectedBSName, existingBackendService.Name)
-		if err := gce.teardownInternalBackendService(existingBackendService.Name); err != nil && !isNotFound(err) {
+		if err := g.teardownInternalBackendService(existingBackendService.Name); err != nil && !isNotFound(err) {
 			glog.Warningf("clearPreviousInternalResources: could not delete old backend service: %v, err: %v", existingBackendService.Name, err)
 		}
 	}
@@ -189,7 +189,7 @@ func (gce *GCECloud) clearPreviousInternalResources(svc *v1.Service, loadBalance
 		existingHCName := getNameFromLink(existingBackendService.HealthChecks[0])
 		if existingHCName != expectedHCName {
 			glog.V(2).Infof("clearPreviousInternalResources(%v): expected health check %q does not match previous %q - deleting health check", loadBalancerName, expectedHCName, existingHCName)
-			if err := gce.teardownInternalHealthCheckAndFirewall(svc, existingHCName); err != nil {
+			if err := g.teardownInternalHealthCheckAndFirewall(svc, existingHCName); err != nil {
 				glog.Warningf("clearPreviousInternalResources: could not delete existing healthcheck: %v, err: %v", existingHCName, err)
 			}
 		}
@@ -200,12 +200,12 @@ func (gce *GCECloud) clearPreviousInternalResources(svc *v1.Service, loadBalance
 
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
-func (gce *GCECloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
-	gce.sharedResourceLock.Lock()
-	defer gce.sharedResourceLock.Unlock()
+func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
+	g.sharedResourceLock.Lock()
+	defer g.sharedResourceLock.Unlock()
 
 	igName := makeInstanceGroupName(clusterID)
-	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
+	igLinks, err := g.ensureInternalInstanceGroups(igName, nodes)
 	if err != nil {
 		return err
 	}
@@ -213,41 +213,41 @@ func (gce *GCECloud) updateInternalLoadBalancer(clusterName, clusterID string, s
 	// Generate the backend service name
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
-	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, svc)
+	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, shareBackendService(svc), scheme, protocol, svc.Spec.SessionAffinity)
 	// Ensure the backend service has the proper backend/instance-group links
-	return gce.ensureInternalBackendServiceGroups(backendServiceName, igLinks)
+	return g.ensureInternalBackendServiceGroups(backendServiceName, igLinks)
 }
 
-func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string, svc *v1.Service) error {
-	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, svc)
+func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string, svc *v1.Service) error {
+	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)
 	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
 
-	gce.sharedResourceLock.Lock()
-	defer gce.sharedResourceLock.Unlock()
+	g.sharedResourceLock.Lock()
+	defer g.sharedResourceLock.Unlock()
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): attempting delete of region internal address", loadBalancerName)
-	ensureAddressDeleted(gce, loadBalancerName, gce.region)
+	ensureAddressDeleted(g, loadBalancerName, g.region)
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting region internal forwarding rule", loadBalancerName)
-	if err := ignoreNotFound(gce.DeleteRegionForwardingRule(loadBalancerName, gce.region)); err != nil {
+	if err := ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 		return err
 	}
 
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting region backend service %v", loadBalancerName, backendServiceName)
-	if err := gce.teardownInternalBackendService(backendServiceName); err != nil {
+	if err := g.teardownInternalBackendService(backendServiceName); err != nil {
 		return err
 	}
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := ignoreNotFound(gce.DeleteFirewall(loadBalancerName)); err != nil {
-		if isForbidden(err) && gce.OnXPN() {
+	if err := ignoreNotFound(g.DeleteFirewall(loadBalancerName)); err != nil {
+		if isForbidden(err) && g.OnXPN() {
 			glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
-			gce.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, gce.NetworkProjectID()))
+			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, g.NetworkProjectID()))
 		} else {
 			return err
 		}
@@ -255,21 +255,21 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting health check %v and its firewall", loadBalancerName, hcName)
-	if err := gce.teardownInternalHealthCheckAndFirewall(svc, hcName); err != nil {
+	if err := g.teardownInternalHealthCheckAndFirewall(svc, hcName); err != nil {
 		return err
 	}
 
 	// Try deleting instance groups - expect ResourceInuse error if needed by other LBs
 	igName := makeInstanceGroupName(clusterID)
-	if err := gce.ensureInternalInstanceGroupsDeleted(igName); err != nil && !isInUsedByError(err) {
+	if err := g.ensureInternalInstanceGroupsDeleted(igName); err != nil && !isInUsedByError(err) {
 		return err
 	}
 
 	return nil
 }
 
-func (gce *GCECloud) teardownInternalBackendService(bsName string) error {
-	if err := gce.DeleteRegionBackendService(bsName, gce.region); err != nil {
+func (g *Cloud) teardownInternalBackendService(bsName string) error {
+	if err := g.DeleteRegionBackendService(bsName, g.region); err != nil {
 		if isNotFound(err) {
 			glog.V(2).Infof("teardownInternalBackendService(%v): backend service already deleted. err: %v", bsName, err)
 			return nil
@@ -284,8 +284,8 @@ func (gce *GCECloud) teardownInternalBackendService(bsName string) error {
 	return nil
 }
 
-func (gce *GCECloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName string) error {
-	if err := gce.DeleteHealthCheck(hcName); err != nil {
+func (g *Cloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName string) error {
+	if err := g.DeleteHealthCheck(hcName); err != nil {
 		if isNotFound(err) {
 			glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): health check does not exist.", hcName)
 			// Purposely do not early return - double check the firewall does not exist
@@ -299,10 +299,10 @@ func (gce *GCECloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcN
 	glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): health check deleted", hcName)
 
 	hcFirewallName := makeHealthCheckFirewallNameFromHC(hcName)
-	if err := ignoreNotFound(gce.DeleteFirewall(hcFirewallName)); err != nil {
-		if isForbidden(err) && gce.OnXPN() {
+	if err := ignoreNotFound(g.DeleteFirewall(hcFirewallName)); err != nil {
+		if isForbidden(err) && g.OnXPN() {
 			glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): could not delete health check traffic firewall on XPN cluster. Raising Event.", hcName)
-			gce.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(hcFirewallName, gce.NetworkProjectID()))
+			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(hcFirewallName, g.NetworkProjectID()))
 			return nil
 		}
 
@@ -312,14 +312,14 @@ func (gce *GCECloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcN
 	return nil
 }
 
-func (gce *GCECloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
 	glog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
-	targetTags, err := gce.GetNodeTags(nodeNames(nodes))
+	targetTags, err := g.GetNodeTags(nodeNames(nodes))
 	if err != nil {
 		return err
 	}
 
-	existingFirewall, err := gce.GetFirewall(fwName)
+	existingFirewall, err := g.GetFirewall(fwName)
 	if err != nil && !isNotFound(err) {
 		return err
 	}
@@ -327,7 +327,7 @@ func (gce *GCECloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc stri
 	expectedFirewall := &compute.Firewall{
 		Name:         fwName,
 		Description:  fwDesc,
-		Network:      gce.networkURL,
+		Network:      g.networkURL,
 		SourceRanges: sourceRanges,
 		TargetTags:   targetTags,
 		Allowed: []*compute.FirewallAllowed{
@@ -340,10 +340,10 @@ func (gce *GCECloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc stri
 
 	if existingFirewall == nil {
 		glog.V(2).Infof("ensureInternalFirewall(%v): creating firewall", fwName)
-		err = gce.CreateFirewall(expectedFirewall)
-		if err != nil && isForbidden(err) && gce.OnXPN() {
+		err = g.CreateFirewall(expectedFirewall)
+		if err != nil && isForbidden(err) && g.OnXPN() {
 			glog.V(2).Infof("ensureInternalFirewall(%v): do not have permission to create firewall rule (on XPN). Raising event.", fwName)
-			gce.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudCreateCmd(expectedFirewall, gce.NetworkProjectID()))
+			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudCreateCmd(expectedFirewall, g.NetworkProjectID()))
 			return nil
 		}
 		return err
@@ -354,16 +354,16 @@ func (gce *GCECloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc stri
 	}
 
 	glog.V(2).Infof("ensureInternalFirewall(%v): updating firewall", fwName)
-	err = gce.UpdateFirewall(expectedFirewall)
-	if err != nil && isForbidden(err) && gce.OnXPN() {
+	err = g.UpdateFirewall(expectedFirewall)
+	if err != nil && isForbidden(err) && g.OnXPN() {
 		glog.V(2).Infof("ensureInternalFirewall(%v): do not have permission to update firewall rule (on XPN). Raising event.", fwName)
-		gce.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudUpdateCmd(expectedFirewall, gce.NetworkProjectID()))
+		g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudUpdateCmd(expectedFirewall, g.NetworkProjectID()))
 		return nil
 	}
 	return err
 }
 
-func (gce *GCECloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
 	// First firewall is for ingress traffic
 	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
@@ -371,7 +371,7 @@ func (gce *GCECloud) ensureInternalFirewalls(loadBalancerName, ipAddress, cluste
 	if err != nil {
 		return err
 	}
-	err = gce.ensureInternalFirewall(svc, loadBalancerName, fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes)
+	err = g.ensureInternalFirewall(svc, loadBalancerName, fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes)
 	if err != nil {
 		return err
 	}
@@ -379,24 +379,24 @@ func (gce *GCECloud) ensureInternalFirewalls(loadBalancerName, ipAddress, cluste
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
 	hcSrcRanges := LoadBalancerSrcRanges()
-	return gce.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes)
+	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes)
 }
 
-func (gce *GCECloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
+func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
 	glog.V(2).Infof("ensureInternalHealthCheck(%v, %v, %v): checking existing health check", name, path, port)
 	expectedHC := newInternalLBHealthCheck(name, svcName, shared, path, port)
 
-	hc, err := gce.GetHealthCheck(name)
+	hc, err := g.GetHealthCheck(name)
 	if err != nil && !isNotFound(err) {
 		return nil, err
 	}
 
 	if hc == nil {
 		glog.V(2).Infof("ensureInternalHealthCheck: did not find health check %v, creating one with port %v path %v", name, port, path)
-		if err = gce.CreateHealthCheck(expectedHC); err != nil {
+		if err = g.CreateHealthCheck(expectedHC); err != nil {
 			return nil, err
 		}
-		hc, err = gce.GetHealthCheck(name)
+		hc, err = g.GetHealthCheck(name)
 		if err != nil {
 			glog.Errorf("Failed to get http health check %v", err)
 			return nil, err
@@ -405,22 +405,25 @@ func (gce *GCECloud) ensureInternalHealthCheck(name string, svcName types.Namesp
 		return hc, nil
 	}
 
-	if healthChecksEqual(expectedHC, hc) {
-		return hc, nil
+	if needToUpdateHealthChecks(hc, expectedHC) {
+		glog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
+		expectedHC = mergeHealthChecks(hc, expectedHC)
+		if err := g.UpdateHealthCheck(expectedHC); err != nil {
+			glog.Warningf("Failed to reconcile http health check %v parameters", name)
+			return nil, err
+		}
+		glog.V(2).Infof("ensureInternalHealthCheck: corrected health check %v parameters successful", name)
+		hc, err = g.GetHealthCheck(name)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	glog.V(2).Infof("ensureInternalHealthCheck: health check %v exists but parameters have drifted - updating...", name)
-	if err := gce.UpdateHealthCheck(expectedHC); err != nil {
-		glog.Warningf("Failed to reconcile http health check %v parameters", name)
-		return nil, err
-	}
-	glog.V(2).Infof("ensureInternalHealthCheck: corrected health check %v parameters successful", name)
 	return hc, nil
 }
 
-func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node) (string, error) {
+func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node) (string, error) {
 	glog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): checking group that it contains %v nodes", name, zone, len(nodes))
-	ig, err := gce.GetInstanceGroup(name, zone)
+	ig, err := g.GetInstanceGroup(name, zone)
 	if err != nil && !isNotFound(err) {
 		return "", err
 	}
@@ -434,16 +437,16 @@ func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.
 	if ig == nil {
 		glog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): creating instance group", name, zone)
 		newIG := &compute.InstanceGroup{Name: name}
-		if err = gce.CreateInstanceGroup(newIG, zone); err != nil {
+		if err = g.CreateInstanceGroup(newIG, zone); err != nil {
 			return "", err
 		}
 
-		ig, err = gce.GetInstanceGroup(name, zone)
+		ig, err = g.GetInstanceGroup(name, zone)
 		if err != nil {
 			return "", err
 		}
 	} else {
-		instances, err := gce.ListInstancesInInstanceGroup(name, zone, allInstances)
+		instances, err := g.ListInstancesInInstanceGroup(name, zone, allInstances)
 		if err != nil {
 			return "", err
 		}
@@ -459,17 +462,17 @@ func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.
 
 	if len(removeNodes) != 0 {
 		glog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): removing nodes: %v", name, zone, removeNodes)
-		instanceRefs := gce.ToInstanceReferences(zone, removeNodes)
+		instanceRefs := g.ToInstanceReferences(zone, removeNodes)
 		// Possible we'll receive 404's here if the instance was deleted before getting to this point.
-		if err = gce.RemoveInstancesFromInstanceGroup(name, zone, instanceRefs); err != nil && !isNotFound(err) {
+		if err = g.RemoveInstancesFromInstanceGroup(name, zone, instanceRefs); err != nil && !isNotFound(err) {
 			return "", err
 		}
 	}
 
 	if len(addNodes) != 0 {
 		glog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): adding nodes: %v", name, zone, addNodes)
-		instanceRefs := gce.ToInstanceReferences(zone, addNodes)
-		if err = gce.AddInstancesToInstanceGroup(name, zone, instanceRefs); err != nil {
+		instanceRefs := g.ToInstanceReferences(zone, addNodes)
+		if err = g.AddInstancesToInstanceGroup(name, zone, instanceRefs); err != nil {
 			return "", err
 		}
 	}
@@ -479,12 +482,12 @@ func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.
 
 // ensureInternalInstanceGroups generates an unmanaged instance group for every zone
 // where a K8s node exists. It also ensures that each node belongs to an instance group
-func (gce *GCECloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]string, error) {
+func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]string, error) {
 	zonedNodes := splitNodesByZone(nodes)
-	glog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), gce.region)
+	glog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
 	var igLinks []string
 	for zone, nodes := range zonedNodes {
-		igLink, err := gce.ensureInternalInstanceGroup(name, zone, nodes)
+		igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
 		if err != nil {
 			return []string{}, err
 		}
@@ -494,25 +497,25 @@ func (gce *GCECloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node)
 	return igLinks, nil
 }
 
-func (gce *GCECloud) ensureInternalInstanceGroupsDeleted(name string) error {
+func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
 	// List of nodes isn't available here - fetch all zones in region and try deleting this cluster's ig
-	zones, err := gce.ListZonesInRegion(gce.region)
+	zones, err := g.ListZonesInRegion(g.region)
 	if err != nil {
 		return err
 	}
 
 	glog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
 	for _, z := range zones {
-		if err := gce.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
+		if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
 			return err
 		}
 	}
 	return nil
 }
 
-func (gce *GCECloud) ensureInternalBackendService(name, description string, affinityType v1.ServiceAffinity, scheme cloud.LbScheme, protocol v1.Protocol, igLinks []string, hcLink string) error {
+func (g *Cloud) ensureInternalBackendService(name, description string, affinityType v1.ServiceAffinity, scheme cloud.LbScheme, protocol v1.Protocol, igLinks []string, hcLink string) error {
 	glog.V(2).Infof("ensureInternalBackendService(%v, %v, %v): checking existing backend service with %d groups", name, scheme, protocol, len(igLinks))
-	bs, err := gce.GetRegionBackendService(name, gce.region)
+	bs, err := g.GetRegionBackendService(name, g.region)
 	if err != nil && !isNotFound(err) {
 		return err
 	}
@@ -531,7 +534,7 @@ func (gce *GCECloud) ensureInternalBackendService(name, description string, affi
 	// Create backend service if none was found
 	if bs == nil {
 		glog.V(2).Infof("ensureInternalBackendService: creating backend service %v", name)
-		err := gce.CreateRegionBackendService(expectedBS, gce.region)
+		err := g.CreateRegionBackendService(expectedBS, g.region)
 		if err != nil {
 			return err
 		}
@@ -546,7 +549,7 @@ func (gce *GCECloud) ensureInternalBackendService(name, description string, affi
 	glog.V(2).Infof("ensureInternalBackendService: updating backend service %v", name)
 	// Set fingerprint for optimistic locking
 	expectedBS.Fingerprint = bs.Fingerprint
-	if err := gce.UpdateRegionBackendService(expectedBS, gce.region); err != nil {
+	if err := g.UpdateRegionBackendService(expectedBS, g.region); err != nil {
 		return err
 	}
 	glog.V(2).Infof("ensureInternalBackendService: updated backend service %v successfully", name)
@@ -554,9 +557,9 @@ func (gce *GCECloud) ensureInternalBackendService(name, description string, affi
 }
 
 // ensureInternalBackendServiceGroups updates backend services if their list of backend instance groups is incorrect.
-func (gce *GCECloud) ensureInternalBackendServiceGroups(name string, igLinks []string) error {
+func (g *Cloud) ensureInternalBackendServiceGroups(name string, igLinks []string) error {
 	glog.V(2).Infof("ensureInternalBackendServiceGroups(%v): checking existing backend service's groups", name)
-	bs, err := gce.GetRegionBackendService(name, gce.region)
+	bs, err := g.GetRegionBackendService(name, g.region)
 	if err != nil {
 		return err
 	}
@@ -570,7 +573,7 @@ func (gce *GCECloud) ensureInternalBackendServiceGroups(name string, igLinks []s
 	bs.Backends = backends
 
 	glog.V(2).Infof("ensureInternalBackendServiceGroups: updating backend service %v", name)
-	if err := gce.UpdateRegionBackendService(bs, gce.region); err != nil {
+	if err := g.UpdateRegionBackendService(bs, g.region); err != nil {
 		return err
 	}
 	glog.V(2).Infof("ensureInternalBackendServiceGroups: updated backend service %v successfully", name)
@@ -620,15 +623,37 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 		equalStringSets(a.TargetTags, b.TargetTags)
 }
 
-func healthChecksEqual(a, b *compute.HealthCheck) bool {
-	return a.HttpHealthCheck != nil && b.HttpHealthCheck != nil &&
-		a.HttpHealthCheck.Port == b.HttpHealthCheck.Port &&
-		a.HttpHealthCheck.RequestPath == b.HttpHealthCheck.RequestPath &&
-		a.Description == b.Description &&
-		a.CheckIntervalSec == b.CheckIntervalSec &&
-		a.TimeoutSec == b.TimeoutSec &&
-		a.UnhealthyThreshold == b.UnhealthyThreshold &&
-		a.HealthyThreshold == b.HealthyThreshold
+// mergeHealthChecks reconciles HealthCheck configures to be no smaller than
+// the default values.
+// E.g. old health check interval is 2s, new default is 8.
+// The HC interval will be reconciled to 8 seconds.
+// If the existing health check is larger than the default interval,
+// the configuration will be kept.
+func mergeHealthChecks(hc, newHC *compute.HealthCheck) *compute.HealthCheck {
+	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
+		newHC.CheckIntervalSec = hc.CheckIntervalSec
+	}
+	if hc.TimeoutSec > newHC.TimeoutSec {
+		newHC.TimeoutSec = hc.TimeoutSec
+	}
+	if hc.UnhealthyThreshold > newHC.UnhealthyThreshold {
+		newHC.UnhealthyThreshold = hc.UnhealthyThreshold
+	}
+	if hc.HealthyThreshold > newHC.HealthyThreshold {
+		newHC.HealthyThreshold = hc.HealthyThreshold
+	}
+	return newHC
+}
+
+// needToUpdateHealthChecks checks whether the healthcheck needs to be updated.
+func needToUpdateHealthChecks(hc, newHC *compute.HealthCheck) bool {
+	if hc.HttpHealthCheck == nil || newHC.HttpHealthCheck == nil {
+		return true
+	}
+	changed := hc.HttpHealthCheck.Port != newHC.HttpHealthCheck.Port || hc.HttpHealthCheck.RequestPath != newHC.HttpHealthCheck.RequestPath || hc.Description != newHC.Description
+	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
+	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
+	return changed
 }
 
 // backendsListEqual asserts that backend lists are equal by instance group link only
@@ -682,8 +707,8 @@ func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1
 	return ports, protocol
 }
 
-func (gce *GCECloud) getBackendServiceLink(name string) string {
-	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", gce.region, "backendServices", name}, "/")
+func (g *Cloud) getBackendServiceLink(name string) string {
+	return g.service.BasePath + strings.Join([]string{g.projectID, "regions", g.region, "backendServices", name}, "/")
 }
 
 func getNameFromLink(link string) string {

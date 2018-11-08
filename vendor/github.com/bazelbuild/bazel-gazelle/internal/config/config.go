@@ -36,10 +36,6 @@ import (
 // information is language-specific and is stored in Exts. This information
 // is modified by extensions that implement Configurer.
 type Config struct {
-	// Dirs is a list of absolute, canonical paths to directories where Gazelle
-	// should run.
-	Dirs []string
-
 	// RepoRoot is the absolute, canonical path to the root directory of the
 	// repository with all symlinks resolved.
 	RepoRoot string

@@ -12,7 +12,7 @@ import (
 )
 
 // SOCKS5 returns a Dialer that makes SOCKSv5 connections to the given address
-// with an optional username and password. See RFC 1928.
+// with an optional username and password. See RFC 1928 and RFC 1929.
 func SOCKS5(network, addr string, auth *Auth, forward Dialer) (Dialer, error) {
 	s := &socks5{
 		network: network,
@@ -60,7 +60,7 @@ var socks5Errors = []string{
 	"address type not supported",
 }
 
-// Dial connects to the address addr on the network net via the SOCKS5 proxy.
+// Dial connects to the address addr on the given network via the SOCKS5 proxy.
 func (s *socks5) Dial(network, addr string) (net.Conn, error) {
 	switch network {
 	case "tcp", "tcp6", "tcp4":
@@ -120,6 +120,7 @@ func (s *socks5) connect(conn net.Conn, target string) error {
 		return errors.New("proxy: SOCKS5 proxy at " + s.addr + " requires authentication")
 	}
 
+	// See RFC 1929
 	if buf[1] == socks5AuthPassword {
 		buf = buf[:0]
 		buf = append(buf, 1 /* password protocol version */)

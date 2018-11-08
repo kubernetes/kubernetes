@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	pkgerrors "github.com/pkg/errors"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	pkgversion "k8s.io/kubernetes/pkg/version"
@@ -102,7 +103,7 @@ func KubernetesReleaseVersion(version string) (string, error) {
 		// Re-validate received version and return.
 		return KubernetesReleaseVersion(body)
 	}
-	return "", fmt.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+	return "", pkgerrors.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
 }
 
 // KubernetesVersionToImageTag is helper function that replaces all
@@ -143,7 +144,7 @@ func splitVersion(version string) (string, string, error) {
 	var urlSuffix string
 	subs := kubeBucketPrefixes.FindAllStringSubmatch(version, 1)
 	if len(subs) != 1 || len(subs[0]) != 4 {
-		return "", "", fmt.Errorf("invalid version %q", version)
+		return "", "", pkgerrors.Errorf("invalid version %q", version)
 	}
 
 	switch {
@@ -163,12 +164,12 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	resp, err := client.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("unable to get URL %q: %s", url, err.Error())
+		return "", pkgerrors.Errorf("unable to get URL %q: %s", url, err.Error())
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("unable to read content of URL %q: %s", url, err.Error())
+		return "", pkgerrors.Errorf("unable to read content of URL %q: %s", url, err.Error())
 	}
 	bodyString := strings.TrimSpace(string(body))
 
@@ -183,7 +184,7 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 func kubeadmVersion(info string) (string, error) {
 	v, err := versionutil.ParseSemantic(info)
 	if err != nil {
-		return "", fmt.Errorf("kubeadm version error: %v", err)
+		return "", pkgerrors.Wrap(err, "kubeadm version error")
 	}
 	// There is no utility in versionutil to get the version without the metadata,
 	// so this needs some manual formatting.
@@ -222,11 +223,11 @@ func validateStableVersion(remoteVersion, clientVersion string) (string, error) 
 
 	verRemote, err := versionutil.ParseGeneric(remoteVersion)
 	if err != nil {
-		return "", fmt.Errorf("remote version error: %v", err)
+		return "", pkgerrors.Wrap(err, "remote version error")
 	}
 	verClient, err := versionutil.ParseGeneric(clientVersion)
 	if err != nil {
-		return "", fmt.Errorf("client version error: %v", err)
+		return "", pkgerrors.Wrap(err, "client version error")
 	}
 	// If the remote Major version is bigger or if the Major versions are the same,
 	// but the remote Minor is bigger use the client version release. This handles Major bumps too.

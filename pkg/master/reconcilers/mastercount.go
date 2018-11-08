@@ -22,26 +22,26 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/api/endpoints"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
 // masters. masterCountEndpointReconciler implements EndpointReconciler.
 type masterCountEndpointReconciler struct {
 	masterCount           int
-	endpointClient        coreclient.EndpointsGetter
+	endpointClient        corev1client.EndpointsGetter
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
 // specified expected number of masters.
-func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient.EndpointsGetter) EndpointReconciler {
+func NewMasterCountEndpointReconciler(masterCount int, endpointClient corev1client.EndpointsGetter) EndpointReconciler {
 	return &masterCountEndpointReconciler{
 		masterCount:    masterCount,
 		endpointClient: endpointClient,
@@ -60,7 +60,7 @@ func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient
 //  * All apiservers MUST know and agree on the number of apiservers expected
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -70,7 +70,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 
 	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
-		e = &api.Endpoints{
+		e = &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: metav1.NamespaceDefault,
@@ -79,8 +79,8 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	}
 	if errors.IsNotFound(err) {
 		// Simply create non-existing endpoints for the service.
-		e.Subsets = []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: ip.String()}},
+		e.Subsets = []corev1.EndpointSubset{{
+			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
 		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(e)
@@ -92,8 +92,8 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
-		e.Subsets = []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: ip.String()}},
+		e.Subsets = []corev1.EndpointSubset{{
+			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
 		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
@@ -105,10 +105,10 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
+		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip.String()})
 
 		// Lexicographic order is retained by this step.
-		e.Subsets = endpoints.RepackSubsets(e.Subsets)
+		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
 
 		// If too many IP addresses, remove the ones lexicographically after our
 		// own IP address.  Given the requirements stated at the top of
@@ -137,7 +137,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	return err
 }
 
-func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []api.EndpointPort) error {
+func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 	r.stopReconcilingCalled = true
@@ -152,14 +152,14 @@ func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip n
 	}
 
 	// Remove our IP from the list of addresses
-	new := []api.EndpointAddress{}
+	new := []corev1.EndpointAddress{}
 	for _, addr := range e.Subsets[0].Addresses {
 		if addr.IP != ip.String() {
 			new = append(new, addr)
 		}
 	}
 	e.Subsets[0].Addresses = new
-	e.Subsets = endpoints.RepackSubsets(e.Subsets)
+	e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		_, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
 		return err
@@ -175,7 +175,7 @@ func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip n
 //     of addresses is less than or equal to the master count.
 // * portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
+func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
 	}
@@ -214,7 +214,7 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 // * All apiservers MUST use GetMasterServiceUpdateIfNeeded and only
 //     GetMasterServiceUpdateIfNeeded to manage service attributes
 // * updateMasterService is called periodically from all apiservers.
-func GetMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.ServicePort, serviceType api.ServiceType) (s *api.Service, updated bool) {
+func GetMasterServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType) (s *corev1.Service, updated bool) {
 	// Determine if the service is in the format we expect
 	// (servicePorts are present and service type matches)
 	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
@@ -229,7 +229,7 @@ func GetMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.Service
 // Determine if the service is in the correct format
 // GetMasterServiceUpdateIfNeeded expects (servicePorts are correct
 // and service type matches).
-func checkServiceFormat(s *api.Service, ports []api.ServicePort, serviceType api.ServiceType) (formatCorrect bool) {
+func checkServiceFormat(s *corev1.Service, ports []corev1.ServicePort, serviceType corev1.ServiceType) (formatCorrect bool) {
 	if s.Spec.Type != serviceType {
 		return false
 	}

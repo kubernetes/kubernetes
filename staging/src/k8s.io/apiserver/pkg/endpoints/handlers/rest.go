@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -56,6 +57,7 @@ type RequestScope struct {
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 	Authorizer      authorizer.Authorizer
+	Trace           *utiltrace.Trace
 
 	TableConvertor rest.TableConvertor
 	OpenAPISchema  openapiproto.Schema
@@ -65,6 +67,9 @@ type RequestScope struct {
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
+
+	// HubGroupVersion indicates what version objects read from etcd or incoming requests should be converted to for in-memory handling.
+	HubGroupVersion schema.GroupVersion
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {

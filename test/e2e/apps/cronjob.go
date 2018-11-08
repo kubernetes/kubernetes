@@ -214,8 +214,8 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 
-		By("Ensuring there are no active jobs in the cronjob")
-		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, true)
+		By("Ensuring the job is not in the cronjob active list")
+		err = waitForJobNotActive(f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring MissingJob event has occurred")
@@ -336,7 +336,7 @@ func deleteCronJob(c clientset.Interface, ns, name string) error {
 // Wait for at least given amount of active jobs.
 func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+		curr, err := getCronJob(c, ns, cronJobName)
 		if err != nil {
 			return false, err
 		}
@@ -350,7 +350,7 @@ func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int
 // empty after the timeout.
 func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty bool) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := getCronJob(c, ns, jobName)
 		if err != nil {
 			return false, err
 		}
@@ -360,6 +360,23 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty boo
 		} else {
 			return len(curr.Status.Active) != 0, nil
 		}
+	})
+}
+
+// Wait till a given job actually goes away from the Active list for a given cronjob
+func waitForJobNotActive(c clientset.Interface, ns, cronJobName, jobName string) error {
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		curr, err := getCronJob(c, ns, cronJobName)
+		if err != nil {
+			return false, err
+		}
+
+		for _, j := range curr.Status.Active {
+			if j.Name == jobName {
+				return false, nil
+			}
+		}
+		return true, nil
 	})
 }
 
@@ -429,7 +446,7 @@ func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 // waitForEventWithReason waits for events with a reason within a list has occurred
 func waitForEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
 	return wait.Poll(framework.Poll, 30*time.Second, func() (bool, error) {
-		sj, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+		sj, err := getCronJob(c, ns, cronJobName)
 		if err != nil {
 			return false, err
 		}

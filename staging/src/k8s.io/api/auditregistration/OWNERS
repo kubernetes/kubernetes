@@ -1,5 +1,6 @@
 reviewers:
-- lavalamp
-- sttts
-- tallclair
-- pbarker
+- sig-auth-audit-approvers
+- sig-auth-audit-reviewers
+labels:
+- sig/auth
+

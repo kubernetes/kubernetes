@@ -228,19 +228,21 @@ func TestLowercaseSANs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := &kubeadmapiv1beta1.InitConfiguration{
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					APIServerCertSANs: test.in,
+					APIServer: kubeadmapiv1beta1.APIServer{
+						CertSANs: test.in,
+					},
 				},
 			}
 
-			LowercaseSANs(cfg.APIServerCertSANs)
+			LowercaseSANs(cfg.APIServer.CertSANs)
 
-			if len(cfg.APIServerCertSANs) != len(test.out) {
-				t.Fatalf("expected %d elements, got %d", len(test.out), len(cfg.APIServerCertSANs))
+			if len(cfg.APIServer.CertSANs) != len(test.out) {
+				t.Fatalf("expected %d elements, got %d", len(test.out), len(cfg.APIServer.CertSANs))
 			}
 
 			for i, expected := range test.out {
-				if cfg.APIServerCertSANs[i] != expected {
-					t.Errorf("expected element %d to be %q, got %q", i, expected, cfg.APIServerCertSANs[i])
+				if cfg.APIServer.CertSANs[i] != expected {
+					t.Errorf("expected element %d to be %q, got %q", i, expected, cfg.APIServer.CertSANs[i])
 				}
 			}
 		})

@@ -26,12 +26,11 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestGetEtcdPodSpec(t *testing.T) {
-
 	// Creates a Master Configuration
 	cfg := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
@@ -46,7 +45,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 	}
 
 	// Executes GetEtcdPodSpec
-	spec := GetEtcdPodSpec(cfg)
+	spec := GetEtcdPodSpec(cfg, []etcdutil.Member{})
 
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
@@ -117,11 +116,17 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 
 func TestGetEtcdCommand(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.InitConfiguration
-		expected []string
+		name           string
+		cfg            *kubeadmapi.InitConfiguration
+		initialCluster []etcdutil.Member
+		expected       []string
 	}{
 		{
+			name: "Default args - with empty etcd initial cluster",
 			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 					Name: "foo",
 				},
@@ -136,10 +141,10 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
-				fmt.Sprintf("--advertise-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
-				fmt.Sprintf("--listen-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
-				fmt.Sprintf("--initial-advertise-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
 				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
 				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
@@ -150,11 +155,57 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
-				fmt.Sprintf("--initial-cluster=foo=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-cluster=foo=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 			},
 		},
 		{
+			name: "Default args - With an existing etcd cluster",
 			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+					Name: "foo",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
+							DataDir: "/var/lib/etcd",
+						},
+					},
+				},
+			},
+			initialCluster: []etcdutil.Member{
+				{Name: "foo", PeerURL: fmt.Sprintf("https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort)}, // NB. the joining etcd instance should be part of the initialCluster list
+				{Name: "bar", PeerURL: fmt.Sprintf("https://5.6.7.8:%d", kubeadmconstants.EtcdListenPeerPort)},
+			},
+			expected: []string{
+				"etcd",
+				"--name=foo",
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				"--data-dir=/var/lib/etcd",
+				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
+				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
+				"--trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--client-cert-auth=true",
+				"--peer-cert-file=" + kubeadmconstants.EtcdPeerCertName,
+				"--peer-key-file=" + kubeadmconstants.EtcdPeerKeyName,
+				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--snapshot-count=10000",
+				"--peer-client-cert-auth=true",
+				"--initial-cluster-state=existing",
+				fmt.Sprintf("--initial-cluster=foo=https://1.2.3.4:%d,bar=https://5.6.7.8:%d", kubeadmconstants.EtcdListenPeerPort, kubeadmconstants.EtcdListenPeerPort),
+			},
+		},
+		{
+			name: "Extra args",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 					Name: "bar",
 				},
@@ -175,8 +226,8 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--name=bar",
 				"--listen-client-urls=https://10.0.1.10:2379",
 				"--advertise-client-urls=https://10.0.1.10:2379",
-				fmt.Sprintf("--listen-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
-				fmt.Sprintf("--initial-advertise-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
 				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
 				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
@@ -187,50 +238,19 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
-				fmt.Sprintf("--initial-cluster=bar=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
-			},
-		},
-		{
-			cfg: &kubeadmapi.InitConfiguration{
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
-					Name: "wombat",
-				},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{
-						Local: &kubeadmapi.LocalEtcd{
-							DataDir: "/etc/foo",
-						},
-					},
-				},
-			},
-			expected: []string{
-				"etcd",
-				"--name=wombat",
-				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
-				fmt.Sprintf("--advertise-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
-				fmt.Sprintf("--listen-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
-				fmt.Sprintf("--initial-advertise-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
-				"--data-dir=/etc/foo",
-				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
-				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
-				"--trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
-				"--client-cert-auth=true",
-				"--peer-cert-file=" + kubeadmconstants.EtcdPeerCertName,
-				"--peer-key-file=" + kubeadmconstants.EtcdPeerKeyName,
-				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
-				"--snapshot-count=10000",
-				"--peer-client-cert-auth=true",
-				fmt.Sprintf("--initial-cluster=wombat=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-cluster=bar=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		actual := getEtcdCommand(rt.cfg)
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := getEtcdCommand(rt.cfg, rt.initialCluster)
+			sort.Strings(actual)
+			sort.Strings(rt.expected)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+			}
+		})
 	}
 }

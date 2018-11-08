@@ -89,8 +89,9 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 		defaultGVK := scope.Kind
 		original := r.New()
+
 		trace.Step("About to convert to expected version")
-		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: defaultGVK.Group, Version: runtime.APIVersionInternal})
+		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(scope.Typer, err, original, gvk, body)
@@ -189,6 +190,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			status = http.StatusCreated
 		}
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }

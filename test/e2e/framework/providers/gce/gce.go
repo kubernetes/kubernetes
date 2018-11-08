@@ -58,7 +58,7 @@ func factory() (framework.ProviderInterface, error) {
 	}
 
 	gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
-		ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
+		APIEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
 		ProjectID:          framework.TestContext.CloudConfig.ProjectID,
 		Region:             region,
 		Zone:               zone,
@@ -89,7 +89,7 @@ func factory() (framework.ProviderInterface, error) {
 	return NewProvider(gceCloud), nil
 }
 
-func NewProvider(gceCloud *gcecloud.GCECloud) framework.ProviderInterface {
+func NewProvider(gceCloud *gcecloud.Cloud) framework.ProviderInterface {
 	return &Provider{
 		gceCloud: gceCloud,
 	}
@@ -97,7 +97,7 @@ func NewProvider(gceCloud *gcecloud.GCECloud) framework.ProviderInterface {
 
 type Provider struct {
 	framework.NullProvider
-	gceCloud *gcecloud.GCECloud
+	gceCloud *gcecloud.Cloud
 }
 
 func (p *Provider) ResizeGroup(group string, size int32) error {
@@ -279,7 +279,7 @@ func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, 
 		return
 	}
 	hcNames := []string{gcecloud.MakeNodesHealthCheckName(clusterID)}
-	hc, getErr := p.gceCloud.GetHttpHealthCheck(loadBalancerName)
+	hc, getErr := p.gceCloud.GetHTTPHealthCheck(loadBalancerName)
 	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
 		return
@@ -351,7 +351,7 @@ func IsGoogleAPIHTTPErrorCode(err error, code int) bool {
 	return ok && apiErr.Code == code
 }
 
-func GetGCECloud() (*gcecloud.GCECloud, error) {
+func GetGCECloud() (*gcecloud.Cloud, error) {
 	p, ok := framework.TestContext.CloudConfig.Provider.(*Provider)
 	if !ok {
 		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCE provider: %#v", framework.TestContext.CloudConfig.Provider)

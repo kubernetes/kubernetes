@@ -18,12 +18,12 @@ package aws
 
 import (
 	"fmt"
-
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 

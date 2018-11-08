@@ -274,7 +274,7 @@ func (m *manager) Start() {
 	if m.dynamicTemplate {
 		go wait.Forever(func() {
 			// check if the current template matches what we last requested
-			if !reflect.DeepEqual(m.getLastRequest(), m.getTemplate()) {
+			if !m.certSatisfiesTemplate() && !reflect.DeepEqual(m.getLastRequest(), m.getTemplate()) {
 				// if the template is different, queue up an interrupt of the rotation deadline loop.
 				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
 				templateChanged <- struct{}{}
@@ -389,35 +389,30 @@ func (m *manager) rotateCerts() (bool, error) {
 	return true, nil
 }
 
-// nextRotationDeadline returns a value for the threshold at which the
-// current certificate should be rotated, 80%+/-10% of the expiration of the
-// certificate.
-func (m *manager) nextRotationDeadline() time.Time {
-	// forceRotation is not protected by locks
-	if m.forceRotation {
-		m.forceRotation = false
-		return time.Now()
-	}
-
-	m.certAccessLock.RLock()
-	defer m.certAccessLock.RUnlock()
+// Check that the current certificate on disk satisfies the requests from the
+// current template.
+//
+// Note that extra items in the certificate's SAN or orgs that don't exist in
+// the template will not trigger a renewal.
+//
+// Requires certAccessLock to be locked.
+func (m *manager) certSatisfiesTemplateLocked() bool {
 	if m.cert == nil {
-		return time.Now()
+		return false
 	}
 
-	// Ensure the currently held certificate satisfies the requested subject CN and SANs
 	if template := m.getTemplate(); template != nil {
 		if template.Subject.CommonName != m.cert.Leaf.Subject.CommonName {
-			glog.V(2).Infof("Current certificate CN (%s) does not match requested CN (%s), rotating now", m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
-			return time.Now()
+			glog.V(2).Infof("Current certificate CN (%s) does not match requested CN (%s)", m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
+			return false
 		}
 
 		currentDNSNames := sets.NewString(m.cert.Leaf.DNSNames...)
 		desiredDNSNames := sets.NewString(template.DNSNames...)
 		missingDNSNames := desiredDNSNames.Difference(currentDNSNames)
 		if len(missingDNSNames) > 0 {
-			glog.V(2).Infof("Current certificate is missing requested DNS names %v, rotating now", missingDNSNames.List())
-			return time.Now()
+			glog.V(2).Infof("Current certificate is missing requested DNS names %v", missingDNSNames.List())
+			return false
 		}
 
 		currentIPs := sets.NewString()
@@ -430,9 +425,43 @@ func (m *manager) nextRotationDeadline() time.Time {
 		}
 		missingIPs := desiredIPs.Difference(currentIPs)
 		if len(missingIPs) > 0 {
-			glog.V(2).Infof("Current certificate is missing requested IP addresses %v, rotating now", missingIPs.List())
-			return time.Now()
+			glog.V(2).Infof("Current certificate is missing requested IP addresses %v", missingIPs.List())
+			return false
 		}
+
+		currentOrgs := sets.NewString(m.cert.Leaf.Subject.Organization...)
+		desiredOrgs := sets.NewString(template.Subject.Organization...)
+		missingOrgs := desiredOrgs.Difference(currentOrgs)
+		if len(missingOrgs) > 0 {
+			glog.V(2).Infof("Current certificate is missing requested orgs %v", missingOrgs.List())
+			return false
+		}
+	}
+
+	return true
+}
+
+func (m *manager) certSatisfiesTemplate() bool {
+	m.certAccessLock.RLock()
+	defer m.certAccessLock.RUnlock()
+	return m.certSatisfiesTemplateLocked()
+}
+
+// nextRotationDeadline returns a value for the threshold at which the
+// current certificate should be rotated, 80%+/-10% of the expiration of the
+// certificate.
+func (m *manager) nextRotationDeadline() time.Time {
+	// forceRotation is not protected by locks
+	if m.forceRotation {
+		m.forceRotation = false
+		return time.Now()
+	}
+
+	m.certAccessLock.RLock()
+	defer m.certAccessLock.RUnlock()
+
+	if !m.certSatisfiesTemplateLocked() {
+		return time.Now()
 	}
 
 	notAfter := m.cert.Leaf.NotAfter

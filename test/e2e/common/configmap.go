@@ -27,7 +27,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = Describe("[sig-api-machinery] ConfigMap", func() {
+var _ = Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*

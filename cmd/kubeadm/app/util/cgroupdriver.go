@@ -17,8 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	utilsexec "k8s.io/utils/exec"
 )
@@ -39,7 +40,7 @@ func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
 
 func validateCgroupDriver(driver string) error {
 	if driver != "cgroupfs" && driver != "systemd" {
-		return fmt.Errorf("unknown cgroup driver %q", driver)
+		return errors.Errorf("unknown cgroup driver %q", driver)
 	}
 	return nil
 }
@@ -51,7 +52,7 @@ func validateCgroupDriver(driver string) error {
 func callDockerInfo(execer utilsexec.Interface) (string, error) {
 	out, err := execer.Command("docker", "info").Output()
 	if err != nil {
-		return "", fmt.Errorf("cannot execute 'docker info': %v", err)
+		return "", errors.Wrap(err, "cannot execute 'docker info'")
 	}
 	return string(out), nil
 }
@@ -71,5 +72,5 @@ func getCgroupDriverFromDockerInfo(info string) (string, error) {
 		}
 		return driver, nil
 	}
-	return "", fmt.Errorf("cgroup driver is not defined in 'docker info'")
+	return "", errors.New("cgroup driver is not defined in 'docker info'")
 }

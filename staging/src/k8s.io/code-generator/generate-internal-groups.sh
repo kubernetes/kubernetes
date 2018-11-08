@@ -47,7 +47,7 @@ EXT_APIS_PKG="$4"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
-go install ./$(dirname "${0}")/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+go install ${GOFLAGS:-} ./$(dirname "${0}")/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
@@ -85,11 +85,11 @@ if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
-  echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/clientset"
+  echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
   if [ -n "${INT_APIS_PKG}" ]; then
-    ${GOPATH}/bin/client-gen --clientset-name ${CLIENTSET_NAME_INTERNAL:-internalversion} --input-base "" --input $(codegen::join , $(printf '%s/ ' "${INT_FQ_APIS[@]}")) --output-package ${OUTPUT_PKG}/clientset "$@"
+    ${GOPATH}/bin/client-gen --clientset-name ${CLIENTSET_NAME_INTERNAL:-internalversion} --input-base "" --input $(codegen::join , $(printf '%s/ ' "${INT_FQ_APIS[@]}")) --output-package ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset} "$@"
   fi
-  ${GOPATH}/bin/client-gen --clientset-name ${CLIENTSET_NAME_VERSIONED:-versioned} --input-base "" --input $(codegen::join , "${EXT_FQ_APIS[@]}") --output-package ${OUTPUT_PKG}/clientset "$@"
+  ${GOPATH}/bin/client-gen --clientset-name ${CLIENTSET_NAME_VERSIONED:-versioned} --input-base "" --input $(codegen::join , "${EXT_FQ_APIS[@]}") --output-package ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset} "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
@@ -101,8 +101,8 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   ${GOPATH}/bin/informer-gen \
            --input-dirs $(codegen::join , "${ALL_FQ_APIS[@]}") \
-           --versioned-clientset-package ${OUTPUT_PKG}/clientset/${CLIENTSET_NAME_VERSIONED:-versioned} \
-           --internal-clientset-package ${OUTPUT_PKG}/clientset/${CLIENTSET_NAME_INTERNAL:-internalversion} \
+           --versioned-clientset-package ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned} \
+           --internal-clientset-package ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_INTERNAL:-internalversion} \
            --listers-package ${OUTPUT_PKG}/listers \
            --output-package ${OUTPUT_PKG}/informers \
            "$@"

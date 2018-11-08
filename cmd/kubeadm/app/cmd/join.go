@@ -30,7 +30,6 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
@@ -74,7 +74,6 @@ var (
 
 		Please ensure that:
 		* The cluster has a stable controlPlaneEndpoint address.
-		* The cluster uses an external etcd.
 		* The certificates that must be shared among control plane instances are provided.
 
 		`)))
@@ -85,7 +84,8 @@ var (
 		* Certificate signing request was sent to apiserver and approval was received.
 		* The Kubelet was informed of the new secure connection details.
 		* Master label and taint were applied to the new node.
-		* The kubernetes control plane instances scaled up.
+		* The Kubernetes control plane instances scaled up.
+		{{.etcdMessage}}
 
 		To start administering your cluster from this node, you need to run the following as a regular user:
 
@@ -177,9 +177,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 				cfg.Discovery.File = fd
 			} else {
 				cfg.Discovery.BootstrapToken = btd
-				cfg.Discovery.BootstrapToken.APIServerEndpoints = args
 				if len(cfg.Discovery.BootstrapToken.Token) == 0 {
 					cfg.Discovery.BootstrapToken.Token = token
+				}
+				if len(args) > 0 {
+					if len(cfgPath) == 0 && len(args) > 1 {
+						glog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
+					}
+					cfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 				}
 			}
 
@@ -284,6 +289,8 @@ func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightEr
 // Join defines struct used by kubeadm join command
 type Join struct {
 	cfg                   *kubeadmapi.JoinConfiguration
+	initCfg               *kubeadmapi.InitConfiguration
+	tlsBootstrapCfg       *clientcmdapi.Config
 	ignorePreflightErrors sets.String
 }
 
@@ -298,52 +305,44 @@ func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ig
 		glog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
 	}
 
-	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
+	internalCfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
 	if err != nil {
 		return nil, err
 	}
-	if err := configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress); err != nil {
+	if err := configutil.VerifyAPIServerBindAddress(internalCfg.APIEndpoint.AdvertiseAddress); err != nil {
 		return nil, err
 	}
 
-	fmt.Println("[preflight] running pre-flight checks")
+	fmt.Println("[preflight] Running pre-flight checks")
 
-	// Then continue with the others...
-	glog.V(1).Infoln("[preflight] running various checks on all nodes")
-	if err := preflight.RunJoinNodeChecks(utilsexec.New(), internalcfg, ignorePreflightErrors); err != nil {
+	// Start with general checks
+	glog.V(1).Infoln("[preflight] Running general checks")
+	if err := preflight.RunJoinNodeChecks(utilsexec.New(), internalCfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
-	return &Join{cfg: internalcfg, ignorePreflightErrors: ignorePreflightErrors}, nil
+	// Fetch the init configuration based on the join configuration
+	glog.V(1).Infoln("[preflight] Fetching init configuration")
+	initCfg, tlsBootstrapCfg, err := fetchInitConfigurationFromJoinConfiguration(internalCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Continue with more specific checks based on the init configuration
+	glog.V(1).Infoln("[preflight] Running configuration dependant checks")
+	if err := preflight.RunOptionalJoinNodeChecks(utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
+		return nil, err
+	}
+
+	return &Join{cfg: internalCfg, initCfg: initCfg, tlsBootstrapCfg: tlsBootstrapCfg, ignorePreflightErrors: ignorePreflightErrors}, nil
 }
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a KubeConfig
-	// file that may be used for the TLS Bootstrapping process the kubelet performs using the Certificates API.
-	glog.V(1).Infoln("[join] discovering cluster-info")
-	tlsBootstrapCfg, err := discovery.For(j.cfg)
-	if err != nil {
-		return err
-	}
-
-	// If the node should host a new control plane instance
-	var initConfiguration *kubeadmapi.InitConfiguration
 	if j.cfg.ControlPlane == true {
-		// Retrives the kubeadm configuration used during kubeadm init
-		glog.V(1).Infoln("[join] retrieving KubeConfig objects")
-		initConfiguration, err = j.FetchInitConfiguration(tlsBootstrapCfg)
-		if err != nil {
-			return err
-		}
-
-		// injects into the kubeadm configuration the information about the joining node
-		initConfiguration.NodeRegistration = j.cfg.NodeRegistration
-		initConfiguration.APIEndpoint = j.cfg.APIEndpoint
-
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
-		if err = j.CheckIfReadyForAdditionalControlPlane(initConfiguration); err != nil {
+		if err := j.CheckIfReadyForAdditionalControlPlane(j.initCfg); err != nil {
 			// outputs the not ready for hosting a new control plane instance message
 			ctx := map[string]string{
 				"Error": err.Error(),
@@ -355,12 +354,12 @@ func (j *Join) Run(out io.Writer) error {
 		}
 
 		// run kubeadm init preflight checks for checking all the prequisites
-		fmt.Printf("[join] running pre-flight checks before initializing the new control plane instance\n")
-		preflight.RunInitMasterChecks(utilsexec.New(), initConfiguration, j.ignorePreflightErrors)
+		fmt.Printf("[join] Running pre-flight checks before initializing the new control plane instance\n")
+		preflight.RunInitMasterChecks(utilsexec.New(), j.initCfg, j.ignorePreflightErrors)
 
 		// Prepares the node for hosting a new control plane instance by writing necessary
-		// KubeConfig files, and static pod manifests
-		if err = j.PrepareForHostingControlPlane(initConfiguration); err != nil {
+		// kubeconfig files, and static pod manifests
+		if err := j.PrepareForHostingControlPlane(j.initCfg); err != nil {
 			return err
 		}
 	}
@@ -371,20 +370,27 @@ func (j *Join) Run(out io.Writer) error {
 	// if the node is hosting a new control plane instance, since it uses static pods for the control plane,
 	// as soon as the kubelet starts it will take charge of creating control plane
 	// components on the node.
-	if err = j.BootstrapKubelet(tlsBootstrapCfg); err != nil {
+	if err := j.BootstrapKubelet(j.tlsBootstrapCfg); err != nil {
 		return err
 	}
 
 	// if the node is hosting a new control plane instance
 	if j.cfg.ControlPlane == true {
 		// Completes the control plane setup
-		if err := j.PostInstallControlPlane(initConfiguration); err != nil {
+		if err := j.PostInstallControlPlane(j.initCfg); err != nil {
 			return err
 		}
 
 		// outputs the join control plane done template and exits
+		etcdMessage := ""
+		// in case of local etcd
+		if j.initCfg.Etcd.External == nil {
+			etcdMessage = "* A new etcd member was added to the local/stacked etcd cluster."
+		}
+
 		ctx := map[string]string{
 			"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
+			"etcdMessage":    etcdMessage,
 		}
 		joinControPlaneDoneTemp.Execute(out, ctx)
 		return nil
@@ -396,44 +402,22 @@ func (j *Join) Run(out io.Writer) error {
 	return nil
 }
 
-// FetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap,
-func (j *Join) FetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
-	// creates a client to access the cluster using the bootstrap token identity
-	tlsClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to access the cluster")
-	}
-
-	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchConfigFromFileOrCluster(tlsClient, os.Stdout, "join", "", true)
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch the kubeadm-config ConfigMap")
-	}
-
-	return initConfiguration, nil
-}
-
 // CheckIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
 // joining an additional control plane instance and if the node is ready to join
 func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
-		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
-	}
-
-	// blocks if the cluster was created without an external etcd cluster
-	if initConfiguration.Etcd.External == nil {
-		return fmt.Errorf("unable to add a new control plane instance on a cluster that doesn't use an external etcd")
+		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	// blocks if control plane is self-hosted
 	if features.Enabled(initConfiguration.FeatureGates, features.SelfHosting) {
-		return fmt.Errorf("self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
+		return errors.New("self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
 	}
 
 	// blocks if the certificates for the control plane are stored in secrets (instead of the local pki folder)
 	if features.Enabled(initConfiguration.FeatureGates, features.StoreCertsInSecrets) {
-		return fmt.Errorf("certificates stored in secrets, as well as self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
+		return errors.New("certificates stored in secrets, as well as self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
 	}
 
 	// checks if the certificates that must be equal across contolplane instances are provided
@@ -463,6 +447,23 @@ func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitC
 	// Static pods will be created and managed by the kubelet as soon as it starts
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(kubeadmconstants.GetStaticPodDirectory(), initConfiguration); err != nil {
 		return errors.Wrap(err, "error creating static pod manifest files for the control plane components")
+	}
+
+	// in case of local etcd
+	if initConfiguration.Etcd.External == nil {
+		// Checks that the etcd cluster is healthy
+		// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates
+		//     for connecting to etcd already in place
+		kubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
+
+		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+		if err != nil {
+			return errors.Wrap(err, "couldn't create Kubernetes client")
+		}
+
+		if err := etcdphase.CheckLocalEtcdClusterStatus(client, initConfiguration); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -495,7 +496,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 
 	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
 	if err != nil {
-		return fmt.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
+		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
 	}
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
@@ -521,10 +522,10 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
-	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf KubeConfig file. If this process
+	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
 	// times out, display a somewhat user-friendly message.
 	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
-	if err := waitForKubeletAndFunc(waiter, waitForTLSBootstrappedClient); err != nil {
+	if err := waiter.WaitForKubeletAndFunc(waitForTLSBootstrappedClient); err != nil {
 		fmt.Printf(kubeadmJoinFailMsg, err)
 		return err
 	}
@@ -556,12 +557,29 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 
 	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create kubernetes client")
+		return errors.Wrap(err, "couldn't create Kubernetes client")
+	}
+
+	// in case of local etcd
+	if initConfiguration.Etcd.External == nil {
+		// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
+		// the existing etcd members before being created.
+		// This operation must be executed after kubelet is already started in order to minimize the time
+		// between the new etcd member is announced and the start of the static pod running the new etcd member, because during
+		// this time frame etcd gets temporary not available (only when moving from 1 to 2 members in the etcd cluster).
+		// From https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
+		// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
+		// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
+		// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the existing one."
+		glog.V(1).Info("[join] adding etcd")
+		if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), initConfiguration); err != nil {
+			return errors.Wrap(err, "error creating local etcd static pod manifest file")
+		}
 	}
 
 	glog.V(1).Info("[join] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
-		return fmt.Errorf("error uploading configuration: %v", err)
+		return errors.Wrap(err, "error uploading configuration")
 	}
 
 	glog.V(1).Info("[join] marking the master with right label")
@@ -582,4 +600,45 @@ func waitForTLSBootstrappedClient() error {
 		_, err := os.Stat(kubeletKubeConfig)
 		return (err == nil), nil
 	})
+}
+
+// fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
+func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration) (*kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
+	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a KubeConfig
+	// file that may be used for the TLS Bootstrapping process the kubelet performs using the Certificates API.
+	glog.V(1).Infoln("[join] Discovering cluster-info")
+	tlsBootstrapCfg, err := discovery.For(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Retrieves the kubeadm configuration
+	glog.V(1).Infoln("[join] Retrieving KubeConfig objects")
+	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// injects into the kubeadm configuration the information about the joining node
+	initConfiguration.NodeRegistration = cfg.NodeRegistration
+	initConfiguration.APIEndpoint = cfg.APIEndpoint
+
+	return initConfiguration, tlsBootstrapCfg, nil
+}
+
+// fetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap
+func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+	// creates a client to access the cluster using the bootstrap token identity
+	tlsClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to access the cluster")
+	}
+
+	// Fetches the init configuration
+	initConfiguration, err := configutil.FetchConfigFromFileOrCluster(tlsClient, os.Stdout, "join", "", true)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
+	}
+
+	return initConfiguration, nil
 }

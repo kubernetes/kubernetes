@@ -79,7 +79,7 @@ var (
 	errCgroupExecer = fakeExecer{
 		ioMap: map[string]fakeCmd{
 			"docker info": {
-				err: fmt.Errorf("no such binary: docker"),
+				err: errors.New("no such binary: docker"),
 			},
 		},
 	}

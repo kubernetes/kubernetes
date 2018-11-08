@@ -164,6 +164,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
 			pv.Spec.CSI.VolumeAttributes = test.attributes
+			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
 			pvName := pv.GetName()
 
 			mounter, err := plug.NewMounter(
@@ -239,6 +240,9 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			}
 			if vol.Path != csiMounter.GetPath() {
 				t.Errorf("csi server expected path %s, got %s", csiMounter.GetPath(), vol.Path)
+			}
+			if !reflect.DeepEqual(vol.MountFlags, pv.Spec.MountOptions) {
+				t.Errorf("csi server expected mount options %v, got %v", pv.Spec.MountOptions, vol.MountFlags)
 			}
 			if podInfoEnabled {
 				if !reflect.DeepEqual(vol.Attributes, test.expectedAttributes) {

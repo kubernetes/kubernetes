@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +91,7 @@ func (f fakeEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse,
 func (f fakeEtcdClient) GetVersion() (string, error) {
 	versions, _ := f.GetClusterVersions()
 	if f.mismatchedVersions {
-		return "", fmt.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
+		return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
 	}
 	return "3.1.12", nil
 }
@@ -105,6 +107,12 @@ func (f fakeEtcdClient) GetClusterVersions() (map[string]string, error) {
 		"foo": "3.1.12",
 		"bar": "3.1.12",
 	}, nil
+}
+
+func (f fakeEtcdClient) Sync() error { return nil }
+
+func (f fakeEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
 }
 
 func TestGetAvailableUpgrades(t *testing.T) {
@@ -724,7 +732,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	}
 
 	// Instantiating a fake etcd cluster for being able to get etcd version for a corresponding
-	// kubernetes release.
+	// Kubernetes release.
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 

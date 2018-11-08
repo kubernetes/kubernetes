@@ -947,6 +947,38 @@ func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
 }
 
+// IsWindowsUNCPath checks if path is prefixed with \\
+// This can be used to skip any processing of paths
+// that point to SMB shares, local named pipes and local UNC path
+func IsWindowsUNCPath(goos, path string) bool {
+	if goos != "windows" {
+		return false
+	}
+	// Check for UNC prefix \\
+	if strings.HasPrefix(path, `\\`) {
+		return true
+	}
+	return false
+}
+
+// IsWindowsLocalPath checks if path is a local path
+// prefixed with "/" or "\" like "/foo/bar" or "\foo\bar"
+func IsWindowsLocalPath(goos, path string) bool {
+	if goos != "windows" {
+		return false
+	}
+	if IsWindowsUNCPath(goos, path) {
+		return false
+	}
+	if strings.Contains(path, ":") {
+		return false
+	}
+	if !(strings.HasPrefix(path, `/`) || strings.HasPrefix(path, `\`)) {
+		return false
+	}
+	return true
+}
+
 // MakeAbsolutePath convert path to absolute path according to GOOS
 func MakeAbsolutePath(goos, path string) string {
 	if goos != "windows" {

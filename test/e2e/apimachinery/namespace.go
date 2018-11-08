@@ -45,8 +45,9 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 		go func(n int) {
 			defer wg.Done()
 			defer GinkgoRecover()
-			_, err = f.CreateNamespace(fmt.Sprintf("nslifetest-%v", n), nil)
-			Expect(err).NotTo(HaveOccurred())
+			ns := fmt.Sprintf("nslifetest-%v", n)
+			_, err = f.CreateNamespace(ns, nil)
+			Expect(err).NotTo(HaveOccurred(), "failed to create namespace: %s", ns)
 		}(n)
 	}
 	wg.Wait()
@@ -54,8 +55,9 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	//Wait 10 seconds, then SEND delete requests for all the namespaces.
 	By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
-	deleted, err := framework.DeleteNamespaces(f.ClientSet, []string{"nslifetest"}, nil /* skipFilter */)
-	Expect(err).NotTo(HaveOccurred())
+	deleteFilter := []string{"nslifetest"}
+	deleted, err := framework.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
+	Expect(err).NotTo(HaveOccurred(), "failed to delete namespace(s) containing: %s", deleteFilter)
 	Expect(len(deleted)).To(Equal(totalNS))
 
 	By("Waiting for namespaces to vanish")
@@ -93,23 +95,25 @@ func waitForPodInNamespace(c clientset.Interface, ns, podName string) *v1.Pod {
 		}
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to get pod %s in namespace: %s", podName, ns)
 	return pod
 }
 
 func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	By("Creating a test namespace")
-	namespace, err := f.CreateNamespace("nsdeletetest", nil)
-	Expect(err).NotTo(HaveOccurred())
+	namespaceName := "nsdeletetest"
+	namespace, err := f.CreateNamespace(namespaceName, nil)
+	Expect(err).NotTo(HaveOccurred(), "failed to create namespace: %s", namespaceName)
 
 	By("Waiting for a default service account to be provisioned in namespace")
 	err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
 
 	By("Creating a pod in the namespace")
+	podName := "test-pod"
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pod",
+			Name: podName,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -121,7 +125,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		},
 	}
 	pod, err = f.ClientSet.CoreV1().Pods(namespace.Name).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", podName, namespace.Name)
 
 	By("Waiting for the pod to have running status")
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
@@ -150,7 +154,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 
 	By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.Name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to delete namespace: %s", namespace.Name)
 
 	By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
@@ -164,26 +168,27 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		}))
 
 	By("Recreating the namespace")
-	namespace, err = f.CreateNamespace("nsdeletetest", nil)
-	Expect(err).NotTo(HaveOccurred())
+	namespace, err = f.CreateNamespace(namespaceName, nil)
+	Expect(err).NotTo(HaveOccurred(), "failed to create namespace: %s", namespaceName)
 
 	By("Verifying there are no pods in the namespace")
 	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).To(HaveOccurred())
+	Expect(err).To(HaveOccurred(), "failed to get pod %s in namespace: %s", pod.Name, namespace.Name)
 	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(podB.Name, metav1.GetOptions{IncludeUninitialized: true})
-	Expect(err).To(HaveOccurred())
+	Expect(err).To(HaveOccurred(), "failed to get pod %s in namespace: %s", podB.Name, namespace.Name)
 }
 
 func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	var err error
 
 	By("Creating a test namespace")
-	namespace, err := f.CreateNamespace("nsdeletetest", nil)
-	Expect(err).NotTo(HaveOccurred())
+	namespaceName := "nsdeletetest"
+	namespace, err := f.CreateNamespace(namespaceName, nil)
+	Expect(err).NotTo(HaveOccurred(), "failed to create namespace: %s", namespaceName)
 
 	By("Waiting for a default service account to be provisioned in namespace")
 	err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
 
 	By("Creating a service in the namespace")
 	serviceName := "test-service"
@@ -204,11 +209,11 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		},
 	}
 	service, err = f.ClientSet.CoreV1().Services(namespace.Name).Create(service)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create service %s in namespace %s", serviceName, namespace.Name)
 
 	By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.Name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to delete namespace: %s", namespace.Name)
 
 	By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60)
@@ -222,12 +227,12 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		}))
 
 	By("Recreating the namespace")
-	namespace, err = f.CreateNamespace("nsdeletetest", nil)
-	Expect(err).NotTo(HaveOccurred())
+	namespace, err = f.CreateNamespace(namespaceName, nil)
+	Expect(err).NotTo(HaveOccurred(), "failed to create namespace: %s", namespaceName)
 
 	By("Verifying there is no service in the namespace")
 	_, err = f.ClientSet.CoreV1().Services(namespace.Name).Get(service.Name, metav1.GetOptions{})
-	Expect(err).To(HaveOccurred())
+	Expect(err).To(HaveOccurred(), "failed to get service %s in namespace: %s", service.Name, namespace.Name)
 }
 
 // This test must run [Serial] due to the impact of running other parallel

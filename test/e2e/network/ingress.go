@@ -26,6 +26,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
+	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -733,6 +734,61 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Scale down number of backends to 2")
 			scaleAndValidateExposedNEG(3)
 		})
+
+		It("should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise", func() {
+			By("Create a basic HTTP ingress using standalone NEG")
+			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+
+			name := "hostname"
+			detectNegAnnotation(f, jig, gceController, ns, name, 2)
+
+			// Add Ingress annotation - NEGs should stay the same.
+			By("Adding NEG Ingress annotation")
+			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"80":{},"443":{}}}`
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			detectNegAnnotation(f, jig, gceController, ns, name, 2)
+
+			// Modify exposed NEG annotation, but keep ingress annotation
+			By("Modifying exposed NEG annotation, but keep Ingress annotation")
+			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"443":{}}}`
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			detectNegAnnotation(f, jig, gceController, ns, name, 2)
+
+			// Remove Ingress annotation. Expect 1 NEG
+			By("Disabling Ingress annotation, but keeping one standalone NEG")
+			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":false,"exposed_ports":{"443":{}}}`
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			detectNegAnnotation(f, jig, gceController, ns, name, 1)
+
+			// Remove NEG annotation entirely. Expect 0 NEGs.
+			By("Removing NEG annotation")
+			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				delete(svc.Annotations, ingress.NEGAnnotation)
+				// Service cannot be ClusterIP if it's using Instance Groups.
+				svc.Spec.Type = v1.ServiceTypeNodePort
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			detectNegAnnotation(f, jig, gceController, ns, name, 0)
+		})
 	})
 
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
@@ -1043,4 +1099,50 @@ func detectHttpVersionAndSchemeTest(f *framework.Framework, jig *ingress.Ingress
 		return true, nil
 	})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get %s or %s, response body: %s", version, scheme, resp))
+}
+
+func detectNegAnnotation(f *framework.Framework, jig *ingress.IngressTestJig, gceController *gce.GCEIngressController, ns, name string, negs int) {
+	wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+		svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		// if we expect no NEGs, then we should be using IGs
+		if negs == 0 {
+			return gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
+		}
+
+		var status ingress.NegStatus
+		v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
+		if !ok {
+			framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+			return false, nil
+		}
+
+		err = json.Unmarshal([]byte(v), &status)
+		if err != nil {
+			framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+			return false, nil
+		}
+		framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+
+		if len(status.NetworkEndpointGroups) != negs {
+			framework.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
+			return false, nil
+		}
+
+		gceCloud, err := gce.GetGCECloud()
+		Expect(err).NotTo(HaveOccurred())
+		for _, neg := range status.NetworkEndpointGroups {
+			networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
+			Expect(err).NotTo(HaveOccurred())
+			if len(networkEndpoints) != 1 {
+				framework.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
+				return false, nil
+			}
+		}
+
+		return gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
+	})
 }

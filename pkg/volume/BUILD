@@ -9,6 +9,7 @@ go_library(
         "metrics_errors.go",
         "metrics_nil.go",
         "metrics_statfs.go",
+        "noop_expandable_plugin.go",
         "plugins.go",
         "volume.go",
         "volume_linux.go",

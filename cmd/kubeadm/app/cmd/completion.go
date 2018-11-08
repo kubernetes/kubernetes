@@ -18,10 +18,10 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
@@ -118,14 +118,14 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 // RunCompletion checks given arguments and executes command
 func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("shell not specified")
+		return errors.New("shell not specified")
 	}
 	if len(args) > 1 {
-		return fmt.Errorf("too many arguments. expected only the shell type")
+		return errors.New("too many arguments. expected only the shell type")
 	}
 	run, found := completionShells[args[0]]
 	if !found {
-		return fmt.Errorf("unsupported shell type %q", args[0])
+		return errors.Errorf("unsupported shell type %q", args[0])
 	}
 
 	if len(boilerPlate) == 0 {

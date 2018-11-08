@@ -201,6 +201,10 @@ func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *auth
 	}
 }
 
+func (f *fakeVolumeHost) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {}
+}
+
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 	if f.nodeLabels == nil {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
@@ -262,6 +266,7 @@ var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeVolumePlugin{}
 var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
+var _ FSResizableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume := &FakeVolume{}
@@ -478,6 +483,10 @@ func (plugin *FakeVolumePlugin) ExpandVolumeDevice(spec *Spec, newSize resource.
 
 func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 	return true
+}
+
+func (plugin *FakeVolumePlugin) ExpandFS(spec *Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
+	return nil
 }
 
 func (plugin *FakeVolumePlugin) GetVolumeLimits() (map[string]int64, error) {

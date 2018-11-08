@@ -48,7 +48,8 @@ func NewApiVersionsOptions(ioStreams genericclioptions.IOStreams) *ApiVersionsOp
 	}
 }
 
-func NewCmdApiVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdAPIVersions creates the `api-versions` command
+func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewApiVersionsOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "api-versions",

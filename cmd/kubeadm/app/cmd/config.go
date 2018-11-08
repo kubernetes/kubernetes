@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -187,7 +188,7 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 func getDefaultComponentConfigAPIObjectBytes(apiObject string) ([]byte, error) {
 	registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
 	if !ok {
-		return []byte{}, fmt.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigAPIObjects())
+		return []byte{}, errors.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigAPIObjects())
 	}
 	return getDefaultComponentConfigBytes(registration)
 }
@@ -207,7 +208,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 		// Is this a component config?
 		registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
 		if !ok {
-			return []byte{}, fmt.Errorf("--api-object needs to be one of %v", getAllAPIObjectNames())
+			return []byte{}, errors.Errorf("--api-object needs to be one of %v", getAllAPIObjectNames())
 		}
 		return getDefaultComponentConfigBytes(registration)
 	}
@@ -276,7 +277,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 		Discovery: kubeadmapiv1beta1.Discovery{
 			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
-				APIServerEndpoints:       []string{"kube-apiserver:6443"},
+				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
@@ -296,7 +297,7 @@ func getDefaultComponentConfigBytes(registration componentconfigs.Registration) 
 
 	realobj, ok := registration.GetFromInternalConfig(&defaultedInitConfig.ClusterConfiguration)
 	if !ok {
-		return []byte{}, fmt.Errorf("GetFromInternalConfig failed")
+		return []byte{}, errors.New("GetFromInternalConfig failed")
 	}
 
 	return registration.Marshal(realobj)
@@ -325,7 +326,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 		`), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1beta1.SchemeGroupVersion.String(), kubeadmapiv1beta1.SchemeGroupVersion.String()),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
+				kubeadmutil.CheckErr(errors.New("The --old-config flag is mandatory"))
 			}
 
 			internalcfg, err := configutil.AnyConfigFileAndDefaultsToInternal(oldCfgPath)
@@ -338,7 +339,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 				fmt.Fprint(out, string(outputBytes))
 			} else {
 				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
-					kubeadmutil.CheckErr(fmt.Errorf("failed to write the new configuration to the file %q: %v", newCfgPath, err))
+					kubeadmutil.CheckErr(errors.Wrapf(err, "failed to write the new configuration to the file %q", newCfgPath))
 				}
 			}
 		},
@@ -382,7 +383,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	}
 }
 
-// NewCmdConfigUploadFromFile verifies given kubernetes config file and returns cobra.Command for
+// NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
 // "kubeadm config upload from-file" command
 func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	var cfgPath string
@@ -398,7 +399,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
+				kubeadmutil.CheckErr(errors.New("The --config flag is mandatory"))
 			}
 
 			glog.V(1).Infoln("[config] retrieving ClientSet from file")
@@ -544,7 +545,7 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 func (ip *ImagesPull) PullAll() error {
 	for _, image := range ip.images {
 		if err := ip.runtime.PullImage(image); err != nil {
-			return fmt.Errorf("failed to pull image %q: %v", image, err)
+			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
@@ -558,7 +559,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 	var cfgPath, featureGatesString string
 	var err error
 
-	// This just sets the kubernetes version for unit testing so kubeadm won't try to
+	// This just sets the Kubernetes version for unit testing so kubeadm won't try to
 	// lookup the latest release from the internet.
 	if mockK8sVersion != nil {
 		externalcfg.KubernetesVersion = *mockK8sVersion
@@ -583,7 +584,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration) (*ImagesList, error) {
 	initcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
+		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}
 
 	return &ImagesList{

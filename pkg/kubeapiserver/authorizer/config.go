@@ -33,7 +33,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
-type AuthorizationConfig struct {
+// Config contains the data on how to authorize a request to the Kube API Server
+type Config struct {
 	AuthorizationModes []string
 
 	// Options for ModeABAC
@@ -55,7 +56,7 @@ type AuthorizationConfig struct {
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.
-func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleResolver, error) {
+func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(config.AuthorizationModes) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}

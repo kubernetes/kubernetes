@@ -49,6 +49,7 @@ type csiClient interface {
 		volumeAttribs map[string]string,
 		nodePublishSecrets map[string]string,
 		fsType string,
+		mountOptions []string,
 	) error
 	NodeUnpublishVolume(
 		ctx context.Context,
@@ -138,6 +139,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	volumeAttribs map[string]string,
 	nodePublishSecrets map[string]string,
 	fsType string,
+	mountOptions []string,
 ) error {
 	glog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
@@ -177,7 +179,8 @@ func (c *csiDriverClient) NodePublishVolume(
 	} else {
 		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
 			Mount: &csipb.VolumeCapability_MountVolume{
-				FsType: fsType,
+				FsType:     fsType,
+				MountFlags: mountOptions,
 			},
 		}
 	}

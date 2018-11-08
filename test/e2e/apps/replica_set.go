@@ -103,7 +103,12 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testReplicaSetConditionCheck(f)
 	})
 
-	It("should adopt matching pods on creation and release no longer matching pods", func() {
+	/*
+		Release : v1.13
+		Testname: Replica Set, adopt matching pods and release non matching pods
+		Description: A Pod is created, then a Replica Set (RS) whose label selector will match the Pod. The RS MUST either adopt the Pod or delete and replace it with a new Pod. When the labels on one of the Pods owned by the RS change to no longer match the RS's label selector, the RS MUST release the Pod and update the Pod's owner references
+	*/
+	framework.ConformanceIt("should adopt matching pods on creation and release no longer matching pods", func() {
 		testRSAdoptMatchingAndReleaseNotMatching(f)
 	})
 })

@@ -229,11 +229,11 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
 	} else if len(configAuthInfo.TokenFile) > 0 {
-		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
-		if err != nil {
+		ts := restclient.NewCachedFileTokenSource(configAuthInfo.TokenFile)
+		if _, err := ts.Token(); err != nil {
 			return nil, err
 		}
-		mergedConfig.BearerToken = string(tokenBytes)
+		mergedConfig.WrapTransport = restclient.TokenSourceWrapTransport(ts)
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = restclient.ImpersonationConfig{

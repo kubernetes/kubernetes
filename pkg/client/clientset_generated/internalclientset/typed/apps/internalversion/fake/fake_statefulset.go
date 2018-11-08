@@ -26,7 +26,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 // FakeStatefulSets implements StatefulSetInterface
@@ -138,26 +137,4 @@ func (c *FakeStatefulSets) Patch(name string, pt types.PatchType, data []byte, s
 		return nil, err
 	}
 	return obj.(*apps.StatefulSet), err
-}
-
-// GetScale takes name of the statefulSet, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeStatefulSets) GetScale(statefulSetName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(statefulsetsResource, c.ns, "scale", statefulSetName), &autoscaling.Scale{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*autoscaling.Scale), err
-}
-
-// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeStatefulSets) UpdateScale(statefulSetName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &autoscaling.Scale{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*autoscaling.Scale), err
 }

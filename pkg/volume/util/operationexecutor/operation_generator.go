@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/resizefs"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -604,10 +603,9 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 		return nil, nil
 	}
 
-	mounter := og.volumePluginMgr.Host.GetMounter(pluginName)
 	// Get expander, if possible
 	expandableVolumePlugin, _ :=
-		og.volumePluginMgr.FindExpandablePluginBySpec(volumeToMount.VolumeSpec)
+		og.volumePluginMgr.FindFSResizablePluginBySpec(volumeToMount.VolumeSpec)
 
 	if expandableVolumePlugin != nil &&
 		expandableVolumePlugin.RequiresFSResize() &&
@@ -631,25 +629,12 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
 				return nil, nil
 			}
-
-			diskFormatter := &mount.SafeFormatAndMount{
-				Interface: mounter,
-				Exec:      og.volumePluginMgr.Host.GetExec(expandableVolumePlugin.GetPluginName()),
-			}
-
-			resizer := resizefs.NewResizeFs(diskFormatter)
-			resizeStatus, resizeErr := resizer.Resize(devicePath, deviceMountPath)
-
-			if resizeErr != nil {
+			if resizeErr := expandableVolumePlugin.ExpandFS(volumeToMount.VolumeSpec, devicePath, deviceMountPath, pvSpecCap, pvcStatusCap); resizeErr != nil {
 				return volumeToMount.GenerateError("MountVolume.resizeFileSystem failed", resizeErr)
 			}
-
-			if resizeStatus {
-				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem succeeded", "")
-				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-				glog.Infof(detailedMsg)
-			}
-
+			simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem succeeded", "")
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
+			glog.Infof(detailedMsg)
 			// File system resize succeeded, now update the PVC's Capacity to match the PV's
 			err = util.MarkFSResizeFinished(pvc, pv.Spec.Capacity, og.kubeClient)
 			if err != nil {
@@ -1270,6 +1255,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	if err != nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
+
 	if volumePlugin == nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
 	}
@@ -1284,9 +1270,10 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				pvcWithResizeRequest.CurrentSize)
 
 			if expandErr != nil {
-				detailedErr := fmt.Errorf("Error expanding volume %q of plugin %s : %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
+				detailedErr := fmt.Errorf("error expanding volume %q of plugin %q: %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
 				return detailedErr, detailedErr
 			}
+
 			glog.Infof("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 			newSize = updatedSize
 			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
@@ -1371,6 +1358,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 	fsResizeFunc := func() (error, error) {
 		resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, volumeToMount.DevicePath, deviceMountPath, volumePlugin.GetPluginName())
+
 		if resizeSimpleError != nil || resizeDetailedError != nil {
 			return resizeSimpleError, resizeDetailedError
 		}

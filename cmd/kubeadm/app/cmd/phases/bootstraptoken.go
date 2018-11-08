@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -324,7 +325,7 @@ func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfg
 	if len(internalcfg.BootstrapTokens) > 0 {
 		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
 		if err != nil {
-			return fmt.Errorf("failed to get join command: %v", err)
+			return errors.Wrap(err, "failed to get join command")
 		}
 		fmt.Println(joinCommand)
 	}

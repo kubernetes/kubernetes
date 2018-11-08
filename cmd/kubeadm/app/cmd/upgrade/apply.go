@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -169,7 +169,7 @@ func RunApply(flags *applyFlags) error {
 	flags.newK8sVersionStr = upgradeVars.cfg.KubernetesVersion
 	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
 	if err != nil {
-		return fmt.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
+		return errors.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
 	}
 	flags.newK8sVersion = k8sVer
 
@@ -180,7 +180,7 @@ func RunApply(flags *applyFlags) error {
 	// Enforce the version skew policies
 	glog.V(1).Infof("[upgrade/version] enforcing version skew policies")
 	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
-		return fmt.Errorf("[upgrade/version] FATAL: %v", err)
+		return errors.Wrap(err, "[upgrade/version] FATAL")
 	}
 
 	// If the current session is interactive, ask the user whether they really want to upgrade
@@ -199,19 +199,19 @@ func RunApply(flags *applyFlags) error {
 		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
 	}
 	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
-		return fmt.Errorf("[upgrade/prepull] Failed prepulled the images for the control plane components error: %v", err)
+		return errors.Wrap(err, "[upgrade/prepull] Failed prepulled the images for the control plane components error")
 	}
 
 	// Now; perform the upgrade procedure
 	glog.V(1).Infof("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg); err != nil {
-		return fmt.Errorf("[upgrade/apply] FATAL: %v", err)
+		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
 	// Upgrade RBAC rules and addons.
 	glog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, upgradeVars.cfg, flags.newK8sVersion, flags.dryRun); err != nil {
-		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
+		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 
 	if flags.dryRun {
@@ -235,7 +235,7 @@ func SetImplicitFlags(flags *applyFlags) error {
 	}
 
 	if len(flags.newK8sVersionStr) == 0 {
-		return fmt.Errorf("version string can't be empty")
+		return errors.New("version string can't be empty")
 	}
 
 	return nil
@@ -250,13 +250,15 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {
-			return fmt.Errorf("The --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again", kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))
+			return errors.Errorf("the --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
+				kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))
 		}
 
 		if len(versionSkewErrs.Skippable) > 0 {
 			// Return the error if the user hasn't specified the --force flag
 			if !flags.force {
-				return fmt.Errorf("The --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag", kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
+				return errors.Errorf("the --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
+					kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified
 			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
@@ -303,7 +305,7 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 	}
 
 	// The arguments oldEtcdClient and newEtdClient, are uninitialized because passing in the clients allow for mocking the client during testing
-	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg, etcdUpgrade, nil, nil)
+	return upgrade.StaticPodControlPlane(client, waiter, pathManager, internalcfg, etcdUpgrade, nil, nil)
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane

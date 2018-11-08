@@ -77,7 +77,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			scope.err(err, w, req)
 			return
 		}
-		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal})
+		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
 
 		body, err := readBody(req)
 		if err != nil {
@@ -167,6 +167,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			status.Code = int32(code)
 		}
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, code, result)
 	}
 }

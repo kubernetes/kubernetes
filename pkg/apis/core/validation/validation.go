@@ -1115,10 +1115,6 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	if mountPropagation == nil {
 		return allErrs
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "mount propagation is disabled by feature-gate"))
-		return allErrs
-	}
 
 	supportedMountPropagations := sets.NewString(string(core.MountPropagationBidirectional), string(core.MountPropagationHostToContainer), string(core.MountPropagationNone))
 	if !supportedMountPropagations.Has(string(*mountPropagation)) {

@@ -17,17 +17,17 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"io/ioutil"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -45,7 +45,11 @@ func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 	return nil
 }
 
-// JoinConfigFileAndDefaultsToInternalConfig
+// JoinConfigFileAndDefaultsToInternalConfig takes a path to a config file and a versioned configuration that can serve as the default config
+// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
+// Then the external, versioned configuration is defaulted and converted to the internal type.
+// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
+// Lastly, the internal config is validated and returned.
 func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
 
@@ -56,7 +60,7 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+			return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 		}
 
 		if err := DetectUnsupportedVersion(b); err != nil {
@@ -76,7 +80,7 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 		}
 
 		if len(joinBytes) == 0 {
-			return nil, fmt.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
+			return nil, errors.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
 		}
 
 		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), joinBytes, internalcfg); err != nil {

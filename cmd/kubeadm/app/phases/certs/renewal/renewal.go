@@ -18,11 +18,10 @@ package renewal
 
 import (
 	"crypto/x509"
-	"fmt"
 
 	"github.com/pkg/errors"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // RenewExistingCert loads a certificate file, uses the renew interface to renew it,
@@ -31,11 +30,11 @@ func RenewExistingCert(certsDir, baseName string, impl Interface) error {
 	certificatePath, _ := pkiutil.PathsForCertAndKey(certsDir, baseName)
 	certs, err := certutil.CertsFromFile(certificatePath)
 	if err != nil {
-		return fmt.Errorf("failed to load existing certificate %s: %v", baseName, err)
+		return errors.Wrapf(err, "failed to load existing certificate %s", baseName)
 	}
 
 	if len(certs) != 1 {
-		return fmt.Errorf("wanted exactly one certificate, got %d", len(certs))
+		return errors.Errorf("wanted exactly one certificate, got %d", len(certs))
 	}
 
 	cfg := certToConfig(certs[0])

@@ -73,7 +73,7 @@ type noDialH2RoundTripper struct{ t *Transport }
 
 func (rt noDialH2RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	res, err := rt.t.RoundTrip(req)
-	if err == ErrNoCachedConn {
+	if isNoCachedConnError(err) {
 		return nil, http.ErrSkipAltProtocol
 	}
 	return res, err

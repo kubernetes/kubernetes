@@ -42,7 +42,7 @@ message AllowedHostPath {
   // pathPrefix is the path prefix that the host volume must match.
   // It does not support `*`.
   // Trailing slashes are trimmed when validating the path prefix with a host path.
-  // 
+  //
   // Examples:
   // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
   // `/foo` would not allow `/food` or `/etc/foo`
@@ -58,9 +58,11 @@ message AllowedHostPath {
 // created by POSTing to .../pods/<pod name>/evictions.
 message Eviction {
   // ObjectMeta describes the pod that is being evicted.
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DeleteOptions may be provided
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.DeleteOptions deleteOptions = 2;
 }
 
@@ -97,17 +99,21 @@ message IDRange {
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the PodDisruptionBudget.
+  // +optional
   optional PodDisruptionBudgetSpec spec = 2;
 
   // Most recently observed status of the PodDisruptionBudget.
+  // +optional
   optional PodDisruptionBudgetStatus status = 3;
 }
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 message PodDisruptionBudgetList {
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated PodDisruptionBudget items = 2;
@@ -119,16 +125,19 @@ message PodDisruptionBudgetSpec {
   // "selector" will still be available after the eviction, i.e. even in the
   // absence of the evicted pod.  So for example you can prevent all voluntary
   // evictions by specifying "100%".
+  // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString minAvailable = 1;
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // An eviction is allowed if at most "maxUnavailable" pods selected by
   // "selector" are unavailable after the eviction, i.e. even in absence of
   // the evicted pod. For example, one can prevent all voluntary evictions
   // by specifying 0. This is a mutually exclusive setting with "minAvailable".
+  // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 3;
 }
 
@@ -287,7 +296,7 @@ message PodSecurityPolicySpec {
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
   // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
@@ -297,7 +306,7 @@ message PodSecurityPolicySpec {
   // forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
