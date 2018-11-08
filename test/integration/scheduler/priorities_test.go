@@ -17,12 +17,14 @@ limitations under the License.
 package scheduler
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	testutils "k8s.io/kubernetes/test/utils"
-	"strings"
 )
 
 // This file tests the scheduler priority functions.
@@ -212,6 +214,57 @@ func TestImageLocality(t *testing.T) {
 	}
 	if pod.Spec.NodeName != nodeWithLargeImage.Name {
 		t.Errorf("pod %v got scheduled on an unexpected node: %v. Expected node: %v.", podName, pod.Spec.NodeName, nodeWithLargeImage.Name)
+	} else {
+		t.Logf("pod %v got successfully scheduled on node %v.", podName, pod.Spec.NodeName)
+	}
+}
+
+// TestResourceLimits verifies that the scheduler's resource limits priority function works correctly, i.e., the pod
+// gets scheduled to the node which can hold pod's limits.
+func TestResourceLimits(t *testing.T) {
+	algorithmprovider.ApplyFeatureGates()
+	context := initTest(t, "resource-limits")
+	defer cleanupTest(t, context)
+	nodeRes := &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(500, resource.BinarySI),
+	}
+	// Add a few nodes.
+	_, err := createNodes(context.clientSet, "testnode", nodeRes, 10)
+	if err != nil {
+		t.Fatalf("cannot create nodes: %v", err)
+	}
+
+	nodeRes = &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(12000, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(2000, resource.BinarySI),
+	}
+	// Create a node with the large capacity
+	nodeWithLargeResources, err := createNode(context.clientSet, "test-large-node", nodeRes)
+	if err != nil {
+		t.Fatalf("cannot create node with a large allocatable: %v", err)
+	}
+
+	// Create a pod with containers having large limit
+	podName := "pod-with-large-limits"
+	pod, err := runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
+		Name:      podName,
+		Namespace: context.ns.Name,
+		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI)},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(9000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI)},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("error running pod with large limits: %v", err)
+	}
+	if pod.Spec.NodeName != nodeWithLargeResources.Name {
+		t.Errorf("pod %v got scheduled on an unexpected node: %v. Expected node: %v.", podName, pod.Spec.NodeName, nodeWithLargeResources.Name)
 	} else {
 		t.Logf("pod %v got successfully scheduled on node %v.", podName, pod.Spec.NodeName)
 	}
