@@ -60,6 +60,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
 					},
+					NodeSelector: framework.GetOSNodeSelectorForPod(true),
 				},
 			})
 			Eventually(func() string {
@@ -94,6 +95,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 							Command: []string{"/bin/false"},
 						},
 					},
+					NodeSelector: framework.GetOSNodeSelectorForPod(true),
 				},
 			})
 		})
@@ -162,6 +164,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 							Hostnames: []string{"foo", "bar"},
 						},
 					},
+					NodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 			})
 
@@ -210,6 +213,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 							},
 						},
 					},
+					NodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 			})
 			Eventually(func() string {
