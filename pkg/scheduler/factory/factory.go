@@ -984,10 +984,7 @@ func (c *configFactory) updateNodeInCache(oldObj, newObj interface{}) {
 	}
 
 	c.invalidateCachedPredicatesOnNodeUpdate(newNode, oldNode)
-	// Only activate unschedulable pods if the node became more schedulable.
-	if nodeSchedulingPropertiesChanged(newNode, oldNode) {
-		c.podQueue.MoveAllToActiveQueue()
-	}
+	c.podQueue.MoveAllToActiveQueue()
 }
 
 func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node, oldNode *v1.Node) {
@@ -1057,64 +1054,6 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		}
 		c.equivalencePodCache.InvalidatePredicatesOnNode(newNode.GetName(), invalidPredicates)
 	}
-}
-
-func nodeSchedulingPropertiesChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	if nodeAllocatableChanged(newNode, oldNode) {
-		glog.V(4).Infof("Allocatable resource of node %s changed", newNode.Name)
-		return true
-	}
-	if nodeLabelsChanged(newNode, oldNode) {
-		glog.V(4).Infof("Labels of node %s changed", newNode.Name)
-		return true
-	}
-	if nodeTaintsChanged(newNode, oldNode) {
-		glog.V(4).Infof("Taints of node %s changed", newNode.Name)
-		return true
-	}
-	if nodeConditionsChanged(newNode, oldNode) {
-		glog.V(4).Infof("Conditions of node %s changed", newNode.Name)
-		return true
-	}
-	if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && newNode.Spec.Unschedulable == false {
-		glog.V(4).Infof("Node %s changed to schedulable", newNode.Name)
-		return true
-	}
-	return false
-}
-
-func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
-}
-
-func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
-}
-
-func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	if !reflect.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints) {
-		return true
-	}
-	oldTaints, oldErr := helper.GetTaintsFromNodeAnnotations(oldNode.GetAnnotations())
-	if oldErr != nil {
-		// If parse old node's taint annotation failed, we assume node's taint changed.
-		glog.Errorf("Failed to get taints from annotation of old node %s: %v", oldNode.Name, oldErr)
-		return true
-	}
-	newTaints, newErr := helper.GetTaintsFromNodeAnnotations(newNode.GetAnnotations())
-	if newErr != nil {
-		// If parse new node's taint annotation failed, we assume node's taint changed.
-		glog.Errorf("Failed to get taints from annotation of new node %s: %v", newNode.Name, newErr)
-		return true
-	}
-	if !reflect.DeepEqual(oldTaints, newTaints) {
-		return true
-	}
-	return false
-}
-
-func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.Status.Conditions, newNode.Status.Conditions)
 }
 
 func (c *configFactory) deleteNodeFromCache(obj interface{}) {
