@@ -90,11 +90,13 @@ func (config *KubeletManagedHostConfig) setup() {
 
 func (config *KubeletManagedHostConfig) createPodWithoutHostNetwork() {
 	podSpec := config.createPodSpec(etcHostsPodName)
+	podSpec.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 	config.pod = config.f.PodClient().CreateSync(podSpec)
 }
 
 func (config *KubeletManagedHostConfig) createPodWithHostNetwork() {
 	podSpec := config.createPodSpecWithHostNetwork(etcHostsHostNetworkPodName)
+	podSpec.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 	config.hostNetworkPod = config.f.PodClient().CreateSync(podSpec)
 }
 
