@@ -164,6 +164,10 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if k == core.MirrorPodAnnotationKey {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update mirror pod annotation"))
 		}
+		// quietly restore the old seccomp annotations, this is kept for backward compatibility and should be removed with the annotations
+		if k == core.SeccompPodAnnotationKey || strings.HasPrefix(k, core.SeccompContainerAnnotationKeyPrefix) {
+			newAnnotations[k] = oldAnnotations[k]
+		}
 	}
 	// Check for additions
 	for k := range newAnnotations {
@@ -176,8 +180,15 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if k == core.MirrorPodAnnotationKey {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add mirror pod annotation"))
 		}
+		// quietly restore the old seccomp annotations, this is kept for backward compatibility and should be removed with the annotations
+		if k == core.SeccompPodAnnotationKey || strings.HasPrefix(k, core.SeccompContainerAnnotationKeyPrefix) {
+			if _, existed := oldAnnotations[k]; existed {
+				newAnnotations[k] = oldAnnotations[k]
+			} else {
+				delete(newAnnotations, k)
+			}
+		}
 	}
-	// FIXME: this will need some specific check for seccomp
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath)...)
 	return allErrs
 }
