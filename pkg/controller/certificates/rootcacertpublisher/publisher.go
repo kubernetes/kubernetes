@@ -52,10 +52,10 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 				"ca.crt": string(rootCA),
 			},
 		},
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root-ca-crt-publisher"),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root-ca-cert-publisher"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("root_ca_crt_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
