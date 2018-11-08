@@ -309,7 +309,7 @@ func (cc *Controller) graduateAssignedToLastKnownGood() error {
 	}
 	// if the sources are equal, no need to change
 	if assigned == lastKnownGood ||
-		assigned != nil && lastKnownGood != nil && apiequality.Semantic.DeepEqual(assigned, lastKnownGood) {
+		assigned != nil && lastKnownGood != nil && apiequality.Semantic.DeepEqual(assigned.NodeConfigSource(), lastKnownGood.NodeConfigSource()) {
 		return nil
 	}
 	// update last-known-good
