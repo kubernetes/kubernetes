@@ -40,7 +40,7 @@ var vcsGit = &VCS{
 	vcs: vcs.ByCmd("git"),
 
 	IdentifyCmd: "rev-parse HEAD",
-	DescribeCmd: "describe --tags",
+	DescribeCmd: "describe --tags --abbrev=14",
 	DiffCmd:     "diff {rev}",
 	ListCmd:     "ls-files --full-name",
 	RootCmd:     "rev-parse --show-cdup",
