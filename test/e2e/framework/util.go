@@ -201,6 +201,10 @@ const (
 
 	// ssh port
 	sshPort = "22"
+
+	nodeSelectorKey     = "beta.kubernetes.io/os"
+	nodeSelectorWindows = "windows"
+	nodeSelectorLinux   = "linux"
 )
 
 var (
@@ -460,6 +464,22 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 		}
 	}
 	return false
+}
+
+func isHybridCluster() bool {
+	return TestContext.HybridCluster
+}
+
+func GetOSNodeSelectorForPod(testRunsOnWin bool) map[string]string {
+	nodeOS := nodeSelectorLinux
+	if isHybridCluster() && testRunsOnWin {
+		nodeOS = nodeSelectorWindows
+	}
+
+	return map[string]string{
+		nodeSelectorKey: nodeOS,
+	}
+
 }
 
 func ProxyMode(f *Framework) (string, error) {

@@ -108,6 +108,9 @@ type TestContextType struct {
 	DeleteNamespaceOnFailure bool
 	AllowedNotReadyNodes     int
 	CleanStart               bool
+	// If set to 'true' indicates that the tested cluster is to be a hybrid consisting of both Linux and Windows nodes
+	// This means tests that can't be run on Windows ( tmpfs tests , security context tests etc. ) will be run on the Linux nodes
+	HybridCluster bool
 	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
 	// only master Node will be monitored.
@@ -252,6 +255,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "standalone", "The monitoring solution that is used in the cluster.")
 	flag.BoolVar(&TestContext.EnablePrometheusMonitoring, "prometheus-monitoring", false, "Separate Prometheus monitoring deployed in cluster.")
 	flag.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
+	flag.BoolVar(&TestContext.HybridCluster, "hybrid-cluster", false, "Indicates weather the tested cluster is a hybrid consisting of Linux and Windows nodes")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig

@@ -73,6 +73,7 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 			},
 		}
 
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
 		})
@@ -116,6 +117,7 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"data_1=value-1", "data_2=value-2", "data_3=value-3",
