@@ -40,6 +40,9 @@ var (
 var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
+	// All these tests should be skipped on Windows. They set podSecurityContext which
+	// is unsupported on Windows.
+
 	Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
 		It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
@@ -448,6 +451,7 @@ func testPodWithVolume(image, path string, source *v1.EmptyDirVolumeSource) *v1.
 					},
 				},
 			},
+			NodeSelector: framework.GetOSNodeSelectorForPod(false),
 		},
 	}
 }
