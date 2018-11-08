@@ -452,13 +452,16 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 }
 
 func (u *Unstructured) GetManagedFields() map[string]metav1.VersionedFieldSet {
-	unstructuredManagedFields, _, _ := NestedMap(u.Object, "metadata", "managedFields")
-	if unstructuredManagedFields == nil {
+	m, found, err := nestedMapNoCopy(u.Object, "metadata", "managedFields")
+	if !found || err != nil {
 		return nil
 	}
-	managedFields := make(map[string]metav1.VersionedFieldSet, len(unstructuredManagedFields))
-	// TODO: convert from unstructured
-	return managedFields
+	out := &map[string]metav1.VersionedFieldSet{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, out); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve managedFields for object: %v", err))
+		return nil
+	}
+	return *out
 }
 
 func (u *Unstructured) SetManagedFields(managedFields map[string]metav1.VersionedFieldSet) {
@@ -466,7 +469,9 @@ func (u *Unstructured) SetManagedFields(managedFields map[string]metav1.Versione
 		RemoveNestedField(u.Object, "metadata", "managedFields")
 		return
 	}
-	unstructuredManagedFields := make(map[string]string, len(managedFields))
-	// TODO: convert to unstructured
-	u.setNestedMap(unstructuredManagedFields, "metadata", "managedFields")
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&managedFields)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve managedFields for object: %v", err))
+	}
+	u.setNestedField(out, "metadata", "managedFields")
 }
