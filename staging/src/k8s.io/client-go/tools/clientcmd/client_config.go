@@ -391,7 +391,7 @@ func (config *DirectClientConfig) getContextName() (string, bool) {
 }
 
 // getAuthInfoName returns a string containing the current authinfo name for the current context,
-// and a boolean indicating  whether the default authInfo name is overwritten by a user-set flag, or
+// and a boolean indicating whether the default authInfo name is overwritten by a user-set flag, or
 // left as its default value
 func (config *DirectClientConfig) getAuthInfoName() (string, bool) {
 	if len(config.overrides.Context.AuthInfo) != 0 {

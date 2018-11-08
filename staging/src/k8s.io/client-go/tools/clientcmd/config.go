@@ -38,7 +38,7 @@ type ConfigAccess interface {
 	GetStartingConfig() (*clientcmdapi.Config, error)
 	// GetDefaultFilename returns the name of the file you should write into (create if necessary), if you're trying to create a new stanza as opposed to updating an existing one.
 	GetDefaultFilename() string
-	// IsExplicitFile indicates whether or not this command is interested in exactly one file.  This implementation only ever does that  via a flag, but implementations that handle local, global, and flags may have more
+	// IsExplicitFile indicates whether or not this command is interested in exactly one file.  This implementation only ever does that via a flag, but implementations that handle local, global, and flags may have more
 	IsExplicitFile() bool
 	// GetExplicitFile returns the particular file this command is operating against.  This implementation only ever has one, but implementations that handle local, global, and flags may have more
 	GetExplicitFile() string
