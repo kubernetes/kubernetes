@@ -55,7 +55,8 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Description: Create a Pod that is configured with a initial delay set on the readiness probe. Check the Pod Start time to compare to the initial delay. The Pod MUST be ready only after the specified initial delay.
 	*/
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
-		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil, nodeSelector))
 		f.WaitForPodReady(p.Name)
 
 		p, err := podClient.Get(p.Name, metav1.GetOptions{})
@@ -88,7 +89,8 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			then the Pod MUST never be ready, never be running and restart count MUST be zero.
 	*/
 	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
-		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil, nodeSelector))
 		Consistently(func() (bool, error) {
 			p, err := podClient.Get(p.Name, metav1.GetOptions{})
 			if err != nil {
@@ -135,6 +137,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 						},
 					},
 				},
+				NodeSelector: framework.GetOSNodeSelectorForPod(true),
 			},
 		}, 1, defaultObservationTimeout)
 	})
@@ -167,6 +170,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 						},
 					},
 				},
+				NodeSelector: framework.GetOSNodeSelectorForPod(true),
 			},
 		}, 0, defaultObservationTimeout)
 	})
@@ -200,6 +204,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 						},
 					},
 				},
+				NodeSelector: framework.GetOSNodeSelectorForPod(true),
 			},
 		}, 1, defaultObservationTimeout)
 	})
@@ -234,6 +239,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 						},
 					},
 				},
+				NodeSelector: framework.GetOSNodeSelectorForPod(true),
 			},
 		}, 5, time.Minute*5)
 	})
@@ -268,6 +274,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 						},
 					},
 				},
+				NodeSelector: framework.GetOSNodeSelectorForPod(true),
 			},
 		}, 0, defaultObservationTimeout)
 	})
@@ -338,7 +345,7 @@ func getRestartCount(p *v1.Pod) int {
 	return count
 }
 
-func makePodSpec(readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
+func makePodSpec(readinessProbe, livenessProbe *v1.Probe, nodeSelector map[string]string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-webserver-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
@@ -350,6 +357,7 @@ func makePodSpec(readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
 					ReadinessProbe: readinessProbe,
 				},
 			},
+			NodeSelector: nodeSelector,
 		},
 	}
 	return pod
