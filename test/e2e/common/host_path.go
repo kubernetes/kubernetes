@@ -50,6 +50,8 @@ var _ = Describe("[sig-storage] HostPath", func() {
 			Path: "/tmp",
 		}
 		pod := testPodWithHostVol(volumePath, source)
+		// Does not work on Windows as we cannot check for file mode.
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 
 		pod.Spec.Containers[0].Args = []string{
 			fmt.Sprintf("--fs_type=%v", volumePath),
@@ -68,6 +70,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 			Path: "/tmp",
 		}
 		pod := testPodWithHostVol(volumePath, source)
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		pod.Spec.Containers[0].Args = []string{
 			fmt.Sprintf("--new_file_0644=%v", filePath),
@@ -97,6 +100,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 			Path: "/tmp",
 		}
 		pod := testPodWithHostVol(volumePath, source)
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 
 		// Write the file in the subPath from container 0
 		container := &pod.Spec.Containers[0]
