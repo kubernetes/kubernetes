@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -26,6 +27,10 @@ import (
 func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s); err != nil {
 		return err
+	}
+
+	if len(in.FeatureGates) != 0 {
+		return errors.New("featureGates has been removed from JoinConfiguration and featureGates from ClusterConfiguration will be used instead. Please cleanup JoinConfiguration.FeatureGates fields")
 	}
 
 	out.Discovery.Timeout = in.DiscoveryTimeout
