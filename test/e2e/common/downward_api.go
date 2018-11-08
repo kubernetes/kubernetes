@@ -38,6 +38,9 @@ var (
 var _ = Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
+	// All downward API Conformance tests work on Windows. Using one "global" nodeSelector var.
+	nodeSelector := framework.GetOSNodeSelectorForPod(true)
+
 	/*
 	   Release : v1.9
 	   Testname: DownwardAPI, environment for name, namespace and ip
@@ -81,7 +84,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 		}
 
-		testDownwardAPI(f, podName, env, expectations)
+		testDownwardAPI(f, podName, env, expectations, nodeSelector)
 	})
 
 	/*
@@ -108,7 +111,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 			"HOST_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 		}
 
-		testDownwardAPI(f, podName, env, expectations)
+		testDownwardAPI(f, podName, env, expectations, nodeSelector)
 	})
 
 	/*
@@ -159,7 +162,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 			"MEMORY_REQUEST=33554432",
 		}
 
-		testDownwardAPI(f, podName, env, expectations)
+		testDownwardAPI(f, podName, env, expectations, nodeSelector)
 	})
 
 	/*
@@ -205,6 +208,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 						Env:     env,
 					},
 				},
+				NodeSelector:  nodeSelector,
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
@@ -236,7 +240,7 @@ var _ = Describe("[sig-node] Downward API", func() {
 			"POD_UID=[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}",
 		}
 
-		testDownwardAPI(f, podName, env, expectations)
+		testDownwardAPI(f, podName, env, expectations, nodeSelector)
 	})
 })
 
@@ -315,7 +319,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 
 })
 
-func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
+func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string, nodeSelector map[string]string) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
@@ -340,6 +344,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 					Env: env,
 				},
 			},
+			NodeSelector:  nodeSelector,
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
