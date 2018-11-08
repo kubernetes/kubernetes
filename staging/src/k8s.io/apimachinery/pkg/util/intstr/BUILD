@@ -10,7 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["intstr_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
+    deps = ["//vendor/sigs.k8s.io/yaml:go_default_library"],
 )
 
 go_library(

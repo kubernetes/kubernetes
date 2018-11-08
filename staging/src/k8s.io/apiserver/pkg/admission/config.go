@@ -25,8 +25,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
