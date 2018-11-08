@@ -77,9 +77,19 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+}
+
+func skipPersistenceTest(driver drivers.TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.IsPersistent {
+	if !dInfo.Capabilities[drivers.CapPersistence] {
 		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
+	}
+}
+
+func skipExecTest(driver drivers.TestDriver) {
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[drivers.CapExec] {
+		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
 	}
 }
 
@@ -94,7 +104,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 	}
 
-	if dInfo.IsFsGroupSupported {
+	if dInfo.Capabilities[drivers.CapFsGroup] {
 		fsGroupVal := int64(1234)
 		fsGroup = &fsGroupVal
 	}
@@ -164,13 +174,15 @@ func testVolumes(input *volumesTestInput) {
 		cs := f.ClientSet
 		defer framework.VolumeTestCleanup(f, input.config)
 
+		skipPersistenceTest(input.resource.driver)
+
 		volumeTest := input.tests
 		framework.InjectHtml(cs, input.config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
 		framework.TestVolumeClient(cs, input.config, input.fsGroup, input.tests)
 	})
 	It("should allow exec of files on the volume", func() {
 		f := input.f
-		defer framework.VolumeTestCleanup(f, input.config)
+		skipExecTest(input.resource.driver)
 
 		testScriptInPod(f, input.resource.volType, input.resource.volSource)
 	})
