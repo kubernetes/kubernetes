@@ -1649,6 +1649,9 @@ func TestPrintPod(t *testing.T) {
 }
 
 func TestPrintPodwide(t *testing.T) {
+	condition1 := "condition1"
+	condition2 := "condition2"
+	condition3 := "condition3"
 	tests := []struct {
 		pod    api.Pod
 		expect []metav1beta1.TableRow
@@ -1660,8 +1663,29 @@ func TestPrintPodwide(t *testing.T) {
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
 					NodeName:   "test1",
+					ReadinessGates: []api.PodReadinessGate{
+						{
+							ConditionType: api.PodConditionType(condition1),
+						},
+						{
+							ConditionType: api.PodConditionType(condition2),
+						},
+						{
+							ConditionType: api.PodConditionType(condition3),
+						},
+					},
 				},
 				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodConditionType(condition1),
+							Status: api.ConditionFalse,
+						},
+						{
+							Type:   api.PodConditionType(condition2),
+							Status: api.ConditionTrue,
+						},
+					},
 					Phase: "podPhase",
 					PodIP: "1.1.1.1",
 					ContainerStatuses: []api.ContainerStatus{
@@ -1671,7 +1695,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1690,7 +1714,7 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
 		},
 	}
 
