@@ -285,45 +285,7 @@ func NewInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
-	// This will hold incoming changes. Note how we pass clientState in as a
-	// KeyLister, that way resync operations will result in the correct set
-	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, clientState)
-
-	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
-		RetryOnError:     false,
-
-		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(Deltas) {
-				switch d.Type {
-				case Sync, Added, Updated:
-					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
-						if err := clientState.Update(d.Object); err != nil {
-							return err
-						}
-						h.OnUpdate(old, d.Object)
-					} else {
-						if err := clientState.Add(d.Object); err != nil {
-							return err
-						}
-						h.OnAdd(d.Object)
-					}
-				case Deleted:
-					if err := clientState.Delete(d.Object); err != nil {
-						return err
-					}
-					h.OnDelete(d.Object)
-				}
-			}
-			return nil
-		},
-	}
-	return clientState, New(cfg)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
 }
 
 // NewIndexerInformer returns a Indexer and a controller for populating the index
@@ -352,6 +314,16 @@ func NewIndexerInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
+}
+
+func newInformer(
+	lw ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+	clientState Store,
+) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
@@ -390,5 +362,5 @@ func NewIndexerInformer(
 			return nil
 		},
 	}
-	return clientState, New(cfg)
+	return New(cfg)
 }
