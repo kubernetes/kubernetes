@@ -82,7 +82,7 @@ func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern
 }
 
 func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
-	provisioner := h.driverInfo.Name + h.driverInfo.Framework.UniqueName
+	provisioner := GetUniqueDriverName(h)
 	parameters := map[string]string{}
 	ns := h.driverInfo.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", provisioner)
@@ -105,7 +105,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 	// settings are ignored for this test. We could patch the image definitions.
 	o := utils.PatchCSIOptions{
 		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            h.driverInfo.Name + h.driverInfo.Framework.UniqueName,
+		NewDriverName:            GetUniqueDriverName(h),
 		DriverContainerName:      "hostpath",
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 h.driverInfo.Config.ServerNodeName,
@@ -199,8 +199,8 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	//
 	// These are the options which would have to be used:
 	// o := utils.PatchCSIOptions{
-	// 	OldDriverName:            "com.google.csi.gcepd",
-	// 	NewDriverName:            "com.google.csi.gcepd-" + g.f.UniqueName,
+	// 	OldDriverName:            g.driverInfo.Name,
+	// 	NewDriverName:            GetUniqueDriverName(g),
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }

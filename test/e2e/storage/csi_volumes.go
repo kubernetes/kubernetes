@@ -192,7 +192,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			test := t
 			It(test.name, func() {
 				if test.driverExists {
-					csiDriver := createCSIDriver(csics, "csi-hostpath-"+f.UniqueName, test.driverAttachable)
+					csiDriver := createCSIDriver(csics, drivers.GetUniqueDriverName(driver), test.driverAttachable)
 					if csiDriver != nil {
 						defer csics.CsiV1alpha1().CSIDrivers().Delete(csiDriver.Name, nil)
 					}
