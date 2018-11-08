@@ -87,6 +87,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
@@ -158,6 +159,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
@@ -230,6 +232,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
@@ -347,6 +350,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
