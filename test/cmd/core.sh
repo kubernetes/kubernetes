@@ -25,7 +25,7 @@ run_configmap_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing configmaps"
   kubectl create -f test/fixtures/doc-yaml/user-guide/configmap/configmap.yaml
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
+  kube::test::get_object_assert 'configmap/test-configmap' "{{$id_field}}" 'test-configmap'
   kubectl delete configmap test-configmap "${kube_flags[@]}"
 
   ### Create a new namespace
@@ -37,8 +37,10 @@ run_configmap_tests() {
   kube::test::get_object_assert 'namespaces/test-configmaps' "{{$id_field}}" 'test-configmaps'
 
   ### Create a generic configmap in a specific namespace
-  # Pre-condition: no configmaps namespace exists
-  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: configmap test-configmap and test-binary-configmap does not exist
+  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"test-binary-configmap\" }}found{{end}}{{end}}:' ':'
+
   # Command
   kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
   kubectl create configmap test-binary-configmap --from-file <( head -c 256 /dev/urandom ) --namespace=test-configmaps
@@ -222,8 +224,11 @@ run_pod_tests() {
   kube::test::get_object_assert 'secret/test-secret --namespace=test-kubectl-describe-pod' "{{$secret_type}}" 'test-type'
 
   ### Create a generic configmap
-  # Pre-condition: no CONFIGMAP exists
-  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: CONFIGMAP test-configmap does not exist
+  #kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" ''
+  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' '{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:' ':'
+
+  #kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create configmap test-configmap --from-literal=key-2=value2 --namespace=test-kubectl-describe-pod
   # Post-condition: configmap exists and has expected values
