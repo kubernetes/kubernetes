@@ -176,9 +176,14 @@ func (w *Watcher) init() error {
 
 // Walks through the plugin directory discover any existing plugin sockets.
 // Goroutines started here will be waited for in Stop() before cleaning up.
+// Ignore all errors except root dir not being walkable
 func (w *Watcher) traversePluginDir(dir string) error {
 	return w.fs.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if path == dir {
+				return fmt.Errorf("error accessing path: %s error: %v", path, err)
+			}
+
 			glog.Errorf("error accessing path: %s error: %v", path, err)
 			return nil
 		}
