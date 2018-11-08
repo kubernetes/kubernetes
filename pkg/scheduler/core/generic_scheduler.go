@@ -692,7 +692,7 @@ func PrioritizeNodes(
 			}
 			if glog.V(10) {
 				for _, hostPriority := range results[index] {
-					glog.Infof("%v -> %v: %v, Score: (%d)", pod.Name, hostPriority.Host, config.Name, hostPriority.Score)
+					glog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), hostPriority.Host, config.Name, hostPriority.Score)
 				}
 			}
 		}(i, priorityConfig)
@@ -730,6 +730,9 @@ func PrioritizeNodes(
 				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+					if glog.V(10) {
+						glog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, ext.Name(), score)
+					}
 					combinedScores[host] += score * weight
 				}
 				mu.Unlock()

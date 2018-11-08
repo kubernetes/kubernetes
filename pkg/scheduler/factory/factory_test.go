@@ -532,6 +532,10 @@ type fakeExtender struct {
 	ignorable         bool
 }
 
+func (f *fakeExtender) Name() string {
+	return "fakeExtender"
+}
+
 func (f *fakeExtender) IsIgnorable() bool {
 	return f.ignorable
 }
