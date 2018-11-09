@@ -30,6 +30,7 @@ go_test(
     deps = [
         "//pkg/kubelet/apis/pluginregistration/v1alpha1:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

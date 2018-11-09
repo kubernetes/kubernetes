@@ -34,7 +34,6 @@ import (
 	"github.com/emicklei/go-restful"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -818,12 +817,6 @@ func (a prometheusHostAdapter) GetVersionInfo() (*cadvisorapi.VersionInfo, error
 }
 func (a prometheusHostAdapter) GetMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return a.host.GetCachedMachineInfo()
-}
-
-func (a prometheusHostAdapter) GetProcessList(containerName string, options cadvisorapiv2.RequestOptions) ([]cadvisorapiv2.ProcessInfo, error) {
-	ps := []cadvisorapiv2.ProcessInfo{}
-	// FIXME(dims): Need to fill this up
-	return ps, nil
 }
 
 func containerPrometheusLabelsFunc(s stats.StatsProvider) metrics.ContainerLabelsFunc {

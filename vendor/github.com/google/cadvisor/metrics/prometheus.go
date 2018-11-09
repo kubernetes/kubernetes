@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog"
@@ -36,8 +35,6 @@ type infoProvider interface {
 	GetVersionInfo() (*info.VersionInfo, error)
 	// GetMachineInfo provides information about the machine.
 	GetMachineInfo() (*info.MachineInfo, error)
-	// GetProcessList provides information about each container's processes
-	GetProcessList(containerName string, options v2.RequestOptions) ([]v2.ProcessInfo, error)
 }
 
 // metricValue describes a single metric value for a given set of label values
