@@ -61,7 +61,8 @@ func (t *volumeModeTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeModeTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+func (t *volumeModeTestSuite) isTestSupported(pattern testpatterns.TestPattern, driver TestDriver) bool {
+	return true
 }
 
 func createVolumeModeTestInput(pattern testpatterns.TestPattern, resource volumeModeTestResource) volumeModeTestInput {
@@ -107,20 +108,14 @@ func getVolumeModeTestFunc(pattern testpatterns.TestPattern, driver TestDriver) 
 func (t *volumeModeTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
-			resource     volumeModeTestResource
-			input        volumeModeTestInput
-			testFunc     func(*volumeModeTestInput)
-			needsCleanup bool
+			resource volumeModeTestResource
+			input    volumeModeTestInput
+			testFunc func(*volumeModeTestInput)
 		)
 
 		testFunc = getVolumeModeTestFunc(pattern, driver)
 
 		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
-			needsCleanup = true
-
 			// Setup test resource for driver and testpattern
 			resource = volumeModeTestResource{}
 			resource.setupResource(driver, pattern)
@@ -130,9 +125,7 @@ func (t *volumeModeTestSuite) execTest(driver TestDriver, pattern testpatterns.T
 		})
 
 		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
+			resource.cleanupResource(driver, pattern)
 		})
 
 		testFunc(&input)

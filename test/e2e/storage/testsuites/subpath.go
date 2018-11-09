@@ -71,7 +71,8 @@ func (s *subPathTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+func (s *subPathTestSuite) isTestSupported(pattern testpatterns.TestPattern, driver TestDriver) bool {
+	return true
 }
 
 func createSubPathTestInput(pattern testpatterns.TestPattern, resource subPathTestResource) subPathTestInput {
@@ -97,17 +98,11 @@ func createSubPathTestInput(pattern testpatterns.TestPattern, resource subPathTe
 func (s *subPathTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(s, pattern), func() {
 		var (
-			resource     subPathTestResource
-			input        subPathTestInput
-			needsCleanup bool
+			resource subPathTestResource
+			input    subPathTestInput
 		)
 
 		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(s, driver, pattern)
-			needsCleanup = true
-
 			// Setup test resource for driver and testpattern
 			resource = subPathTestResource{}
 			resource.setupResource(driver, pattern)
@@ -117,9 +112,7 @@ func (s *subPathTestSuite) execTest(driver TestDriver, pattern testpatterns.Test
 		})
 
 		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
+			resource.cleanupResource(driver, pattern)
 		})
 
 		testSubPath(&input)

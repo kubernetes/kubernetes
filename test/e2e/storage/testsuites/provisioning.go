@@ -73,7 +73,8 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+func (p *provisioningTestSuite) isTestSupported(pattern testpatterns.TestPattern, driver TestDriver) bool {
+	return true
 }
 
 func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
@@ -102,25 +103,17 @@ func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPat
 func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(p, pattern), func() {
 		var (
-			resource     provisioningTestResource
-			input        provisioningTestInput
-			needsCleanup bool
+			resource provisioningTestResource
+			input    provisioningTestInput
 		)
 
 		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(p, driver, pattern)
-			needsCleanup = true
-
 			// Create test input
 			resource, input = createProvisioningTestInput(driver, pattern)
 		})
 
 		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
+			resource.cleanupResource(driver, pattern)
 		})
 
 		// Ginkgo's "Global Shared Behaviors" require arguments for a shared function

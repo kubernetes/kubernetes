@@ -94,9 +94,6 @@ func (h *hostpathCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
 func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	provisioner := testsuites.GetUniqueDriverName(h)
 	parameters := map[string]string{}
@@ -197,12 +194,6 @@ func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	f := g.driverInfo.Config.Framework
-	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(f.ClientSet)
-}
-
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	ns := g.driverInfo.Config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
@@ -218,6 +209,9 @@ func (g *gcePDCSIDriver) GetClaimSize() string {
 }
 
 func (g *gcePDCSIDriver) CreateDriver() {
+	framework.SkipUnlessProviderIs("gce", "gke")
+	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
+
 	By("deploying csi gce-pd driver")
 	// It would be safer to rename the gcePD driver, but that
 	// hasn't been done before either and attempts to do so now led to
@@ -293,11 +287,6 @@ func (g *gcePDExternalCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDExternalCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
-}
-
 func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	ns := g.driverInfo.Config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
@@ -313,6 +302,8 @@ func (g *gcePDExternalCSIDriver) GetClaimSize() string {
 }
 
 func (g *gcePDExternalCSIDriver) CreateDriver() {
+	framework.SkipUnlessProviderIs("gce", "gke")
+	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
 }
 
 func (g *gcePDExternalCSIDriver) CleanupDriver() {

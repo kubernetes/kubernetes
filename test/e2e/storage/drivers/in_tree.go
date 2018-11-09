@@ -105,9 +105,6 @@ func (n *nfsDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &n.driverInfo
 }
 
-func (n *nfsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
 func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
 	ntr, ok := testResource.(*nfsTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to NFS Test Resource")
@@ -233,6 +230,7 @@ var _ testsuites.TestDriver = &glusterFSDriver{}
 var _ testsuites.PreprovisionedVolumeTestDriver = &glusterFSDriver{}
 var _ testsuites.InlineVolumeTestDriver = &glusterFSDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &glusterFSDriver{}
+var _ testsuites.FilterTestDriver = &glusterFSDriver{}
 
 // InitGlusterFSDriver returns glusterFSDriver that implements TestDriver interface
 func InitGlusterFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -257,11 +255,9 @@ func (g *glusterFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *glusterFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
-	if pattern.FsType == "xfs" {
-		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
-	}
+func (g *glusterFSDriver) IsTestSupported(pattern testpatterns.TestPattern) bool {
+	return framework.NodeOSDistroIs("gci", "ubuntu", "custom") &&
+		(pattern.FsType != "xfs" || framework.NodeOSDistroIs("ubuntu", "custom"))
 }
 
 func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -383,9 +379,6 @@ func (i *iSCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &i.driverInfo
 }
 
-func (i *iSCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
 func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
 	itr, ok := testResource.(*iSCSITestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to iSCSI Test Resource")
@@ -495,9 +488,6 @@ func InitRbdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 
 func (r *rbdDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &r.driverInfo
-}
-
-func (r *rbdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
 func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -621,9 +611,6 @@ func (c *cephFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &c.driverInfo
 }
 
-func (c *cephFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
 func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
 	ctr, ok := testResource.(*cephTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to Ceph Test Resource")
@@ -722,9 +709,6 @@ func (h *hostPathDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostPathDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
 func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
 	// hostPath doesn't support readOnly volume
 	if readOnly {
@@ -794,9 +778,6 @@ func InitHostPathSymlinkDriver(config testsuites.TestConfig) testsuites.TestDriv
 
 func (h *hostPathSymlinkDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
-}
-
-func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
 func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -938,9 +919,6 @@ func (e *emptydirDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &e.driverInfo
 }
 
-func (e *emptydirDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
 func (e *emptydirDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
 	// emptydir doesn't support readOnly volume
 	if readOnly {
@@ -983,6 +961,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &cinderDriver{}
 var _ testsuites.InlineVolumeTestDriver = &cinderDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &cinderDriver{}
 var _ testsuites.DynamicPVTestDriver = &cinderDriver{}
+var _ testsuites.FilterTestDriver = &cinderDriver{}
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
 func InitCinderDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -1009,8 +988,8 @@ func (c *cinderDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &c.driverInfo
 }
 
-func (c *cinderDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("openstack")
+func (c *cinderDriver) IsTestSupported(pattern testpatterns.TestPattern) bool {
+	return framework.ProviderIs("openstack")
 }
 
 func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -1145,6 +1124,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &gcePdDriver{}
 var _ testsuites.InlineVolumeTestDriver = &gcePdDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
+var _ testsuites.FilterTestDriver = &gcePdDriver{}
 
 // InitGceDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -1176,11 +1156,9 @@ func (g *gcePdDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FsType == "xfs" {
-		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
-	}
+func (g *gcePdDriver) IsTestSupported(pattern testpatterns.TestPattern) bool {
+	return framework.ProviderIs("gce", "gke") &&
+		(pattern.FsType != "xfs" || framework.NodeOSDistroIs("ubuntu", "custom"))
 }
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -1272,6 +1250,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &vSphereDriver{}
 var _ testsuites.InlineVolumeTestDriver = &vSphereDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &vSphereDriver{}
 var _ testsuites.DynamicPVTestDriver = &vSphereDriver{}
+var _ testsuites.FilterTestDriver = &vSphereDriver{}
 
 // InitVSphereDriver returns vSphereDriver that implements TestDriver interface
 func InitVSphereDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -1297,8 +1276,8 @@ func (v *vSphereDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &v.driverInfo
 }
 
-func (v *vSphereDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("vsphere")
+func (v *vSphereDriver) IsTestSupported(pattern testpatterns.TestPattern) bool {
+	return framework.ProviderIs("vsphere")
 }
 
 func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -1396,6 +1375,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &azureDriver{}
 var _ testsuites.InlineVolumeTestDriver = &azureDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &azureDriver{}
 var _ testsuites.DynamicPVTestDriver = &azureDriver{}
+var _ testsuites.FilterTestDriver = &azureDriver{}
 
 // InitAzureDriver returns azureDriver that implements TestDriver interface
 func InitAzureDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -1423,8 +1403,8 @@ func (a *azureDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &a.driverInfo
 }
 
-func (a *azureDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("azure")
+func (a *azureDriver) IsTestSupported(pattern testpatterns.TestPattern) bool {
+	return framework.ProviderIs("azure")
 }
 
 func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -1517,6 +1497,7 @@ var _ testsuites.TestDriver = &awsDriver{}
 //var _ testsuites.InlineVolumeTestDriver = &awsDriver{}
 //var _ testsuites.PreprovisionedPVTestDriver = &awsDriver{}
 var _ testsuites.DynamicPVTestDriver = &awsDriver{}
+var _ testsuites.FilterTestDriver = &awsDriver{}
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
 func InitAwsDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -1545,8 +1526,8 @@ func (a *awsDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &a.driverInfo
 }
 
-func (a *awsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("aws")
+func (a *awsDriver) IsTestSupported(pattern testpatterns.TestPattern) bool {
+	return framework.ProviderIs("aws")
 }
 
 // TODO: Fix authorization error in attach operation and uncomment below

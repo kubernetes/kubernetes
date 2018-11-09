@@ -16,8 +16,12 @@ limitations under the License.
 
 package utils
 
-import "github.com/onsi/ginkgo"
+import "k8s.io/kubernetes/test/e2e/framework"
 
+// SIGDescribe adds the sig-storage tag and ensures that the body only
+// gets called after TestContext is valid. Therefore it is okay to use
+// functions like framework.NodeDistroOSIs or framework.ProviderIs to
+// add specs conditionally.
 func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-storage] "+text, body)
+	return framework.DescribeWithTestContext("[sig-storage] "+text, body)
 }

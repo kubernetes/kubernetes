@@ -74,7 +74,8 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
+func (t *volumeIOTestSuite) isTestSupported(pattern testpatterns.TestPattern, driver TestDriver) bool {
+	return true
 }
 
 func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumeIOTestInput {
@@ -110,17 +111,11 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 func (t *volumeIOTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
-			resource     genericVolumeTestResource
-			input        volumeIOTestInput
-			needsCleanup bool
+			resource genericVolumeTestResource
+			input    volumeIOTestInput
 		)
 
 		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
-			needsCleanup = true
-
 			// Setup test resource for driver and testpattern
 			resource = genericVolumeTestResource{}
 			resource.setupResource(driver, pattern)
@@ -130,9 +125,7 @@ func (t *volumeIOTestSuite) execTest(driver TestDriver, pattern testpatterns.Tes
 		})
 
 		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
+			resource.cleanupResource(driver, pattern)
 		})
 
 		execTestVolumeIO(&input)

@@ -72,21 +72,8 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
-}
-
-func skipPersistenceTest(driver TestDriver) {
-	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapPersistence] {
-		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
-	}
-}
-
-func skipExecTest(driver TestDriver) {
-	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapExec] {
-		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
-	}
+func (t *volumesTestSuite) isTestSupported(pattern testpatterns.TestPattern, driver TestDriver) bool {
+	return true
 }
 
 func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumesTestInput {
@@ -126,17 +113,11 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
-			resource     genericVolumeTestResource
-			input        volumesTestInput
-			needsCleanup bool
+			resource genericVolumeTestResource
+			input    volumesTestInput
 		)
 
 		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
-			needsCleanup = true
-
 			// Setup test resource for driver and testpattern
 			resource = genericVolumeTestResource{}
 			resource.setupResource(driver, pattern)
@@ -146,12 +127,10 @@ func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.Test
 		})
 
 		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
+			resource.cleanupResource(driver, pattern)
 		})
 
-		testVolumes(&input)
+		testVolumes(driver, &input)
 	})
 }
 
@@ -164,25 +143,27 @@ type volumesTestInput struct {
 	resource genericVolumeTestResource
 }
 
-func testVolumes(input *volumesTestInput) {
-	It("should be mountable", func() {
-		f := input.f
-		cs := f.ClientSet
-		defer framework.VolumeTestCleanup(f, convertTestConfig(input.config))
+func testVolumes(driver TestDriver, input *volumesTestInput) {
+	dInfo := driver.GetDriverInfo()
+	if dInfo.Capabilities[CapPersistence] {
+		It("should be mountable", func() {
+			f := input.f
+			cs := f.ClientSet
+			defer framework.VolumeTestCleanup(f, convertTestConfig(input.config))
 
-		skipPersistenceTest(input.resource.driver)
+			volumeTest := input.tests
+			config := convertTestConfig(input.config)
+			framework.InjectHtml(cs, config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
+			framework.TestVolumeClient(cs, config, input.fsGroup, input.tests)
+		})
+	}
+	if dInfo.Capabilities[CapExec] {
+		It("should allow exec of files on the volume", func() {
+			f := input.f
 
-		volumeTest := input.tests
-		config := convertTestConfig(input.config)
-		framework.InjectHtml(cs, config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
-		framework.TestVolumeClient(cs, config, input.fsGroup, input.tests)
-	})
-	It("should allow exec of files on the volume", func() {
-		f := input.f
-		skipExecTest(input.resource.driver)
-
-		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.resource.driver.GetDriverInfo().Config.ClientNodeSelector)
-	})
+			testScriptInPod(f, input.resource.volType, input.resource.volSource, input.resource.driver.GetDriverInfo().Config.ClientNodeSelector)
+		})
+	}
 }
 
 func testScriptInPod(
