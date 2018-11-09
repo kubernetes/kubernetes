@@ -95,5 +95,12 @@ func (l *SortableList) Sort() {
 // the second one. It takes arguments of the type "interface{}" to be used with
 // SortableList, but expects those arguments to be *v1.Pod.
 func HigherPriorityPod(pod1, pod2 interface{}) bool {
+	if GetPodPriority(pod1.(*v1.Pod)) == GetPodPriority(pod2.(*v1.Pod)) {
+		if (pod1.(*v1.Pod)).CreationTimestamp.Before(&(pod2.(*v1.Pod)).CreationTimestamp) {
+			return true
+		} else {
+			return false
+		}
+	}
 	return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
 }
