@@ -160,7 +160,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Glusterfs: &v1.GlusterfsPersistentVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
+				Glusterfs: &v1.GlusterfsPersistentVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: true},
 			},
 		},
 	}
@@ -181,7 +181,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Glusterfs: &v1.GlusterfsPersistentVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
+				Glusterfs: &v1.GlusterfsPersistentVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: true},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",

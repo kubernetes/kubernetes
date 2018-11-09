@@ -461,7 +461,7 @@ func getVolumeInfo(spec *volume.Spec) (string, bool, error) {
 
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.Glusterfs != nil {
-		return spec.PersistentVolume.Spec.Glusterfs.Path, spec.ReadOnly, nil
+		return spec.PersistentVolume.Spec.Glusterfs.Path, spec.PersistentVolume.Spec.Glusterfs.ReadOnly, nil
 	}
 	return "", false, fmt.Errorf("Spec does not reference a Glusterfs volume type")
 }
