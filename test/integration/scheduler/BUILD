@@ -12,6 +12,7 @@ go_test(
     srcs = [
         "extender_test.go",
         "main_test.go",
+        "plugin_test.go",
         "predicates_test.go",
         "preemption_test.go",
         "priorities_test.go",
@@ -37,6 +38,7 @@ go_test(
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
+        "//pkg/scheduler/plugins/v1alpha1:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
@@ -96,6 +98,7 @@ go_library(
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
+        "//pkg/scheduler/plugins/v1alpha1:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
