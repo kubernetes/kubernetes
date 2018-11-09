@@ -388,7 +388,7 @@ func (in *InitConfiguration) DeepCopyInto(out *InitConfiguration) {
 		}
 	}
 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
-	out.APIEndpoint = in.APIEndpoint
+	out.LocalAPIEndpoint = in.LocalAPIEndpoint
 	return
 }
 

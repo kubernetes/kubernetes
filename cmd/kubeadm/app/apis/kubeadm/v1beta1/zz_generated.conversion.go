@@ -624,7 +624,7 @@ func autoConvert_v1beta1_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 	if err := Convert_v1beta1_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
+	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
 	return nil
@@ -643,7 +643,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kube
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
+	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
 	return nil
