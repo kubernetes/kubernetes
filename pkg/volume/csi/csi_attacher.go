@@ -717,7 +717,9 @@ func (c *csiAttacher) newVolumeAttachment(attachID, node, driverName string, spe
 	var vaSource storage.VolumeAttachmentSource
 
 	if c.plugin.inlineFeatureEnabled && volSrc != nil {
-		vaSource.InlineVolumeSource.VolumeSource = spec.Volume.VolumeSource
+		vaSource.InlineVolumeSource = &storage.InlineVolumeSource{
+			VolumeSource: spec.Volume.VolumeSource,
+		}
 	} else if pvSrc != nil {
 		pvName := spec.PersistentVolume.GetName()
 		vaSource.PersistentVolumeName = &pvName
