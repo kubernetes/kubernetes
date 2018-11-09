@@ -238,6 +238,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 					},
 				},
 			}
+			pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 			By("submitting the pod to kubernetes")
 			podClient.Create(pod)
