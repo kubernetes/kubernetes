@@ -113,6 +113,7 @@ func CaseSensitiveJsonIterator() jsoniter.API {
 		SortMapKeys:            true,
 		ValidateJsonRawMessage: true,
 		CaseSensitive:          true,
+		DisallowUnknownFields:  true,
 	}.Froze()
 	// Force jsoniter to decode number to interface{} via int64/float64, if possible.
 	config.RegisterExtension(&customNumberExtension{})
