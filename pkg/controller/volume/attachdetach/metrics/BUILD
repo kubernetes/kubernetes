@@ -9,6 +9,7 @@ go_library(
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/attachdetach/util:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
