@@ -81,7 +81,7 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 	var fsGroup *int64
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	fileSizes := createFileSizes(dInfo.MaxFileSize)
 	volSource := resource.volSource
 
@@ -97,7 +97,7 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 	return volumeIOTestInput{
 		f:         f,
 		name:      dInfo.Name,
-		config:    dInfo.Config,
+		config:    &dInfo.Config,
 		volSource: *volSource,
 		testFile:  fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name),
 		podSec: v1.PodSecurityContext{
@@ -142,7 +142,7 @@ func (t *volumeIOTestSuite) execTest(driver TestDriver, pattern testpatterns.Tes
 type volumeIOTestInput struct {
 	f         *framework.Framework
 	name      string
-	config    framework.VolumeTestConfig
+	config    *TestConfig
 	volSource v1.VolumeSource
 	testFile  string
 	podSec    v1.PodSecurityContext
@@ -154,7 +154,7 @@ func execTestVolumeIO(input *volumeIOTestInput) {
 		f := input.f
 		cs := f.ClientSet
 
-		err := testVolumeIO(f, cs, input.config, input.volSource, &input.podSec, input.testFile, input.fileSizes)
+		err := testVolumeIO(f, cs, convertTestConfig(input.config), input.volSource, &input.podSec, input.testFile, input.fileSizes)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }

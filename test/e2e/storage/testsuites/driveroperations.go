@@ -68,19 +68,6 @@ func DeleteVolume(driver TestDriver, volType testpatterns.TestVolType, testResou
 	}
 }
 
-// SetCommonDriverParameters sets a common driver parameters to TestDriver
-// This function is intended to be called in BeforeEach() inside test loop.
-func SetCommonDriverParameters(
-	driver TestDriver,
-	f *framework.Framework,
-	config framework.VolumeTestConfig,
-) {
-	dInfo := driver.GetDriverInfo()
-
-	dInfo.Framework = f
-	dInfo.Config = config
-}
-
 // GetStorageClass constructs a new StorageClass instance
 // with a unique name that is based on namespace + suffix.
 func GetStorageClass(
@@ -110,5 +97,5 @@ func GetStorageClass(
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests
 func GetUniqueDriverName(driver TestDriver) string {
-	return fmt.Sprintf("%s-%s", driver.GetDriverInfo().Name, driver.GetDriverInfo().Framework.UniqueName)
+	return fmt.Sprintf("%s-%s", driver.GetDriverInfo().Name, driver.GetDriverInfo().Config.Framework.UniqueName)
 }

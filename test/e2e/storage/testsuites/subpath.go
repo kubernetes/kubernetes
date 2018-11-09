@@ -77,7 +77,7 @@ func (s *subPathTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern,
 func createSubPathTestInput(pattern testpatterns.TestPattern, resource subPathTestResource) subPathTestInput {
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	subPath := f.Namespace.Name
 	subPathDir := filepath.Join(volumePath, subPath)
 
@@ -139,7 +139,7 @@ var _ TestResource = &subPathTestResource{}
 func (s *subPathTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	s.driver = driver
 	dInfo := s.driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	fsType := pattern.FsType
 	volType := pattern.VolType
 
@@ -174,16 +174,16 @@ func (s *subPathTestResource) setupResource(driver TestDriver, pattern testpatte
 	config := dInfo.Config
 	s.pod = SubpathTestPod(f, subPath, s.volType, s.volSource, true)
 	s.pod.Spec.NodeName = config.ClientNodeName
-	s.pod.Spec.NodeSelector = config.NodeSelector
+	s.pod.Spec.NodeSelector = config.ClientNodeSelector
 
 	s.formatPod = volumeFormatPod(f, s.volSource)
 	s.formatPod.Spec.NodeName = config.ClientNodeName
-	s.formatPod.Spec.NodeSelector = config.NodeSelector
+	s.formatPod.Spec.NodeSelector = config.ClientNodeSelector
 }
 
 func (s *subPathTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 
 	// Cleanup subPath test dependent resource
 	By("Deleting pod")

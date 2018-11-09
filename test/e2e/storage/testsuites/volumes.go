@@ -93,7 +93,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	var fsGroup *int64
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	volSource := resource.volSource
 
 	if volSource == nil {
@@ -108,7 +108,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	return volumesTestInput{
 		f:        f,
 		name:     dInfo.Name,
-		config:   dInfo.Config,
+		config:   &dInfo.Config,
 		fsGroup:  fsGroup,
 		resource: resource,
 		tests: []framework.VolumeTest{
@@ -158,7 +158,7 @@ func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.Test
 type volumesTestInput struct {
 	f        *framework.Framework
 	name     string
-	config   framework.VolumeTestConfig
+	config   *TestConfig
 	fsGroup  *int64
 	tests    []framework.VolumeTest
 	resource genericVolumeTestResource
@@ -168,19 +168,20 @@ func testVolumes(input *volumesTestInput) {
 	It("should be mountable", func() {
 		f := input.f
 		cs := f.ClientSet
-		defer framework.VolumeTestCleanup(f, input.config)
+		defer framework.VolumeTestCleanup(f, convertTestConfig(input.config))
 
 		skipPersistenceTest(input.resource.driver)
 
 		volumeTest := input.tests
-		framework.InjectHtml(cs, input.config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
-		framework.TestVolumeClient(cs, input.config, input.fsGroup, input.tests)
+		config := convertTestConfig(input.config)
+		framework.InjectHtml(cs, config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
+		framework.TestVolumeClient(cs, config, input.fsGroup, input.tests)
 	})
 	It("should allow exec of files on the volume", func() {
 		f := input.f
 		skipExecTest(input.resource.driver)
 
-		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.config.NodeSelector)
+		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.resource.driver.GetDriverInfo().Config.ClientNodeSelector)
 	})
 }
 

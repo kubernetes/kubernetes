@@ -86,7 +86,7 @@ func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPat
 			ClaimSize:    resource.claimSize,
 			ExpectedSize: resource.claimSize,
 		},
-		cs:    driver.GetDriverInfo().Framework.ClientSet,
+		cs:    driver.GetDriverInfo().Config.Framework.ClientSet,
 		pvc:   resource.pvc,
 		sc:    resource.sc,
 		dInfo: driver.GetDriverInfo(),
@@ -151,7 +151,7 @@ func (p *provisioningTestResource) setupResource(driver TestDriver, pattern test
 			}
 			p.driver = driver
 			p.claimSize = dDriver.GetClaimSize()
-			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
+			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
 		}

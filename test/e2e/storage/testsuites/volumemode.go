@@ -67,7 +67,7 @@ func (t *volumeModeTestSuite) skipUnsupportedTest(pattern testpatterns.TestPatte
 func createVolumeModeTestInput(pattern testpatterns.TestPattern, resource volumeModeTestResource) volumeModeTestInput {
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 
 	return volumeModeTestInput{
 		f:                f,
@@ -154,7 +154,7 @@ var _ TestResource = &volumeModeTestResource{}
 func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	s.driver = driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	ns := f.Namespace
 	fsType := pattern.FsType
 	volBindMode := storagev1.VolumeBindingImmediate
@@ -207,7 +207,7 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 
 func (s *volumeModeTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 	volType := pattern.VolType

@@ -43,7 +43,7 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var csiTestDrivers = []func() testsuites.TestDriver{
+var csiTestDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	drivers.InitGcePDExternalCSIDriver,
@@ -81,7 +81,11 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		cancel context.CancelFunc
 		cs     clientset.Interface
 		ns     *v1.Namespace
-		config framework.VolumeTestConfig
+		// Common configuration options for each driver.
+		config = testsuites.TestConfig{
+			Framework: f,
+			Prefix:    "csi",
+		}
 	)
 
 	BeforeEach(func() {
@@ -89,10 +93,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		cancel = c
 		cs = f.ClientSet
 		ns = f.Namespace
-		config = framework.VolumeTestConfig{
-			Namespace: ns.Name,
-			Prefix:    "csi",
-		}
+
 		// Debugging of the following tests heavily depends on the log output
 		// of the different containers. Therefore include all of that in log
 		// files (when using --report-dir, as in the CI) or the output stream
@@ -125,13 +126,12 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	})
 
 	for _, initDriver := range csiTestDrivers {
-		curDriver := initDriver()
+		curDriver := initDriver(config)
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			driver := curDriver
 
 			BeforeEach(func() {
 				// setupDriver
-				testsuites.SetCommonDriverParameters(driver, f, config)
 				driver.CreateDriver()
 			})
 
@@ -140,7 +140,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				driver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, config, driver, csiTestSuites, csiTunePattern)
+			testsuites.RunTestSuite(f, driver, csiTestSuites, csiTunePattern)
 		})
 	}
 
@@ -155,8 +155,11 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		BeforeEach(func() {
 			cs = f.ClientSet
 			csics = f.CSIClientSet
-			driver = drivers.InitHostPathCSIDriver()
-			testsuites.SetCommonDriverParameters(driver, f, config)
+			config := testsuites.TestConfig{
+				Framework: f,
+				Prefix:    "csi-attach",
+			}
+			driver = drivers.InitHostPathCSIDriver(config)
 			driver.CreateDriver()
 		})
 

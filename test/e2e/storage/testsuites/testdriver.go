@@ -99,9 +99,35 @@ type DriverInfo struct {
 	RequiredMountOption  sets.String         // Map of string for required mount option (Optional)
 	Capabilities         map[Capability]bool // Map that represents plugin capabilities
 
-	// Parameters below will be set inside test loop by using SetCommonDriverParameters.
-	// Drivers that implement TestDriver is required to set all the above parameters
-	// and return DriverInfo on GetDriverInfo() call.
-	Framework *framework.Framework       // Framework for the test
-	Config    framework.VolumeTestConfig // VolumeTestConfig for thet test
+	Config TestConfig // Test configuration for the current test.
+}
+
+// TestConfig represents parameters that control test execution.
+// They can still be modified after defining tests, for example
+// in a BeforeEach or when creating the driver.
+type TestConfig struct {
+	// Some short word that gets inserted into dynamically
+	// generated entities (pods, paths) as first part of the name
+	// to make debugging easier. Can be the same for different
+	// tests inside the test suite.
+	Prefix string
+
+	// The framework instance allocated for the current test.
+	Framework *framework.Framework
+
+	// If non-empty, then pods using a volume will be scheduled
+	// onto the node with this name. Otherwise Kubernetes will
+	// pick a node.
+	ClientNodeName string
+
+	// Some tests also support scheduling pods onto nodes with
+	// these label/value pairs. As not all tests use this field,
+	// a driver that absolutely needs the pods on a specific
+	// node must use ClientNodeName.
+	ClientNodeSelector map[string]string
+
+	// Some test drivers initialize a storage server. This is
+	// the configuration that then has to be used to run tests.
+	// The values above are ignored for such tests.
+	ServerConfig *framework.VolumeTestConfig
 }

@@ -65,7 +65,7 @@ func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
 }
 
 // RunTestSuite runs all testpatterns of all testSuites for a driver
-func RunTestSuite(f *framework.Framework, config framework.VolumeTestConfig, driver TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
+func RunTestSuite(f *framework.Framework, driver TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
 	for _, testSuiteInit := range tsInits {
 		suite := testSuiteInit()
 		patterns := tunePatternFunc(suite.getTestSuiteInfo().testPatterns)
@@ -136,7 +136,7 @@ var _ TestResource = &genericVolumeTestResource{}
 func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	r.driver = driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	cs := f.ClientSet
 	fsType := pattern.FsType
 	volType := pattern.VolType
@@ -189,7 +189,7 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 // cleanupResource cleans up genericVolumeTestResource
 func (r *genericVolumeTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	volType := pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
@@ -321,5 +321,26 @@ func deleteStorageClass(cs clientset.Interface, className string) {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
 		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
+// convertTestConfig returns a framework test config with the
+// parameters specified for the testsuite or (if available) the
+// dynamically created config for the volume server.
+//
+// This is done because TestConfig is the public API for
+// the testsuites package whereas framework.VolumeTestConfig is merely
+// an implementation detail. It contains fields that have no effect,
+// which makes it unsuitable for use in the testsuits public API.
+func convertTestConfig(in *TestConfig) framework.VolumeTestConfig {
+	if in.ServerConfig != nil {
+		return *in.ServerConfig
+	}
+
+	return framework.VolumeTestConfig{
+		Namespace:      in.Framework.Namespace.Name,
+		Prefix:         in.Prefix,
+		ClientNodeName: in.ClientNodeName,
+		NodeSelector:   in.ClientNodeSelector,
 	}
 }
