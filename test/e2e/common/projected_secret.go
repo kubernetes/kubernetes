@@ -40,7 +40,8 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil, nodeSelector)
 	})
 
 	/*
@@ -50,7 +51,9 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
 		defaultMode := int32(0400)
-		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
+		// Cannot set mode on Windows. Test should be run on Linux Nodes with hybridClusters
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil, nodeSelector)
 	})
 
 	/*
@@ -62,7 +65,9 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		uid := int64(1000)
-		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
+		// Cannot set mode on Windows. Test should be run on Linux Nodes with hybridClusters
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid, nodeSelector)
 	})
 
 	/*
@@ -71,7 +76,8 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r—-—————— on the mapped volume.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doProjectedSecretE2EWithMapping(f, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doProjectedSecretE2EWithMapping(f, nil, nodeSelector)
 	})
 
 	/*
@@ -81,7 +87,9 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [NodeConformance]", func() {
 		mode := int32(0400)
-		doProjectedSecretE2EWithMapping(f, &mode)
+		// Cannot set mode on Windows. Test should be run on Linux Nodes with hybridClusters
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doProjectedSecretE2EWithMapping(f, &mode, nodeSelector)
 	})
 
 	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
@@ -102,7 +110,8 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(secret2); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
-		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil, nodeSelector)
 	})
 
 	/*
@@ -192,7 +201,7 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
-
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 			"mode of file \"/etc/projected-secret-volume/data-1\": -rw-r--r--",
@@ -359,6 +368,7 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
@@ -402,7 +412,7 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 })
 
 func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32,
-	secretName string, fsGroup *int64, uid *int64) {
+	secretName string, fsGroup *int64, uid *int64, nodeSelector map[string]string) {
 	var (
 		volumeName      = "projected-secret-volume"
 		volumeMountPath = "/etc/projected-secret-volume"
@@ -455,6 +465,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
+			NodeSelector:  nodeSelector,
 		},
 	}
 
@@ -482,7 +493,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 	f.TestContainerOutput("consume secrets", pod, 0, expectedOutput)
 }
 
-func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
+func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32, nodeSelector map[string]string) {
 	var (
 		name            = "projected-secret-test-map-" + string(uuid.NewUUID())
 		volumeName      = "projected-secret-volume"
@@ -541,6 +552,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
+			NodeSelector:  nodeSelector,
 		},
 	}
 
