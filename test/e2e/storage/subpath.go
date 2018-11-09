@@ -58,6 +58,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		*/
 		framework.ConformanceIt("should support subpaths with secret pod", func() {
 			pod := testsuites.SubpathTestPod(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
+			pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 			testsuites.TestBasicSubpath(f, "secret-value", pod)
 		})
 
@@ -68,6 +69,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		*/
 		framework.ConformanceIt("should support subpaths with configmap pod", func() {
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
+			pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
 		})
 
@@ -80,6 +82,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
+			pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 			testsuites.TestBasicSubpathFile(f, "configmap-value", pod, file)
 		})
 
@@ -94,6 +97,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
 				},
 			}, privilegedSecurityContext)
+			pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 			testsuites.TestBasicSubpath(f, pod.Name, pod)
 		})
 
@@ -113,6 +117,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 					},
 				},
 			}, privilegedSecurityContext)
+			pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(false)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
 		})
 	})
