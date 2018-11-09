@@ -2,14 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["args.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/openapi-gen/args",
-    importpath = "k8s.io/code-generator/cmd/openapi-gen/args",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/gengo/args:go_default_library",
+    srcs = [
+        "fields.go",
+        "yaml.go",
+        "yaml_go110.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/yaml",
+    importpath = "sigs.k8s.io/yaml",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )
 
 filegroup(

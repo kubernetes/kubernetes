@@ -20,6 +20,7 @@ go_test(
         "//cmd/cloud-controller-manager/app/testing:go_default_library",
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//cmd/kube-controller-manager/app/testing:go_default_library",
+        "//cmd/kube-scheduler/app/testing:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -180,7 +180,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		masterAddresses := framework.GetAllMasterAddresses(cs)
 		for _, masterAddress := range masterAddresses {
 			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, ports.SchedulerPort, gce.FirewallTestTcpTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, gce.FirewallTestTcpTimeout)
 		}
 		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout)
 		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, gce.FirewallTestTcpTimeout)

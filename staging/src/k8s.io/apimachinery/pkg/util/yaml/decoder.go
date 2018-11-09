@@ -26,8 +26,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"sigs.k8s.io/yaml"
 )
 
 // ToJSON converts a single YAML document into a JSON document

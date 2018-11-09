@@ -4004,6 +4004,11 @@
 			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
 		},
 		{
+			"ImportPath": "sigs.k8s.io/yaml",
+			"Comment": "v1.1.0",
+			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
+		},
+		{
 			"ImportPath": "vbom.ml/util/sortorder",
 			"Rev": "db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394"
 		}

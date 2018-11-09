@@ -29,10 +29,13 @@ import (
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
+	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -118,5 +121,35 @@ func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 	)
 	go cleaner.Run(1, ctx.Stop)
+	return nil, true, nil
+}
+
+func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		return nil, false, nil
+	}
+
+	var (
+		rootCA []byte
+		err    error
+	)
+	if ctx.ComponentConfig.SAController.RootCAFile != "" {
+		if rootCA, err = readCA(ctx.ComponentConfig.SAController.RootCAFile); err != nil {
+			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
+		}
+	} else {
+		rootCA = ctx.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
+	}
+
+	sac, err := rootcacertpublisher.NewPublisher(
+		ctx.InformerFactory.Core().V1().ConfigMaps(),
+		ctx.InformerFactory.Core().V1().Namespaces(),
+		ctx.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
+		rootCA,
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
 	return nil, true, nil
 }

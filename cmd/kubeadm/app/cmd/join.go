@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/golang/glog"
@@ -164,7 +163,6 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	var token string
 	var cfgPath string
-	var featureGatesString string
 	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
@@ -192,13 +190,13 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 				cfg.Discovery.TLSBootstrapToken = token
 			}
 
-			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, cfgPath, featureGatesString, ignorePreflightErrors)
+			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, cfgPath, ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
 
-	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString, &token)
+	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &token)
 	AddJoinBootstrapTokenDiscoveryFlags(cmd.PersistentFlags(), btd)
 	AddJoinFileDiscoveryFlags(cmd.PersistentFlags(), fd)
 	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &ignorePreflightErrors)
@@ -207,13 +205,10 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 }
 
 // NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
+func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, cfgPath string, ignorePreflightErrors []string) (*Join, error) {
 	var err error
-	if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
-		return nil, err
-	}
 
-	if err := validation.ValidateMixedArguments(flagSet); err != nil {
+	if err = validation.ValidateMixedArguments(flagSet); err != nil {
 		return nil, err
 	}
 
@@ -226,17 +221,13 @@ func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguratio
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, featureGatesString *string, token *string) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, token *string) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
 		"Specify the node name.")
 	flagSet.StringVar(
 		token, "token", "",
 		"Use this token for both discovery-token and tls-bootstrap-token when those values are not provided.")
-	flagSet.StringVar(
-		featureGatesString, "feature-gates", *featureGatesString,
-		"A set of key=value pairs that describe feature gates for various features. "+
-			"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 	flagSet.StringVar(
 		&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket,
 		`Specify the CRI socket to connect to.`,
@@ -503,7 +494,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	// register the joining node with the specified taints if the node
 	// is not a master. The markmaster phase will register the taints otherwise.
 	registerTaintsUsingFlags := !j.cfg.ControlPlane
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, j.cfg.FeatureGates, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, j.initCfg.FeatureGates, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 
@@ -532,7 +523,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	}
 
 	// This feature is disabled by default in kubeadm
-	if features.Enabled(j.cfg.FeatureGates, features.DynamicKubeletConfig) {
+	if features.Enabled(j.initCfg.FeatureGates, features.DynamicKubeletConfig) {
 		if err := kubeletphase.EnableDynamicConfigForNode(client, j.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return errors.Wrap(err, "error consuming base kubelet configuration")
 		}
