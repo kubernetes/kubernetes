@@ -43,6 +43,7 @@ type ConformanceContainer struct {
 	PodClient          *framework.PodClient
 	podName            string
 	PodSecurityContext *v1.PodSecurityContext
+	NodeSelector       map[string]string
 }
 
 func (cc *ConformanceContainer) Create() {
@@ -63,6 +64,7 @@ func (cc *ConformanceContainer) Create() {
 			SecurityContext:  cc.PodSecurityContext,
 			Volumes:          cc.Volumes,
 			ImagePullSecrets: imagePullSecrets,
+			NodeSelector:     cc.NodeSelector,
 		},
 	}
 	cc.PodClient.Create(pod)

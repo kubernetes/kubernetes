@@ -101,6 +101,7 @@ while true; do sleep 1; done
 								Level: "s0",
 							},
 						},
+						NodeSelector: framework.GetOSNodeSelectorForPod(false),
 					}
 					terminateContainer.Create()
 					defer terminateContainer.Delete()
@@ -132,78 +133,84 @@ while true; do sleep 1; done
 			rootUser := int64(0)
 			nonRootUser := int64(10000)
 			for _, testCase := range []struct {
-				name      string
-				container v1.Container
-				phase     v1.PodPhase
-				message   gomegatypes.GomegaMatcher
+				name         string
+				container    v1.Container
+				phase        v1.PodPhase
+				message      gomegatypes.GomegaMatcher
+				nodeSelector map[string]string
 			}{
 				{
 					name: "if TerminationMessagePath is set [NodeConformance]",
 					container: v1.Container{
-						Image:                  framework.BusyBoxImage,
-						Command:                []string{"/bin/sh", "-c"},
-						Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
+						Image:   framework.BusyBoxImage,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{"/bin/echo -n DONE > /dev/termination-log"},
 						TerminationMessagePath: "/dev/termination-log",
 						SecurityContext: &v1.SecurityContext{
 							RunAsUser: &rootUser,
 						},
 					},
-					phase:   v1.PodSucceeded,
-					message: Equal("DONE"),
+					phase:        v1.PodSucceeded,
+					message:      Equal("DONE"),
+					nodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 
 				{
 					name: "if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]",
 					container: v1.Container{
-						Image:                  framework.BusyBoxImage,
-						Command:                []string{"/bin/sh", "-c"},
-						Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
+						Image:   framework.BusyBoxImage,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 						TerminationMessagePath: "/dev/termination-custom-log",
 						SecurityContext: &v1.SecurityContext{
 							RunAsUser: &nonRootUser,
 						},
 					},
-					phase:   v1.PodSucceeded,
-					message: Equal("DONE"),
+					phase:        v1.PodSucceeded,
+					message:      Equal("DONE"),
+					nodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 
 				{
 					name: "from log output if TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
-						Image:                    framework.BusyBoxImage,
-						Command:                  []string{"/bin/sh", "-c"},
-						Args:                     []string{"/bin/echo -n DONE; /bin/false"},
+						Image:   framework.BusyBoxImage,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{"/bin/echo -n DONE; /bin/false"},
 						TerminationMessagePath:   "/dev/termination-log",
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
-					phase:   v1.PodFailed,
-					message: Equal("DONE\n"),
+					phase:        v1.PodFailed,
+					message:      Equal("DONE\n"),
+					nodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 
 				{
 					name: "as empty when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
-						Image:                    framework.BusyBoxImage,
-						Command:                  []string{"/bin/sh", "-c"},
-						Args:                     []string{"/bin/echo DONE; /bin/true"},
+						Image:   framework.BusyBoxImage,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{"/bin/echo DONE; /bin/true"},
 						TerminationMessagePath:   "/dev/termination-log",
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
-					phase:   v1.PodSucceeded,
-					message: Equal(""),
+					phase:        v1.PodSucceeded,
+					message:      Equal(""),
+					nodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 
 				{
 					name: "from file when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
-						Image:                    framework.BusyBoxImage,
-						Command:                  []string{"/bin/sh", "-c"},
-						Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
+						Image:   framework.BusyBoxImage,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
 						TerminationMessagePath:   "/dev/termination-log",
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
-					phase:   v1.PodSucceeded,
-					message: Equal("OK"),
+					phase:        v1.PodSucceeded,
+					message:      Equal("OK"),
+					nodeSelector: framework.GetOSNodeSelectorForPod(false),
 				},
 			} {
 				It(fmt.Sprintf("should report termination message %s", testCase.name), func() {
@@ -212,6 +219,7 @@ while true; do sleep 1; done
 						PodClient:     f.PodClient(),
 						Container:     testCase.container,
 						RestartPolicy: v1.RestartPolicyNever,
+						NodeSelector:  testCase.nodeSelector,
 					}
 
 					By("create the container")
@@ -314,6 +322,7 @@ while true; do sleep 1; done
 							ImagePullPolicy: v1.PullAlways,
 						},
 						RestartPolicy: v1.RestartPolicyNever,
+						NodeSelector:  framework.GetOSNodeSelectorForPod(false),
 					}
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
