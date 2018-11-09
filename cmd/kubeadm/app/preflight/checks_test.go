@@ -18,11 +18,11 @@ package preflight
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 
 	"net/http"
@@ -173,12 +173,12 @@ func (pfct preflightCheckTest) Name() string {
 	return "preflightCheckTest"
 }
 
-func (pfct preflightCheckTest) Check() (warning, errors []error) {
+func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 	if pfct.msg == "warning" {
-		return []error{fmt.Errorf("warning")}, nil
+		return []error{errors.New("warning")}, nil
 	}
 	if pfct.msg != "" {
-		return nil, []error{fmt.Errorf("fake error")}
+		return nil, []error{errors.New("fake error")}
 	}
 	return
 }

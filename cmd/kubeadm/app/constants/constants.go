@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -382,7 +384,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, fmt.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+	return nil, errors.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
@@ -420,12 +422,12 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	tempDir, err := ioutil.TempDir(tempDir, dirName)
 	if err != nil {
-		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+		return "", errors.Wrap(err, "couldn't create a temporary directory")
 	}
 	return tempDir, nil
 }
@@ -435,13 +437,13 @@ func CreateTimestampDirForKubeadm(dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create directory %q: %v", tempDir, err)
+		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
 	timestampDir := path.Join(tempDir, timestampDirName)
 	if err := os.Mkdir(timestampDir, 0700); err != nil {
-		return "", fmt.Errorf("could not create timestamp directory: %v", err)
+		return "", errors.Wrap(err, "could not create timestamp directory")
 	}
 
 	return timestampDir, nil
@@ -452,13 +454,13 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	// Get the service subnet CIDR
 	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse service subnet CIDR %q: %v", svcSubnet, err)
+		return nil, errors.Wrapf(err, "couldn't parse service subnet CIDR %q", svcSubnet)
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
 	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get tenth IP address from service subnet CIDR %s: %v", svcSubnetCIDR.String(), err)
+		return nil, errors.Wrapf(err, "unable to get tenth IP address from service subnet CIDR %s", svcSubnetCIDR.String())
 	}
 
 	return dnsIP, nil
