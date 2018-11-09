@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -102,8 +102,8 @@ func (c *Publisher) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting root CA certificate configmap publisher")
-	defer glog.Infof("Shutting down root CA certificate configmap publisher")
+	klog.Infof("Starting root CA certificate configmap publisher")
+	defer klog.Infof("Shutting down root CA certificate configmap publisher")
 
 	if !controller.WaitForCacheSync("crt configmap", stopCh, c.cmListerSynced, c.nsListerSynced) {
 		return
@@ -190,7 +190,7 @@ func (c *Publisher) processNextWorkItem() bool {
 func (c *Publisher) syncNamespace(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
 	ns, err := c.nsLister.Get(key)

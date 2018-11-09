@@ -22,8 +22,8 @@ import (
 	"net"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -261,13 +261,13 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	if pathExists, pathErr := volumeutil.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("Error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		glog.Warningf("Path %q does not exist", podVolDir)
+		klog.Warningf("Path %q does not exist", podVolDir)
 		return volumes, nil
 	}
 
 	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
 	if err != nil {
-		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+		klog.Errorf("Could not read directory %s: %v", podVolDir, err)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {

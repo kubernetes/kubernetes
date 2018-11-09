@@ -83,7 +83,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/pager:go_default_library",
         "//staging/src/k8s.io/client-go/util/buffer:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

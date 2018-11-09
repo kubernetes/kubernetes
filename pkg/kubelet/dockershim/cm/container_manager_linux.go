@@ -25,11 +25,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 
@@ -83,19 +83,19 @@ func (m *containerManager) Start() error {
 func (m *containerManager) doWork() {
 	v, err := m.client.Version()
 	if err != nil {
-		glog.Errorf("Unable to get docker version: %v", err)
+		klog.Errorf("Unable to get docker version: %v", err)
 		return
 	}
 	version, err := utilversion.ParseGeneric(v.APIVersion)
 	if err != nil {
-		glog.Errorf("Unable to parse docker version %q: %v", v.APIVersion, err)
+		klog.Errorf("Unable to parse docker version %q: %v", v.APIVersion, err)
 		return
 	}
 	// EnsureDockerInContainer does two things.
 	//   1. Ensure processes run in the cgroups if m.cgroupsManager is not nil.
 	//   2. Ensure processes have the OOM score applied.
 	if err := kubecm.EnsureDockerInContainer(version, dockerOOMScoreAdj, m.cgroupsManager); err != nil {
-		glog.Errorf("Unable to ensure the docker processes run in the desired containers: %v", err)
+		klog.Errorf("Unable to ensure the docker processes run in the desired containers: %v", err)
 	}
 }
 
@@ -104,7 +104,7 @@ func createCgroupManager(name string) (*fs.Manager, error) {
 
 	memoryCapacity, err := getMemoryCapacity()
 	if err != nil {
-		glog.Errorf("Failed to get the memory capacity on machine: %v", err)
+		klog.Errorf("Failed to get the memory capacity on machine: %v", err)
 	} else {
 		memoryLimit = memoryCapacity * dockerMemoryLimitThresholdPercent / 100
 	}
@@ -112,7 +112,7 @@ func createCgroupManager(name string) (*fs.Manager, error) {
 	if err != nil || memoryLimit < minDockerMemoryLimit {
 		memoryLimit = minDockerMemoryLimit
 	}
-	glog.V(2).Infof("Configure resource-only container %q with memory limit: %d", name, memoryLimit)
+	klog.V(2).Infof("Configure resource-only container %q with memory limit: %d", name, memoryLimit)
 
 	allowAllDevices := true
 	cm := &fs.Manager{

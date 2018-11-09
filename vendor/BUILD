@@ -234,7 +234,6 @@ filegroup(
         "//vendor/github.com/gogo/protobuf/sortkeys:all-srcs",
         "//vendor/github.com/gogo/protobuf/types:all-srcs",
         "//vendor/github.com/gogo/protobuf/vanity:all-srcs",
-        "//vendor/github.com/golang/glog:all-srcs",
         "//vendor/github.com/golang/groupcache/lru:all-srcs",
         "//vendor/github.com/golang/mock/gomock:all-srcs",
         "//vendor/github.com/golang/protobuf/jsonpb:all-srcs",

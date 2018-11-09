@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -259,7 +259,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		responseMetadata, err := meta.Accessor(response)
 		if err != nil {
 			// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
-			glog.V(1).Info(err)
+			klog.V(1).Info(err)
 			return nil
 		}
 		uidMap[resourceLocation] = responseMetadata.GetUID()
@@ -301,7 +301,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		// if the resource doesn't support a verb we need, we shouldn't fail.
-		glog.V(1).Info(err)
+		klog.V(1).Info(err)
 		return nil
 	}
 	return err

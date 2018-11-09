@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -227,17 +227,17 @@ func (m *manager) Start() {
 	// signing API, so don't start the certificate manager if we don't have a
 	// client.
 	if m.certSigningRequestClient == nil {
-		glog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
+		klog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
 	}
 
-	glog.V(2).Infof("Certificate rotation is enabled.")
+	klog.V(2).Infof("Certificate rotation is enabled.")
 
 	templateChanged := make(chan struct{})
 	go wait.Forever(func() {
 		deadline := m.nextRotationDeadline()
 		if sleepInterval := deadline.Sub(time.Now()); sleepInterval > 0 {
-			glog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
+			klog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
 
 			timer := time.NewTimer(sleepInterval)
 			defer timer.Stop()
@@ -250,7 +250,7 @@ func (m *manager) Start() {
 					// if the template now matches what we last requested, restart the rotation deadline loop
 					return
 				}
-				glog.V(2).Infof("Certificate template changed, rotating")
+				klog.V(2).Infof("Certificate template changed, rotating")
 			}
 		}
 
@@ -321,7 +321,7 @@ func getCurrentCertificateOrBootstrap(
 	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to set the cert/key pair to the bootstrap certificate: %v", err))
 	} else {
-		glog.V(4).Infof("Updated the store to contain the initial bootstrap certificate")
+		klog.V(4).Infof("Updated the store to contain the initial bootstrap certificate")
 	}
 
 	return &bootstrapCert, true, nil
@@ -333,7 +333,7 @@ func getCurrentCertificateOrBootstrap(
 // This method also keeps track of "server health" by interpreting the responses it gets
 // from the server on the various calls it makes.
 func (m *manager) rotateCerts() (bool, error) {
-	glog.V(2).Infof("Rotating certificates")
+	klog.V(2).Infof("Rotating certificates")
 
 	template, csrPEM, keyPEM, privateKey, err := m.generateCSR()
 	if err != nil {
@@ -403,7 +403,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 
 	if template := m.getTemplate(); template != nil {
 		if template.Subject.CommonName != m.cert.Leaf.Subject.CommonName {
-			glog.V(2).Infof("Current certificate CN (%s) does not match requested CN (%s)", m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
+			klog.V(2).Infof("Current certificate CN (%s) does not match requested CN (%s)", m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
 			return false
 		}
 
@@ -411,7 +411,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		desiredDNSNames := sets.NewString(template.DNSNames...)
 		missingDNSNames := desiredDNSNames.Difference(currentDNSNames)
 		if len(missingDNSNames) > 0 {
-			glog.V(2).Infof("Current certificate is missing requested DNS names %v", missingDNSNames.List())
+			klog.V(2).Infof("Current certificate is missing requested DNS names %v", missingDNSNames.List())
 			return false
 		}
 
@@ -425,7 +425,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		}
 		missingIPs := desiredIPs.Difference(currentIPs)
 		if len(missingIPs) > 0 {
-			glog.V(2).Infof("Current certificate is missing requested IP addresses %v", missingIPs.List())
+			klog.V(2).Infof("Current certificate is missing requested IP addresses %v", missingIPs.List())
 			return false
 		}
 
@@ -433,7 +433,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		desiredOrgs := sets.NewString(template.Subject.Organization...)
 		missingOrgs := desiredOrgs.Difference(currentOrgs)
 		if len(missingOrgs) > 0 {
-			glog.V(2).Infof("Current certificate is missing requested orgs %v", missingOrgs.List())
+			klog.V(2).Infof("Current certificate is missing requested orgs %v", missingOrgs.List())
 			return false
 		}
 	}
@@ -468,7 +468,7 @@ func (m *manager) nextRotationDeadline() time.Time {
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
 	deadline := m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
 
-	glog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, deadline)
+	klog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, deadline)
 	if m.certificateExpiration != nil {
 		m.certificateExpiration.Set(float64(notAfter.Unix()))
 	}

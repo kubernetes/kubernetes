@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -42,7 +42,7 @@ import (
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
 func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("[control-plane] creating static Pod files")
+	klog.V(1).Infoln("[control-plane] creating static Pod files")
 	return CreateStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
@@ -97,7 +97,7 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration,
 	}
 
 	// gets the StaticPodSpecs, actualized for the current InitConfiguration
-	glog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
+	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, k8sVersion)
 
 	// creates required static pod specs
@@ -113,7 +113,7 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration,
 			return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
 		}
 
-		glog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
+		klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
 	}
 
 	return nil

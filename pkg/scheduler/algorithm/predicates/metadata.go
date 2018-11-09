@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,7 +140,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	// incomingPodAntiAffinityMap will be used later for efficient check on incoming pod's anti-affinity
 	incomingPodAffinityMap, incomingPodAntiAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, nodeNameToInfoMap)
 	if err != nil {
-		glog.Errorf("[predicate meta data generation] error finding pods that match affinity terms: %v", err)
+		klog.Errorf("[predicate meta data generation] error finding pods that match affinity terms: %v", err)
 		return nil
 	}
 	predicateMetadata := &predicateMetadata{
@@ -153,7 +153,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		topologyPairsAntiAffinityPodsMap:       existingPodAntiAffinityMap,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
-		glog.V(10).Infof("Precompute: %v", predicateName)
+		klog.V(10).Infof("Precompute: %v", predicateName)
 		precomputeFunc(predicateMetadata)
 	}
 	return predicateMetadata
@@ -502,7 +502,7 @@ func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
 	}
 	affinityProperties, err := getAffinityTermProperties(pod, GetPodAffinityTerms(affinity.PodAffinity))
 	if err != nil {
-		glog.Errorf("error in getting affinity properties of Pod %v", pod.Name)
+		klog.Errorf("error in getting affinity properties of Pod %v", pod.Name)
 		return false
 	}
 	return podMatchesAllAffinityTermProperties(targetPod, affinityProperties)
@@ -519,7 +519,7 @@ func targetPodMatchesAntiAffinityOfPod(pod, targetPod *v1.Pod) bool {
 	}
 	properties, err := getAffinityTermProperties(pod, GetPodAntiAffinityTerms(affinity.PodAntiAffinity))
 	if err != nil {
-		glog.Errorf("error in getting anti-affinity properties of Pod %v", pod.Name)
+		klog.Errorf("error in getting anti-affinity properties of Pod %v", pod.Name)
 		return false
 	}
 	return podMatchesAnyAffinityTermProperties(targetPod, properties)

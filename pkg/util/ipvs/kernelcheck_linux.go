@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilsexec "k8s.io/utils/exec"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // RequiredIPVSKernelModulesAvailableCheck tests IPVS required kernel modules.
@@ -42,7 +42,7 @@ func (r RequiredIPVSKernelModulesAvailableCheck) Name() string {
 // Check try to validates IPVS required kernel modules exists or not.
 // The name of function can not be changed.
 func (r RequiredIPVSKernelModulesAvailableCheck) Check() (warnings, errors []error) {
-	glog.V(1).Infoln("validating the kernel module IPVS required exists in machine or not")
+	klog.V(1).Infoln("validating the kernel module IPVS required exists in machine or not")
 
 	kernelVersion, ipvsModules, err := GetKernelVersionAndIPVSMods(r.Executor)
 	if err != nil {

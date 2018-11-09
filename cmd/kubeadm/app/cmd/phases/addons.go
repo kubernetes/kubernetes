@@ -19,8 +19,8 @@ package phases
 import (
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -83,7 +83,7 @@ func EnsureAllAddons(cfg *kubeadmapi.InitConfiguration, client clientset.Interfa
 		proxyaddon.EnsureProxyAddon,
 	}
 
-	glog.V(1).Infoln("[addon] installing all addons")
+	klog.V(1).Infoln("[addon] installing all addons")
 	for _, action := range addonActions {
 		err := action(cfg, client)
 		if err != nil {

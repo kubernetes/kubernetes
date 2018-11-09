@@ -21,8 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/golang/glog"
 	"k8s.io/api/admission/v1beta1"
+	"k8s.io/klog"
 )
 
 const (
@@ -35,7 +35,7 @@ const (
 )
 
 func mutateCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("mutating custom resource")
+	klog.V(2).Info("mutating custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -44,7 +44,7 @@ func mutateCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 	raw := ar.Request.Object.Raw
 	err := json.Unmarshal(raw, &cr)
 	if err != nil {
-		glog.Error(err)
+		klog.Error(err)
 		return toAdmissionResponse(err)
 	}
 
@@ -63,7 +63,7 @@ func mutateCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 }
 
 func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("admitting custom resource")
+	klog.V(2).Info("admitting custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -72,7 +72,7 @@ func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse 
 	raw := ar.Request.Object.Raw
 	err := json.Unmarshal(raw, &cr)
 	if err != nil {
-		glog.Error(err)
+		klog.Error(err)
 		return toAdmissionResponse(err)
 	}
 

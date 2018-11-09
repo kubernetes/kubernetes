@@ -24,10 +24,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -110,7 +110,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		}
 		for name, data := range secrets.Data {
 			secret = string(data)
-			glog.V(4).Infof("found ceph secret info: %s", name)
+			klog.V(4).Infof("found ceph secret info: %s", name)
 		}
 	}
 	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter(plugin.GetPluginName()), secret)
@@ -225,7 +225,7 @@ func (cephfsVolume *cephfsMounter) SetUp(fsGroup *int64) error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
+	klog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -239,7 +239,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	// check whether it belongs to fuse, if not, default to use kernel mount.
 	if cephfsVolume.checkFuseMount() {
-		glog.V(4).Info("CephFS fuse mount.")
+		klog.V(4).Info("CephFS fuse mount.")
 		err = cephfsVolume.execFuseMount(dir)
 		// cleanup no matter if fuse mount fail.
 		keyringPath := cephfsVolume.GetKeyringPath()
@@ -252,10 +252,10 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 			return nil
 		}
 		// if cephfs fuse mount failed, fallback to kernel mount.
-		glog.V(2).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
+		klog.V(2).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
 
 	}
-	glog.V(4).Info("CephFS kernel mount.")
+	klog.V(4).Info("CephFS kernel mount.")
 
 	err = cephfsVolume.execMount(dir)
 	if err != nil {
@@ -336,7 +336,7 @@ func (cephfsVolume *cephfsMounter) checkFuseMount() bool {
 	switch runtime.GOOS {
 	case "linux":
 		if _, err := execute.Run("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph"); err == nil {
-			glog.V(4).Info("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
+			klog.V(4).Info("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
 			return true
 		}
 		return false
@@ -351,7 +351,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	if cephfsVolume.secret != "" {
 		// TODO: cephfs fuse currently doesn't support secret option,
 		// remove keyring file create once secret option is supported.
-		glog.V(4).Info("cephfs mount begin using fuse.")
+		klog.V(4).Info("cephfs mount begin using fuse.")
 
 		keyringPath := cephfsVolume.GetKeyringPath()
 		os.MkdirAll(keyringPath, 0750)
@@ -370,13 +370,13 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		writerContext := fmt.Sprintf("cephfuse:%v.keyring", cephfsVolume.id)
 		writer, err := util.NewAtomicWriter(keyringPath, writerContext)
 		if err != nil {
-			glog.Errorf("failed to create atomic writer: %v", err)
+			klog.Errorf("failed to create atomic writer: %v", err)
 			return err
 		}
 
 		err = writer.Write(payload)
 		if err != nil {
-			glog.Errorf("failed to write payload to dir: %v", err)
+			klog.Errorf("failed to write payload to dir: %v", err)
 			return err
 		}
 
@@ -419,7 +419,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		mountArgs = append(mountArgs, strings.Join(opt, ","))
 	}
 
-	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
+	klog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
 	command := exec.Command("ceph-fuse", mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil || !(strings.Contains(string(output), "starting fuse")) {

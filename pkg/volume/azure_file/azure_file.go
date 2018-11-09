@@ -22,12 +22,12 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -237,20 +237,20 @@ func (b *azureFileMounter) SetUp(fsGroup *int64) error {
 
 func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
+	klog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	if !notMnt {
 		// testing original mount point, make sure the mount link is valid
 		if _, err := ioutil.ReadDir(dir); err == nil {
-			glog.V(4).Infof("azureFile - already mounted to target %s", dir)
+			klog.V(4).Infof("azureFile - already mounted to target %s", dir)
 			return nil
 		}
 		// mount link is invalid, now unmount and remount later
-		glog.Warningf("azureFile - ReadDir %s failed with %v, unmount this directory", dir, err)
+		klog.Warningf("azureFile - ReadDir %s failed with %v, unmount this directory", dir, err)
 		if err := b.mounter.Unmount(dir); err != nil {
-			glog.Errorf("azureFile - Unmount directory %s failed with %v", dir, err)
+			klog.Errorf("azureFile - Unmount directory %s failed with %v", dir, err)
 			return err
 		}
 		notMnt = true
@@ -285,22 +285,22 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}
@@ -376,7 +376,7 @@ func getStorageEndpointSuffix(cloudprovider cloudprovider.Interface) string {
 	const publicCloudStorageEndpointSuffix = "core.windows.net"
 	azure, err := getAzureCloud(cloudprovider)
 	if err != nil {
-		glog.Warningf("No Azure cloud provider found. Using the Azure public cloud endpoint: %s", publicCloudStorageEndpointSuffix)
+		klog.Warningf("No Azure cloud provider found. Using the Azure public cloud endpoint: %s", publicCloudStorageEndpointSuffix)
 		return publicCloudStorageEndpointSuffix
 	}
 	return azure.Environment.StorageEndpointSuffix

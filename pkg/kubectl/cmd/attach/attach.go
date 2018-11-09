@@ -22,8 +22,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -326,7 +326,7 @@ func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container,
 		fmt.Fprintf(o.ErrOut, "%s\n", o.SuggestedCmdUsage)
 	}
 
-	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
+	klog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
 	return &pod.Spec.Containers[0], nil
 }
 

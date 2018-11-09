@@ -22,10 +22,10 @@ import (
 	"io"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
@@ -73,7 +73,7 @@ func newPersistentVolumeLabel() *persistentVolumeLabel {
 	// DEPRECATED: cloud-controller-manager will now start NewPersistentVolumeLabelController
 	// which does exactly what this admission controller used to do. So once GCE, AWS and AZURE can
 	// run externally, we can remove this admission controller.
-	glog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
+	klog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
 		"Please remove this controller from your configuration files and scripts.")
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
@@ -170,7 +170,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 				volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
 			}
 			if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-				glog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+				klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
 					requirements, volume.Spec.NodeAffinity)
 			} else {
 				for _, req := range requirements {

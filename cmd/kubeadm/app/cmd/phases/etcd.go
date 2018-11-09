@@ -19,8 +19,8 @@ package phases
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -93,7 +93,7 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {
-			glog.V(1).Infof("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
+			klog.V(1).Infof("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
 		}
 		return nil
 	}

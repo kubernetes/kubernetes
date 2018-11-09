@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -113,8 +113,8 @@ func (tc *TokenCleaner) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
 
-	glog.Infof("Starting token cleaner controller")
-	defer glog.Infof("Shutting down token cleaner controller")
+	klog.Infof("Starting token cleaner controller")
+	defer klog.Infof("Shutting down token cleaner controller")
 
 	if !controller.WaitForCacheSync("token_cleaner", stopCh, tc.secretSynced) {
 		return
@@ -161,7 +161,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 func (tc *TokenCleaner) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -171,7 +171,7 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 	ret, err := tc.secretLister.Secrets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		glog.V(3).Infof("secret has been deleted: %v", key)
+		klog.V(3).Infof("secret has been deleted: %v", key)
 		return nil
 	}
 
@@ -188,7 +188,7 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
 	if isSecretExpired(secret) {
-		glog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
+		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
 		var options *metav1.DeleteOptions
 		if len(secret.UID) > 0 {
 			options = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &secret.UID}}
@@ -197,7 +197,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-			glog.V(3).Infof("Error deleting Secret: %v", err)
+			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
 	}
 }

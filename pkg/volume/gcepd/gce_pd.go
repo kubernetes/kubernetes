@@ -24,12 +24,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -137,13 +137,13 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 
 	instances, ok := cloud.Instances()
 	if !ok {
-		glog.Warning("Failed to get instances from cloud provider")
+		klog.Warning("Failed to get instances from cloud provider")
 		return volumeLimits, nil
 	}
 
 	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
 	if err != nil {
-		glog.Errorf("Failed to get instance type from GCE cloud provider")
+		klog.Errorf("Failed to get instance type from GCE cloud provider")
 		return volumeLimits, nil
 	}
 	if strings.HasPrefix(instanceType, "n1-") {
@@ -367,9 +367,9 @@ func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
 func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)
+	klog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notMnt {
@@ -377,7 +377,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
 
@@ -388,7 +388,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
-	glog.V(4).Infof("attempting to mount %s", dir)
+	klog.V(4).Infof("attempting to mount %s", dir)
 
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 
@@ -396,27 +396,27 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("Mount of disk %s failed: %v", dir, err)
+		klog.Errorf("Mount of disk %s failed: %v", dir, err)
 		return err
 	}
 
@@ -424,7 +424,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
 
-	glog.V(4).Infof("Successfully mounted %s", dir)
+	klog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
 }
 

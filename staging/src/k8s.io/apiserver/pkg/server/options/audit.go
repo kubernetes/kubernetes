@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
@@ -272,7 +272,7 @@ func (o *AuditOptions) ApplyTo(c *server.Config) error {
 	}
 
 	if c.AuditBackend != nil && c.AuditPolicyChecker == nil {
-		glog.V(2).Info("No audit policy file provided for AdvancedAuditing, no events will be recorded.")
+		klog.V(2).Info("No audit policy file provided for AdvancedAuditing, no events will be recorded.")
 	}
 	return nil
 }

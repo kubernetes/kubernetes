@@ -43,7 +43,7 @@ import (
 	"time"
 
 	oidc "github.com/coreos/go-oidc"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -147,10 +147,10 @@ func newAsyncIDTokenVerifier(ctx context.Context, c *oidc.Config, iss string) *a
 	// Polls indefinitely in an attempt to initialize the distributed claims
 	// verifier, or until context canceled.
 	initFn := func() (done bool, err error) {
-		glog.V(4).Infof("oidc authenticator: attempting init: iss=%v", iss)
+		klog.V(4).Infof("oidc authenticator: attempting init: iss=%v", iss)
 		v, err := initVerifier(ctx, c, iss)
 		if err != nil {
-			glog.Errorf("oidc authenticator: async token verifier for issuer: %q: %v", iss, err)
+			klog.Errorf("oidc authenticator: async token verifier for issuer: %q: %v", iss, err)
 			return false, nil
 		}
 		t.m.Lock()
@@ -221,7 +221,7 @@ func New(opts Options) (*Authenticator, error) {
 		go wait.PollUntil(time.Second*10, func() (done bool, err error) {
 			provider, err := oidc.NewProvider(ctx, a.issuerURL)
 			if err != nil {
-				glog.Errorf("oidc authenticator: initializing plugin: %v", err)
+				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
 				return false, nil
 			}
 
@@ -279,7 +279,7 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
 		}
 	} else {
-		glog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
+		klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
 	}
 
 	// Copied from http.DefaultTransport.

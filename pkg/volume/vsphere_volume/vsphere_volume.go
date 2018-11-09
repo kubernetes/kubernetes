@@ -22,12 +22,12 @@ import (
 	"path"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -146,7 +146,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 		return nil, err
 	}
 	volumePath = strings.Replace(volumePath, "\\040", " ", -1)
-	glog.V(5).Infof("vSphere volume path is %q", volumePath)
+	klog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -216,21 +216,21 @@ func (b *vsphereVolumeMounter) CanMount() error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
+	klog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
 
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
+		klog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
 		return err
 	}
 	if !notmnt {
-		glog.V(4).Infof("Something is already mounted to target %s", dir)
+		klog.V(4).Infof("Something is already mounted to target %s", dir)
 		return nil
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
+		klog.V(4).Infof("Could not create directory %s: %v", dir, err)
 		return err
 	}
 
@@ -243,21 +243,21 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notmnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notmnt {
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
 				return err
 			}
 		}
@@ -265,7 +265,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	volume.SetVolumeOwnership(b, fsGroup)
-	glog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
+	klog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
 
 	return nil
 }
@@ -372,7 +372,7 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		volumeMode = v.options.PVC.Spec.VolumeMode
 		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
-			glog.V(5).Infof("vSphere block volume should not have any FSType")
+			klog.V(5).Infof("vSphere block volume should not have any FSType")
 			volSpec.Fstype = ""
 		}
 	}

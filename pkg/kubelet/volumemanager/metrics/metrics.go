@@ -19,8 +19,8 @@ package metrics
 import (
 	"sync"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -85,7 +85,7 @@ func (c *totalVolumesCollector) Collect(ch chan<- prometheus.Metric) {
 				pluginName,
 				stateName)
 			if err != nil {
-				glog.Warningf("Failed to create metric : %v", err)
+				klog.Warningf("Failed to create metric : %v", err)
 			}
 			ch <- metric
 		}

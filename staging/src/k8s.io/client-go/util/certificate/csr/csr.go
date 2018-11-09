@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -104,7 +104,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
-		glog.Infof("csr for this node already exists, reusing")
+		klog.Infof("csr for this node already exists, reusing")
 		req, err = client.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return nil, formatError("cannot retrieve certificate signing request: %v", err)
@@ -112,7 +112,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		if err := ensureCompatible(req, csr, privateKey); err != nil {
 			return nil, fmt.Errorf("retrieved csr is not compatible: %v", err)
 		}
-		glog.Infof("csr for this node is still valid")
+		klog.Infof("csr for this node is still valid")
 	default:
 		return nil, formatError("cannot create certificate signing request: %v", err)
 	}

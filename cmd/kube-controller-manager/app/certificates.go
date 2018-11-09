@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"net/http"
 
@@ -69,7 +69,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 
 	switch {
 	case (keyFileExists && keyUsesDefault) || (certFileExists && certUsesDefault):
-		glog.Warningf("You might be using flag defaulting for --cluster-signing-cert-file and" +
+		klog.Warningf("You might be using flag defaulting for --cluster-signing-cert-file and" +
 			" --cluster-signing-key-file. These defaults are deprecated and will be removed" +
 			" in a subsequent release. Please pass these options explicitly.")
 	case (!keyFileExists && keyUsesDefault) && (!certFileExists && certUsesDefault):

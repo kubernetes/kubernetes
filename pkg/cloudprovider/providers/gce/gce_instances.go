@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	"github.com/golang/glog"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -97,7 +97,7 @@ func (g *Cloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.NodeAdd
 	}
 
 	if internalDNSFull, err := metadata.Get("instance/hostname"); err != nil {
-		glog.Warningf("couldn't get full internal DNS name: %v", err)
+		klog.Warningf("couldn't get full internal DNS name: %v", err)
 	} else {
 		addresses = append(addresses,
 			v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNSFull},
@@ -234,7 +234,7 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 	return wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
 		project, err := g.c.Projects().Get(ctx, g.projectID)
 		if err != nil {
-			glog.Errorf("Could not get project: %v", err)
+			klog.Errorf("Could not get project: %v", err)
 			return false, nil
 		}
 		keyString := fmt.Sprintf("%s:%s %s@%s", user, strings.TrimSpace(string(keyData)), user, user)
@@ -243,7 +243,7 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 			if item.Key == "sshKeys" {
 				if strings.Contains(*item.Value, keyString) {
 					// We've already added the key
-					glog.Info("SSHKey already in project metadata")
+					klog.Info("SSHKey already in project metadata")
 					return true, nil
 				}
 				value := *item.Value + "\n" + keyString
@@ -254,7 +254,7 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 		}
 		if !found {
 			// This is super unlikely, so log.
-			glog.Infof("Failed to find sshKeys metadata, creating a new item")
+			klog.Infof("Failed to find sshKeys metadata, creating a new item")
 			project.CommonInstanceMetadata.Items = append(project.CommonInstanceMetadata.Items,
 				&compute.MetadataItems{
 					Key:   "sshKeys",
@@ -267,10 +267,10 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 		mc.Observe(err)
 
 		if err != nil {
-			glog.Errorf("Could not Set Metadata: %v", err)
+			klog.Errorf("Could not Set Metadata: %v", err)
 			return false, nil
 		}
-		glog.Infof("Successfully added sshKey to project metadata")
+		klog.Infof("Successfully added sshKey to project metadata")
 		return true, nil
 	})
 }
@@ -278,7 +278,7 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 // GetAllCurrentZones returns all the zones in which k8s nodes are currently running
 func (g *Cloud) GetAllCurrentZones() (sets.String, error) {
 	if g.nodeInformerSynced == nil {
-		glog.Warningf("Cloud object does not have informers set, should only happen in E2E binary.")
+		klog.Warningf("Cloud object does not have informers set, should only happen in E2E binary.")
 		return g.GetAllZonesFromCloudProvider()
 	}
 	g.nodeZonesLock.Lock()
@@ -407,7 +407,7 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 		return fmt.Errorf("instance %q has no network interfaces", nodeName)
 	case 1:
 	default:
-		glog.Warningf("Instance %q has more than one network interface, using only the first (%v)",
+		klog.Warningf("Instance %q has more than one network interface, using only the first (%v)",
 			nodeName, instance.NetworkInterfaces)
 	}
 
@@ -437,7 +437,7 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	for _, name := range names {
 		name = canonicalizeInstanceName(name)
 		if !strings.HasPrefix(name, g.nodeInstancePrefix) {
-			glog.Warningf("Instance %q does not conform to prefix %q, removing filter", name, g.nodeInstancePrefix)
+			klog.Warningf("Instance %q does not conform to prefix %q, removing filter", name, g.nodeInstancePrefix)
 			nodeInstancePrefix = ""
 		}
 		found[name] = nil
@@ -459,7 +459,7 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 				continue
 			}
 			if found[inst.Name] != nil {
-				glog.Errorf("Instance name %q was duplicated (in zone %q and %q)", inst.Name, zone, found[inst.Name].Zone)
+				klog.Errorf("Instance name %q was duplicated (in zone %q and %q)", inst.Name, zone, found[inst.Name].Zone)
 				continue
 			}
 			found[inst.Name] = &gceInstance{
@@ -480,7 +480,7 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 				failed = append(failed, k)
 			}
 		}
-		glog.Errorf("Failed to retrieve instances: %v", failed)
+		klog.Errorf("Failed to retrieve instances: %v", failed)
 		return nil, cloudprovider.InstanceNotFound
 	}
 
@@ -501,7 +501,7 @@ func (g *Cloud) getInstanceByName(name string) (*gceInstance, error) {
 			if isHTTPErrorCode(err, http.StatusNotFound) {
 				continue
 			}
-			glog.Errorf("getInstanceByName: failed to get instance %s in zone %s; err: %v", name, zone, err)
+			klog.Errorf("getInstanceByName: failed to get instance %s in zone %s; err: %v", name, zone, err)
 			return nil, err
 		}
 		return instance, nil
@@ -561,7 +561,7 @@ func (g *Cloud) isCurrentInstance(instanceID string) bool {
 	currentInstanceID, err := getInstanceIDViaMetadata()
 	if err != nil {
 		// Log and swallow error
-		glog.Errorf("Failed to fetch instanceID via Metadata: %v", err)
+		klog.Errorf("Failed to fetch instanceID via Metadata: %v", err)
 		return false
 	}
 
@@ -583,7 +583,7 @@ func (g *Cloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 	nodeInstancePrefix := g.nodeInstancePrefix
 	for _, host := range hosts {
 		if !strings.HasPrefix(host.Name, g.nodeInstancePrefix) {
-			glog.Warningf("instance %v does not conform to prefix '%s', ignoring filter", host, g.nodeInstancePrefix)
+			klog.Warningf("instance %v does not conform to prefix '%s', ignoring filter", host, g.nodeInstancePrefix)
 			nodeInstancePrefix = ""
 		}
 

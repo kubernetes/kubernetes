@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
@@ -139,13 +139,13 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	// Iterate each volume spec and put them into a map index by the pluginName
 	for _, volumeAttached := range attachedVolumes {
 		if volumeAttached.VolumeSpec == nil {
-			glog.Errorf("VerifyVolumesAreAttached.GenerateVolumesAreAttachedFunc: nil spec for volume %s", volumeAttached.VolumeName)
+			klog.Errorf("VerifyVolumesAreAttached.GenerateVolumesAreAttachedFunc: nil spec for volume %s", volumeAttached.VolumeName)
 			continue
 		}
 		volumePlugin, err :=
 			og.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
 		if err != nil || volumePlugin == nil {
-			glog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.FindPluginBySpec failed", err).Error())
+			klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.FindPluginBySpec failed", err).Error())
 			continue
 		}
 		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
@@ -165,7 +165,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 			attachableVolumePlugin, err :=
 				og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				glog.Errorf(
+				klog.Errorf(
 					"VolumeAreAttached.FindAttachablePluginBySpec failed for plugin %q with: %v",
 					pluginName,
 					err)
@@ -174,7 +174,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 
 			volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
 			if newAttacherErr != nil {
-				glog.Errorf(
+				klog.Errorf(
 					"VolumesAreAttached.NewAttacher failed for getting plugin %q with: %v",
 					pluginName,
 					newAttacherErr)
@@ -183,7 +183,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 
 			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumesSpecs, nodeName)
 			if areAttachedErr != nil {
-				glog.Errorf(
+				klog.Errorf(
 					"VolumesAreAttached failed for checking on node %q with: %v",
 					nodeName,
 					areAttachedErr)
@@ -193,7 +193,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 			for spec, check := range attached {
 				if !check {
 					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
-					glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
+					klog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
 						volumeSpecMap[spec], spec.Name(), nodeName)
 				}
 			}
@@ -218,7 +218,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 		attachableVolumePlugin, err :=
 			og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 		if err != nil || attachableVolumePlugin == nil {
-			glog.Errorf(
+			klog.Errorf(
 				"BulkVerifyVolume.FindAttachablePluginBySpec failed for plugin %q with: %v",
 				pluginName,
 				err)
@@ -228,7 +228,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 		volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
 
 		if newAttacherErr != nil {
-			glog.Errorf(
+			klog.Errorf(
 				"BulkVerifyVolume.NewAttacher failed for getting plugin %q with: %v",
 				attachableVolumePlugin,
 				newAttacherErr)
@@ -237,13 +237,13 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 		bulkVolumeVerifier, ok := volumeAttacher.(volume.BulkVolumeVerifier)
 
 		if !ok {
-			glog.Errorf("BulkVerifyVolume failed to type assert attacher %q", bulkVolumeVerifier)
+			klog.Errorf("BulkVerifyVolume failed to type assert attacher %q", bulkVolumeVerifier)
 			return nil, nil
 		}
 
 		attached, bulkAttachErr := bulkVolumeVerifier.BulkVerifyVolumes(pluginNodeVolumes)
 		if bulkAttachErr != nil {
-			glog.Errorf("BulkVerifyVolume.BulkVerifyVolumes Error checking volumes are attached with %v", bulkAttachErr)
+			klog.Errorf("BulkVerifyVolume.BulkVerifyVolumes Error checking volumes are attached with %v", bulkAttachErr)
 			return nil, nil
 		}
 
@@ -252,7 +252,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 				nodeVolumeSpecs, nodeChecked := attached[nodeName]
 
 				if !nodeChecked {
-					glog.V(2).Infof("VerifyVolumesAreAttached.BulkVerifyVolumes failed for node %q and leaving volume %q as attached",
+					klog.V(2).Infof("VerifyVolumesAreAttached.BulkVerifyVolumes failed for node %q and leaving volume %q as attached",
 						nodeName,
 						volumeSpec.Name())
 					continue
@@ -261,7 +261,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 				check := nodeVolumeSpecs[volumeSpec]
 
 				if !check {
-					glog.V(2).Infof("VerifyVolumesAreAttached.BulkVerifyVolumes failed for node %q and volume %q",
+					klog.V(2).Infof("VerifyVolumesAreAttached.BulkVerifyVolumes failed for node %q and volume %q",
 						nodeName,
 						volumeSpec.Name())
 					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[volumeSpec], nodeName)
@@ -319,7 +319,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 					derr.DevicePath)
 
 				if addErr != nil {
-					glog.Errorf("AttachVolume.MarkVolumeAsAttached failed to fix dangling volume error for volume %q with %s", volumeToAttach.VolumeName, addErr)
+					klog.Errorf("AttachVolume.MarkVolumeAsAttached failed to fix dangling volume error for volume %q with %s", volumeToAttach.VolumeName, addErr)
 				}
 
 			}
@@ -332,7 +332,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		for _, pod := range volumeToAttach.ScheduledPods {
 			og.recorder.Eventf(pod, v1.EventTypeNormal, kevents.SuccessfulAttachVolume, simpleMsg)
 		}
-		glog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
+		klog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
@@ -416,7 +416,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			return volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
 		}
 
-		glog.Infof(volumeToDetach.GenerateMsgDetailed("DetachVolume.Detach succeeded", ""))
+		klog.Infof(volumeToDetach.GenerateMsgDetailed("DetachVolume.Detach succeeded", ""))
 
 		// Update actual state of world
 		actualStateOfWorld.MarkVolumeAsDetached(
@@ -494,7 +494,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		devicePath := volumeToMount.DevicePath
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+			klog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
 
 			devicePath, err = volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, devicePath, volumeToMount.Pod, waitForAttachTimeout)
@@ -503,7 +503,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumeToMount.GenerateError("MountVolume.WaitForAttach failed", err)
 			}
 
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
+			klog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 		}
 
 		if volumeDeviceMounter != nil {
@@ -524,7 +524,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumeToMount.GenerateError("MountVolume.MountDevice failed", err)
 			}
 
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath)))
+			klog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.MountDevice succeeded", fmt.Sprintf("device mount path %q", deviceMountPath)))
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
@@ -560,11 +560,11 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		_, detailedMsg := volumeToMount.GenerateMsg("MountVolume.SetUp succeeded", "")
-		verbosity := glog.Level(1)
+		verbosity := klog.Level(1)
 		if isRemount {
-			verbosity = glog.Level(4)
+			verbosity = klog.Level(4)
 		}
-		glog.V(verbosity).Infof(detailedMsg)
+		klog.V(verbosity).Infof(detailedMsg)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
@@ -599,7 +599,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath, deviceMountPath, pluginName string) (simpleErr, detailedErr error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		glog.V(4).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
+		klog.V(4).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
 		return nil, nil
 	}
 
@@ -621,11 +621,11 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 		pvSpecCap := pv.Spec.Capacity[v1.ResourceStorage]
 		if pvcStatusCap.Cmp(pvSpecCap) < 0 {
 			// File system resize was requested, proceed
-			glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.resizeFileSystem entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+			klog.V(4).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.resizeFileSystem entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
 
 			if volumeToMount.VolumeSpec.ReadOnly {
 				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem failed", "requested read-only file system")
-				glog.Warningf(detailedMsg)
+				klog.Warningf(detailedMsg)
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
 				return nil, nil
 			}
@@ -634,7 +634,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 			}
 			simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem succeeded", "")
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-			glog.Infof(detailedMsg)
+			klog.Infof(detailedMsg)
 			// File system resize succeeded, now update the PVC's Capacity to match the PV's
 			err = util.MarkFSResizeFinished(pvc, pv.Spec.Capacity, og.kubeClient)
 			if err != nil {
@@ -680,7 +680,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 			return volumeToUnmount.GenerateError("UnmountVolume.TearDown failed", unmountErr)
 		}
 
-		glog.Infof(
+		klog.Infof(
 			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
 			volumeToUnmount.VolumeName,
 			volumeToUnmount.OuterVolumeSpecName,
@@ -695,7 +695,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 			volumeToUnmount.PodName, volumeToUnmount.VolumeName)
 		if markVolMountedErr != nil {
 			// On failure, just log and exit
-			glog.Errorf(volumeToUnmount.GenerateErrorDetailed("UnmountVolume.MarkVolumeAsUnmounted failed", markVolMountedErr).Error())
+			klog.Errorf(volumeToUnmount.GenerateErrorDetailed("UnmountVolume.MarkVolumeAsUnmounted failed", markVolMountedErr).Error())
 		}
 
 		return nil, nil
@@ -765,7 +765,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
 		}
 
-		glog.Infof(deviceToDetach.GenerateMsg("UnmountDevice succeeded", ""))
+		klog.Infof(deviceToDetach.GenerateMsg("UnmountDevice succeeded", ""))
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(
@@ -844,7 +844,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
+			klog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
 
 			devicePath, err = volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, volumeToMount.DevicePath, volumeToMount.Pod, waitForAttachTimeout)
@@ -853,7 +853,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 				return volumeToMount.GenerateError("MapVolume.WaitForAttach failed", err)
 			}
 
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
+			klog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 
 		}
 		// A plugin doesn't have attacher also needs to map device to global map path with SetUpDevice()
@@ -909,15 +909,15 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 		// Device mapping for global map path succeeded
 		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("globalMapPath %q", globalMapPath))
-		verbosity := glog.Level(4)
+		verbosity := klog.Level(4)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
-		glog.V(verbosity).Infof(detailedMsg)
+		klog.V(verbosity).Infof(detailedMsg)
 
 		// Device mapping for pod device map path succeeded
 		simpleMsg, detailedMsg = volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("volumeMapPath %q", volumeMapPath))
-		verbosity = glog.Level(1)
+		verbosity = klog.Level(1)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
-		glog.V(verbosity).Infof(detailedMsg)
+		klog.V(verbosity).Infof(detailedMsg)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
@@ -992,7 +992,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on global map path failed", unmapDeviceErr)
 		}
 
-		glog.Infof(
+		klog.Infof(
 			"UnmapVolume succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
 			volumeToUnmount.VolumeName,
 			volumeToUnmount.OuterVolumeSpecName,
@@ -1007,7 +1007,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 			volumeToUnmount.PodName, volumeToUnmount.VolumeName)
 		if markVolUnmountedErr != nil {
 			// On failure, just log and exit
-			glog.Errorf(volumeToUnmount.GenerateErrorDetailed("UnmapVolume.MarkVolumeAsUnmounted failed", markVolUnmountedErr).Error())
+			klog.Errorf(volumeToUnmount.GenerateErrorDetailed("UnmapVolume.MarkVolumeAsUnmounted failed", markVolUnmountedErr).Error())
 		}
 
 		return nil, nil
@@ -1067,11 +1067,11 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		// The block volume is not referenced from Pods. Release file descriptor lock.
 		// This should be done before calling TearDownDevice, because some plugins that do local detach
 		// in TearDownDevice will fail in detaching device due to the refcnt on the loopback device.
-		glog.V(4).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
+		klog.V(4).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
 		loopPath, err := og.blkUtil.GetLoopDevice(deviceToDetach.DevicePath)
 		if err != nil {
 			if err.Error() == volumepathhandler.ErrDeviceNotFound {
-				glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+				klog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
 			} else {
 				errInfo := "UnmapDevice.GetLoopDevice failed to get loopback device, " + fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)
 				return deviceToDetach.GenerateError(errInfo, err)
@@ -1115,7 +1115,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
 		}
 
-		glog.Infof(deviceToDetach.GenerateMsgDetailed("UnmapDevice succeeded", ""))
+		klog.Infof(deviceToDetach.GenerateMsgDetailed("UnmapDevice succeeded", ""))
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(
@@ -1189,7 +1189,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
 					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
-				glog.Infof(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)))
+				klog.Infof(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)))
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.
 					return volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
@@ -1216,7 +1216,7 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	node, fetchErr := og.kubeClient.CoreV1().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
-			glog.Warningf(volumeToDetach.GenerateMsgDetailed("Node not found on API server. DetachVolume will skip safe to detach check", ""))
+			klog.Warningf(volumeToDetach.GenerateMsgDetailed("Node not found on API server. DetachVolume will skip safe to detach check", ""))
 			return nil
 		}
 
@@ -1240,7 +1240,7 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	}
 
 	// Volume is not marked as in use by node
-	glog.Infof(volumeToDetach.GenerateMsgDetailed("Verified volume is safe to detach", ""))
+	klog.Infof(volumeToDetach.GenerateMsgDetailed("Verified volume is safe to detach", ""))
 	return nil
 }
 
@@ -1274,7 +1274,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				return detailedErr, detailedErr
 			}
 
-			glog.Infof("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
+			klog.Infof("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 			newSize = updatedSize
 			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
 			// successful, that is why all PVCs for which pvc.Spec.Size > pvc.Status.Size must be reprocessed
@@ -1285,14 +1285,14 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				detailedErr := fmt.Errorf("Error updating PV spec capacity for volume %q with : %v", pvcWithResizeRequest.QualifiedName(), updateErr)
 				return detailedErr, detailedErr
 			}
-			glog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
+			klog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 		}
 
 		// No Cloudprovider resize needed, lets mark resizing as done
 		// Rest of the volume expand controller code will assume PVC as *not* resized until pvc.Status.Size
 		// reflects user requested size.
 		if !volumePlugin.RequiresFSResize() {
-			glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
+			klog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
 			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
 
 			if err != nil {
@@ -1305,7 +1305,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 			err := resizeMap.MarkForFSResize(pvcWithResizeRequest)
 			if err != nil {
 				detailedErr := fmt.Errorf("Error updating pvc %s condition for fs resize : %v", pvcWithResizeRequest.QualifiedName(), err)
-				glog.Warning(detailedErr)
+				klog.Warning(detailedErr)
 				return nil, nil
 			}
 		}
@@ -1421,7 +1421,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 		(devicePathErr != nil && strings.Contains(devicePathErr.Error(), "does not exist")) {
 		// not a device path or path doesn't exist
 		//TODO: refer to #36092
-		glog.V(3).Infof("The path isn't device path or doesn't exist. Skip checking device path: %s", deviceToDetach.DevicePath)
+		klog.V(3).Infof("The path isn't device path or doesn't exist. Skip checking device path: %s", deviceToDetach.DevicePath)
 		deviceOpened = false
 	} else if devicePathErr != nil {
 		return false, deviceToDetach.GenerateErrorDetailed("PathIsDevice failed", devicePathErr)

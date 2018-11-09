@@ -30,9 +30,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
@@ -143,12 +143,12 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 		// No code here, mountCmd and mountArgs are already populated.
 	}
 
-	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
+	klog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		args := strings.Join(mountArgs, " ")
-		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
+		klog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
 			err, mountCmd, args, string(output))
 	}
@@ -161,7 +161,7 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 // systemd-runs (needed by Mount()) works.
 func detectSystemd() bool {
 	if _, err := exec.LookPath("systemd-run"); err != nil {
-		glog.V(2).Infof("Detected OS without systemd")
+		klog.V(2).Infof("Detected OS without systemd")
 		return false
 	}
 	// Try to run systemd-run --scope /bin/true, that should be enough
@@ -171,12 +171,12 @@ func detectSystemd() bool {
 	cmd := exec.Command("systemd-run", "--description=Kubernetes systemd probe", "--scope", "true")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
-		glog.V(4).Infof("systemd-run failed with: %v", err)
-		glog.V(4).Infof("systemd-run output: %s", string(output))
+		klog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
+		klog.V(4).Infof("systemd-run failed with: %v", err)
+		klog.V(4).Infof("systemd-run output: %s", string(output))
 		return false
 	}
-	glog.V(2).Infof("Detected OS with systemd")
+	klog.V(2).Infof("Detected OS with systemd")
 	return true
 }
 
@@ -208,7 +208,7 @@ func addSystemdScope(systemdRunPath, mountName, command string, args []string) (
 
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
-	glog.V(4).Infof("Unmounting %s", target)
+	klog.V(4).Infof("Unmounting %s", target)
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -290,7 +290,7 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 
 	if !isDevice {
-		glog.Errorf("Path %q is not referring to a device.", pathname)
+		klog.Errorf("Path %q is not referring to a device.", pathname)
 		return false, nil
 	}
 	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
@@ -319,11 +319,11 @@ func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (str
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
 		return "", err
 	}
 	if len(refs) == 0 {
-		glog.V(4).Infof("Directory %s is not mounted", mountPath)
+		klog.V(4).Infof("Directory %s is not mounted", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
 	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
@@ -331,7 +331,7 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 		if strings.HasPrefix(ref, basemountPath) {
 			volumeID, err := filepath.Rel(basemountPath, ref)
 			if err != nil {
-				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
 				return "", err
 			}
 			return volumeID, nil
@@ -437,26 +437,26 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 	if !readOnly {
 		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
-		glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
+		klog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
 		args := []string{"-a", source}
 		out, err := mounter.Exec.Run("fsck", args...)
 		if err != nil {
 			ee, isExitError := err.(utilexec.ExitError)
 			switch {
 			case err == utilexec.ErrExecutableNotFound:
-				glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
+				klog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
 			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-				glog.Infof("Device %s has errors which were corrected by fsck.", source)
+				klog.Infof("Device %s has errors which were corrected by fsck.", source)
 			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
 				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
 			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
-				glog.Infof("`fsck` error %s", string(out))
+				klog.Infof("`fsck` error %s", string(out))
 			}
 		}
 	}
 
 	// Try to mount the disk
-	glog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
+	klog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
 	mountErr := mounter.Interface.Mount(source, target, fstype, options)
 	if mountErr != nil {
 		// Mount failed. This indicates either that the disk is unformatted or
@@ -485,14 +485,14 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 					source,
 				}
 			}
-			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
+			klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			_, err := mounter.Exec.Run("mkfs."+fstype, args...)
 			if err == nil {
 				// the disk has been formatted successfully try to mount it again.
-				glog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
+				klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
 				return mounter.Interface.Mount(source, target, fstype, options)
 			}
-			glog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
+			klog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
 		} else {
 			// Disk is already formatted and failed to mount
@@ -511,10 +511,10 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 // GetDiskFormat uses 'blkid' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := mounter.Exec.Run("blkid", args...)
 	output := string(dataOut)
-	glog.V(4).Infof("Output: %q, err: %v", output, err)
+	klog.V(4).Infof("Output: %q, err: %v", output, err)
 
 	if err != nil {
 		if exit, ok := err.(utilexec.ExitError); ok {
@@ -526,7 +526,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 				return "", nil
 			}
 		}
-		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
+		klog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return "", err
 	}
 
@@ -552,7 +552,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	}
 
 	if len(pttype) > 0 {
-		glog.V(4).Infof("Disk %s detected partition table type: %s", disk, pttype)
+		klog.V(4).Infof("Disk %s detected partition table type: %s", disk, pttype)
 		// Returns a special non-empty string as filesystem type, then kubelet
 		// will not format it.
 		return "unknown data, probably partitions", nil
@@ -686,11 +686,11 @@ func doMakeRShared(path string, mountInfoFilename string) error {
 		return err
 	}
 	if shared {
-		glog.V(4).Infof("Directory %s is already on a shared mount", path)
+		klog.V(4).Infof("Directory %s is already on a shared mount", path)
 		return nil
 	}
 
-	glog.V(2).Infof("Bind-mounting %q with shared mount propagation", path)
+	klog.V(2).Infof("Bind-mounting %q with shared mount propagation", path)
 	// mount --bind /var/lib/kubelet /var/lib/kubelet
 	if err := syscall.Mount(path, path, "" /*fstype*/, syscall.MS_BIND, "" /*data*/); err != nil {
 		return fmt.Errorf("failed to bind-mount %s: %v", path, err)
@@ -766,7 +766,7 @@ func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, err
 	}
 	if !notMount {
 		// It's already mounted
-		glog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+		klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
 		return true, bindPathTarget, nil
 	}
 
@@ -819,7 +819,7 @@ func doBindSubPath(mounter Interface, subpath Subpath) (hostPath string, err err
 	if err != nil {
 		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
 	}
-	glog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, newPath, subpath.VolumePath)
+	klog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, newPath, subpath.VolumePath)
 	subpath.VolumePath = newVolumePath
 	subpath.Path = newPath
 
@@ -841,9 +841,9 @@ func doBindSubPath(mounter Interface, subpath Subpath) (hostPath string, err err
 	defer func() {
 		// Cleanup subpath on error
 		if !success {
-			glog.V(4).Infof("doBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
+			klog.V(4).Infof("doBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
 			if cleanErr := cleanSubPath(mounter, subpath); cleanErr != nil {
-				glog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
+				klog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
 			}
 		}
 	}()
@@ -853,13 +853,13 @@ func doBindSubPath(mounter Interface, subpath Subpath) (hostPath string, err err
 
 	// Do the bind mount
 	options := []string{"bind"}
-	glog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
+	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
 	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 	success = true
 
-	glog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
+	klog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
 	return bindPathTarget, nil
 }
 
@@ -871,7 +871,7 @@ func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error {
 	// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/*
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
-	glog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
+	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
 
 	containerDirs, err := ioutil.ReadDir(subPathDir)
 	if err != nil {
@@ -883,10 +883,10 @@ func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error 
 
 	for _, containerDir := range containerDirs {
 		if !containerDir.IsDir() {
-			glog.V(4).Infof("Container file is not a directory: %s", containerDir.Name())
+			klog.V(4).Infof("Container file is not a directory: %s", containerDir.Name())
 			continue
 		}
-		glog.V(4).Infof("Cleaning up subpath mounts for container %s", containerDir.Name())
+		klog.V(4).Infof("Cleaning up subpath mounts for container %s", containerDir.Name())
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
@@ -903,27 +903,27 @@ func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error 
 		if err := os.Remove(fullContainerDirPath); err != nil {
 			return fmt.Errorf("error deleting %s: %s", fullContainerDirPath, err)
 		}
-		glog.V(5).Infof("Removed %s", fullContainerDirPath)
+		klog.V(5).Infof("Removed %s", fullContainerDirPath)
 	}
 	// Whole pod volume subpaths have been cleaned up, remove its subpath directory.
 	if err := os.Remove(subPathDir); err != nil {
 		return fmt.Errorf("error deleting %s: %s", subPathDir, err)
 	}
-	glog.V(5).Infof("Removed %s", subPathDir)
+	klog.V(5).Infof("Removed %s", subPathDir)
 
 	// Remove entire subpath directory if it's the last one
 	podSubPathDir := filepath.Join(podDir, containerSubPathDirectoryName)
 	if err := os.Remove(podSubPathDir); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error deleting %s: %s", podSubPathDir, err)
 	}
-	glog.V(5).Infof("Removed %s", podSubPathDir)
+	klog.V(5).Infof("Removed %s", podSubPathDir)
 	return nil
 }
 
 // doCleanSubPath tears down the single subpath bind mount
 func doCleanSubPath(mounter Interface, fullContainerDirPath, subPathIndex string) error {
 	// process /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/<subPathName>
-	glog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
+	klog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
 	fullSubPath := filepath.Join(fullContainerDirPath, subPathIndex)
 	notMnt, err := IsNotMountPoint(mounter, fullSubPath)
 	if err != nil {
@@ -934,13 +934,13 @@ func doCleanSubPath(mounter Interface, fullContainerDirPath, subPathIndex string
 		if err = mounter.Unmount(fullSubPath); err != nil {
 			return fmt.Errorf("error unmounting %s: %s", fullSubPath, err)
 		}
-		glog.V(5).Infof("Unmounted %s", fullSubPath)
+		klog.V(5).Infof("Unmounted %s", fullSubPath)
 	}
 	// Remove it *non*-recursively, just in case there were some hiccups.
 	if err = os.Remove(fullSubPath); err != nil {
 		return fmt.Errorf("error deleting %s: %s", fullSubPath, err)
 	}
-	glog.V(5).Infof("Removed %s", fullSubPath)
+	klog.V(5).Infof("Removed %s", fullSubPath)
 	return nil
 }
 
@@ -972,7 +972,7 @@ func removeEmptyDirs(baseDir, endDir string) error {
 		s, err := os.Stat(curDir)
 		if err != nil {
 			if os.IsNotExist(err) {
-				glog.V(5).Infof("curDir %q doesn't exist, skipping", curDir)
+				klog.V(5).Infof("curDir %q doesn't exist, skipping", curDir)
 				continue
 			}
 			return fmt.Errorf("error stat %q: %v", curDir, err)
@@ -983,12 +983,12 @@ func removeEmptyDirs(baseDir, endDir string) error {
 
 		err = os.Remove(curDir)
 		if os.IsExist(err) {
-			glog.V(5).Infof("Directory %q not empty, not removing", curDir)
+			klog.V(5).Infof("Directory %q not empty, not removing", curDir)
 			break
 		} else if err != nil {
 			return fmt.Errorf("error removing directory %q: %v", curDir, err)
 		}
-		glog.V(5).Infof("Removed directory %q", curDir)
+		klog.V(5).Infof("Removed directory %q", curDir)
 	}
 	return nil
 }
@@ -1055,7 +1055,7 @@ func getMode(pathname string) (os.FileMode, error) {
 // and base must be either already resolved symlinks or thet will be resolved in
 // kubelet's mount namespace (in case it runs containerized).
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	glog.V(4).Infof("Creating directory %q within base %q", pathname, base)
+	klog.V(4).Infof("Creating directory %q within base %q", pathname, base)
 
 	if !PathWithinBase(pathname, base) {
 		return fmt.Errorf("path %s is outside of allowed base %s", pathname, base)
@@ -1068,7 +1068,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		if s.IsDir() {
 			// The directory already exists. It can be outside of the parent,
 			// but there is no race-proof check.
-			glog.V(4).Infof("Directory %s already exists", pathname)
+			klog.V(4).Infof("Directory %s already exists", pathname)
 			return nil
 		}
 		return &os.PathError{Op: "mkdir", Path: pathname, Err: syscall.ENOTDIR}
@@ -1088,7 +1088,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, err)
 	}
 
-	glog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
+	klog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
 	parentFD, err := doSafeOpen(fullExistingPath, base)
 	if err != nil {
 		return fmt.Errorf("cannot open directory %s: %s", existingPath, err)
@@ -1097,12 +1097,12 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	defer func() {
 		if parentFD != -1 {
 			if err = syscall.Close(parentFD); err != nil {
-				glog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
+				klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
 			}
 		}
 		if childFD != -1 {
 			if err = syscall.Close(childFD); err != nil {
-				glog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", childFD, pathname, err)
+				klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", childFD, pathname, err)
 			}
 		}
 	}()
@@ -1112,7 +1112,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	// created directory into symlink.
 	for _, dir := range toCreate {
 		currentPath = filepath.Join(currentPath, dir)
-		glog.V(4).Infof("Creating %s", dir)
+		klog.V(4).Infof("Creating %s", dir)
 		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
 		if err != nil {
 			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
@@ -1131,7 +1131,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		//   and user either gets error or the file that it can already access.
 
 		if err = syscall.Close(parentFD); err != nil {
-			glog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
+			klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
 		}
 		parentFD = childFD
 		childFD = -1
@@ -1180,7 +1180,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	}
 	defer func() {
 		if err = syscall.Close(fd); err != nil {
-			glog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
+			klog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
 		}
 	}()
 	for i, dir := range dirs {
@@ -1194,7 +1194,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 			return base, nil, err
 		}
 		if err = syscall.Close(fd); err != nil {
-			glog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
+			klog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
 		}
 		fd = childFD
 		currentPath = filepath.Join(currentPath, dir)
@@ -1226,7 +1226,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	defer func() {
 		if parentFD != -1 {
 			if err = syscall.Close(parentFD); err != nil {
-				glog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", parentFD, pathname, err)
+				klog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", parentFD, pathname, err)
 			}
 		}
 	}()
@@ -1235,7 +1235,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	defer func() {
 		if childFD != -1 {
 			if err = syscall.Close(childFD); err != nil {
-				glog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", childFD, pathname, err)
+				klog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", childFD, pathname, err)
 			}
 		}
 	}()
@@ -1250,7 +1250,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 			return -1, fmt.Errorf("path %s is outside of allowed base %s", currentPath, base)
 		}
 
-		glog.V(5).Infof("Opening path %s", currentPath)
+		klog.V(5).Infof("Opening path %s", currentPath)
 		childFD, err = syscall.Openat(parentFD, seg, openFDFlags, 0)
 		if err != nil {
 			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)

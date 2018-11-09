@@ -23,10 +23,10 @@ import (
 	"hash/fnv"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -143,7 +143,7 @@ func (c *Cache) predicateKeysToIDs(predicateKeys sets.String) []int {
 		if id, ok := c.predicateIDMap[predicateKey]; ok {
 			predicateIDs = append(predicateIDs, id)
 		} else {
-			glog.Errorf("predicate key %q not found", predicateKey)
+			klog.Errorf("predicate key %q not found", predicateKey)
 		}
 	}
 	return predicateIDs
@@ -160,7 +160,7 @@ func (c *Cache) InvalidatePredicates(predicateKeys sets.String) {
 	for _, n := range c.nodeToCache {
 		n.invalidatePreds(predicateIDs)
 	}
-	glog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
+	klog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
 
 }
 
@@ -175,7 +175,7 @@ func (c *Cache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.S
 	if n, ok := c.nodeToCache[nodeName]; ok {
 		n.invalidatePreds(predicateIDs)
 	}
-	glog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
+	klog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
 }
 
 // InvalidateAllPredicatesOnNode clears all cached results for one node.
@@ -185,7 +185,7 @@ func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
 	if node, ok := c.nodeToCache[nodeName]; ok {
 		node.invalidate()
 	}
-	glog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
+	klog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
 }
 
 // InvalidateCachedPredicateItemForPodAdd is a wrapper of
@@ -344,7 +344,7 @@ func (n *NodeCache) updateResult(
 	}
 	n.predicateGenerations[predicateID]++
 
-	glog.V(5).Infof("Cache update: node=%s, predicate=%s,pod=%s,value=%v",
+	klog.V(5).Infof("Cache update: node=%s, predicate=%s,pod=%s,value=%v",
 		nodeInfo.Node().Name, predicateKey, podName, predicateItem)
 }
 

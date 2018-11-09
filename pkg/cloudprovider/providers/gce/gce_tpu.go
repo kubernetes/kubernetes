@@ -23,9 +23,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"google.golang.org/api/googleapi"
 	tpuapi "google.golang.org/api/tpu/v1"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -61,7 +61,7 @@ func (g *Cloud) CreateTPU(ctx context.Context, name, zone string, node *tpuapi.N
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("Creating Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
+	klog.V(2).Infof("Creating Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
 
 	op, err = g.waitForTPUOp(ctx, op)
 	if err != nil {
@@ -94,7 +94,7 @@ func (g *Cloud) DeleteTPU(ctx context.Context, name, zone string) error {
 	if err != nil {
 		return err
 	}
-	glog.V(2).Infof("Deleting Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
+	klog.V(2).Infof("Deleting Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
 
 	op, err = g.waitForTPUOp(ctx, op)
 	if err != nil {
@@ -149,18 +149,18 @@ func (g *Cloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*tpuapi
 		// Check if context has been cancelled.
 		select {
 		case <-ctx.Done():
-			glog.V(3).Infof("Context for operation %q has been cancelled: %s", op.Name, ctx.Err())
+			klog.V(3).Infof("Context for operation %q has been cancelled: %s", op.Name, ctx.Err())
 			return true, ctx.Err()
 		default:
 		}
 
-		glog.V(3).Infof("Waiting for operation %q to complete...", op.Name)
+		klog.V(3).Infof("Waiting for operation %q to complete...", op.Name)
 
 		start := time.Now()
 		g.operationPollRateLimiter.Accept()
 		duration := time.Now().Sub(start)
 		if duration > 5*time.Second {
-			glog.V(2).Infof("Getting operation %q throttled for %v", op.Name, duration)
+			klog.V(2).Infof("Getting operation %q throttled for %v", op.Name, duration)
 		}
 
 		var err error
@@ -169,7 +169,7 @@ func (g *Cloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*tpuapi
 			return true, err
 		}
 		if op.Done {
-			glog.V(3).Infof("Operation %q has completed", op.Name)
+			klog.V(3).Infof("Operation %q has completed", op.Name)
 			return true, nil
 		}
 		return false, nil

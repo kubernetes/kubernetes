@@ -21,7 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // AWSCloud implements InstanceGroups
@@ -64,7 +64,7 @@ func DescribeInstanceGroup(asg ASG, instanceGroupName string) (InstanceGroupInfo
 		return nil, nil
 	}
 	if len(response.AutoScalingGroups) > 1 {
-		glog.Warning("AWS returned multiple autoscaling groups with name ", instanceGroupName)
+		klog.Warning("AWS returned multiple autoscaling groups with name ", instanceGroupName)
 	}
 	group := response.AutoScalingGroups[0]
 	return &awsInstanceGroup{group: group}, nil

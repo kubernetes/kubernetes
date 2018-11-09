@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -180,7 +180,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 				}
 				if len(args) > 0 {
 					if len(cfgPath) == 0 && len(args) > 1 {
-						glog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
+						klog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
 					}
 					cfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 				}
@@ -289,11 +289,11 @@ type Join struct {
 func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
 
 	if defaultcfg.NodeRegistration.Name == "" {
-		glog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")
+		klog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")
 	}
 
 	if defaultcfg.APIEndpoint.AdvertiseAddress == "" {
-		glog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
+		klog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
 	}
 
 	internalCfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
@@ -307,20 +307,20 @@ func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ig
 	fmt.Println("[preflight] Running pre-flight checks")
 
 	// Start with general checks
-	glog.V(1).Infoln("[preflight] Running general checks")
+	klog.V(1).Infoln("[preflight] Running general checks")
 	if err := preflight.RunJoinNodeChecks(utilsexec.New(), internalCfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
 	// Fetch the init configuration based on the join configuration
-	glog.V(1).Infoln("[preflight] Fetching init configuration")
+	klog.V(1).Infoln("[preflight] Fetching init configuration")
 	initCfg, tlsBootstrapCfg, err := fetchInitConfigurationFromJoinConfiguration(internalCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// Continue with more specific checks based on the init configuration
-	glog.V(1).Infoln("[preflight] Running configuration dependant checks")
+	klog.V(1).Infoln("[preflight] Running configuration dependant checks")
 	if err := preflight.RunOptionalJoinNodeChecks(utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
@@ -457,7 +457,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
-	glog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
+	klog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
 	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
@@ -482,7 +482,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
-	glog.V(1).Infof("Stopping the kubelet")
+	klog.V(1).Infof("Stopping the kubelet")
 	kubeletphase.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
@@ -499,7 +499,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting the kubelet")
+	klog.V(1).Infof("Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
@@ -517,7 +517,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 		return err
 	}
 
-	glog.V(1).Infof("[join] preserving the crisocket information for the node")
+	klog.V(1).Infof("[join] preserving the crisocket information for the node")
 	if err := patchnodephase.AnnotateCRISocket(client, j.cfg.NodeRegistration.Name, j.cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "error uploading crisocket")
 	}
@@ -552,18 +552,18 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 		// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
 		// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
 		// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the existing one."
-		glog.V(1).Info("[join] adding etcd")
+		klog.V(1).Info("[join] adding etcd")
 		if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), initConfiguration); err != nil {
 			return errors.Wrap(err, "error creating local etcd static pod manifest file")
 		}
 	}
 
-	glog.V(1).Info("[join] uploading currently used configuration to the cluster")
+	klog.V(1).Info("[join] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
 		return errors.Wrap(err, "error uploading configuration")
 	}
 
-	glog.V(1).Info("[join] marking the master with right label")
+	klog.V(1).Info("[join] marking the master with right label")
 	if err = markmasterphase.MarkMaster(client, initConfiguration.NodeRegistration.Name, initConfiguration.NodeRegistration.Taints); err != nil {
 		return errors.Wrap(err, "error applying master label and taints")
 	}
@@ -587,14 +587,14 @@ func waitForTLSBootstrappedClient() error {
 func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration) (*kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
 	// Perform the Discovery, which turns a Bootstrap Token and optionally (and preferably) a CA cert hash into a KubeConfig
 	// file that may be used for the TLS Bootstrapping process the kubelet performs using the Certificates API.
-	glog.V(1).Infoln("[join] Discovering cluster-info")
+	klog.V(1).Infoln("[join] Discovering cluster-info")
 	tlsBootstrapCfg, err := discovery.For(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Retrieves the kubeadm configuration
-	glog.V(1).Infoln("[join] Retrieving KubeConfig objects")
+	klog.V(1).Infoln("[join] Retrieving KubeConfig objects")
 	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
 	if err != nil {
 		return nil, nil, err

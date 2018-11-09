@@ -23,12 +23,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
@@ -96,7 +96,7 @@ func NewObserver(clientSet *clientset.Clientset, numNodes int) *Observer {
 // Call Results() to get the test results after starting observer.
 func (o *Observer) StartObserving() error {
 	o.monitor()
-	glog.Infof("Test observer started")
+	klog.Infof("Test observer started")
 	return nil
 }
 
@@ -174,12 +174,12 @@ func (o *Observer) monitor() {
 				nTime.podCIDR = newNode.Spec.PodCIDR
 				o.numAllocated++
 				if o.numAllocated%10 == 0 {
-					glog.Infof("progress: %d/%d - %.2d%%", o.numAllocated, o.numNodes, (o.numAllocated * 100.0 / o.numNodes))
+					klog.Infof("progress: %d/%d - %.2d%%", o.numAllocated, o.numNodes, (o.numAllocated * 100.0 / o.numNodes))
 				}
 				// do following check only if numAllocated is modified, as otherwise, redundant updates
 				// can cause wg.Done() to be called multiple times, causing a panic
 				if o.numAdded == o.numNodes && o.numAllocated == o.numNodes {
-					glog.Info("All nodes assigned podCIDR")
+					klog.Info("All nodes assigned podCIDR")
 					o.wg.Done()
 				}
 			}

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -180,13 +180,13 @@ func (plugin *portworxVolumePlugin) ExpandVolumeDevice(
 	spec *volume.Spec,
 	newSize resource.Quantity,
 	oldSize resource.Quantity) (resource.Quantity, error) {
-	glog.V(4).Infof("Expanding: %s from %v to %v", spec.Name(), oldSize, newSize)
+	klog.V(4).Infof("Expanding: %s from %v to %v", spec.Name(), oldSize, newSize)
 	err := plugin.util.ResizeVolume(spec, newSize, plugin.host)
 	if err != nil {
 		return oldSize, err
 	}
 
-	glog.V(4).Infof("Successfully resized %s to %v", spec.Name(), newSize)
+	klog.V(4).Infof("Successfully resized %s to %v", spec.Name(), newSize)
 	return newSize, nil
 }
 
@@ -290,9 +290,9 @@ func (b *portworxVolumeMounter) SetUp(fsGroup *int64) error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.Infof("Portworx Volume set up. Dir: %s %v %v", dir, !notMnt, err)
+	klog.Infof("Portworx Volume set up. Dir: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Cannot validate mountpoint: %s", dir)
+		klog.Errorf("Cannot validate mountpoint: %s", dir)
 		return err
 	}
 	if !notMnt {
@@ -306,7 +306,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	glog.V(4).Infof("Portworx Volume %s attached", b.volumeID)
+	klog.V(4).Infof("Portworx Volume %s attached", b.volumeID)
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
@@ -318,7 +318,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
-	glog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
+	klog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil
 }
 
@@ -341,7 +341,7 @@ func (c *portworxVolumeUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
-	glog.Infof("Portworx Volume TearDown of %s", dir)
+	klog.Infof("Portworx Volume TearDown of %s", dir)
 
 	if err := c.manager.UnmountVolume(c, dir); err != nil {
 		return err
