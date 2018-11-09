@@ -74,6 +74,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"SECRET_DATA=value-1",
@@ -118,6 +119,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"data_1=value-1", "data_2=value-2", "data_3=value-3",
