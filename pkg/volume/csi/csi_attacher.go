@@ -719,6 +719,7 @@ func (c *csiAttacher) newVolumeAttachment(attachID, node, driverName string, spe
 	if c.plugin.inlineFeatureEnabled && volSrc != nil {
 		vaSource.InlineVolumeSource = &storage.InlineVolumeSource{
 			VolumeSource: spec.Volume.VolumeSource,
+			Namespace:    spec.PodNamespace,
 		}
 	} else if pvSrc != nil {
 		pvName := spec.PersistentVolume.GetName()
@@ -729,7 +730,8 @@ func (c *csiAttacher) newVolumeAttachment(attachID, node, driverName string, spe
 
 	return &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
-			Name: attachID,
+			Name:      attachID,
+			Namespace: spec.PodNamespace,
 		},
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: node,

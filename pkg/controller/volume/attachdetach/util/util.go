@@ -80,8 +80,11 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 	// Do not return the original volume object, since it's from the shared
 	// informer it may be mutated by another consumer.
 	clonedPodVolume := podVolume.DeepCopy()
+	volumeSpec := volume.NewSpecFromVolume(clonedPodVolume)
+	// Populating PodNamespace field of Volume Spec with podNamespace passed as a parameter.
+	volumeSpec.PodNamespace = podNamespace
 
-	return volume.NewSpecFromVolume(clonedPodVolume), nil
+	return volumeSpec, nil
 }
 
 // getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
