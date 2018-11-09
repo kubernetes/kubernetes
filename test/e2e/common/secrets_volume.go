@@ -40,7 +40,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil, nodeSelector)
 	})
 
 	/*
@@ -50,7 +51,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
 		defaultMode := int32(0400)
-		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil, nil, nodeSelector)
 	})
 
 	/*
@@ -62,7 +64,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		uid := int64(1000)
-		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid, nodeSelector)
 	})
 
 	/*
@@ -71,7 +74,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		Description: Create a secret. Create a Pod with secret volume source configured into the container with a custom path. Pod MUST be able to read the secret from the mounted volume from the specified custom path. The file mode of the secret MUST be -rw—r-—r—- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doSecretE2EWithMapping(f, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doSecretE2EWithMapping(f, nil, nodeSelector)
 	})
 
 	/*
@@ -81,7 +85,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [NodeConformance]", func() {
 		mode := int32(0400)
-		doSecretE2EWithMapping(f, &mode)
+		nodeSelector := framework.GetOSNodeSelectorForPod(false)
+		doSecretE2EWithMapping(f, &mode, nodeSelector)
 	})
 
 	/*
@@ -107,7 +112,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(secret2); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
-		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
+		nodeSelector := framework.GetOSNodeSelectorForPod(true)
+		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil, nodeSelector)
 	})
 
 	/*
@@ -181,6 +187,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
@@ -324,6 +331,8 @@ var _ = Describe("[sig-storage] Secrets", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
@@ -381,7 +390,7 @@ func secretForTest(namespace, name string) *v1.Secret {
 }
 
 func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string,
-	fsGroup *int64, uid *int64) {
+	fsGroup *int64, uid *int64, nodeSelector map[string]string) {
 	var (
 		volumeName      = "secret-volume"
 		volumeMountPath = "/etc/secret-volume"
@@ -426,6 +435,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
+			NodeSelector:  nodeSelector,
 		},
 	}
 
@@ -452,7 +462,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 	f.TestContainerOutput("consume secrets", pod, 0, expectedOutput)
 }
 
-func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
+func doSecretE2EWithMapping(f *framework.Framework, mode *int32, nodeSelector map[string]string) {
 	var (
 		name            = "secret-test-map-" + string(uuid.NewUUID())
 		volumeName      = "secret-volume"
@@ -503,6 +513,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
+			NodeSelector:  nodeSelector,
 		},
 	}
 
