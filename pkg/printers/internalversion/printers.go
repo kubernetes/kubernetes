@@ -25,15 +25,20 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -45,19 +50,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/coordination"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	internalrbacv1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -493,7 +487,7 @@ func printObjectMeta(obj runtime.Object, options printers.PrintOptions) ([]metav
 }
 
 // Pass ports=nil for all ports.
-func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
+func formatEndpoints(endpoints *corev1.Endpoints, ports sets.String) string {
 	if len(endpoints.Subsets) == 0 {
 		return "<none>"
 	}
@@ -562,11 +556,11 @@ func translateTimestampUntil(timestamp metav1.Time) string {
 }
 
 var (
-	podSuccessConditions = []metav1beta1.TableRowCondition{{Type: metav1beta1.RowCompleted, Status: metav1beta1.ConditionTrue, Reason: string(api.PodSucceeded), Message: "The pod has completed successfully."}}
-	podFailedConditions  = []metav1beta1.TableRowCondition{{Type: metav1beta1.RowCompleted, Status: metav1beta1.ConditionTrue, Reason: string(api.PodFailed), Message: "The pod failed."}}
+	podSuccessConditions = []metav1beta1.TableRowCondition{{Type: metav1beta1.RowCompleted, Status: metav1beta1.ConditionTrue, Reason: string(corev1.PodSucceeded), Message: "The pod has completed successfully."}}
+	podFailedConditions  = []metav1beta1.TableRowCondition{{Type: metav1beta1.RowCompleted, Status: metav1beta1.ConditionTrue, Reason: string(corev1.PodFailed), Message: "The pod failed."}}
 )
 
-func printPodList(podList *api.PodList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodList(podList *corev1.PodList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(podList.Items))
 	for i := range podList.Items {
 		r, err := printPod(&podList.Items[i], options)
@@ -578,7 +572,7 @@ func printPodList(podList *api.PodList, options printers.PrintOptions) ([]metav1
 	return rows, nil
 }
 
-func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPod(pod *corev1.Pod, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	restarts := 0
 	totalContainers := len(pod.Spec.Containers)
 	readyContainers := 0
@@ -593,9 +587,9 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 	}
 
 	switch pod.Status.Phase {
-	case api.PodSucceeded:
+	case corev1.PodSucceeded:
 		row.Conditions = podSuccessConditions
-	case api.PodFailed:
+	case corev1.PodFailed:
 		row.Conditions = podFailedConditions
 	}
 
@@ -683,7 +677,7 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPodTemplate(obj *api.PodTemplate, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodTemplate(obj *corev1.PodTemplate, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -692,7 +686,7 @@ func printPodTemplate(obj *api.PodTemplate, options printers.PrintOptions) ([]me
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPodTemplateList(list *api.PodTemplateList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodTemplateList(list *corev1.PodTemplateList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodTemplate(&list.Items[i], options)
@@ -704,7 +698,7 @@ func printPodTemplateList(list *api.PodTemplateList, options printers.PrintOptio
 	return rows, nil
 }
 
-func printPodDisruptionBudget(obj *policy.PodDisruptionBudget, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodDisruptionBudget(obj *policyv1beta1.PodDisruptionBudget, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -727,7 +721,7 @@ func printPodDisruptionBudget(obj *policy.PodDisruptionBudget, options printers.
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPodDisruptionBudgetList(list *policy.PodDisruptionBudgetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodDisruptionBudgetList(list *policyv1beta1.PodDisruptionBudgetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodDisruptionBudget(&list.Items[i], options)
@@ -740,12 +734,15 @@ func printPodDisruptionBudgetList(list *policy.PodDisruptionBudgetList, options 
 }
 
 // TODO(AdoHe): try to put wide output in a single method
-func printReplicationController(obj *api.ReplicationController, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printReplicationController(obj *corev1.ReplicationController, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := obj.Spec.Replicas
+	var desiredReplicas int32
+	if obj.Spec.Replicas != nil {
+		desiredReplicas = *obj.Spec.Replicas
+	}
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
@@ -757,7 +754,7 @@ func printReplicationController(obj *api.ReplicationController, options printers
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printReplicationControllerList(list *api.ReplicationControllerList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printReplicationControllerList(list *corev1.ReplicationControllerList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printReplicationController(&list.Items[i], options)
@@ -769,12 +766,15 @@ func printReplicationControllerList(list *api.ReplicationControllerList, options
 	return rows, nil
 }
 
-func printReplicaSet(obj *apps.ReplicaSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printReplicaSet(obj *appsv1.ReplicaSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := obj.Spec.Replicas
+	var desiredReplicas int32
+	if obj.Spec.Replicas != nil {
+		desiredReplicas = *obj.Spec.Replicas
+	}
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
@@ -786,7 +786,7 @@ func printReplicaSet(obj *apps.ReplicaSet, options printers.PrintOptions) ([]met
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printReplicaSetList(list *apps.ReplicaSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printReplicaSetList(list *appsv1.ReplicaSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printReplicaSet(&list.Items[i], options)
@@ -798,7 +798,7 @@ func printReplicaSetList(list *apps.ReplicaSetList, options printers.PrintOption
 	return rows, nil
 }
 
-func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printJob(obj *batchv1.Job, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -834,7 +834,7 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printJobList(list *batch.JobList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printJobList(list *batchv1.JobList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printJob(&list.Items[i], options)
@@ -846,7 +846,7 @@ func printJobList(list *batch.JobList, options printers.PrintOptions) ([]metav1b
 	return rows, nil
 }
 
-func printCronJob(obj *batch.CronJob, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printCronJob(obj *batchv1beta1.CronJob, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -864,7 +864,7 @@ func printCronJob(obj *batch.CronJob, options printers.PrintOptions) ([]metav1be
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printCronJobList(list *batch.CronJobList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printCronJobList(list *batchv1beta1.CronJobList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printCronJob(&list.Items[i], options)
@@ -878,7 +878,7 @@ func printCronJobList(list *batch.CronJobList, options printers.PrintOptions) ([
 
 // loadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
-func loadBalancerStatusStringer(s api.LoadBalancerStatus, wide bool) string {
+func loadBalancerStatusStringer(s corev1.LoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
 	result := sets.NewString()
 	for i := range ingress {
@@ -896,19 +896,19 @@ func loadBalancerStatusStringer(s api.LoadBalancerStatus, wide bool) string {
 	return r
 }
 
-func getServiceExternalIP(svc *api.Service, wide bool) string {
+func getServiceExternalIP(svc *corev1.Service, wide bool) string {
 	switch svc.Spec.Type {
-	case api.ServiceTypeClusterIP:
+	case corev1.ServiceTypeClusterIP:
 		if len(svc.Spec.ExternalIPs) > 0 {
 			return strings.Join(svc.Spec.ExternalIPs, ",")
 		}
 		return "<none>"
-	case api.ServiceTypeNodePort:
+	case corev1.ServiceTypeNodePort:
 		if len(svc.Spec.ExternalIPs) > 0 {
 			return strings.Join(svc.Spec.ExternalIPs, ",")
 		}
 		return "<none>"
-	case api.ServiceTypeLoadBalancer:
+	case corev1.ServiceTypeLoadBalancer:
 		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
 		if len(svc.Spec.ExternalIPs) > 0 {
 			results := []string{}
@@ -922,13 +922,13 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 			return lbIps
 		}
 		return "<pending>"
-	case api.ServiceTypeExternalName:
+	case corev1.ServiceTypeExternalName:
 		return svc.Spec.ExternalName
 	}
 	return "<unknown>"
 }
 
-func makePortString(ports []api.ServicePort) string {
+func makePortString(ports []corev1.ServicePort) string {
 	pieces := make([]string, len(ports))
 	for ix := range ports {
 		port := &ports[ix]
@@ -940,7 +940,7 @@ func makePortString(ports []api.ServicePort) string {
 	return strings.Join(pieces, ",")
 }
 
-func printService(obj *api.Service, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printService(obj *corev1.Service, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -963,7 +963,7 @@ func printService(obj *api.Service, options printers.PrintOptions) ([]metav1beta
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printServiceList(list *api.ServiceList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printServiceList(list *corev1.ServiceList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printService(&list.Items[i], options)
@@ -976,14 +976,14 @@ func printServiceList(list *api.ServiceList, options printers.PrintOptions) ([]m
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *extensions.IngressBackend) string {
+func backendStringer(backend *extensionsv1beta1.IngressBackend) string {
 	if backend == nil {
 		return ""
 	}
 	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
 }
 
-func formatHosts(rules []extensions.IngressRule) string {
+func formatHosts(rules []extensionsv1beta1.IngressRule) string {
 	list := []string{}
 	max := 3
 	more := false
@@ -1005,14 +1005,14 @@ func formatHosts(rules []extensions.IngressRule) string {
 	return ret
 }
 
-func formatPorts(tls []extensions.IngressTLS) string {
+func formatPorts(tls []extensionsv1beta1.IngressTLS) string {
 	if len(tls) != 0 {
 		return "80, 443"
 	}
 	return "80"
 }
 
-func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printIngress(obj *extensionsv1beta1.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1024,7 +1024,7 @@ func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]met
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printIngressList(list *extensions.IngressList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printIngressList(list *extensionsv1beta1.IngressList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printIngress(&list.Items[i], options)
@@ -1036,11 +1036,14 @@ func printIngressList(list *extensions.IngressList, options printers.PrintOption
 	return rows, nil
 }
 
-func printStatefulSet(obj *apps.StatefulSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printStatefulSet(obj *appsv1.StatefulSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	desiredReplicas := obj.Spec.Replicas
+	var desiredReplicas int32
+	if obj.Spec.Replicas != nil {
+		desiredReplicas = *obj.Spec.Replicas
+	}
 	currentReplicas := obj.Status.Replicas
 	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), createTime)
@@ -1051,7 +1054,7 @@ func printStatefulSet(obj *apps.StatefulSet, options printers.PrintOptions) ([]m
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printStatefulSetList(list *apps.StatefulSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printStatefulSetList(list *appsv1.StatefulSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printStatefulSet(&list.Items[i], options)
@@ -1063,7 +1066,7 @@ func printStatefulSetList(list *apps.StatefulSetList, options printers.PrintOpti
 	return rows, nil
 }
 
-func printDaemonSet(obj *apps.DaemonSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDaemonSet(obj *appsv1.DaemonSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1082,7 +1085,7 @@ func printDaemonSet(obj *apps.DaemonSet, options printers.PrintOptions) ([]metav
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printDaemonSetList(list *apps.DaemonSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDaemonSetList(list *appsv1.DaemonSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printDaemonSet(&list.Items[i], options)
@@ -1094,7 +1097,7 @@ func printDaemonSetList(list *apps.DaemonSetList, options printers.PrintOptions)
 	return rows, nil
 }
 
-func printEndpoints(obj *api.Endpoints, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printEndpoints(obj *corev1.Endpoints, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1102,7 +1105,7 @@ func printEndpoints(obj *api.Endpoints, options printers.PrintOptions) ([]metav1
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printEndpointsList(list *api.EndpointsList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printEndpointsList(list *corev1.EndpointsList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEndpoints(&list.Items[i], options)
@@ -1114,7 +1117,7 @@ func printEndpointsList(list *api.EndpointsList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printNamespace(obj *api.Namespace, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printNamespace(obj *corev1.Namespace, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1122,7 +1125,7 @@ func printNamespace(obj *api.Namespace, options printers.PrintOptions) ([]metav1
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printNamespaceList(list *api.NamespaceList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printNamespaceList(list *corev1.NamespaceList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printNamespace(&list.Items[i], options)
@@ -1134,7 +1137,7 @@ func printNamespaceList(list *api.NamespaceList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printSecret(obj *api.Secret, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printSecret(obj *corev1.Secret, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1142,7 +1145,7 @@ func printSecret(obj *api.Secret, options printers.PrintOptions) ([]metav1beta1.
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printSecretList(list *api.SecretList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printSecretList(list *corev1.SecretList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printSecret(&list.Items[i], options)
@@ -1154,7 +1157,7 @@ func printSecretList(list *api.SecretList, options printers.PrintOptions) ([]met
 	return rows, nil
 }
 
-func printServiceAccount(obj *api.ServiceAccount, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printServiceAccount(obj *corev1.ServiceAccount, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1162,7 +1165,7 @@ func printServiceAccount(obj *api.ServiceAccount, options printers.PrintOptions)
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printServiceAccountList(list *api.ServiceAccountList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printServiceAccountList(list *corev1.ServiceAccountList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printServiceAccount(&list.Items[i], options)
@@ -1174,13 +1177,13 @@ func printServiceAccountList(list *api.ServiceAccountList, options printers.Prin
 	return rows, nil
 }
 
-func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printNode(obj *corev1.Node, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
-	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
+	conditionMap := make(map[corev1.NodeConditionType]*corev1.NodeCondition)
+	NodeAllConditions := []corev1.NodeConditionType{corev1.NodeReady}
 	for i := range obj.Status.Conditions {
 		cond := obj.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
@@ -1188,7 +1191,7 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1beta1.Tabl
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
-			if condition.Status == api.ConditionTrue {
+			if condition.Status == corev1.ConditionTrue {
 				status = append(status, string(condition.Type))
 			} else {
 				status = append(status, "Not"+string(condition.Type))
@@ -1226,9 +1229,9 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1beta1.Tabl
 }
 
 // Returns first external ip of the node or "<none>" if none is found.
-func getNodeExternalIP(node *api.Node) string {
+func getNodeExternalIP(node *corev1.Node) string {
 	for _, address := range node.Status.Addresses {
-		if address.Type == api.NodeExternalIP {
+		if address.Type == corev1.NodeExternalIP {
 			return address.Address
 		}
 	}
@@ -1237,9 +1240,9 @@ func getNodeExternalIP(node *api.Node) string {
 }
 
 // Returns the internal IP of the node or "<none>" if none is found.
-func getNodeInternalIP(node *api.Node) string {
+func getNodeInternalIP(node *corev1.Node) string {
 	for _, address := range node.Status.Addresses {
-		if address.Type == api.NodeInternalIP {
+		if address.Type == corev1.NodeInternalIP {
 			return address.Address
 		}
 	}
@@ -1251,7 +1254,7 @@ func getNodeInternalIP(node *api.Node) string {
 // The roles are determined by looking for:
 // * a node-role.kubernetes.io/<role>="" label
 // * a kubernetes.io/role="<role>" label
-func findNodeRoles(node *api.Node) []string {
+func findNodeRoles(node *corev1.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {
 		switch {
@@ -1267,7 +1270,7 @@ func findNodeRoles(node *api.Node) []string {
 	return roles.List()
 }
 
-func printNodeList(list *api.NodeList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printNodeList(list *corev1.NodeList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printNode(&list.Items[i], options)
@@ -1279,7 +1282,7 @@ func printNodeList(list *api.NodeList, options printers.PrintOptions) ([]metav1b
 	return rows, nil
 }
 
-func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPersistentVolume(obj *corev1.PersistentVolume, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1294,7 +1297,7 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOpti
 	modesStr := helper.GetAccessModesAsString(obj.Spec.AccessModes)
 	reclaimPolicyStr := string(obj.Spec.PersistentVolumeReclaimPolicy)
 
-	aQty := obj.Spec.Capacity[api.ResourceStorage]
+	aQty := obj.Spec.Capacity[corev1.ResourceStorage]
 	aSize := aQty.String()
 
 	phase := obj.Status.Phase
@@ -1309,7 +1312,7 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOpti
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPersistentVolumeList(list *api.PersistentVolumeList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPersistentVolumeList(list *corev1.PersistentVolumeList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPersistentVolume(&list.Items[i], options)
@@ -1321,7 +1324,7 @@ func printPersistentVolumeList(list *api.PersistentVolumeList, options printers.
 	return rows, nil
 }
 
-func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPersistentVolumeClaim(obj *corev1.PersistentVolumeClaim, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1331,12 +1334,12 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 		phase = "Terminating"
 	}
 
-	storage := obj.Spec.Resources.Requests[api.ResourceStorage]
+	storage := obj.Spec.Resources.Requests[corev1.ResourceStorage]
 	capacity := ""
 	accessModes := ""
 	if obj.Spec.VolumeName != "" {
 		accessModes = helper.GetAccessModesAsString(obj.Status.AccessModes)
-		storage = obj.Status.Capacity[api.ResourceStorage]
+		storage = obj.Status.Capacity[corev1.ResourceStorage]
 		capacity = storage.String()
 	}
 
@@ -1344,7 +1347,7 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPersistentVolumeClaimList(list *corev1.PersistentVolumeClaimList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPersistentVolumeClaim(&list.Items[i], options)
@@ -1356,7 +1359,7 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, options
 	return rows, nil
 }
 
-func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printEvent(obj *corev1.Event, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1396,7 +1399,7 @@ func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1beta1.Ta
 }
 
 // Sorts and prints the EventList in a human-friendly format.
-func printEventList(list *api.EventList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printEventList(list *corev1.EventList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEvent(&list.Items[i], options)
@@ -1408,7 +1411,7 @@ func printEventList(list *api.EventList, options printers.PrintOptions) ([]metav
 	return rows, nil
 }
 
-func printRoleBinding(obj *rbac.RoleBinding, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printRoleBinding(obj *rbacv1.RoleBinding, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1416,14 +1419,14 @@ func printRoleBinding(obj *rbac.RoleBinding, options printers.PrintOptions) ([]m
 	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
-		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
+		users, groups, sas, _ := internalrbacv1.SubjectsStrings(obj.Subjects)
 		row.Cells = append(row.Cells, roleRef, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
 	}
 	return []metav1beta1.TableRow{row}, nil
 }
 
 // Prints the RoleBinding in a human-friendly format.
-func printRoleBindingList(list *rbac.RoleBindingList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printRoleBindingList(list *rbacv1.RoleBindingList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printRoleBinding(&list.Items[i], options)
@@ -1435,7 +1438,7 @@ func printRoleBindingList(list *rbac.RoleBindingList, options printers.PrintOpti
 	return rows, nil
 }
 
-func printClusterRoleBinding(obj *rbac.ClusterRoleBinding, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printClusterRoleBinding(obj *rbacv1.ClusterRoleBinding, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1443,14 +1446,14 @@ func printClusterRoleBinding(obj *rbac.ClusterRoleBinding, options printers.Prin
 	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
-		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
+		users, groups, sas, _ := internalrbacv1.SubjectsStrings(obj.Subjects)
 		row.Cells = append(row.Cells, roleRef, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
 	}
 	return []metav1beta1.TableRow{row}, nil
 }
 
 // Prints the ClusterRoleBinding in a human-friendly format.
-func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printClusterRoleBindingList(list *rbacv1.ClusterRoleBindingList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printClusterRoleBinding(&list.Items[i], options)
@@ -1462,7 +1465,7 @@ func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, options prin
 	return rows, nil
 }
 
-func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printCertificateSigningRequest(obj *certificatesv1beta1.CertificateSigningRequest, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1474,13 +1477,13 @@ func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest,
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, error) {
+func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) (string, error) {
 	var approved, denied bool
 	for _, c := range csr.Status.Conditions {
 		switch c.Type {
-		case certificates.CertificateApproved:
+		case certificatesv1beta1.CertificateApproved:
 			approved = true
-		case certificates.CertificateDenied:
+		case certificatesv1beta1.CertificateDenied:
 			denied = true
 		default:
 			return "", fmt.Errorf("unknown csr condition %q", c)
@@ -1501,7 +1504,7 @@ func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, erro
 	return status, nil
 }
 
-func printCertificateSigningRequestList(list *certificates.CertificateSigningRequestList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printCertificateSigningRequestList(list *certificatesv1beta1.CertificateSigningRequestList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printCertificateSigningRequest(&list.Items[i], options)
@@ -1513,7 +1516,7 @@ func printCertificateSigningRequestList(list *certificates.CertificateSigningReq
 	return rows, nil
 }
 
-func printComponentStatus(obj *api.ComponentStatus, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printComponentStatus(obj *corev1.ComponentStatus, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1521,8 +1524,8 @@ func printComponentStatus(obj *api.ComponentStatus, options printers.PrintOption
 	message := ""
 	error := ""
 	for _, condition := range obj.Conditions {
-		if condition.Type == api.ComponentHealthy {
-			if condition.Status == api.ConditionTrue {
+		if condition.Type == corev1.ComponentHealthy {
+			if condition.Status == corev1.ConditionTrue {
 				status = "Healthy"
 			} else {
 				status = "Unhealthy"
@@ -1536,7 +1539,7 @@ func printComponentStatus(obj *api.ComponentStatus, options printers.PrintOption
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printComponentStatusList(list *api.ComponentStatusList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printComponentStatusList(list *corev1.ComponentStatusList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printComponentStatus(&list.Items[i], options)
@@ -1548,11 +1551,14 @@ func printComponentStatusList(list *api.ComponentStatusList, options printers.Pr
 	return rows, nil
 }
 
-func printDeployment(obj *apps.Deployment, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDeployment(obj *appsv1.Deployment, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	desiredReplicas := obj.Spec.Replicas
+	var desiredReplicas int32
+	if obj.Spec.Replicas != nil {
+		desiredReplicas = *obj.Spec.Replicas
+	}
 	currentReplicas := obj.Status.Replicas
 	updatedReplicas := obj.Status.UpdatedReplicas
 	availableReplicas := obj.Status.AvailableReplicas
@@ -1571,7 +1577,7 @@ func printDeployment(obj *apps.Deployment, options printers.PrintOptions) ([]met
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printDeploymentList(list *apps.DeploymentList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDeploymentList(list *appsv1.DeploymentList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printDeployment(&list.Items[i], options)
@@ -1583,7 +1589,7 @@ func printDeploymentList(list *apps.DeploymentList, options printers.PrintOption
 	return rows, nil
 }
 
-func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.MetricStatus) string {
+func formatHPAMetrics(specs []autoscalingv2beta2.MetricSpec, statuses []autoscalingv2beta2.MetricStatus) string {
 	if len(specs) == 0 {
 		return "<none>"
 	}
@@ -1593,7 +1599,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	count := 0
 	for i, spec := range specs {
 		switch spec.Type {
-		case autoscaling.ExternalMetricSourceType:
+		case autoscalingv2beta2.ExternalMetricSourceType:
 			if spec.External.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].External != nil && &statuses[i].External.Current.AverageValue != nil {
@@ -1607,19 +1613,19 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.Target.Value.String()))
 			}
-		case autoscaling.PodsMetricSourceType:
+		case autoscalingv2beta2.PodsMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Pods != nil {
 				current = statuses[i].Pods.Current.AverageValue.String()
 			}
 			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.Target.AverageValue.String()))
-		case autoscaling.ObjectMetricSourceType:
+		case autoscalingv2beta2.ObjectMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Object != nil {
 				current = statuses[i].Object.Current.Value.String()
 			}
 			list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.Target.Value.String()))
-		case autoscaling.ResourceMetricSourceType:
+		case autoscalingv2beta2.ResourceMetricSourceType:
 			if spec.Resource.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].Resource != nil {
@@ -1657,7 +1663,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	return ret
 }
 
-func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printHorizontalPodAutoscaler(obj *autoscalingv2beta2.HorizontalPodAutoscaler, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1676,7 +1682,7 @@ func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, opti
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printHorizontalPodAutoscalerList(list *autoscalingv2beta2.HorizontalPodAutoscalerList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printHorizontalPodAutoscaler(&list.Items[i], options)
@@ -1688,7 +1694,7 @@ func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerL
 	return rows, nil
 }
 
-func printConfigMap(obj *api.ConfigMap, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printConfigMap(obj *corev1.ConfigMap, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1696,7 +1702,7 @@ func printConfigMap(obj *api.ConfigMap, options printers.PrintOptions) ([]metav1
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printConfigMapList(list *api.ConfigMapList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printConfigMapList(list *corev1.ConfigMapList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printConfigMap(&list.Items[i], options)
@@ -1708,7 +1714,7 @@ func printConfigMapList(list *api.ConfigMapList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printPodSecurityPolicy(obj *policy.PodSecurityPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodSecurityPolicy(obj *policyv1beta1.PodSecurityPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1729,7 +1735,7 @@ func printPodSecurityPolicy(obj *policy.PodSecurityPolicy, options printers.Prin
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPodSecurityPolicyList(list *policy.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodSecurityPolicyList(list *policyv1beta1.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodSecurityPolicy(&list.Items[i], options)
@@ -1741,7 +1747,7 @@ func printPodSecurityPolicyList(list *policy.PodSecurityPolicyList, options prin
 	return rows, nil
 }
 
-func printNetworkPolicy(obj *networking.NetworkPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printNetworkPolicy(obj *networkingv1.NetworkPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1749,7 +1755,7 @@ func printNetworkPolicy(obj *networking.NetworkPolicy, options printers.PrintOpt
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printNetworkPolicyList(list *networking.NetworkPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printNetworkPolicyList(list *networkingv1.NetworkPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printNetworkPolicy(&list.Items[i], options)
@@ -1761,7 +1767,7 @@ func printNetworkPolicyList(list *networking.NetworkPolicyList, options printers
 	return rows, nil
 }
 
-func printStorageClass(obj *storage.StorageClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printStorageClass(obj *storagev1.StorageClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1776,7 +1782,7 @@ func printStorageClass(obj *storage.StorageClass, options printers.PrintOptions)
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printStorageClassList(list *storage.StorageClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printStorageClassList(list *storagev1.StorageClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printStorageClass(&list.Items[i], options)
@@ -1788,7 +1794,7 @@ func printStorageClassList(list *storage.StorageClassList, options printers.Prin
 	return rows, nil
 }
 
-func printLease(obj *coordination.Lease, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printLease(obj *coordinationv1beta1.Lease, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1801,7 +1807,7 @@ func printLease(obj *coordination.Lease, options printers.PrintOptions) ([]metav
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printLeaseList(list *coordination.LeaseList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printLeaseList(list *coordinationv1beta1.LeaseList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printLease(&list.Items[i], options)
@@ -1823,7 +1829,7 @@ func printStatus(obj *metav1.Status, options printers.PrintOptions) ([]metav1bet
 }
 
 // Lay out all the containers on one line if use wide output.
-func layoutContainerCells(containers []api.Container) (names string, images string) {
+func layoutContainerCells(containers []corev1.Container) (names string, images string) {
 	var namesBuffer bytes.Buffer
 	var imagesBuffer bytes.Buffer
 
@@ -1839,7 +1845,7 @@ func layoutContainerCells(containers []api.Container) (names string, images stri
 }
 
 // formatEventSource formats EventSource as a comma separated string excluding Host when empty
-func formatEventSource(es api.EventSource) string {
+func formatEventSource(es corev1.EventSource) string {
 	EventSourceString := []string{es.Component}
 	if len(es.Host) > 0 {
 		EventSourceString = append(EventSourceString, es.Host)
@@ -1847,7 +1853,7 @@ func formatEventSource(es api.EventSource) string {
 	return strings.Join(EventSourceString, ", ")
 }
 
-func printControllerRevision(obj *apps.ControllerRevision, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printControllerRevision(obj *appsv1.ControllerRevision, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1869,7 +1875,7 @@ func printControllerRevision(obj *apps.ControllerRevision, options printers.Prin
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printControllerRevisionList(list *apps.ControllerRevisionList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printControllerRevisionList(list *appsv1.ControllerRevisionList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printControllerRevision(&list.Items[i], options)
@@ -1881,12 +1887,12 @@ func printControllerRevisionList(list *apps.ControllerRevisionList, options prin
 	return rows, nil
 }
 
-func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printResourceQuota(resourceQuota *corev1.ResourceQuota, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: resourceQuota},
 	}
 
-	resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
+	resources := make([]corev1.ResourceName, 0, len(resourceQuota.Status.Hard))
 	for resource := range resourceQuota.Status.Hard {
 		resources = append(resources, resource)
 	}
@@ -1913,7 +1919,7 @@ func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.Print
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printResourceQuotaList(list *api.ResourceQuotaList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printResourceQuotaList(list *corev1.ResourceQuotaList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printResourceQuota(&list.Items[i], options)
@@ -1925,7 +1931,7 @@ func printResourceQuotaList(list *api.ResourceQuotaList, options printers.PrintO
 	return rows, nil
 }
 
-func printPriorityClass(obj *scheduling.PriorityClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPriorityClass(obj *schedulingv1beta1.PriorityClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1938,7 +1944,7 @@ func printPriorityClass(obj *scheduling.PriorityClass, options printers.PrintOpt
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPriorityClassList(list *scheduling.PriorityClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPriorityClassList(list *schedulingv1beta1.PriorityClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPriorityClass(&list.Items[i], options)

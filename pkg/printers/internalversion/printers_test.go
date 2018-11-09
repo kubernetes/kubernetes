@@ -30,7 +30,17 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,15 +55,6 @@ import (
 	genericprinters "k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/coordination"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -615,31 +616,31 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	AddHandlers(printer)
 
-	obj := api.EventList{
-		Items: []api.Event{
+	obj := corev1.EventList{
+		Items: []corev1.Event{
 			{
-				Source:         api.EventSource{Component: "kubelet"},
+				Source:         corev1.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
 				FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
-				Type:           api.EventTypeNormal,
+				Type:           corev1.EventTypeNormal,
 			},
 			{
-				Source:         api.EventSource{Component: "scheduler"},
+				Source:         corev1.EventSource{Component: "scheduler"},
 				Message:        "Item 2",
 				FirstTimestamp: metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 				LastTimestamp:  metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
-				Type:           api.EventTypeNormal,
+				Type:           corev1.EventTypeNormal,
 			},
 			{
-				Source:         api.EventSource{Component: "kubelet"},
+				Source:         corev1.EventSource{Component: "kubelet"},
 				Message:        "Item 3",
 				FirstTimestamp: metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 				LastTimestamp:  metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
-				Type:           api.EventTypeNormal,
+				Type:           corev1.EventTypeNormal,
 			},
 		},
 	}
@@ -660,75 +661,75 @@ func TestPrintNodeStatus(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
-		node   api.Node
+		node   corev1.Node
 		status string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}},
 			},
 			status: "Ready",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Spec:       api.NodeSpec{Unschedulable: true},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+				Spec:       corev1.NodeSpec{Unschedulable: true},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}},
 			},
 			status: "Ready,SchedulingDisabled",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
-				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Type: api.NodeReady, Status: api.ConditionTrue},
-					{Type: api.NodeReady, Status: api.ConditionTrue}}},
+				Status: corev1.NodeStatus{Conditions: []corev1.NodeCondition{
+					{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+					{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}},
 			},
 			status: "Ready",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo4"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionFalse}}},
 			},
 			status: "NotReady",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo5"},
-				Spec:       api.NodeSpec{Unschedulable: true},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
+				Spec:       corev1.NodeSpec{Unschedulable: true},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionFalse}}},
 			},
 			status: "NotReady,SchedulingDisabled",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo6"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: "InvalidValue", Status: corev1.ConditionTrue}}},
 			},
 			status: "Unknown",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo7"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{}}},
 			},
 			status: "Unknown",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo8"},
-				Spec:       api.NodeSpec{Unschedulable: true},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
+				Spec:       corev1.NodeSpec{Unschedulable: true},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: "InvalidValue", Status: corev1.ConditionTrue}}},
 			},
 			status: "Unknown,SchedulingDisabled",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo9"},
-				Spec:       api.NodeSpec{Unschedulable: true},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+				Spec:       corev1.NodeSpec{Unschedulable: true},
+				Status:     corev1.NodeStatus{Conditions: []corev1.NodeCondition{{}}},
 			},
 			status: "Unknown,SchedulingDisabled",
 		},
@@ -750,17 +751,17 @@ func TestPrintNodeRole(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
-		node     api.Node
+		node     corev1.Node
 		expected string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo9"},
 			},
 			expected: "<none>",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo10",
 					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
@@ -769,7 +770,7 @@ func TestPrintNodeRole(t *testing.T) {
 			expected: "master,node,proxy",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo11",
 					Labels: map[string]string{"kubernetes.io/role": "node"},
@@ -799,25 +800,25 @@ func TestPrintNodeOSImage(t *testing.T) {
 	AddHandlers(printer)
 
 	table := []struct {
-		node    api.Node
+		node    corev1.Node
 		osImage string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Status: api.NodeStatus{
-					NodeInfo:  api.NodeSystemInfo{OSImage: "fake-os-image"},
-					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				Status: corev1.NodeStatus{
+					NodeInfo:  corev1.NodeSystemInfo{OSImage: "fake-os-image"},
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}},
 				},
 			},
 			osImage: "fake-os-image",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Status: api.NodeStatus{
-					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
-					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				Status: corev1.NodeStatus{
+					NodeInfo:  corev1.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}},
 				},
 			},
 			osImage: "<unknown>",
@@ -844,25 +845,25 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	AddHandlers(printer)
 
 	table := []struct {
-		node          api.Node
+		node          corev1.Node
 		kernelVersion string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Status: api.NodeStatus{
-					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
-					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				Status: corev1.NodeStatus{
+					NodeInfo:  corev1.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}},
 				},
 			},
 			kernelVersion: "fake-kernel-version",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Status: api.NodeStatus{
-					NodeInfo:  api.NodeSystemInfo{OSImage: "fake-os-image"},
-					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				Status: corev1.NodeStatus{
+					NodeInfo:  corev1.NodeSystemInfo{OSImage: "fake-os-image"},
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}},
 				},
 			},
 			kernelVersion: "<unknown>",
@@ -889,25 +890,25 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 	AddHandlers(printer)
 
 	table := []struct {
-		node                    api.Node
+		node                    corev1.Node
 		containerRuntimeVersion string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Status: api.NodeStatus{
-					NodeInfo:  api.NodeSystemInfo{ContainerRuntimeVersion: "foo://1.2.3"},
-					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				Status: corev1.NodeStatus{
+					NodeInfo:  corev1.NodeSystemInfo{ContainerRuntimeVersion: "foo://1.2.3"},
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}},
 				},
 			},
 			containerRuntimeVersion: "foo://1.2.3",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Status: api.NodeStatus{
-					NodeInfo:  api.NodeSystemInfo{},
-					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				Status: corev1.NodeStatus{
+					NodeInfo:  corev1.NodeSystemInfo{},
+					Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}},
 				},
 			},
 			containerRuntimeVersion: "<unknown>",
@@ -932,20 +933,20 @@ func TestPrintNodeName(t *testing.T) {
 	})
 	AddHandlers(printer)
 	table := []struct {
-		node api.Node
+		node corev1.Node
 		Name string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
-				Status:     api.NodeStatus{},
+				Status:     corev1.NodeStatus{},
 			},
 			Name: "127.0.0.1",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: ""},
-				Status:     api.NodeStatus{},
+				Status:     corev1.NodeStatus{},
 			},
 			Name: "<unknown>",
 		},
@@ -969,30 +970,30 @@ func TestPrintNodeExternalIP(t *testing.T) {
 	})
 	AddHandlers(printer)
 	table := []struct {
-		node       api.Node
+		node       corev1.Node
 		externalIP string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
+				Status:     corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}}},
 			},
 			externalIP: "1.1.1.1",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
+				Status:     corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "1.1.1.1"}}},
 			},
 			externalIP: "<none>",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
-				Status: api.NodeStatus{Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "2.2.2.2"},
-					{Type: api.NodeInternalIP, Address: "3.3.3.3"},
-					{Type: api.NodeExternalIP, Address: "4.4.4.4"},
+				Status: corev1.NodeStatus{Addresses: []corev1.NodeAddress{
+					{Type: corev1.NodeExternalIP, Address: "2.2.2.2"},
+					{Type: corev1.NodeInternalIP, Address: "3.3.3.3"},
+					{Type: corev1.NodeExternalIP, Address: "4.4.4.4"},
 				}},
 			},
 			externalIP: "2.2.2.2",
@@ -1017,30 +1018,30 @@ func TestPrintNodeInternalIP(t *testing.T) {
 	})
 	AddHandlers(printer)
 	table := []struct {
-		node       api.Node
+		node       corev1.Node
 		internalIP string
 	}{
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
-				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
+				Status:     corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "1.1.1.1"}}},
 			},
 			internalIP: "1.1.1.1",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
-				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
+				Status:     corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeExternalIP, Address: "1.1.1.1"}}},
 			},
 			internalIP: "<none>",
 		},
 		{
-			node: api.Node{
+			node: corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
-				Status: api.NodeStatus{Addresses: []api.NodeAddress{
-					{Type: api.NodeInternalIP, Address: "2.2.2.2"},
-					{Type: api.NodeExternalIP, Address: "3.3.3.3"},
-					{Type: api.NodeInternalIP, Address: "4.4.4.4"},
+				Status: corev1.NodeStatus{Addresses: []corev1.NodeAddress{
+					{Type: corev1.NodeInternalIP, Address: "2.2.2.2"},
+					{Type: corev1.NodeExternalIP, Address: "3.3.3.3"},
+					{Type: corev1.NodeInternalIP, Address: "4.4.4.4"},
 				}},
 			},
 			internalIP: "2.2.2.2",
@@ -1069,7 +1070,7 @@ func contains(fields []string, field string) bool {
 }
 
 func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
-	ingress := extensions.Ingress{
+	ingress := extensionsv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
@@ -1077,15 +1078,15 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 				"app_name": "kubectl_test_ingress",
 			},
 		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
+		Spec: extensionsv1beta1.IngressSpec{
+			Backend: &extensionsv1beta1.IngressBackend{
 				ServiceName: "svc",
 				ServicePort: intstr.FromInt(93),
 			},
 		},
-		Status: extensions.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+		Status: extensionsv1beta1.IngressStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{
 					{
 						IP:       "2.3.4.5",
 						Hostname: "localhost.localdomain",
@@ -1111,21 +1112,21 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 }
 
 func TestPrintHumanReadableService(t *testing.T) {
-	tests := []api.Service{
+	tests := []corev1.Service{
 		{
-			Spec: api.ServiceSpec{
+			Spec: corev1.ServiceSpec{
 				ClusterIP: "1.2.3.4",
 				Type:      "LoadBalancer",
-				Ports: []api.ServicePort{
+				Ports: []corev1.ServicePort{
 					{
 						Port:     80,
 						Protocol: "TCP",
 					},
 				},
 			},
-			Status: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+			Status: corev1.ServiceStatus{
+				LoadBalancer: corev1.LoadBalancerStatus{
+					Ingress: []corev1.LoadBalancerIngress{
 						{
 							IP: "2.3.4.5",
 						},
@@ -1137,9 +1138,9 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 		},
 		{
-			Spec: api.ServiceSpec{
+			Spec: corev1.ServiceSpec{
 				ClusterIP: "1.3.4.5",
-				Ports: []api.ServicePort{
+				Ports: []corev1.ServicePort{
 					{
 						Port:     80,
 						Protocol: "TCP",
@@ -1160,10 +1161,10 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 		},
 		{
-			Spec: api.ServiceSpec{
+			Spec: corev1.ServiceSpec{
 				ClusterIP: "1.4.5.6",
 				Type:      "LoadBalancer",
-				Ports: []api.ServicePort{
+				Ports: []corev1.ServicePort{
 					{
 						Port:     80,
 						Protocol: "TCP",
@@ -1178,9 +1179,9 @@ func TestPrintHumanReadableService(t *testing.T) {
 					},
 				},
 			},
-			Status: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+			Status: corev1.ServiceStatus{
+				LoadBalancer: corev1.LoadBalancerStatus{
+					Ingress: []corev1.LoadBalancerIngress{
 						{
 							IP: "2.3.4.5",
 						},
@@ -1189,10 +1190,10 @@ func TestPrintHumanReadableService(t *testing.T) {
 			},
 		},
 		{
-			Spec: api.ServiceSpec{
+			Spec: corev1.ServiceSpec{
 				ClusterIP: "1.5.6.7",
 				Type:      "LoadBalancer",
-				Ports: []api.ServicePort{
+				Ports: []corev1.ServicePort{
 					{
 						Port:     80,
 						Protocol: "TCP",
@@ -1207,9 +1208,9 @@ func TestPrintHumanReadableService(t *testing.T) {
 					},
 				},
 			},
-			Status: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+			Status: corev1.ServiceStatus{
+				LoadBalancer: corev1.LoadBalancerStatus{
+					Ingress: []corev1.LoadBalancerIngress{
 						{
 							IP: "2.3.4.5",
 						},
@@ -1266,6 +1267,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 }
 
 func TestPrintHumanReadableWithNamespace(t *testing.T) {
+	var replicas int32 = 2
 	namespaceName := "testnamespace"
 	name := "test"
 	table := []struct {
@@ -1273,33 +1275,33 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 		isNamespaced bool
 	}{
 		{
-			obj: &api.Pod{
+			obj: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.ReplicationController{
+			obj: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
-					Template: &api.PodTemplateSpec{
+				Spec: corev1.ReplicationControllerSpec{
+					Replicas: &replicas,
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"name": "foo",
 								"type": "production",
 							},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Image:                  "foo/bar",
-									TerminationMessagePath: api.TerminationMessagePathDefault,
-									ImagePullPolicy:        api.PullIfNotPresent,
+									TerminationMessagePath: corev1.TerminationMessagePathDefault,
+									ImagePullPolicy:        corev1.PullIfNotPresent,
 								},
 							},
-							RestartPolicy: api.RestartPolicyAlways,
-							DNSPolicy:     api.DNSDefault,
+							RestartPolicy: corev1.RestartPolicyAlways,
+							DNSPolicy:     corev1.DNSDefault,
 							NodeSelector: map[string]string{
 								"baz": "blah",
 							},
@@ -1310,20 +1312,20 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			isNamespaced: true,
 		},
 		{
-			obj: &api.Service{
+			obj: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Ports: []api.ServicePort{
+					Ports: []corev1.ServicePort{
 						{
 							Port:     80,
 							Protocol: "TCP",
 						},
 					},
 				},
-				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
 							{
 								IP: "2.3.4.5",
 							},
@@ -1334,83 +1336,83 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			isNamespaced: true,
 		},
 		{
-			obj: &api.Endpoints{
+			obj: &corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
-					Ports:     []api.EndpointPort{{Port: 8080}},
+				Subsets: []corev1.EndpointSubset{{
+					Addresses: []corev1.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+					Ports:     []corev1.EndpointPort{{Port: 8080}},
 				},
 				}},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 			},
 			isNamespaced: false,
 		},
 		{
-			obj: &api.Secret{
+			obj: &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.ServiceAccount{
+			obj: &corev1.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Secrets:    []api.ObjectReference{},
+				Secrets:    []corev1.ObjectReference{},
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.Node{
+			obj: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
-				Status:     api.NodeStatus{},
+				Status:     corev1.NodeStatus{},
 			},
 			isNamespaced: false,
 		},
 		{
-			obj: &api.PersistentVolume{
+			obj: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Spec:       api.PersistentVolumeSpec{},
+				Spec:       corev1.PersistentVolumeSpec{},
 			},
 			isNamespaced: false,
 		},
 		{
-			obj: &api.PersistentVolumeClaim{
+			obj: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Spec:       api.PersistentVolumeClaimSpec{},
+				Spec:       corev1.PersistentVolumeClaimSpec{},
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.Event{
+			obj: &corev1.Event{
 				ObjectMeta:     metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-				Source:         api.EventSource{Component: "kubelet"},
+				Source:         corev1.EventSource{Component: "kubelet"},
 				Message:        "Item 1",
 				FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
-				Type:           api.EventTypeNormal,
+				Type:           corev1.EventTypeNormal,
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.LimitRange{
+			obj: &corev1.LimitRange{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.ResourceQuota{
+			obj: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
 			isNamespaced: true,
 		},
 		{
-			obj: &api.ComponentStatus{
-				Conditions: []api.ComponentCondition{
-					{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: ""},
+			obj: &corev1.ComponentStatus{
+				Conditions: []corev1.ComponentCondition{
+					{Type: corev1.ComponentHealthy, Status: corev1.ConditionTrue, Message: "ok", Error: ""},
 				},
 			},
 			isNamespaced: false,
@@ -1448,24 +1450,24 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 }
 
 func TestPrintPodTable(t *testing.T) {
-	runningPod := &api.Pod{
+	runningPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test1", Labels: map[string]string{"a": "1", "b": "2"}},
-		Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-		Status: api.PodStatus{
+		Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+		Status: corev1.PodStatus{
 			Phase: "Running",
-			ContainerStatuses: []api.ContainerStatus{
-				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+			ContainerStatuses: []corev1.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 				{RestartCount: 3},
 			},
 		},
 	}
-	failedPod := &api.Pod{
+	failedPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test2", Labels: map[string]string{"b": "2"}},
-		Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-		Status: api.PodStatus{
+		Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+		Status: corev1.PodStatus{
 			Phase: "Failed",
-			ContainerStatuses: []api.ContainerStatus{
-				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+			ContainerStatuses: []corev1.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 				{RestartCount: 3},
 			},
 		},
@@ -1489,7 +1491,7 @@ func TestPrintPodTable(t *testing.T) {
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tLABELS\ntest1\t1/2\tRunning\t6\t<unknown>\ta=1,b=2\n",
 		},
 		{
-			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
+			obj: &corev1.PodList{Items: []corev1.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tA\ntest1\t1/2\tRunning\t6\t<unknown>\t1\ntest2\t1/2\tFailed\t6\t<unknown>\t\n",
 		},
 		{
@@ -1537,18 +1539,18 @@ func TestPrintPodTable(t *testing.T) {
 
 func TestPrintPod(t *testing.T) {
 	tests := []struct {
-		pod    api.Pod
+		pod    corev1.Pod
 		expect []metav1beta1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1557,14 +1559,14 @@ func TestPrintPod(t *testing.T) {
 		},
 		{
 			// Test container error overwrites pod phase
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+						{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
 					},
 				},
 			},
@@ -1572,14 +1574,14 @@ func TestPrintPod(t *testing.T) {
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
-						{State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "ContainerTerminatedReason"}}, RestartCount: 3},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
+						{State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "ContainerTerminatedReason"}}, RestartCount: 3},
 					},
 				},
 			},
@@ -1587,13 +1589,13 @@ func TestPrintPod(t *testing.T) {
 		},
 		{
 			// Test ready is not enough for reporting running
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{Ready: true, RestartCount: 3},
 					},
 				},
@@ -1602,14 +1604,14 @@ func TestPrintPod(t *testing.T) {
 		},
 		{
 			// Test ready is not enough for reporting running
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Reason: "podReason",
 					Phase:  "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{Ready: true, RestartCount: 3},
 					},
 				},
@@ -1618,15 +1620,15 @@ func TestPrintPod(t *testing.T) {
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed.
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase:  "Running",
 					Reason: "",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}}},
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Completed", ExitCode: 0}}},
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 					},
 				},
 			},
@@ -1650,22 +1652,22 @@ func TestPrintPod(t *testing.T) {
 
 func TestPrintPodwide(t *testing.T) {
 	tests := []struct {
-		pod    api.Pod
+		pod    corev1.Pod
 		expect []metav1beta1.TableRow
 	}{
 		{
 			// Test when the NodeName and PodIP are not none
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
+				Spec: corev1.PodSpec{
+					Containers: make([]corev1.Container, 2),
 					NodeName:   "test1",
 				},
-				Status: api.PodStatus{
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
 					PodIP: "1.1.1.1",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 					NominatedNodeName: "node1",
@@ -1675,18 +1677,18 @@ func TestPrintPodwide(t *testing.T) {
 		},
 		{
 			// Test when the NodeName and PodIP are none
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
+				Spec: corev1.PodSpec{
+					Containers: make([]corev1.Container, 2),
 					NodeName:   "",
 				},
-				Status: api.PodStatus{
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
 					PodIP: "",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+						{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
 					},
 				},
 			},
@@ -1710,31 +1712,31 @@ func TestPrintPodwide(t *testing.T) {
 
 func TestPrintPodList(t *testing.T) {
 	tests := []struct {
-		pods   api.PodList
+		pods   corev1.PodList
 		expect []metav1beta1.TableRow
 	}{
 		// Test podList's pod: name, num of containers, restarts, container ready status
 		{
-			api.PodList{
-				Items: []api.Pod{
+			corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-						Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-						Status: api.PodStatus{
+						Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+						Status: corev1.PodStatus{
 							Phase: "podPhase",
-							ContainerStatuses: []api.ContainerStatus{
-								{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-								{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+							ContainerStatuses: []corev1.ContainerStatus{
+								{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+								{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 							},
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "test2"},
-						Spec:       api.PodSpec{Containers: make([]api.Container, 1)},
-						Status: api.PodStatus{
+						Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 1)},
+						Status: corev1.PodStatus{
 							Phase: "podPhase",
-							ContainerStatuses: []api.ContainerStatus{
-								{Ready: true, RestartCount: 1, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+							ContainerStatuses: []corev1.ContainerStatus{
+								{Ready: true, RestartCount: 1, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 							},
 						},
 					},
@@ -1761,18 +1763,18 @@ func TestPrintPodList(t *testing.T) {
 
 func TestPrintNonTerminatedPod(t *testing.T) {
 	tests := []struct {
-		pod    api.Pod
+		pod    corev1.Pod
 		expect []metav1beta1.TableRow
 	}{
 		{
 			// Test pod phase Running should be printed
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1781,13 +1783,13 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 		},
 		{
 			// Test pod phase Pending should be printed
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: api.PodPending,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodPending,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1796,13 +1798,13 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 		},
 		{
 			// Test pod phase Unknown should be printed
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: api.PodUnknown,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodUnknown,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1811,13 +1813,13 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 		},
 		{
 			// Test pod phase Succeeded shouldn't be printed
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: api.PodSucceeded,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodSucceeded,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1826,13 +1828,13 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 		},
 		{
 			// Test pod phase Failed shouldn't be printed
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
-				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: api.PodFailed,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				Spec:       corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodFailed,
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{Ready: true, RestartCount: 3},
 					},
 				},
@@ -1859,22 +1861,22 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 
 func TestPrintPodWithLabels(t *testing.T) {
 	tests := []struct {
-		pod          api.Pod
+		pod          corev1.Pod
 		labelColumns []string
 		expect       []metav1beta1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test1",
 					Labels: map[string]string{"col1": "asd", "COL2": "zxc"},
 				},
-				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec: corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1884,16 +1886,16 @@ func TestPrintPodWithLabels(t *testing.T) {
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test1",
 					Labels: map[string]string{"col1": "asd", "COL2": "zxc"},
 				},
-				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec: corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -1970,22 +1972,23 @@ func TestTranslateTimestampUntil(t *testing.T) {
 }
 
 func TestPrintDeployment(t *testing.T) {
+	var replicas int32 = 5
 	tests := []struct {
-		deployment apps.Deployment
+		deployment appsv1.Deployment
 		expect     string
 		wideExpect string
 	}{
 		{
-			apps.Deployment{
+			appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: apps.DeploymentSpec{
-					Replicas: 5,
-					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: &replicas,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "fake-container1",
 									Image: "fake-image1",
@@ -1999,7 +2002,7 @@ func TestPrintDeployment(t *testing.T) {
 					},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
-				Status: apps.DeploymentStatus{
+				Status: appsv1.DeploymentStatus{
 					Replicas:            10,
 					UpdatedReplicas:     2,
 					AvailableReplicas:   1,
@@ -2040,21 +2043,21 @@ func TestPrintDeployment(t *testing.T) {
 
 func TestPrintDaemonSet(t *testing.T) {
 	tests := []struct {
-		ds         apps.DaemonSet
+		ds         appsv1.DaemonSet
 		startsWith string
 	}{
 		{
-			apps.DaemonSet{
+			appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: apps.DaemonSetSpec{
-					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+				Spec: appsv1.DaemonSetSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{Containers: make([]corev1.Container, 2)},
 					},
 				},
-				Status: apps.DaemonSetStatus{
+				Status: appsv1.DaemonSetStatus{
 					CurrentNumberScheduled: 2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
@@ -2087,49 +2090,49 @@ func TestPrintJob(t *testing.T) {
 	now := time.Now()
 	completions := int32(2)
 	tests := []struct {
-		job    batch.Job
+		job    batchv1.Job
 		expect string
 	}{
 		{
-			batch.Job{
+			batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "job1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: batch.JobSpec{
+				Spec: batchv1.JobSpec{
 					Completions: &completions,
 				},
-				Status: batch.JobStatus{
+				Status: batchv1.JobStatus{
 					Succeeded: 1,
 				},
 			},
 			"job1\t1/2\t\t0s\n",
 		},
 		{
-			batch.Job{
+			batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "job2",
 					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
-				Spec: batch.JobSpec{
+				Spec: batchv1.JobSpec{
 					Completions: nil,
 				},
-				Status: batch.JobStatus{
+				Status: batchv1.JobStatus{
 					Succeeded: 0,
 				},
 			},
 			"job2\t0/1\t\t10y\n",
 		},
 		{
-			batch.Job{
+			batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "job3",
 					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
-				Spec: batch.JobSpec{
+				Spec: batchv1.JobSpec{
 					Completions: nil,
 				},
-				Status: batch.JobStatus{
+				Status: batchv1.JobStatus{
 					Succeeded:      0,
 					StartTime:      &metav1.Time{Time: now.Add(time.Minute)},
 					CompletionTime: &metav1.Time{Time: now.Add(31 * time.Minute)},
@@ -2138,15 +2141,15 @@ func TestPrintJob(t *testing.T) {
 			"job3\t0/1\t30m\t10y\n",
 		},
 		{
-			batch.Job{
+			batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "job4",
 					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 				},
-				Spec: batch.JobSpec{
+				Spec: batchv1.JobSpec{
 					Completions: nil,
 				},
-				Status: batch.JobStatus{
+				Status: batchv1.JobStatus{
 					Succeeded: 0,
 					StartTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
 				},
@@ -2181,21 +2184,21 @@ func TestPrintHPA(t *testing.T) {
 		t.Errorf("unable to parse label selector: %v", err)
 	}
 	tests := []struct {
-		hpa      autoscaling.HorizontalPodAutoscaler
+		hpa      autoscalingv2beta2.HorizontalPodAutoscaler
 		expected string
 	}{
 		// minReplicas unset
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MaxReplicas: 10,
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2204,32 +2207,32 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// external source type, target average value (no current)
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ExternalMetricSourceType,
-							External: &autoscaling.ExternalMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.ExternalMetricSourceType,
+							External: &autoscalingv2beta2.ExternalMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name:     "some-external-metric",
 									Selector: metricLabelSelector,
 								},
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2238,43 +2241,43 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// external source type, target average value
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ExternalMetricSourceType,
-							External: &autoscaling.ExternalMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.ExternalMetricSourceType,
+							External: &autoscalingv2beta2.ExternalMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name:     "some-external-metric",
 									Selector: metricLabelSelector,
 								},
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.ExternalMetricSourceType,
-							External: &autoscaling.ExternalMetricStatus{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.ExternalMetricSourceType,
+							External: &autoscalingv2beta2.ExternalMetricStatus{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name:     "some-external-metric",
 									Selector: metricLabelSelector,
 								},
-								Current: autoscaling.MetricValueStatus{
+								Current: autoscalingv2beta2.MetricValueStatus{
 									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
 								},
 							},
@@ -2286,32 +2289,32 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// external source type, target value (no current)
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ExternalMetricSourceType,
-							External: &autoscaling.ExternalMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.ExternalMetricSourceType,
+							External: &autoscalingv2beta2.ExternalMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name:     "some-service-metric",
 									Selector: metricLabelSelector,
 								},
-								Target: autoscaling.MetricTarget{
-									Type:  autoscaling.ValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:  autoscalingv2beta2.ValueMetricType,
 									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2320,42 +2323,42 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// external source type, target value
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ExternalMetricSourceType,
-							External: &autoscaling.ExternalMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.ExternalMetricSourceType,
+							External: &autoscalingv2beta2.ExternalMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name:     "some-external-metric",
 									Selector: metricLabelSelector,
 								},
-								Target: autoscaling.MetricTarget{
-									Type:  autoscaling.ValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:  autoscalingv2beta2.ValueMetricType,
 									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.ExternalMetricSourceType,
-							External: &autoscaling.ExternalMetricStatus{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.ExternalMetricSourceType,
+							External: &autoscalingv2beta2.ExternalMetricStatus{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-external-metric",
 								},
-								Current: autoscaling.MetricValueStatus{
+								Current: autoscalingv2beta2.MetricValueStatus{
 									Value: resource.NewMilliQuantity(50, resource.DecimalSI),
 								},
 							},
@@ -2367,31 +2370,31 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// pods source type (no current)
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.PodsMetricSourceType,
-							Pods: &autoscaling.PodsMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.PodsMetricSourceType,
+							Pods: &autoscalingv2beta2.PodsMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-pods-metric",
 								},
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2400,41 +2403,41 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// pods source type
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.PodsMetricSourceType,
-							Pods: &autoscaling.PodsMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.PodsMetricSourceType,
+							Pods: &autoscalingv2beta2.PodsMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-pods-metric",
 								},
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.PodsMetricSourceType,
-							Pods: &autoscaling.PodsMetricStatus{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.PodsMetricSourceType,
+							Pods: &autoscalingv2beta2.PodsMetricStatus{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-pods-metric",
 								},
-								Current: autoscaling.MetricValueStatus{
+								Current: autoscalingv2beta2.MetricValueStatus{
 									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
 								},
 							},
@@ -2446,35 +2449,35 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// object source type (no current)
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ObjectMetricSourceType,
-							Object: &autoscaling.ObjectMetricSource{
-								DescribedObject: autoscaling.CrossVersionObjectReference{
+							Type: autoscalingv2beta2.ObjectMetricSourceType,
+							Object: &autoscalingv2beta2.ObjectMetricSource{
+								DescribedObject: autoscalingv2beta2.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								Metric: autoscaling.MetricIdentifier{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-service-metric",
 								},
-								Target: autoscaling.MetricTarget{
-									Type:  autoscaling.ValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:  autoscalingv2beta2.ValueMetricType,
 									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2483,49 +2486,49 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// object source type
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ObjectMetricSourceType,
-							Object: &autoscaling.ObjectMetricSource{
-								DescribedObject: autoscaling.CrossVersionObjectReference{
+							Type: autoscalingv2beta2.ObjectMetricSourceType,
+							Object: &autoscalingv2beta2.ObjectMetricSource{
+								DescribedObject: autoscalingv2beta2.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								Metric: autoscaling.MetricIdentifier{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-service-metric",
 								},
-								Target: autoscaling.MetricTarget{
-									Type:  autoscaling.ValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:  autoscalingv2beta2.ValueMetricType,
 									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.ObjectMetricSourceType,
-							Object: &autoscaling.ObjectMetricStatus{
-								DescribedObject: autoscaling.CrossVersionObjectReference{
+							Type: autoscalingv2beta2.ObjectMetricSourceType,
+							Object: &autoscalingv2beta2.ObjectMetricStatus{
+								DescribedObject: autoscalingv2beta2.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								Metric: autoscaling.MetricIdentifier{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-service-metric",
 								},
-								Current: autoscaling.MetricValueStatus{
+								Current: autoscalingv2beta2.MetricValueStatus{
 									Value: resource.NewMilliQuantity(50, resource.DecimalSI),
 								},
 							},
@@ -2537,29 +2540,29 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// resource source type, targetVal (no current)
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2568,37 +2571,37 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// resource source type, targetVal
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
-								Current: autoscaling.MetricValueStatus{
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricStatus{
+								Name: corev1.ResourceCPU,
+								Current: autoscalingv2beta2.MetricValueStatus{
 									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
 								},
 							},
@@ -2610,29 +2613,29 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// resource source type, targetUtil (no current)
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								Target: autoscaling.MetricTarget{
-									Type:               autoscaling.UtilizationMetricType,
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
 									AverageUtilization: &targetUtilizationVal,
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
 				},
@@ -2641,37 +2644,37 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// resource source type, targetUtil
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								Target: autoscaling.MetricTarget{
-									Type:               autoscaling.UtilizationMetricType,
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
 									AverageUtilization: &targetUtilizationVal,
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
-								Current: autoscaling.MetricValueStatus{
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricStatus{
+								Name: corev1.ResourceCPU,
+								Current: autoscalingv2beta2.MetricValueStatus{
 									AverageUtilization: &currentUtilizationVal,
 									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
 								},
@@ -2684,72 +2687,72 @@ func TestPrintHPA(t *testing.T) {
 		},
 		// multiple specs
 		{
-			autoscaling.HorizontalPodAutoscaler{
+			autoscalingv2beta2.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 						Name: "some-rc",
 						Kind: "ReplicationController",
 					},
 					MinReplicas: &minReplicasVal,
 					MaxReplicas: 10,
-					Metrics: []autoscaling.MetricSpec{
+					Metrics: []autoscalingv2beta2.MetricSpec{
 						{
-							Type: autoscaling.PodsMetricSourceType,
-							Pods: &autoscaling.PodsMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.PodsMetricSourceType,
+							Pods: &autoscalingv2beta2.PodsMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-pods-metric",
 								},
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 								},
 							},
 						},
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								Target: autoscaling.MetricTarget{
-									Type:               autoscaling.UtilizationMetricType,
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
 									AverageUtilization: &targetUtilizationVal,
 								},
 							},
 						},
 						{
-							Type: autoscaling.PodsMetricSourceType,
-							Pods: &autoscaling.PodsMetricSource{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.PodsMetricSourceType,
+							Pods: &autoscalingv2beta2.PodsMetricSource{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "other-pods-metric",
 								},
-								Target: autoscaling.MetricTarget{
-									Type:         autoscaling.AverageValueMetricType,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
 									AverageValue: resource.NewMilliQuantity(400, resource.DecimalSI),
 								},
 							},
 						},
 					},
 				},
-				Status: autoscaling.HorizontalPodAutoscalerStatus{
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
-					CurrentMetrics: []autoscaling.MetricStatus{
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
 						{
-							Type: autoscaling.PodsMetricSourceType,
-							Pods: &autoscaling.PodsMetricStatus{
-								Metric: autoscaling.MetricIdentifier{
+							Type: autoscalingv2beta2.PodsMetricSourceType,
+							Pods: &autoscalingv2beta2.PodsMetricStatus{
+								Metric: autoscalingv2beta2.MetricIdentifier{
 									Name: "some-pods-metric",
 								},
-								Current: autoscaling.MetricValueStatus{
+								Current: autoscalingv2beta2.MetricValueStatus{
 									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
 								},
 							},
 						},
 						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
-								Current: autoscaling.MetricValueStatus{
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricStatus{
+								Name: corev1.ResourceCPU,
+								Current: autoscalingv2beta2.MetricValueStatus{
 									AverageUtilization: &currentUtilizationVal,
 									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
 								},
@@ -2782,22 +2785,22 @@ func TestPrintHPA(t *testing.T) {
 
 func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
-		pod        api.Pod
+		pod        corev1.Pod
 		showLabels bool
 		expect     []metav1beta1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test1",
 					Labels: map[string]string{"col1": "asd", "COL2": "zxc"},
 				},
-				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec: corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -2807,16 +2810,16 @@ func TestPrintPodShowLabels(t *testing.T) {
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.Pod{
+			corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "test1",
 					Labels: map[string]string{"col3": "asd", "COL4": "zxc"},
 				},
-				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
+				Spec: corev1.PodSpec{Containers: make([]corev1.Container, 2)},
+				Status: corev1.PodStatus{
 					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
 						{RestartCount: 3},
 					},
 				},
@@ -2846,16 +2849,16 @@ func TestPrintService(t *testing.T) {
 	single_ExternalIP := []string{"80.11.12.10"}
 	mul_ExternalIP := []string{"80.11.12.10", "80.11.12.11"}
 	tests := []struct {
-		service api.Service
+		service corev1.Service
 		expect  string
 	}{
 		{
 			// Test name, cluster ip, port with protocol
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+					Ports: []corev1.ServicePort{
 						{
 							Protocol: "tcp",
 							Port:     2233,
@@ -2868,11 +2871,11 @@ func TestPrintService(t *testing.T) {
 		},
 		{
 			// Test NodePort service
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeNodePort,
+					Ports: []corev1.ServicePort{
 						{
 							Protocol: "tcp",
 							Port:     8888,
@@ -2886,11 +2889,11 @@ func TestPrintService(t *testing.T) {
 		},
 		{
 			// Test LoadBalancer service
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
 						{
 							Protocol: "tcp",
 							Port:     8888,
@@ -2903,11 +2906,11 @@ func TestPrintService(t *testing.T) {
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP and no LoadBalancerStatus
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
 						{
 							Protocol: "tcp",
 							Port:     8888,
@@ -2921,11 +2924,11 @@ func TestPrintService(t *testing.T) {
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
 						{
 							Protocol: "tcp",
 							Port:     8888,
@@ -2934,9 +2937,9 @@ func TestPrintService(t *testing.T) {
 					ClusterIP:   "10.9.8.7",
 					ExternalIPs: single_ExternalIP,
 				},
-				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
 							{
 								IP:       "3.4.5.6",
 								Hostname: "test.cluster.com",
@@ -2949,11 +2952,11 @@ func TestPrintService(t *testing.T) {
 		},
 		{
 			// Test LoadBalancer service with mul ExternalIPs
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
 						{
 							Protocol: "tcp",
 							Port:     8888,
@@ -2962,9 +2965,9 @@ func TestPrintService(t *testing.T) {
 					ClusterIP:   "10.9.8.7",
 					ExternalIPs: mul_ExternalIP,
 				},
-				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
 							{
 								IP:       "2.3.4.5",
 								Hostname: "test.cluster.local",
@@ -2981,10 +2984,10 @@ func TestPrintService(t *testing.T) {
 		},
 		{
 			// Test ExternalName service
-			api.Service{
+			corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test7"},
-				Spec: api.ServiceSpec{
-					Type:         api.ServiceTypeExternalName,
+				Spec: corev1.ServiceSpec{
+					Type:         corev1.ServiceTypeExternalName,
 					ExternalName: "my.database.example.com",
 				},
 			},
@@ -3014,36 +3017,36 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 	minAvailable := intstr.FromInt(22)
 	maxUnavailable := intstr.FromInt(11)
 	tests := []struct {
-		pdb    policy.PodDisruptionBudget
+		pdb    policyv1beta1.PodDisruptionBudget
 		expect string
 	}{
 		{
-			policy.PodDisruptionBudget{
+			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:         "ns1",
 					Name:              "pdb1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: policy.PodDisruptionBudgetSpec{
+				Spec: policyv1beta1.PodDisruptionBudgetSpec{
 					MinAvailable: &minAvailable,
 				},
-				Status: policy.PodDisruptionBudgetStatus{
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
 					PodDisruptionsAllowed: 5,
 				},
 			},
 			"pdb1\t22\tN/A\t5\t0s\n",
 		},
 		{
-			policy.PodDisruptionBudget{
+			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:         "ns2",
 					Name:              "pdb2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: policy.PodDisruptionBudgetSpec{
+				Spec: policyv1beta1.PodDisruptionBudgetSpec{
 					MaxUnavailable: &maxUnavailable,
 				},
-				Status: policy.PodDisruptionBudgetStatus{
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
 					PodDisruptionsAllowed: 5,
 				},
 			},
@@ -3069,11 +3072,11 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 
 func TestPrintControllerRevision(t *testing.T) {
 	tests := []struct {
-		history apps.ControllerRevision
+		history appsv1.ControllerRevision
 		expect  string
 	}{
 		{
-			apps.ControllerRevision{
+			appsv1.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
@@ -3091,7 +3094,7 @@ func TestPrintControllerRevision(t *testing.T) {
 			"test1\tdaemonset.apps/foo\t1\t0s\n",
 		},
 		{
-			apps.ControllerRevision{
+			appsv1.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
@@ -3108,7 +3111,7 @@ func TestPrintControllerRevision(t *testing.T) {
 			"test2\t<none>\t2\t0s\n",
 		},
 		{
-			apps.ControllerRevision{
+			appsv1.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test3",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
@@ -3119,7 +3122,7 @@ func TestPrintControllerRevision(t *testing.T) {
 			"test3\t<none>\t3\t0s\n",
 		},
 		{
-			apps.ControllerRevision{
+			appsv1.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test4",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
@@ -3153,22 +3156,23 @@ func boolP(b bool) *bool {
 }
 
 func TestPrintReplicaSet(t *testing.T) {
+	var replicaset int32 = 5
 	tests := []struct {
-		replicaSet apps.ReplicaSet
+		replicaSet appsv1.ReplicaSet
 		expect     string
 		wideExpect string
 	}{
 		{
-			apps.ReplicaSet{
+			appsv1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
-					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+				Spec: appsv1.ReplicaSetSpec{
+					Replicas: &replicaset,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "fake-container1",
 									Image: "fake-image1",
@@ -3182,7 +3186,7 @@ func TestPrintReplicaSet(t *testing.T) {
 					},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
-				Status: apps.ReplicaSetStatus{
+				Status: appsv1.ReplicaSetStatus{
 					Replicas:      5,
 					ReadyReplicas: 2,
 				},
@@ -3225,23 +3229,23 @@ func TestPrintReplicaSet(t *testing.T) {
 func TestPrintPersistentVolumeClaim(t *testing.T) {
 	myScn := "my-scn"
 	tests := []struct {
-		pvc    api.PersistentVolumeClaim
+		pvc    corev1.PersistentVolumeClaim
 		expect string
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.PersistentVolumeClaim{
+			corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test1",
 				},
-				Spec: api.PersistentVolumeClaimSpec{
+				Spec: corev1.PersistentVolumeClaimSpec{
 					VolumeName: "my-volume",
 				},
-				Status: api.PersistentVolumeClaimStatus{
-					Phase:       api.ClaimBound,
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
-					Capacity: map[api.ResourceName]resource.Quantity{
-						api.ResourceStorage: resource.MustParse("4Gi"),
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase:       corev1.ClaimBound,
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
+					Capacity: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceStorage: resource.MustParse("4Gi"),
 					},
 				},
 			},
@@ -3249,16 +3253,16 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.PersistentVolumeClaim{
+			corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test2",
 				},
-				Spec: api.PersistentVolumeClaimSpec{},
-				Status: api.PersistentVolumeClaimStatus{
-					Phase:       api.ClaimLost,
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
-					Capacity: map[api.ResourceName]resource.Quantity{
-						api.ResourceStorage: resource.MustParse("4Gi"),
+				Spec: corev1.PersistentVolumeClaimSpec{},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase:       corev1.ClaimLost,
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
+					Capacity: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceStorage: resource.MustParse("4Gi"),
 					},
 				},
 			},
@@ -3266,18 +3270,18 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.PersistentVolumeClaim{
+			corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test3",
 				},
-				Spec: api.PersistentVolumeClaimSpec{
+				Spec: corev1.PersistentVolumeClaimSpec{
 					VolumeName: "my-volume",
 				},
-				Status: api.PersistentVolumeClaimStatus{
-					Phase:       api.ClaimPending,
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteMany},
-					Capacity: map[api.ResourceName]resource.Quantity{
-						api.ResourceStorage: resource.MustParse("10Gi"),
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase:       corev1.ClaimPending,
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+					Capacity: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceStorage: resource.MustParse("10Gi"),
 					},
 				},
 			},
@@ -3285,19 +3289,19 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
-			api.PersistentVolumeClaim{
+			corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test4",
 				},
-				Spec: api.PersistentVolumeClaimSpec{
+				Spec: corev1.PersistentVolumeClaimSpec{
 					VolumeName:       "my-volume",
 					StorageClassName: &myScn,
 				},
-				Status: api.PersistentVolumeClaimStatus{
-					Phase:       api.ClaimPending,
-					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-					Capacity: map[api.ResourceName]resource.Quantity{
-						api.ResourceStorage: resource.MustParse("10Gi"),
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase:       corev1.ClaimPending,
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Capacity: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceStorage: resource.MustParse("10Gi"),
 					},
 				},
 			},
@@ -3326,52 +3330,52 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 func TestPrintCronJob(t *testing.T) {
 	suspend := false
 	tests := []struct {
-		cronjob batch.CronJob
+		cronjob batchv1beta1.CronJob
 		expect  string
 	}{
 		{
-			batch.CronJob{
+			batchv1beta1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "cronjob1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: batch.CronJobSpec{
+				Spec: batchv1beta1.CronJobSpec{
 					Schedule: "0/5 * * * ?",
 					Suspend:  &suspend,
 				},
-				Status: batch.CronJobStatus{
+				Status: batchv1beta1.CronJobStatus{
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 			},
 			"cronjob1\t0/5 * * * ?\tFalse\t0\t0s\t0s\n",
 		},
 		{
-			batch.CronJob{
+			batchv1beta1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "cronjob2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				Spec: batch.CronJobSpec{
+				Spec: batchv1beta1.CronJobSpec{
 					Schedule: "0/5 * * * ?",
 					Suspend:  &suspend,
 				},
-				Status: batch.CronJobStatus{
+				Status: batchv1beta1.CronJobStatus{
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(-3e10)},
 				},
 			},
 			"cronjob2\t0/5 * * * ?\tFalse\t0\t30s\t5m\n",
 		},
 		{
-			batch.CronJob{
+			batchv1beta1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "cronjob3",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				Spec: batch.CronJobSpec{
+				Spec: batchv1beta1.CronJobSpec{
 					Schedule: "0/5 * * * ?",
 					Suspend:  &suspend,
 				},
-				Status: batch.CronJobStatus{},
+				Status: batchv1beta1.CronJobStatus{},
 			},
 			"cronjob3\t0/5 * * * ?\tFalse\t0\t<none>\t5m\n",
 		},
@@ -3396,11 +3400,11 @@ func TestPrintCronJob(t *testing.T) {
 
 func TestPrintStorageClass(t *testing.T) {
 	tests := []struct {
-		sc     storage.StorageClass
+		sc     storagev1.StorageClass
 		expect string
 	}{
 		{
-			storage.StorageClass{
+			storagev1.StorageClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "sc1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
@@ -3410,7 +3414,7 @@ func TestPrintStorageClass(t *testing.T) {
 			"sc1\tkubernetes.io/glusterfs\t0s\n",
 		},
 		{
-			storage.StorageClass{
+			storagev1.StorageClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "sc2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
@@ -3442,28 +3446,28 @@ func TestPrintLease(t *testing.T) {
 	holder1 := "holder1"
 	holder2 := "holder2"
 	tests := []struct {
-		sc     coordination.Lease
+		sc     coordinationv1beta1.Lease
 		expect string
 	}{
 		{
-			coordination.Lease{
+			coordinationv1beta1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "lease1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: coordination.LeaseSpec{
+				Spec: coordinationv1beta1.LeaseSpec{
 					HolderIdentity: &holder1,
 				},
 			},
 			"lease1\tholder1\t0s\n",
 		},
 		{
-			coordination.Lease{
+			coordinationv1beta1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "lease2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				Spec: coordination.LeaseSpec{
+				Spec: coordinationv1beta1.LeaseSpec{
 					HolderIdentity: &holder2,
 				},
 			},
@@ -3489,11 +3493,11 @@ func TestPrintLease(t *testing.T) {
 
 func TestPrintPriorityClass(t *testing.T) {
 	tests := []struct {
-		pc     scheduling.PriorityClass
+		pc     schedulingv1beta1.PriorityClass
 		expect string
 	}{
 		{
-			scheduling.PriorityClass{
+			schedulingv1beta1.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pc1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
@@ -3503,7 +3507,7 @@ func TestPrintPriorityClass(t *testing.T) {
 			"pc1\t1\tfalse\t0s\n",
 		},
 		{
-			scheduling.PriorityClass{
+			schedulingv1beta1.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pc2",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},

@@ -35,7 +35,17 @@ import (
 	"github.com/fatih/camelcase"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -48,29 +58,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	externalclient "k8s.io/client-go/kubernetes"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
-	resourcehelper "k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/api/v1/events"
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	internalcertificatesv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	internalrbacv1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/printers"
@@ -138,43 +138,42 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 	}
 
 	m := map[schema.GroupKind]printers.Describer{
-		api.Kind("Pod"):                   &PodDescriber{c},
-		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
-		api.Kind("Secret"):                &SecretDescriber{c},
-		api.Kind("Service"):               &ServiceDescriber{c},
-		api.Kind("ServiceAccount"):        &ServiceAccountDescriber{c},
-		api.Kind("Node"):                  &NodeDescriber{c},
-		api.Kind("LimitRange"):            &LimitRangeDescriber{c},
-		api.Kind("ResourceQuota"):         &ResourceQuotaDescriber{c},
-		api.Kind("PersistentVolume"):      &PersistentVolumeDescriber{c},
-		api.Kind("PersistentVolumeClaim"): &PersistentVolumeClaimDescriber{c},
-		api.Kind("Namespace"):             &NamespaceDescriber{c},
-		api.Kind("Endpoints"):             &EndpointsDescriber{c},
-		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
-		api.Kind("PriorityClass"):         &PriorityClassDescriber{c},
-
-		extensions.Kind("ReplicaSet"):                  &ReplicaSetDescriber{c},
-		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
-		extensions.Kind("PodSecurityPolicy"):           &PodSecurityPolicyDescriber{c},
-		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
-		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):                  &DeploymentDescriber{c, externalclient},
-		extensions.Kind("Ingress"):                     &IngressDescriber{c},
-		batch.Kind("Job"):                              &JobDescriber{c},
-		batch.Kind("CronJob"):                          &CronJobDescriber{c, externalclient},
-		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
-		apps.Kind("Deployment"):                        &DeploymentDescriber{c, externalclient},
-		apps.Kind("DaemonSet"):                         &DaemonSetDescriber{c},
-		apps.Kind("ReplicaSet"):                        &ReplicaSetDescriber{c},
-		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
-		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
-		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
-		rbac.Kind("Role"):                              &RoleDescriber{externalclient},
-		rbac.Kind("ClusterRole"):                       &ClusterRoleDescriber{externalclient},
-		rbac.Kind("RoleBinding"):                       &RoleBindingDescriber{externalclient},
-		rbac.Kind("ClusterRoleBinding"):                &ClusterRoleBindingDescriber{externalclient},
-		networking.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
-		scheduling.Kind("PriorityClass"):               &PriorityClassDescriber{c},
+		{Group: corev1.GroupName, Kind: "Pod"}:                                    &PodDescriber{c},
+		{Group: corev1.GroupName, Kind: "ReplicationController"}:                  &ReplicationControllerDescriber{c},
+		{Group: corev1.GroupName, Kind: "Secret"}:                                 &SecretDescriber{c},
+		{Group: corev1.GroupName, Kind: "Service"}:                                &ServiceDescriber{c},
+		{Group: corev1.GroupName, Kind: "ServiceAccount"}:                         &ServiceAccountDescriber{c},
+		{Group: corev1.GroupName, Kind: "Node"}:                                   &NodeDescriber{c},
+		{Group: corev1.GroupName, Kind: "LimitRange"}:                             &LimitRangeDescriber{c},
+		{Group: corev1.GroupName, Kind: "ResourceQuota"}:                          &ResourceQuotaDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolume"}:                       &PersistentVolumeDescriber{c},
+		{Group: corev1.GroupName, Kind: "PersistentVolumeClaim"}:                  &PersistentVolumeClaimDescriber{c},
+		{Group: corev1.GroupName, Kind: "Namespace"}:                              &NamespaceDescriber{c},
+		{Group: corev1.GroupName, Kind: "Endpoints"}:                              &EndpointsDescriber{c},
+		{Group: corev1.GroupName, Kind: "ConfigMap"}:                              &ConfigMapDescriber{c},
+		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
+		{Group: extensionsv1beta1.GroupName, Kind: "ReplicaSet"}:                  &ReplicaSetDescriber{c},
+		{Group: extensionsv1beta1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
+		{Group: extensionsv1beta1.GroupName, Kind: "PodSecurityPolicy"}:           &PodSecurityPolicyDescriber{c},
+		{Group: autoscalingv2beta2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
+		{Group: extensionsv1beta1.GroupName, Kind: "DaemonSet"}:                   &DaemonSetDescriber{c},
+		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c, externalclient},
+		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
+		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
+		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c, externalclient},
+		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "Deployment"}:                             &DeploymentDescriber{c, externalclient},
+		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                              &DaemonSetDescriber{c},
+		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                             &ReplicaSetDescriber{c},
+		{Group: certificatesv1beta1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
+		{Group: storagev1.GroupName, Kind: "StorageClass"}:                        &StorageClassDescriber{c},
+		{Group: policyv1beta1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{externalclient},
+		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                            &ClusterRoleDescriber{externalclient},
+		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                            &RoleBindingDescriber{externalclient},
+		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                     &ClusterRoleBindingDescriber{externalclient},
+		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:                    &NetworkPolicyDescriber{c},
+		{Group: schedulingv1beta1.GroupName, Kind: "PriorityClass"}:               &PriorityClassDescriber{c},
 	}
 
 	return m, nil
@@ -224,7 +223,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings pr
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = g.events.Events(namespace).Search(legacyscheme.Scheme, obj)
 	}
@@ -361,7 +360,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	return describeNamespace(ns, resourceQuotaList, limitRangeList)
 }
 
-func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.ResourceQuotaList, limitRangeList *api.LimitRangeList) (string, error) {
+func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.ResourceQuotaList, limitRangeList *corev1.LimitRangeList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", namespace.Name)
@@ -380,7 +379,7 @@ func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.Resource
 	})
 }
 
-func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w PrefixWriter) {
+func describeLimitRangeSpec(spec corev1.LimitRangeSpec, prefix string, w PrefixWriter) {
 	for i := range spec.Limits {
 		item := spec.Limits[i]
 		maxResources := item.Max
@@ -389,7 +388,7 @@ func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w PrefixWrit
 		defaultRequestResources := item.DefaultRequest
 		ratio := item.MaxLimitRequestRatio
 
-		set := map[api.ResourceName]bool{}
+		set := map[corev1.ResourceName]bool{}
 		for k := range maxResources {
 			set[k] = true
 		}
@@ -446,7 +445,7 @@ func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w PrefixWrit
 }
 
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
-func DescribeLimitRanges(limitRanges *api.LimitRangeList, w PrefixWriter) {
+func DescribeLimitRanges(limitRanges *corev1.LimitRangeList, w PrefixWriter) {
 	if len(limitRanges.Items) == 0 {
 		w.Write(LEVEL_0, "No resource limits.\n")
 		return
@@ -459,7 +458,7 @@ func DescribeLimitRanges(limitRanges *api.LimitRangeList, w PrefixWriter) {
 }
 
 // DescribeResourceQuotas merges a set of quota items into a single tabular description of all quotas
-func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w PrefixWriter) {
+func DescribeResourceQuotas(quotas *corev1.ResourceQuotaList, w PrefixWriter) {
 	if len(quotas.Items) == 0 {
 		w.Write(LEVEL_0, "No resource quota.\n")
 		return
@@ -477,7 +476,7 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w PrefixWriter) {
 			sort.Strings(scopes)
 			w.Write(LEVEL_0, " Scopes:\t%s\n", strings.Join(scopes, ", "))
 			for _, scope := range scopes {
-				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
+				helpText := helpTextForResourceQuotaScope(corev1.ResourceQuotaScope(scope))
 				if len(helpText) > 0 {
 					w.Write(LEVEL_0, "  * %s\n", helpText)
 				}
@@ -487,7 +486,7 @@ func DescribeResourceQuotas(quotas *api.ResourceQuotaList, w PrefixWriter) {
 		w.Write(LEVEL_0, " Resource\tUsed\tHard\n")
 		w.Write(LEVEL_0, " --------\t---\t---\n")
 
-		resources := make([]api.ResourceName, 0, len(q.Status.Hard))
+		resources := make([]corev1.ResourceName, 0, len(q.Status.Hard))
 		for resource := range q.Status.Hard {
 			resources = append(resources, resource)
 		}
@@ -516,7 +515,7 @@ func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings
 	return describeLimitRange(limitRange)
 }
 
-func describeLimitRange(limitRange *api.LimitRange) (string, error) {
+func describeLimitRange(limitRange *corev1.LimitRange) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", limitRange.Name)
@@ -544,21 +543,21 @@ func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSetti
 	return describeQuota(resourceQuota)
 }
 
-func helpTextForResourceQuotaScope(scope api.ResourceQuotaScope) string {
+func helpTextForResourceQuotaScope(scope corev1.ResourceQuotaScope) string {
 	switch scope {
-	case api.ResourceQuotaScopeTerminating:
+	case corev1.ResourceQuotaScopeTerminating:
 		return "Matches all pods that have an active deadline. These pods have a limited lifespan on a node before being actively terminated by the system."
-	case api.ResourceQuotaScopeNotTerminating:
+	case corev1.ResourceQuotaScopeNotTerminating:
 		return "Matches all pods that do not have an active deadline. These pods usually include long running pods whose container command is not expected to terminate."
-	case api.ResourceQuotaScopeBestEffort:
+	case corev1.ResourceQuotaScopeBestEffort:
 		return "Matches all pods that do not have resource requirements set. These pods have a best effort quality of service."
-	case api.ResourceQuotaScopeNotBestEffort:
+	case corev1.ResourceQuotaScopeNotBestEffort:
 		return "Matches all pods that have at least one resource requirement set. These pods have a burstable or guaranteed quality of service."
 	default:
 		return ""
 	}
 }
-func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
+func describeQuota(resourceQuota *corev1.ResourceQuota) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", resourceQuota.Name)
@@ -571,7 +570,7 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 			sort.Strings(scopes)
 			w.Write(LEVEL_0, "Scopes:\t%s\n", strings.Join(scopes, ", "))
 			for _, scope := range scopes {
-				helpText := helpTextForResourceQuotaScope(api.ResourceQuotaScope(scope))
+				helpText := helpTextForResourceQuotaScope(corev1.ResourceQuotaScope(scope))
 				if len(helpText) > 0 {
 					w.Write(LEVEL_0, " * %s\n", helpText)
 				}
@@ -580,7 +579,7 @@ func describeQuota(resourceQuota *api.ResourceQuota) (string, error) {
 		w.Write(LEVEL_0, "Resource\tUsed\tHard\n")
 		w.Write(LEVEL_0, "--------\t----\t----\n")
 
-		resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
+		resources := make([]corev1.ResourceName, 0, len(resourceQuota.Status.Hard))
 		for resource := range resourceQuota.Status.Hard {
 			resources = append(resources, resource)
 		}
@@ -623,7 +622,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, pod); err != nil {
 			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
@@ -636,7 +635,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 	return describePod(pod, events)
 }
 
-func describePod(pod *api.Pod, events *api.EventList) (string, error) {
+func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pod.Name)
@@ -709,7 +708,7 @@ func printController(controllee metav1.Object) string {
 	return ""
 }
 
-func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
+func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 	if volumes == nil || len(volumes) == 0 {
 		w.Write(LEVEL_0, "%sVolumes:\t<none>\n", space)
 		return
@@ -782,7 +781,7 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 	}
 }
 
-func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, w PrefixWriter) {
+func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWriter) {
 	hostPathType := "<none>"
 	if hostPath.Type != nil {
 		hostPathType = string(*hostPath.Type)
@@ -793,12 +792,12 @@ func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, w PrefixWrite
 		hostPath.Path, hostPathType)
 }
 
-func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, w PrefixWriter) {
+func printEmptyDirVolumeSource(emptyDir *corev1.EmptyDirVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
 		"    Medium:\t%v\n", emptyDir.Medium)
 }
 
-func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, w PrefixWriter) {
+func printGCEPersistentDiskVolumeSource(gce *corev1.GCEPersistentDiskVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGCEPersistentDisk (a Persistent Disk resource in Google Compute Engine)\n"+
 		"    PDName:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -807,7 +806,7 @@ func printGCEPersistentDiskVolumeSource(gce *api.GCEPersistentDiskVolumeSource, 
 		gce.PDName, gce.FSType, gce.Partition, gce.ReadOnly)
 }
 
-func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSource, w PrefixWriter) {
+func printAWSElasticBlockStoreVolumeSource(aws *corev1.AWSElasticBlockStoreVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tAWSElasticBlockStore (a Persistent Disk resource in AWS)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -816,14 +815,14 @@ func printAWSElasticBlockStoreVolumeSource(aws *api.AWSElasticBlockStoreVolumeSo
 		aws.VolumeID, aws.FSType, aws.Partition, aws.ReadOnly)
 }
 
-func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, w PrefixWriter) {
+func printGitRepoVolumeSource(git *corev1.GitRepoVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGitRepo (a volume that is pulled from git when the pod is created)\n"+
 		"    Repository:\t%v\n"+
 		"    Revision:\t%v\n",
 		git.Repository, git.Revision)
 }
 
-func printSecretVolumeSource(secret *api.SecretVolumeSource, w PrefixWriter) {
+func printSecretVolumeSource(secret *corev1.SecretVolumeSource, w PrefixWriter) {
 	optional := secret.Optional != nil && *secret.Optional
 	w.Write(LEVEL_2, "Type:\tSecret (a volume populated by a Secret)\n"+
 		"    SecretName:\t%v\n"+
@@ -831,7 +830,7 @@ func printSecretVolumeSource(secret *api.SecretVolumeSource, w PrefixWriter) {
 		secret.SecretName, optional)
 }
 
-func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w PrefixWriter) {
+func printConfigMapVolumeSource(configMap *corev1.ConfigMapVolumeSource, w PrefixWriter) {
 	optional := configMap.Optional != nil && *configMap.Optional
 	w.Write(LEVEL_2, "Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
 		"    Name:\t%v\n"+
@@ -839,7 +838,7 @@ func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w PrefixWr
 		configMap.Name, optional)
 }
 
-func printProjectedVolumeSource(projected *api.ProjectedVolumeSource, w PrefixWriter) {
+func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
 	for _, source := range projected.Sources {
 		if source.Secret != nil {
@@ -859,7 +858,7 @@ func printProjectedVolumeSource(projected *api.ProjectedVolumeSource, w PrefixWr
 	}
 }
 
-func printNFSVolumeSource(nfs *api.NFSVolumeSource, w PrefixWriter) {
+func printNFSVolumeSource(nfs *corev1.NFSVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tNFS (an NFS mount that lasts the lifetime of a pod)\n"+
 		"    Server:\t%v\n"+
 		"    Path:\t%v\n"+
@@ -867,7 +866,7 @@ func printNFSVolumeSource(nfs *api.NFSVolumeSource, w PrefixWriter) {
 		nfs.Server, nfs.Path, nfs.ReadOnly)
 }
 
-func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w PrefixWriter) {
+func printQuobyteVolumeSource(quobyte *corev1.QuobyteVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tQuobyte (a Quobyte mount on the host that shares a pod's lifetime)\n"+
 		"    Registry:\t%v\n"+
 		"    Volume:\t%v\n"+
@@ -875,13 +874,13 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w PrefixWriter) 
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
 }
 
-func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w PrefixWriter) {
+func printPortworxVolumeSource(pwxVolume *corev1.PortworxVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Volume resource)\n"+
 		"    VolumeID:\t%v\n",
 		pwxVolume.VolumeID)
 }
 
-func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
+func printISCSIVolumeSource(iscsi *corev1.ISCSIVolumeSource, w PrefixWriter) {
 	initiator := "<none>"
 	if iscsi.InitiatorName != nil {
 		initiator = *iscsi.InitiatorName
@@ -901,7 +900,7 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator)
 }
 
-func printISCSIPersistentVolumeSource(iscsi *api.ISCSIPersistentVolumeSource, w PrefixWriter) {
+func printISCSIPersistentVolumeSource(iscsi *corev1.ISCSIPersistentVolumeSource, w PrefixWriter) {
 	initiatorName := "<none>"
 	if iscsi.InitiatorName != nil {
 		initiatorName = *iscsi.InitiatorName
@@ -921,7 +920,7 @@ func printISCSIPersistentVolumeSource(iscsi *api.ISCSIPersistentVolumeSource, w 
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiatorName)
 }
 
-func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWriter) {
+func printGlusterfsVolumeSource(glusterfs *corev1.GlusterfsVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
 		"    Path:\t%v\n"+
@@ -929,7 +928,7 @@ func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWr
 		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
 }
 
-func printGlusterfsPersistentVolumeSource(glusterfs *api.GlusterfsPersistentVolumeSource, w PrefixWriter) {
+func printGlusterfsPersistentVolumeSource(glusterfs *corev1.GlusterfsPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
 		"    EndpointsNamespace:\t%v\n"+
@@ -938,14 +937,14 @@ func printGlusterfsPersistentVolumeSource(glusterfs *api.GlusterfsPersistentVolu
 		glusterfs.EndpointsName, glusterfs.EndpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
 }
 
-func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, w PrefixWriter) {
+func printPersistentVolumeClaimVolumeSource(claim *corev1.PersistentVolumeClaimVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tPersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)\n"+
 		"    ClaimName:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		claim.ClaimName, claim.ReadOnly)
 }
 
-func printRBDVolumeSource(rbd *api.RBDVolumeSource, w PrefixWriter) {
+func printRBDVolumeSource(rbd *corev1.RBDVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
 		"    CephMonitors:\t%v\n"+
 		"    RBDImage:\t%v\n"+
@@ -958,7 +957,7 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, w PrefixWriter) {
 		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
-func printRBDPersistentVolumeSource(rbd *api.RBDPersistentVolumeSource, w PrefixWriter) {
+func printRBDPersistentVolumeSource(rbd *corev1.RBDPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
 		"    CephMonitors:\t%v\n"+
 		"    RBDImage:\t%v\n"+
@@ -971,7 +970,7 @@ func printRBDPersistentVolumeSource(rbd *api.RBDPersistentVolumeSource, w Prefix
 		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
-func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, w PrefixWriter) {
+func printDownwardAPIVolumeSource(d *corev1.DownwardAPIVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
 	for _, mapping := range d.Items {
 		if mapping.FieldRef != nil {
@@ -983,7 +982,7 @@ func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, w PrefixWriter
 	}
 }
 
-func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, w PrefixWriter) {
+func printAzureDiskVolumeSource(d *corev1.AzureDiskVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
 		"    DiskName:\t%v\n"+
 		"    DiskURI:\t%v\n"+
@@ -994,7 +993,7 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, w PrefixWriter) {
 		d.DiskName, d.DataDiskURI, *d.Kind, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
-func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w PrefixWriter) {
+func printVsphereVolumeSource(vsphere *corev1.VsphereVirtualDiskVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
 		"    VolumePath:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -1002,14 +1001,14 @@ func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w Pre
 		vsphere.VolumePath, vsphere.FSType, vsphere.StoragePolicyName)
 }
 
-func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, w PrefixWriter) {
+func printPhotonPersistentDiskVolumeSource(photon *corev1.PhotonPersistentDiskVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
 		"    PdID:\t%v\n"+
 		"    FSType:\t%v\n",
 		photon.PdID, photon.FSType)
 }
 
-func printCinderVolumeSource(cinder *api.CinderVolumeSource, w PrefixWriter) {
+func printCinderVolumeSource(cinder *corev1.CinderVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -1018,7 +1017,7 @@ func printCinderVolumeSource(cinder *api.CinderVolumeSource, w PrefixWriter) {
 			cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
-func printCinderPersistentVolumeSource(cinder *api.CinderPersistentVolumeSource, w PrefixWriter) {
+func printCinderPersistentVolumeSource(cinder *corev1.CinderPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -1027,7 +1026,7 @@ func printCinderPersistentVolumeSource(cinder *api.CinderPersistentVolumeSource,
 			cinder.VolumeID, cinder.SecretRef, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
-func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
+func printScaleIOVolumeSource(sio *corev1.ScaleIOVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tScaleIO (a persistent volume backed by a block device in ScaleIO)\n"+
 		"    Gateway:\t%v\n"+
 		"    System:\t%v\n"+
@@ -1040,7 +1039,7 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
 }
 
-func printScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, w PrefixWriter) {
+func printScaleIOPersistentVolumeSource(sio *corev1.ScaleIOPersistentVolumeSource, w PrefixWriter) {
 	var secretNS, secretName string
 	if sio.SecretRef != nil {
 		secretName = sio.SecretRef.Name
@@ -1060,13 +1059,13 @@ func printScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, 
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, secretName, secretNS, sio.FSType, sio.ReadOnly)
 }
 
-func printLocalVolumeSource(ls *api.LocalVolumeSource, w PrefixWriter) {
+func printLocalVolumeSource(ls *corev1.LocalVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tLocalVolume (a persistent volume backed by local storage on a node)\n"+
 		"    Path:\t%v\n",
 		ls.Path)
 }
 
-func printCephFSVolumeSource(cephfs *api.CephFSVolumeSource, w PrefixWriter) {
+func printCephFSVolumeSource(cephfs *corev1.CephFSVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCephFS (a CephFS mount on the host that shares a pod's lifetime)\n"+
 		"    Monitors:\t%v\n"+
 		"    Path:\t%v\n"+
@@ -1077,7 +1076,7 @@ func printCephFSVolumeSource(cephfs *api.CephFSVolumeSource, w PrefixWriter) {
 		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
 }
 
-func printCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource, w PrefixWriter) {
+func printCephFSPersistentVolumeSource(cephfs *corev1.CephFSPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCephFS (a CephFS mount on the host that shares a pod's lifetime)\n"+
 		"    Monitors:\t%v\n"+
 		"    Path:\t%v\n"+
@@ -1088,7 +1087,7 @@ func printCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource,
 		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
 }
 
-func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w PrefixWriter) {
+func printStorageOSVolumeSource(storageos *corev1.StorageOSVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
 		"    VolumeName:\t%v\n"+
 		"    VolumeNamespace:\t%v\n"+
@@ -1097,7 +1096,7 @@ func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w PrefixWr
 		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
 }
 
-func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolumeSource, w PrefixWriter) {
+func printStorageOSPersistentVolumeSource(storageos *corev1.StorageOSPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
 		"    VolumeName:\t%v\n"+
 		"    VolumeNamespace:\t%v\n"+
@@ -1106,7 +1105,7 @@ func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolu
 		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
 }
 
-func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
+func printFCVolumeSource(fc *corev1.FCVolumeSource, w PrefixWriter) {
 	lun := "<none>"
 	if fc.Lun != nil {
 		lun = strconv.Itoa(int(*fc.Lun))
@@ -1119,7 +1118,7 @@ func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
 		strings.Join(fc.TargetWWNs, ", "), lun, fc.FSType, fc.ReadOnly)
 }
 
-func printAzureFileVolumeSource(azureFile *api.AzureFileVolumeSource, w PrefixWriter) {
+func printAzureFileVolumeSource(azureFile *corev1.AzureFileVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tAzureFile (an Azure File Service mount on the host and bind mount to the pod)\n"+
 		"    SecretName:\t%v\n"+
 		"    ShareName:\t%v\n"+
@@ -1127,7 +1126,7 @@ func printAzureFileVolumeSource(azureFile *api.AzureFileVolumeSource, w PrefixWr
 		azureFile.SecretName, azureFile.ShareName, azureFile.ReadOnly)
 }
 
-func printAzureFilePersistentVolumeSource(azureFile *api.AzureFilePersistentVolumeSource, w PrefixWriter) {
+func printAzureFilePersistentVolumeSource(azureFile *corev1.AzureFilePersistentVolumeSource, w PrefixWriter) {
 	ns := ""
 	if azureFile.SecretNamespace != nil {
 		ns = *azureFile.SecretNamespace
@@ -1140,7 +1139,7 @@ func printAzureFilePersistentVolumeSource(azureFile *api.AzureFilePersistentVolu
 		azureFile.SecretName, ns, azureFile.ShareName, azureFile.ReadOnly)
 }
 
-func printFlexPersistentVolumeSource(flex *api.FlexPersistentVolumeSource, w PrefixWriter) {
+func printFlexPersistentVolumeSource(flex *corev1.FlexPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tFlexVolume (a generic volume resource that is provisioned/attached using an exec based plugin)\n"+
 		"    Driver:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -1150,7 +1149,7 @@ func printFlexPersistentVolumeSource(flex *api.FlexPersistentVolumeSource, w Pre
 		flex.Driver, flex.FSType, flex.SecretRef, flex.ReadOnly, flex.Options)
 }
 
-func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
+func printFlexVolumeSource(flex *corev1.FlexVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tFlexVolume (a generic volume resource that is provisioned/attached using an exec based plugin)\n"+
 		"    Driver:\t%v\n"+
 		"    FSType:\t%v\n"+
@@ -1160,14 +1159,14 @@ func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
 		flex.Driver, flex.FSType, flex.SecretRef, flex.ReadOnly, flex.Options)
 }
 
-func printFlockerVolumeSource(flocker *api.FlockerVolumeSource, w PrefixWriter) {
+func printFlockerVolumeSource(flocker *corev1.FlockerVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tFlocker (a Flocker volume mounted by the Flocker agent)\n"+
 		"    DatasetName:\t%v\n"+
 		"    DatasetUUID:\t%v\n",
 		flocker.DatasetName, flocker.DatasetUUID)
 }
 
-func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w PrefixWriter) {
+func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
 		"    VolumeHandle:\t%v\n"+
@@ -1229,7 +1228,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, pv)
 	}
@@ -1237,7 +1236,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 	return describePersistentVolume(pv, events)
 }
 
-func printVolumeNodeAffinity(w PrefixWriter, affinity *api.VolumeNodeAffinity) {
+func printVolumeNodeAffinity(w PrefixWriter, affinity *corev1.VolumeNodeAffinity) {
 	w.Write(LEVEL_0, "Node Affinity:\t")
 	if affinity == nil || affinity.Required == nil {
 		w.WriteLine("<none>")
@@ -1259,7 +1258,7 @@ func printVolumeNodeAffinity(w PrefixWriter, affinity *api.VolumeNodeAffinity) {
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printNodeSelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []api.NodeSelectorRequirement) {
+func printNodeSelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []corev1.NodeSelectorRequirement) {
 	w.Write(indentLevel, "%s:%s", title, innerIndent)
 
 	if len(reqs) == 0 {
@@ -1279,7 +1278,7 @@ func printNodeSelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, 
 	}
 }
 
-func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (string, error) {
+func describePersistentVolume(pv *corev1.PersistentVolume, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
@@ -1302,7 +1301,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		if pv.Spec.VolumeMode != nil {
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
 		}
-		storage := pv.Spec.Capacity[api.ResourceStorage]
+		storage := pv.Spec.Capacity[corev1.ResourceStorage]
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		printVolumeNodeAffinity(w, pv.Spec.NodeAffinity)
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
@@ -1389,13 +1388,13 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	return describePersistentVolumeClaim(pvc, events, mountPods)
 }
 
-func getMountPods(c coreclient.PodInterface, pvcName string) ([]api.Pod, error) {
+func getMountPods(c coreclient.PodInterface, pvcName string) ([]corev1.Pod, error) {
 	nsPods, err := c.List(metav1.ListOptions{})
 	if err != nil {
-		return []api.Pod{}, err
+		return []corev1.Pod{}, err
 	}
 
-	var pods []api.Pod
+	var pods []corev1.Pod
 
 	for _, pod := range nsPods.Items {
 		pvcs := getPvcs(pod.Spec.Volumes)
@@ -1410,8 +1409,8 @@ func getMountPods(c coreclient.PodInterface, pvcName string) ([]api.Pod, error) 
 	return pods, nil
 }
 
-func getPvcs(volumes []api.Volume) []api.Volume {
-	var pvcs []api.Volume
+func getPvcs(volumes []corev1.Volume) []corev1.Volume {
+	var pvcs []corev1.Volume
 
 	for _, volume := range volumes {
 		if volume.VolumeSource.PersistentVolumeClaim != nil {
@@ -1422,7 +1421,7 @@ func getPvcs(volumes []api.Volume) []api.Volume {
 	return pvcs
 }
 
-func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.EventList, mountPods []api.Pod) (string, error) {
+func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, mountPods []corev1.Pod) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
@@ -1437,12 +1436,12 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		printLabelsMultiline(w, "Labels", pvc.Labels)
 		printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
 		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
-		storage := pvc.Spec.Resources.Requests[api.ResourceStorage]
+		storage := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 		capacity := ""
 		accessModes := ""
 		if pvc.Spec.VolumeName != "" {
 			accessModes = helper.GetAccessModesAsString(pvc.Status.AccessModes)
-			storage = pvc.Status.Capacity[api.ResourceStorage]
+			storage = pvc.Status.Capacity[corev1.ResourceStorage]
 			capacity = storage.String()
 		}
 		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
@@ -1474,9 +1473,9 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 	})
 }
 
-func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus,
+func describeContainers(label string, containers []corev1.Container, containerStatuses []corev1.ContainerStatus,
 	resolverFn EnvVarResolverFunc, w PrefixWriter, space string) {
-	statuses := map[string]api.ContainerStatus{}
+	statuses := map[string]corev1.ContainerStatus{}
 	for _, status := range containerStatuses {
 		statuses[status.Name] = status
 	}
@@ -1500,7 +1499,7 @@ func describeContainers(label string, containers []api.Container, containerStatu
 	}
 }
 
-func describeContainersLabel(containers []api.Container, label, space string, w PrefixWriter) {
+func describeContainersLabel(containers []corev1.Container, label, space string, w PrefixWriter) {
 	none := ""
 	if len(containers) == 0 {
 		none = " <none>"
@@ -1508,7 +1507,7 @@ func describeContainersLabel(containers []api.Container, label, space string, w 
 	w.Write(LEVEL_0, "%s%s:%s\n", space, label, none)
 }
 
-func describeContainerBasicInfo(container api.Container, status api.ContainerStatus, ok bool, space string, w PrefixWriter) {
+func describeContainerBasicInfo(container corev1.Container, status corev1.ContainerStatus, ok bool, space string, w PrefixWriter) {
 	nameIndent := ""
 	if len(space) > 0 {
 		nameIndent = " "
@@ -1535,7 +1534,7 @@ func describeContainerBasicInfo(container api.Container, status api.ContainerSta
 	}
 }
 
-func describeContainerPorts(cPorts []api.ContainerPort) string {
+func describeContainerPorts(cPorts []corev1.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
 		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
@@ -1543,7 +1542,7 @@ func describeContainerPorts(cPorts []api.ContainerPort) string {
 	return strings.Join(ports, ", ")
 }
 
-func describeContainerHostPorts(cPorts []api.ContainerPort) string {
+func describeContainerHostPorts(cPorts []corev1.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
 		ports = append(ports, fmt.Sprintf("%d/%s", cPort.HostPort, cPort.Protocol))
@@ -1551,7 +1550,7 @@ func describeContainerHostPorts(cPorts []api.ContainerPort) string {
 	return strings.Join(ports, ", ")
 }
 
-func describeContainerCommand(container api.Container, w PrefixWriter) {
+func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 	if len(container.Command) > 0 {
 		w.Write(LEVEL_2, "Command:\n")
 		for _, c := range container.Command {
@@ -1570,7 +1569,7 @@ func describeContainerCommand(container api.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerResource(container api.Container, w PrefixWriter) {
+func describeContainerResource(container corev1.Container, w PrefixWriter) {
 	resources := container.Resources
 	if len(resources.Limits) > 0 {
 		w.Write(LEVEL_2, "Limits:\n")
@@ -1589,7 +1588,7 @@ func describeContainerResource(container api.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerState(status api.ContainerStatus, w PrefixWriter) {
+func describeContainerState(status corev1.ContainerStatus, w PrefixWriter) {
 	describeStatus("State", status.State, w)
 	if status.LastTerminationState.Terminated != nil {
 		describeStatus("Last State", status.LastTerminationState, w)
@@ -1598,7 +1597,7 @@ func describeContainerState(status api.ContainerStatus, w PrefixWriter) {
 	w.Write(LEVEL_2, "Restart Count:\t%d\n", status.RestartCount)
 }
 
-func describeContainerProbe(container api.Container, w PrefixWriter) {
+func describeContainerProbe(container corev1.Container, w PrefixWriter) {
 	if container.LivenessProbe != nil {
 		probe := DescribeProbe(container.LivenessProbe)
 		w.Write(LEVEL_2, "Liveness:\t%s\n", probe)
@@ -1609,7 +1608,7 @@ func describeContainerProbe(container api.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerVolumes(container api.Container, w PrefixWriter) {
+func describeContainerVolumes(container corev1.Container, w PrefixWriter) {
 	// Show volumeMounts
 	none := ""
 	if len(container.VolumeMounts) == 0 {
@@ -1639,7 +1638,7 @@ func describeContainerVolumes(container api.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolverFunc, w PrefixWriter) {
+func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResolverFunc, w PrefixWriter) {
 	none := ""
 	if len(container.Env) == 0 {
 		none = "\t<none>"
@@ -1685,7 +1684,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 	}
 }
 
-func describeContainerEnvFrom(container api.Container, resolverFn EnvVarResolverFunc, w PrefixWriter) {
+func describeContainerEnvFrom(container corev1.Container, resolverFn EnvVarResolverFunc, w PrefixWriter) {
 	none := ""
 	if len(container.EnvFrom) == 0 {
 		none = "\t<none>"
@@ -1714,7 +1713,7 @@ func describeContainerEnvFrom(container api.Container, resolverFn EnvVarResolver
 }
 
 // DescribeProbe is exported for consumers in other API groups that have probes
-func DescribeProbe(probe *api.Probe) string {
+func DescribeProbe(probe *corev1.Probe) string {
 	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds #success=%d #failure=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
 	switch {
 	case probe.Exec != nil:
@@ -1735,11 +1734,11 @@ func DescribeProbe(probe *api.Probe) string {
 	return fmt.Sprintf("unknown %s", attrs)
 }
 
-type EnvVarResolverFunc func(e api.EnvVar) string
+type EnvVarResolverFunc func(e corev1.EnvVar) string
 
 // EnvValueFrom is exported for use by describers in other packages
-func EnvValueRetriever(pod *api.Pod) EnvVarResolverFunc {
-	return func(e api.EnvVar) string {
+func EnvValueRetriever(pod *corev1.Pod) EnvVarResolverFunc {
+	return func(e corev1.EnvVar) string {
 		gv, err := schema.ParseGroupVersion(e.ValueFrom.FieldRef.APIVersion)
 		if err != nil {
 			return ""
@@ -1759,7 +1758,7 @@ func EnvValueRetriever(pod *api.Pod) EnvVarResolverFunc {
 	}
 }
 
-func describeStatus(stateName string, state api.ContainerState, w PrefixWriter) {
+func describeStatus(stateName string, state corev1.ContainerState, w PrefixWriter) {
 	switch {
 	case state.Running != nil:
 		w.Write(LEVEL_2, "%s:\tRunning\n", stateName)
@@ -1788,7 +1787,7 @@ func describeStatus(stateName string, state api.ContainerState, w PrefixWriter) 
 	}
 }
 
-func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w PrefixWriter) {
+func describeVolumeClaimTemplates(templates []corev1.PersistentVolumeClaim, w PrefixWriter) {
 	if len(templates) == 0 {
 		w.Write(LEVEL_0, "Volume Claims:\t<none>\n")
 		return
@@ -1799,7 +1798,7 @@ func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w Prefi
 		w.Write(LEVEL_1, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(&pvc))
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
-		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
+		if capacity, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity.String())
 		} else {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", "<default>")
@@ -1844,7 +1843,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, controller)
 	}
@@ -1852,7 +1851,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 	return describeReplicationController(controller, events, running, waiting, succeeded, failed)
 }
 
-func describeReplicationController(controller *api.ReplicationController, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeReplicationController(controller *corev1.ReplicationController, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", controller.Name)
@@ -1877,7 +1876,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 	})
 }
 
-func DescribePodTemplate(template *api.PodTemplateSpec, w PrefixWriter) {
+func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	w.Write(LEVEL_0, "Pod Template:\n")
 	if template == nil {
 		w.Write(LEVEL_1, "<unset>")
@@ -1918,7 +1917,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 
 	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector, rs.UID)
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, rs)
 	}
@@ -1926,7 +1925,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
 }
 
-func describeReplicaSet(rs *apps.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
+func describeReplicaSet(rs *appsv1.ReplicaSet, events *corev1.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
@@ -1970,7 +1969,7 @@ func (d *JobDescriber) Describe(namespace, name string, describerSettings printe
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, job)
 	}
@@ -1978,7 +1977,7 @@ func (d *JobDescriber) Describe(namespace, name string, describerSettings printe
 	return describeJob(job, events)
 }
 
-func describeJob(job *batch.Job, events *api.EventList) (string, error) {
+func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", job.Name)
@@ -2029,12 +2028,12 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings pr
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, cronJob)
 	}
 
-	internalCronJob := &batch.CronJob{}
+	internalCronJob := &batchv1beta1.CronJob{}
 	if err := legacyscheme.Scheme.Convert(cronJob, internalCronJob, nil); err != nil {
 		return "", err
 	}
@@ -2042,7 +2041,7 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings pr
 	return describeCronJob(internalCronJob, events)
 }
 
-func describeCronJob(cronJob *batch.CronJob, events *api.EventList) (string, error) {
+func describeCronJob(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", cronJob.Name)
@@ -2071,7 +2070,7 @@ func describeCronJob(cronJob *batch.CronJob, events *api.EventList) (string, err
 	})
 }
 
-func describeJobTemplate(jobTemplate batch.JobTemplateSpec, w PrefixWriter) {
+func describeJobTemplate(jobTemplate batchv1beta1.JobTemplateSpec, w PrefixWriter) {
 	if jobTemplate.Spec.Selector != nil {
 		selector, _ := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
@@ -2094,7 +2093,7 @@ func describeJobTemplate(jobTemplate batch.JobTemplateSpec, w PrefixWriter) {
 	DescribePodTemplate(&jobTemplate.Spec.Template, w)
 }
 
-func printActiveJobs(w PrefixWriter, title string, jobs []api.ObjectReference) {
+func printActiveJobs(w PrefixWriter, title string, jobs []corev1.ObjectReference) {
 	w.Write(LEVEL_0, "%s:\t", title)
 	if len(jobs) == 0 {
 		w.WriteLine("<none>")
@@ -2133,7 +2132,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, daemon)
 	}
@@ -2141,7 +2140,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *apps.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *appsv1.DaemonSet, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
@@ -2184,13 +2183,13 @@ func (d *SecretDescriber) Describe(namespace, name string, describerSettings pri
 	return describeSecret(secret)
 }
 
-func describeSecret(secret *api.Secret) (string, error) {
+func describeSecret(secret *corev1.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", secret.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(w, "Labels", secret.Labels)
-		skipAnnotations := sets.NewString(api.LastAppliedConfigAnnotation)
+		skipAnnotations := sets.NewString(corev1.LastAppliedConfigAnnotation)
 		printAnnotationsMultilineWithFilter(w, "Annotations", secret.Annotations, skipAnnotations)
 
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
@@ -2198,7 +2197,7 @@ func describeSecret(secret *api.Secret) (string, error) {
 		w.Write(LEVEL_0, "\nData\n====\n")
 		for k, v := range secret.Data {
 			switch {
-			case k == api.ServiceAccountTokenKey && secret.Type == api.SecretTypeServiceAccountToken:
+			case k == corev1.ServiceAccountTokenKey && secret.Type == corev1.SecretTypeServiceAccountToken:
 				w.Write(LEVEL_0, "%s:\t%s\n", k, string(v))
 			default:
 				w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(v))
@@ -2222,7 +2221,7 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings pr
 	return i.describeIngress(ing, describerSettings)
 }
 
-func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
+func (i *IngressDescriber) describeBackend(ns string, backend *extensionsv1beta1.IngressBackend) string {
 	endpoints, _ := i.Core().Endpoints(ns).Get(backend.ServiceName, metav1.GetOptions{})
 	service, _ := i.Core().Services(ns).Get(backend.ServiceName, metav1.GetOptions{})
 	spName := ""
@@ -2242,7 +2241,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensions.Ingres
 	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSettings printers.DescriberSettings) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, describerSettings printers.DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
@@ -2253,7 +2252,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 		if def == nil {
 			// Ingresses that don't specify a default backend inherit the
 			// default backend in the kube-system namespace.
-			def = &extensions.IngressBackend{
+			def = &extensionsv1beta1.IngressBackend{
 				ServiceName: "default-http-backend",
 				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			}
@@ -2295,7 +2294,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 	})
 }
 
-func describeIngressTLS(w PrefixWriter, ingTLS []extensions.IngressTLS) {
+func describeIngressTLS(w PrefixWriter, ingTLS []extensionsv1beta1.IngressTLS) {
 	w.Write(LEVEL_0, "TLS:\n")
 	for _, t := range ingTLS {
 		if t.SecretName == "" {
@@ -2330,14 +2329,14 @@ func (d *ServiceDescriber) Describe(namespace, name string, describerSettings pr
 	}
 
 	endpoints, _ := d.Core().Endpoints(namespace).Get(name, metav1.GetOptions{})
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, service)
 	}
 	return describeService(service, endpoints, events)
 }
 
-func buildIngressString(ingress []api.LoadBalancerIngress) string {
+func buildIngressString(ingress []corev1.LoadBalancerIngress) string {
 	var buffer bytes.Buffer
 
 	for i := range ingress {
@@ -2353,9 +2352,9 @@ func buildIngressString(ingress []api.LoadBalancerIngress) string {
 	return buffer.String()
 }
 
-func describeService(service *api.Service, endpoints *api.Endpoints, events *api.EventList) (string, error) {
+func describeService(service *corev1.Service, endpoints *corev1.Endpoints, events *corev1.EventList) (string, error) {
 	if endpoints == nil {
-		endpoints = &api.Endpoints{}
+		endpoints = &corev1.Endpoints{}
 	}
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2427,7 +2426,7 @@ func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings 
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, ep)
 	}
@@ -2435,7 +2434,7 @@ func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings 
 	return describeEndpoints(ep, events)
 }
 
-func describeEndpoints(ep *api.Endpoints, events *api.EventList) (string, error) {
+func describeEndpoints(ep *corev1.Endpoints, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", ep.Name)
@@ -2502,7 +2501,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		return "", err
 	}
 
-	tokens := []api.Secret{}
+	tokens := []corev1.Secret{}
 
 	// missingSecrets is the set of all secrets present in the
 	// serviceAccount but not present in the set of existing secrets.
@@ -2517,9 +2516,9 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		existingSecrets := sets.NewString()
 
 		for _, s := range secrets.Items {
-			if s.Type == api.SecretTypeServiceAccountToken {
-				name, _ := s.Annotations[api.ServiceAccountNameKey]
-				uid, _ := s.Annotations[api.ServiceAccountUIDKey]
+			if s.Type == corev1.SecretTypeServiceAccountToken {
+				name, _ := s.Annotations[corev1.ServiceAccountNameKey]
+				uid, _ := s.Annotations[corev1.ServiceAccountUIDKey]
 				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
 					tokens = append(tokens, s)
 				}
@@ -2539,7 +2538,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		}
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, serviceAccount)
 	}
@@ -2547,7 +2546,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	return describeServiceAccount(serviceAccount, tokens, missingSecrets, events)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, missingSecrets sets.String, events *api.EventList) (string, error) {
+func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.String, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -2626,7 +2625,7 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings print
 	if err != nil {
 		return "", err
 	}
-	sort.Stable(rbacv1helpers.SortableRuleSlice(compactRules))
+	sort.Stable(internalrbacv1.SortableRuleSlice(compactRules))
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2665,7 +2664,7 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	sort.Stable(rbacv1helpers.SortableRuleSlice(compactRules))
+	sort.Stable(internalrbacv1.SortableRuleSlice(compactRules))
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2777,7 +2776,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 		return "", err
 	}
 
-	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
+	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(corev1.PodSucceeded) + ",status.phase!=" + string(corev1.PodFailed))
 	if err != nil {
 		return "", err
 	}
@@ -2792,7 +2791,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 		canViewPods = false
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, node); err != nil {
 			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
@@ -2806,7 +2805,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods)
 }
 
-func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
+func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -2839,8 +2838,8 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 			w.Write(LEVEL_1, "%s:\t%s\n", address.Type, address.Address)
 		}
 
-		printResourceList := func(resourceList api.ResourceList) {
-			resources := make([]api.ResourceName, 0, len(resourceList))
+		printResourceList := func(resourceList corev1.ResourceList) {
+			resources := make([]corev1.ResourceName, 0, len(resourceList))
 			for resource := range resourceList {
 				resources = append(resources, resource)
 			}
@@ -2911,7 +2910,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = p.client.Core().Events(namespace).Search(legacyscheme.Scheme, ps)
 	}
@@ -2919,7 +2918,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 	return describeStatefulSet(ps, selector, events, running, waiting, succeeded, failed)
 }
 
-func describeStatefulSet(ps *apps.StatefulSet, selector labels.Selector, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", ps.ObjectMeta.Name)
@@ -2932,7 +2931,7 @@ func describeStatefulSet(ps *apps.StatefulSet, selector labels.Selector, events 
 		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
 		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
 			ru := ps.Spec.UpdateStrategy.RollingUpdate
-			if ru.Partition != 0 {
+			if ru.Partition != nil {
 				w.Write(LEVEL_1, "Partition:\t%d\n", ru.Partition)
 			}
 		}
@@ -2958,7 +2957,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	cr, err := certificates.ParseCSR(csr)
+	cr, err := internalcertificatesv1beta1.ParseCSR(csr)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}
@@ -2967,7 +2966,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = p.client.Core().Events(namespace).Search(legacyscheme.Scheme, csr)
 	}
@@ -2975,7 +2974,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 	return describeCertificateSigningRequest(csr, cr, status, events)
 }
 
-func describeCertificateSigningRequest(csr *certificates.CertificateSigningRequest, cr *x509.CertificateRequest, status string, events *api.EventList) (string, error) {
+func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigningRequest, cr *x509.CertificateRequest, status string, events *corev1.EventList) (string, error) {
 	printListHelper := func(w PrefixWriter, prefix, name string, values []string) {
 		if len(values) == 0 {
 			return
@@ -3030,12 +3029,12 @@ type HorizontalPodAutoscalerDescriber struct {
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	hpa, err := d.client.Autoscaling().HorizontalPodAutoscalers(namespace).Get(name, metav1.GetOptions{})
+	hpa, err := d.client.AutoscalingV2beta2().HorizontalPodAutoscalers(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.client.Core().Events(namespace).Search(legacyscheme.Scheme, hpa)
 	}
@@ -3043,7 +3042,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	return describeHorizontalPodAutoscaler(hpa, events, d)
 }
 
-func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, events *api.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
+func describeHorizontalPodAutoscaler(hpa *autoscalingv2beta2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", hpa.Name)
@@ -3057,7 +3056,7 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
 		for i, metric := range hpa.Spec.Metrics {
 			switch metric.Type {
-			case autoscaling.ExternalMetricSourceType:
+			case autoscalingv2beta2.ExternalMetricSourceType:
 				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
@@ -3073,19 +3072,19 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.Value.String())
 
 				}
-			case autoscaling.PodsMetricSourceType:
+			case autoscalingv2beta2.PodsMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
 					current = hpa.Status.CurrentMetrics[i].Pods.Current.AverageValue.String()
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
-			case autoscaling.ObjectMetricSourceType:
+			case autoscalingv2beta2.ObjectMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
 					current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
 				}
 				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name, current, metric.Object.Target.Value.String())
-			case autoscaling.ResourceMetricSourceType:
+			case autoscalingv2beta2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -3135,7 +3134,7 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 	})
 }
 
-func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, w PrefixWriter) {
+func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev1.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
 	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAGE\n")
 	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\t---\n")
@@ -3146,7 +3145,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
 		req, limit := resourcehelper.PodRequestsAndLimits(&pod)
-		cpuReq, cpuLimit, memoryReq, memoryLimit := req[api.ResourceCPU], limit[api.ResourceCPU], req[api.ResourceMemory], limit[api.ResourceMemory]
+		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
 		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
@@ -3161,7 +3160,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	w.Write(LEVEL_1, "--------\t--------\t------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
-		reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory], reqs[api.ResourceEphemeralStorage], limits[api.ResourceEphemeralStorage]
+		reqs[corev1.ResourceCPU], limits[corev1.ResourceCPU], reqs[corev1.ResourceMemory], limits[corev1.ResourceMemory], reqs[corev1.ResourceEphemeralStorage], limits[corev1.ResourceEphemeralStorage]
 	fractionCpuReqs := float64(0)
 	fractionCpuLimits := float64(0)
 	if allocatable.Cpu().MilliValue() != 0 {
@@ -3181,26 +3180,26 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionEphemeralStorageLimits = float64(ephemeralstorageLimits.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
 	}
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		api.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
+		corev1.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		api.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		api.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
 	extResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if !helper.IsStandardContainerResourceName(string(resource)) && resource != api.ResourcePods {
+		if !helper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
 	sort.Strings(extResources)
 	for _, ext := range extResources {
-		extRequests, extLimits := reqs[api.ResourceName(ext)], limits[api.ResourceName(ext)]
+		extRequests, extLimits := reqs[corev1.ResourceName(ext)], limits[corev1.ResourceName(ext)]
 		w.Write(LEVEL_1, "%s\t%s\t%s\n", ext, extRequests.String(), extLimits.String())
 	}
 }
 
-func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity) {
-	reqs, limits = map[api.ResourceName]resource.Quantity{}, map[api.ResourceName]resource.Quantity{}
+func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
+	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
 		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
 		for podReqName, podReqValue := range podReqs {
@@ -3223,7 +3222,7 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 	return
 }
 
-func DescribeEvents(el *api.EventList, w PrefixWriter) {
+func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 	if len(el.Items) == 0 {
 		w.Write(LEVEL_0, "Events:\t<none>\n")
 		return
@@ -3264,12 +3263,12 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	internalDeployment := &apps.Deployment{}
-	if err := legacyscheme.Scheme.Convert(d, internalDeployment, apps.SchemeGroupVersion); err != nil {
+	internalDeployment := &appsv1.Deployment{}
+	if err := legacyscheme.Scheme.Convert(d, internalDeployment, appsv1.SchemeGroupVersion); err != nil {
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = dd.Core().Events(namespace).Search(legacyscheme.Scheme, d)
 	}
@@ -3277,7 +3276,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	return describeDeployment(d, selector, internalDeployment, events, dd)
 }
 
-func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *apps.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
+func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *appsv1.Deployment, events *corev1.EventList, dd *DeploymentDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
@@ -3345,13 +3344,13 @@ func getPodStatusForController(c coreclient.PodInterface, selector labels.Select
 			continue
 		}
 		switch pod.Status.Phase {
-		case api.PodRunning:
+		case corev1.PodRunning:
 			running++
-		case api.PodPending:
+		case corev1.PodPending:
 			waiting++
-		case api.PodSucceeded:
+		case corev1.PodSucceeded:
 			succeeded++
-		case api.PodFailed:
+		case corev1.PodFailed:
 			failed++
 		}
 	}
@@ -3396,7 +3395,7 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 	})
 }
 
-// NetworkPolicyDescriber generates information about a networking.NetworkPolicy
+// NetworkPolicyDescriber generates information about a networkingv1.NetworkPolicy
 type NetworkPolicyDescriber struct {
 	clientset.Interface
 }
@@ -3412,7 +3411,7 @@ func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSetti
 	return describeNetworkPolicy(networkPolicy)
 }
 
-func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, error) {
+func describeNetworkPolicy(networkPolicy *networkingv1.NetworkPolicy) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
@@ -3425,7 +3424,7 @@ func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, err
 	})
 }
 
-func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter) {
+func describeNetworkPolicySpec(nps networkingv1.NetworkPolicySpec, w PrefixWriter) {
 	w.Write(LEVEL_0, "Spec:\n")
 	w.Write(LEVEL_1, "PodSelector: ")
 	if len(nps.PodSelector.MatchLabels) == 0 && len(nps.PodSelector.MatchExpressions) == 0 {
@@ -3440,7 +3439,7 @@ func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter)
 	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
 }
 
-func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
+func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
 	if len(npirs) == 0 {
 		w.Write(LEVEL_0, "%s%s\n", initialIndent, "<none> (Selected pods are isolated for ingress connectivity)")
 		return
@@ -3450,11 +3449,11 @@ func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRu
 			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
 		} else {
 			for _, port := range npir.Ports {
-				var proto api.Protocol
+				var proto corev1.Protocol
 				if port.Protocol != nil {
 					proto = *port.Protocol
 				} else {
-					proto = api.ProtocolTCP
+					proto = corev1.ProtocolTCP
 				}
 				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
 			}
@@ -3484,7 +3483,7 @@ func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRu
 	}
 }
 
-func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, initialIndent string, w PrefixWriter) {
+func printNetworkPolicySpecEgressTo(npers []networkingv1.NetworkPolicyEgressRule, initialIndent string, w PrefixWriter) {
 	if len(npers) == 0 {
 		w.Write(LEVEL_0, "%s%s\n", initialIndent, "<none> (Selected pods are isolated for egress connectivity)")
 		return
@@ -3494,11 +3493,11 @@ func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, 
 			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
 		} else {
 			for _, port := range nper.Ports {
-				var proto api.Protocol
+				var proto corev1.Protocol
 				if port.Protocol != nil {
 					proto = *port.Protocol
 				} else {
-					proto = api.ProtocolTCP
+					proto = corev1.ProtocolTCP
 				}
 				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
 			}
@@ -3538,7 +3537,7 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = s.Core().Events(namespace).Search(legacyscheme.Scheme, sc)
 	}
@@ -3546,7 +3545,7 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 	return describeStorageClass(sc, events)
 }
 
-func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (string, error) {
+func describeStorageClass(sc *storagev1.StorageClass, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", sc.Name)
@@ -3580,7 +3579,7 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 	})
 }
 
-func printAllowedTopologies(w PrefixWriter, topologies []api.TopologySelectorTerm) {
+func printAllowedTopologies(w PrefixWriter, topologies []corev1.TopologySelectorTerm) {
 	w.Write(LEVEL_0, "AllowedTopologies:\t")
 	if len(topologies) == 0 {
 		w.WriteLine("<none>")
@@ -3592,7 +3591,7 @@ func printAllowedTopologies(w PrefixWriter, topologies []api.TopologySelectorTer
 	}
 }
 
-func printTopologySelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []api.TopologySelectorLabelRequirement) {
+func printTopologySelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []corev1.TopologySelectorLabelRequirement) {
 	w.Write(indentLevel, "%s:%s", title, innerIndent)
 
 	if len(reqs) == 0 {
@@ -3622,7 +3621,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = p.Core().Events(namespace).Search(legacyscheme.Scheme, pdb)
 	}
@@ -3630,7 +3629,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 	return describePodDisruptionBudget(pdb, events)
 }
 
-func describePodDisruptionBudget(pdb *policy.PodDisruptionBudget, events *api.EventList) (string, error) {
+func describePodDisruptionBudget(pdb *policyv1beta1.PodDisruptionBudget, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pdb.Name)
@@ -3671,7 +3670,7 @@ func (s *PriorityClassDescriber) Describe(namespace, name string, describerSetti
 		return "", err
 	}
 
-	var events *api.EventList
+	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		events, _ = s.Core().Events(namespace).Search(legacyscheme.Scheme, pc)
 	}
@@ -3679,7 +3678,7 @@ func (s *PriorityClassDescriber) Describe(namespace, name string, describerSetti
 	return describePriorityClass(pc, events)
 }
 
-func describePriorityClass(pc *scheduling.PriorityClass, events *api.EventList) (string, error) {
+func describePriorityClass(pc *schedulingv1beta1.PriorityClass, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
@@ -3696,7 +3695,7 @@ func describePriorityClass(pc *scheduling.PriorityClass, events *api.EventList) 
 	})
 }
 
-// PodSecurityPolicyDescriber generates information about a PodSecurityPolicy.
+// PodSecurityPolicyDescriber generates information about a PodSecuritypolicyv1beta1.
 type PodSecurityPolicyDescriber struct {
 	clientset.Interface
 }
@@ -3710,7 +3709,7 @@ func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerS
 	return describePodSecurityPolicy(psp)
 }
 
-func describePodSecurityPolicy(psp *policy.PodSecurityPolicy) (string, error) {
+func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", psp.Name)
@@ -3776,7 +3775,7 @@ func stringOrDefaultValue(s, defaultValue string) string {
 	return defaultValue
 }
 
-func fsTypeToString(volumes []policy.FSType) string {
+func fsTypeToString(volumes []policyv1beta1.FSType) string {
 	strVolumes := []string{}
 	for _, v := range volumes {
 		strVolumes = append(strVolumes, string(v))
@@ -3784,7 +3783,7 @@ func fsTypeToString(volumes []policy.FSType) string {
 	return stringOrNone(strings.Join(strVolumes, ","))
 }
 
-func flexVolumesToString(flexVolumes []policy.AllowedFlexVolume) string {
+func flexVolumesToString(flexVolumes []policyv1beta1.AllowedFlexVolume) string {
 	volumes := []string{}
 	for _, flexVolume := range flexVolumes {
 		volumes = append(volumes, "driver="+flexVolume.Driver)
@@ -3796,7 +3795,7 @@ func sysctlsToString(sysctls []string) string {
 	return stringOrNone(strings.Join(sysctls, ","))
 }
 
-func hostPortRangeToString(ranges []policy.HostPortRange) string {
+func hostPortRangeToString(ranges []policyv1beta1.HostPortRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}
@@ -3808,7 +3807,7 @@ func hostPortRangeToString(ranges []policy.HostPortRange) string {
 	return stringOrNone(formattedString)
 }
 
-func idRangeToString(ranges []policy.IDRange) string {
+func idRangeToString(ranges []policyv1beta1.IDRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}
@@ -3820,7 +3819,7 @@ func idRangeToString(ranges []policy.IDRange) string {
 	return stringOrNone(formattedString)
 }
 
-func capsToString(caps []api.Capability) string {
+func capsToString(caps []corev1.Capability) string {
 	formattedString := ""
 	if caps != nil {
 		strCaps := []string{}
@@ -3832,7 +3831,7 @@ func capsToString(caps []api.Capability) string {
 	return stringOrNone(formattedString)
 }
 
-func policyTypesToString(pts []networking.PolicyType) string {
+func policyTypesToString(pts []networkingv1.PolicyType) string {
 	formattedString := ""
 	if pts != nil {
 		strPts := []string{}
@@ -4024,12 +4023,12 @@ func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 }
 
 // printTaintsMultiline prints multiple taints with a proper alignment.
-func printNodeTaintsMultiline(w PrefixWriter, title string, taints []api.Taint) {
+func printNodeTaintsMultiline(w PrefixWriter, title string, taints []corev1.Taint) {
 	printTaintsMultilineWithIndent(w, "", title, "\t", taints)
 }
 
 // printTaintsMultilineWithIndent prints multiple taints with a user-defined alignment.
-func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, taints []api.Taint) {
+func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, taints []corev1.Taint) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if taints == nil || len(taints) == 0 {
@@ -4039,7 +4038,7 @@ func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 
 	// to print taints in the sorted order
 	sort.Slice(taints, func(i, j int) bool {
-		cmpKey := func(taint api.Taint) string {
+		cmpKey := func(taint corev1.Taint) string {
 			return string(taint.Effect) + "," + taint.Key
 		}
 		return cmpKey(taints[i]) < cmpKey(taints[j])
@@ -4055,12 +4054,12 @@ func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 }
 
 // printPodsMultiline prints multiple pods with a proper alignment.
-func printPodsMultiline(w PrefixWriter, title string, pods []api.Pod) {
+func printPodsMultiline(w PrefixWriter, title string, pods []corev1.Pod) {
 	printPodsMultilineWithIndent(w, "", title, "\t", pods)
 }
 
 // printPodsMultilineWithIndent prints multiple pods with a user-defined alignment.
-func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, pods []api.Pod) {
+func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, pods []corev1.Pod) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if pods == nil || len(pods) == 0 {
@@ -4070,7 +4069,7 @@ func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerInd
 
 	// to print pods in the sorted order
 	sort.Slice(pods, func(i, j int) bool {
-		cmpKey := func(pod api.Pod) string {
+		cmpKey := func(pod corev1.Pod) string {
 			return pod.Name
 		}
 		return cmpKey(pods[i]) < cmpKey(pods[j])
@@ -4086,12 +4085,12 @@ func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerInd
 }
 
 // printPodTolerationsMultiline prints multiple tolerations with a proper alignment.
-func printPodTolerationsMultiline(w PrefixWriter, title string, tolerations []api.Toleration) {
+func printPodTolerationsMultiline(w PrefixWriter, title string, tolerations []corev1.Toleration) {
 	printTolerationsMultilineWithIndent(w, "", title, "\t", tolerations)
 }
 
 // printTolerationsMultilineWithIndent prints multiple tolerations with a user-defined alignment.
-func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, tolerations []api.Toleration) {
+func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, tolerations []corev1.Toleration) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if tolerations == nil || len(tolerations) == 0 {
@@ -4142,7 +4141,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	return str, nil
 }
 
-type SortableResourceNames []api.ResourceName
+type SortableResourceNames []corev1.ResourceName
 
 func (list SortableResourceNames) Len() int {
 	return len(list)
@@ -4157,8 +4156,8 @@ func (list SortableResourceNames) Less(i, j int) bool {
 }
 
 // SortedResourceNames returns the sorted resource names of a resource list.
-func SortedResourceNames(list api.ResourceList) []api.ResourceName {
-	resources := make([]api.ResourceName, 0, len(list))
+func SortedResourceNames(list corev1.ResourceList) []corev1.ResourceName {
+	resources := make([]corev1.ResourceName, 0, len(list))
 	for res := range list {
 		resources = append(resources, res)
 	}
@@ -4166,7 +4165,7 @@ func SortedResourceNames(list api.ResourceList) []api.ResourceName {
 	return resources
 }
 
-type SortableResourceQuotas []api.ResourceQuota
+type SortableResourceQuotas []corev1.ResourceQuota
 
 func (list SortableResourceQuotas) Len() int {
 	return len(list)
@@ -4180,7 +4179,7 @@ func (list SortableResourceQuotas) Less(i, j int) bool {
 	return list[i].Name < list[j].Name
 }
 
-type SortableVolumeMounts []api.VolumeMount
+type SortableVolumeMounts []corev1.VolumeMount
 
 func (list SortableVolumeMounts) Len() int {
 	return len(list)
@@ -4194,7 +4193,7 @@ func (list SortableVolumeMounts) Less(i, j int) bool {
 	return list[i].MountPath < list[j].MountPath
 }
 
-type SortableVolumeDevices []api.VolumeDevice
+type SortableVolumeDevices []corev1.VolumeDevice
 
 func (list SortableVolumeDevices) Len() int {
 	return len(list)

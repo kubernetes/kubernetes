@@ -17,7 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
+	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"sort"
 	"testing"
@@ -25,21 +25,21 @@ import (
 
 func TestSortableResourceNamesSorting(t *testing.T) {
 	want := SortableResourceNames{
-		api.ResourceName(""),
-		api.ResourceName("42"),
-		api.ResourceName("bar"),
-		api.ResourceName("foo"),
-		api.ResourceName("foo"),
-		api.ResourceName("foobar"),
+		corev1.ResourceName(""),
+		corev1.ResourceName("42"),
+		corev1.ResourceName("bar"),
+		corev1.ResourceName("foo"),
+		corev1.ResourceName("foo"),
+		corev1.ResourceName("foobar"),
 	}
 
 	in := SortableResourceNames{
-		api.ResourceName("foo"),
-		api.ResourceName("42"),
-		api.ResourceName("foobar"),
-		api.ResourceName("foo"),
-		api.ResourceName("bar"),
-		api.ResourceName(""),
+		corev1.ResourceName("foo"),
+		corev1.ResourceName("42"),
+		corev1.ResourceName("foobar"),
+		corev1.ResourceName("foo"),
+		corev1.ResourceName("bar"),
+		corev1.ResourceName(""),
 	}
 
 	sort.Sort(in)

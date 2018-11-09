@@ -17,11 +17,11 @@ limitations under the License.
 package events
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // SortableEvents implements sort.Interface for []api.Event based on the Timestamp field
-type SortableEvents []api.Event
+type SortableEvents []corev1.Event
 
 func (list SortableEvents) Len() int {
 	return len(list)

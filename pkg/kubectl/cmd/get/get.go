@@ -40,10 +40,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/printers"
@@ -150,11 +150,11 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	o := NewGetOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
+		Use: "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display one or many resources"),
-		Long:                  getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
-		Example:               getExample,
+		Short:   i18n.T("Display one or many resources"),
+		Long:    getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
+		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
@@ -381,7 +381,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 	return &RuntimeSorter{
 		field:   parsedField,
-		decoder: legacyscheme.Codecs.UniversalDecoder(),
+		decoder: scheme.Codecs.UniversalDecoder(),
 		objects: objects,
 	}
 }
@@ -552,13 +552,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			continue
 		}
 
-		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
+		obj, err := scheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			// if there's an error, try to print what you have (mirrors old behavior).
 			klog.V(1).Info(err)
 			printer.PrintObj(info.Object, w)
 		} else {
-			printer.PrintObj(internalObj, w)
+			printer.PrintObj(obj, w)
 		}
 	}
 	w.Flush()
@@ -654,9 +654,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		}
 		for _, objToPrint := range objsToPrint {
 			if o.IsHumanReadablePrinter {
-				// printing always takes the internal version, but the watch event uses externals
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
+				objToPrint = attemptToConvertToInternal(objToPrint, scheme.Scheme, mapping.GroupVersionKind.GroupVersion())
 			}
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
@@ -687,8 +685,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			// TODO fix printing to use server-side or be version agnostic
 			objToPrint := e.Object
 			if o.IsHumanReadablePrinter {
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
+				objToPrint = attemptToConvertToInternal(e.Object, scheme.Scheme, mapping.GroupVersionKind.GroupVersion())
 			}
 			if err := printer.PrintObj(objToPrint, o.Out); err != nil {
 				return false, err

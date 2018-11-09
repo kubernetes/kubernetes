@@ -12,7 +12,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/endpoints:all-srcs",
-        "//pkg/api/events:all-srcs",
         "//pkg/api/legacyscheme:all-srcs",
         "//pkg/api/persistentvolume:all-srcs",
         "//pkg/api/persistentvolumeclaim:all-srcs",
@@ -24,6 +23,7 @@ filegroup(
         "//pkg/api/testapi:all-srcs",
         "//pkg/api/testing:all-srcs",
         "//pkg/api/v1/endpoints:all-srcs",
+        "//pkg/api/v1/events:all-srcs",
         "//pkg/api/v1/node:all-srcs",
         "//pkg/api/v1/persistentvolume:all-srcs",
         "//pkg/api/v1/pod:all-srcs",

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
@@ -524,4 +525,16 @@ func ScopedResourceSelectorRequirementsAsSelector(ssr v1.ScopedResourceSelectorR
 	}
 	selector = selector.Add(*r)
 	return selector, nil
+}
+
+var standardContainerResources = sets.NewString(
+	string(v1.ResourceCPU),
+	string(v1.ResourceMemory),
+	string(v1.ResourceEphemeralStorage),
+)
+
+// IsStandardContainerResourceName returns true if the container can make a resource request
+// for the specified resource
+func IsStandardContainerResourceName(str string) bool {
+	return standardContainerResources.Has(str) || IsHugePageResourceName(v1.ResourceName(str))
 }
