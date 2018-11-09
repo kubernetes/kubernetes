@@ -45,6 +45,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/google/cadvisor/metrics:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
