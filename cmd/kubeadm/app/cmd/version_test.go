@@ -19,8 +19,8 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 	"testing"
 )
 

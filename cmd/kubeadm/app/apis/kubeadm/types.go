@@ -295,9 +295,6 @@ type JoinConfiguration struct {
 
 	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
 	APIEndpoint APIEndpoint
-
-	// FeatureGates enabled by the user.
-	FeatureGates map[string]bool
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process

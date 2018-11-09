@@ -26,7 +26,7 @@ import (
 	"os"
 	"time"
 
-	yaml "github.com/ghodss/yaml"
+	yaml "sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/value"

@@ -365,6 +365,22 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a configMap.", func() {
+		found, unchanged := 0, 0
+		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if len(configmaps.Items) == found {
+				// loop until the number of configmaps has stabilized for 5 seconds
+				unchanged++
+				return unchanged > 4, nil
+			}
+			unchanged = 0
+			found = len(configmaps.Items)
+			return false, nil
+		})
+		defaultConfigMaps := fmt.Sprintf("%d", found)
+		hardConfigMaps := fmt.Sprintf("%d", found+1)
+
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
@@ -374,6 +390,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
 		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceConfigMaps] = resource.MustParse(defaultConfigMaps)
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -385,7 +402,10 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		By("Ensuring resource quota status captures configMap creation")
 		usedResources = v1.ResourceList{}
 		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		usedResources[v1.ResourceConfigMaps] = resource.MustParse("1")
+		// we expect there to be two configmaps because each namespace will receive
+		// a ca.crt configmap by default.
+		// ref:https://github.com/kubernetes/kubernetes/pull/68812
+		usedResources[v1.ResourceConfigMaps] = resource.MustParse(hardConfigMaps)
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -394,7 +414,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
-		usedResources[v1.ResourceConfigMaps] = resource.MustParse("0")
+		usedResources[v1.ResourceConfigMaps] = resource.MustParse(defaultConfigMaps)
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})

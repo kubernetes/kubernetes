@@ -94,7 +94,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
-	waiter, err := NewControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
+	waiter, err := newControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
@@ -144,7 +144,7 @@ func printFilesIfDryRunning(data waitControlPlaneData) error {
 
 // NewControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
 // TODO: make private (lowercase) after self-hosting phase is removed.
-func NewControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
+func newControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
 	if dryRun {
 		return dryrunutil.NewWaiter(), nil
 	}

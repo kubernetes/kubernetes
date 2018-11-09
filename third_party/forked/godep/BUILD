@@ -1,5 +1,7 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
+licenses(["notice"])
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -24,8 +26,7 @@ go_library(
         "vcs.go",
         "version.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/tools/godep",
-    importpath = "github.com/tools/godep",
+    importpath = "k8s.io/kubernetes/third_party/forked/godep",
     visibility = ["//visibility:private"],
     deps = [
         "//vendor/github.com/kr/fs:go_default_library",

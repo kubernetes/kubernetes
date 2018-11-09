@@ -151,7 +151,7 @@ func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, patt
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = "2Gi"
+			p.claimSize = "5Gi"
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)

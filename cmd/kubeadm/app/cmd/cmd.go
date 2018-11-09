@@ -89,7 +89,7 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
-	cmds.AddCommand(alpha.NewCmdAlpha(out))
+	cmds.AddCommand(alpha.NewCmdAlpha(in, out))
 
 	AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
 

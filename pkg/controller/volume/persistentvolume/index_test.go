@@ -494,7 +494,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("5G"),
 				},
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					Glusterfs: &v1.GlusterfsVolumeSource{},
+					Glusterfs: &v1.GlusterfsPersistentVolumeSource{},
 				},
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,
@@ -539,7 +539,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					Glusterfs: &v1.GlusterfsVolumeSource{},
+					Glusterfs: &v1.GlusterfsPersistentVolumeSource{},
 				},
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,
@@ -582,7 +582,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
 				},
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					Glusterfs: &v1.GlusterfsVolumeSource{},
+					Glusterfs: &v1.GlusterfsPersistentVolumeSource{},
 				},
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,

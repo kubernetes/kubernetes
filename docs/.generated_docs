@@ -35,10 +35,10 @@ docs/admin/kubeadm_alpha_phase_bootstrap-token_node.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-auto-approve.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-post-csrs.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
-docs/admin/kubeadm_alpha_phase_selfhosting.md
-docs/admin/kubeadm_alpha_phase_selfhosting_convert-from-staticpods.md
 docs/admin/kubeadm_alpha_preflight.md
 docs/admin/kubeadm_alpha_preflight_node.md
+docs/admin/kubeadm_alpha_selfhosting.md
+docs/admin/kubeadm_alpha_selfhosting_pivot.md
 docs/admin/kubeadm_completion.md
 docs/admin/kubeadm_config.md
 docs/admin/kubeadm_config_images.md
@@ -131,11 +131,11 @@ docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-post-csrs.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
-docs/man/man1/kubeadm-alpha-phase-selfhosting-convert-from-staticpods.1
-docs/man/man1/kubeadm-alpha-phase-selfhosting.1
 docs/man/man1/kubeadm-alpha-phase.1
 docs/man/man1/kubeadm-alpha-preflight-node.1
 docs/man/man1/kubeadm-alpha-preflight.1
+docs/man/man1/kubeadm-alpha-selfhosting-pivot.1
+docs/man/man1/kubeadm-alpha-selfhosting.1
 docs/man/man1/kubeadm-alpha.1
 docs/man/man1/kubeadm-completion.1
 docs/man/man1/kubeadm-config-images-list.1

@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"net"
 	goruntime "runtime"
+	"sort"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -348,8 +350,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 }
 
 // syncNodeStatus should be called periodically from a goroutine.
-// It synchronizes node status to master, registering the kubelet first if
-// necessary.
+// It synchronizes node status to master if there is any change or enough time
+// passed from the last sync, registering the kubelet first if necessary.
 func (kl *Kubelet) syncNodeStatus() {
 	kl.syncNodeStatusMux.Lock()
 	defer kl.syncNodeStatusMux.Unlock()
@@ -366,7 +368,8 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
-// updateNodeStatus updates node status to master with retries.
+// updateNodeStatus updates node status to master with retries if there is any
+// change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus() error {
 	glog.V(5).Infof("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
@@ -382,7 +385,8 @@ func (kl *Kubelet) updateNodeStatus() error {
 	return fmt.Errorf("update node status exceeds retry count")
 }
 
-// tryUpdateNodeStatus tries to update node status to master.
+// tryUpdateNodeStatus tries to update node status to master if there is any
+// change or enough time passed from the last sync.
 func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
@@ -404,18 +408,31 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		return fmt.Errorf("nil %q node object", kl.nodeName)
 	}
 
+	podCIDRChanged := false
 	if node.Spec.PodCIDR != "" {
-		if err := kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
+		// Pod CIDR could have been updated before, so we cannot rely on
+		// node.Spec.PodCIDR being non-empty. We also need to know if pod CIDR is
+		// actually changed.
+		if podCIDRChanged, err = kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
 			glog.Errorf(err.Error())
 		}
 	}
 
 	kl.setNodeStatus(node)
+
+	now := kl.clock.Now()
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) && now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
+		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
+			return nil
+		}
+	}
+
 	// Patch the current status on the API server
 	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)
 	if err != nil {
 		return err
 	}
+	kl.lastStatusReportTime = now
 	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)
 	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
 	// those volumes are already updated in the node's status
@@ -552,4 +569,54 @@ func validateNodeIP(nodeIP net.IP) error {
 		}
 	}
 	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", nodeIP.String())
+}
+
+// nodeStatusHasChanged compares the original node and current node's status and
+// returns true if any change happens. The heartbeat timestamp is ignored.
+func nodeStatusHasChanged(originalStatus *v1.NodeStatus, status *v1.NodeStatus) bool {
+	if originalStatus == nil && status == nil {
+		return false
+	}
+	if originalStatus == nil || status == nil {
+		return true
+	}
+
+	// Compare node conditions here because we need to ignore the heartbeat timestamp.
+	if nodeConditionsHaveChanged(originalStatus.Conditions, status.Conditions) {
+		return true
+	}
+
+	// Compare other fields of NodeStatus.
+	originalStatusCopy := originalStatus.DeepCopy()
+	statusCopy := status.DeepCopy()
+	originalStatusCopy.Conditions = nil
+	statusCopy.Conditions = nil
+	return !apiequality.Semantic.DeepEqual(originalStatusCopy, statusCopy)
+}
+
+// nodeConditionsHaveChanged compares the original node and current node's
+// conditions and returns true if any change happens. The heartbeat timestamp is
+// ignored.
+func nodeConditionsHaveChanged(originalConditions []v1.NodeCondition, conditions []v1.NodeCondition) bool {
+	if len(originalConditions) != len(conditions) {
+		return true
+	}
+
+	originalConditionsCopy := make([]v1.NodeCondition, 0, len(originalConditions))
+	originalConditionsCopy = append(originalConditionsCopy, originalConditions...)
+	conditionsCopy := make([]v1.NodeCondition, 0, len(conditions))
+	conditionsCopy = append(conditionsCopy, conditions...)
+
+	sort.SliceStable(originalConditionsCopy, func(i, j int) bool { return originalConditionsCopy[i].Type < originalConditionsCopy[j].Type })
+	sort.SliceStable(conditionsCopy, func(i, j int) bool { return conditionsCopy[i].Type < conditionsCopy[j].Type })
+
+	replacedheartbeatTime := metav1.Time{}
+	for i := range conditionsCopy {
+		originalConditionsCopy[i].LastHeartbeatTime = replacedheartbeatTime
+		conditionsCopy[i].LastHeartbeatTime = replacedheartbeatTime
+		if !apiequality.Semantic.DeepEqual(&originalConditionsCopy[i], &conditionsCopy[i]) {
+			return true
+		}
+	}
+	return false
 }

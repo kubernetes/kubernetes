@@ -31,5 +31,5 @@ fi
 kube::util::ensure_godep_version
 
 kube::log::status "Downloading dependencies - this might take a while"
-GOPATH="${GOPATH}:${KUBE_ROOT}/staging" godep restore "$@"
+GOPATH="${GOPATH}:${KUBE_ROOT}/staging" ${KUBE_GODEP:?} restore "$@"
 kube::log::status "Done"

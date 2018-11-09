@@ -502,7 +502,7 @@ func autoConvert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Joi
 	if err := Convert_v1alpha3_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err
 	}
-	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	// WARNING: in.FeatureGates requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -517,7 +517,6 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kub
 	if err := Convert_kubeadm_APIEndpoint_To_v1alpha3_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err
 	}
-	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 

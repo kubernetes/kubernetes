@@ -13,7 +13,6 @@ Discovery:
   File: null
   TLSBootstrapToken: abcdef.0123456789abcdef
   Timeout: 5m0s
-FeatureGates: null
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
   KubeletExtraArgs: null

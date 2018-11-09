@@ -270,8 +270,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			cfg: &kubeadmapi.InitConfiguration{
 				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:   kubeadmapi.Networking{ServiceSubnet: "bar"},
-					FeatureGates: map[string]bool{features.HighAvailability: true},
+					Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
 					Etcd: kubeadmapi.Etcd{
 						External: &kubeadmapi.ExternalEtcd{
 							Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"},
@@ -311,7 +310,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--etcd-cafile=fuz",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
-				fmt.Sprintf("--endpoint-reconciler-type=%s", kubeadmconstants.LeaseEndpointReconcilerType),
 			},
 		},
 		{
@@ -356,12 +354,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "auditing and HA are enabled with a custom log max age of 0",
+			name: "auditing is enabled with a custom log max age of 0",
 			cfg: &kubeadmapi.InitConfiguration{
 				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					FeatureGates:    map[string]bool{features.HighAvailability: true, features.Auditing: true},
+					FeatureGates:    map[string]bool{features.Auditing: true},
 					CertificatesDir: testCertsDir,
 					AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
 						LogMaxAge: utilpointer.Int32Ptr(0),
@@ -396,7 +394,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
 				"--etcd-certfile=" + testCertsDir + "/apiserver-etcd-client.crt",
 				"--etcd-keyfile=" + testCertsDir + "/apiserver-etcd-client.key",
-				fmt.Sprintf("--endpoint-reconciler-type=%s", kubeadmconstants.LeaseEndpointReconcilerType),
 				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
 				"--audit-log-maxage=0",

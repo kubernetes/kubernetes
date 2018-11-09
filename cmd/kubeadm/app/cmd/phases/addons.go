@@ -49,7 +49,7 @@ var (
 		# Installs the CoreDNS and the kube-proxy addons components via the API server,
 		# functionally equivalent to what installed by kubeadm init. 
 
-		kubeadm alpha phase selfhosting from-staticpods
+		kubeadm alpha phase self-hosting from-staticpods
 		`)
 
 	corednsAddonsLongDesc = normalizer.LongDesc(`

@@ -58,6 +58,11 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
+	// Check if the cluster is self-hosted
+	if upgrade.IsControlPlaneSelfHosted(client) {
+		return nil, errors.Errorf("cannot upgrade a self-hosted control plane")
+	}
+
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
 		return nil, errors.Wrap(err, "[upgrade/health] FATAL")

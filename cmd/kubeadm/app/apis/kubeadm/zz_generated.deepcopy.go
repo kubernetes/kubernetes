@@ -446,13 +446,6 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 	in.Discovery.DeepCopyInto(&out.Discovery)
 	out.APIEndpoint = in.APIEndpoint
-	if in.FeatureGates != nil {
-		in, out := &in.FeatureGates, &out.FeatureGates
-		*out = make(map[string]bool, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	return
 }
 
