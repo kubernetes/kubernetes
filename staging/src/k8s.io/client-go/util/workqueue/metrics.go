@@ -28,6 +28,7 @@ type queueMetrics interface {
 	add(item t)
 	get(item t)
 	done(item t)
+	updateUnfinishedWork()
 }
 
 // GaugeMetric represents a single numerical value that can arbitrarily go up
@@ -35,6 +36,12 @@ type queueMetrics interface {
 type GaugeMetric interface {
 	Inc()
 	Dec()
+}
+
+// SettableGaugeMetric represents a single numerical value that can arbitrarily go up
+// and down. (Separate from GaugeMetric to preserve backwards compatibility.)
+type SettableGaugeMetric interface {
+	Set(float64)
 }
 
 // CounterMetric represents a single numerical value that only ever
@@ -52,6 +59,7 @@ type noopMetric struct{}
 
 func (noopMetric) Inc()            {}
 func (noopMetric) Dec()            {}
+func (noopMetric) Set(float64)     {}
 func (noopMetric) Observe(float64) {}
 
 type defaultQueueMetrics struct {
@@ -65,6 +73,9 @@ type defaultQueueMetrics struct {
 	workDuration         SummaryMetric
 	addTimes             map[t]time.Time
 	processingStartTimes map[t]time.Time
+
+	// how long have current threads been working?
+	unfinishedWorkMicroseconds SettableGaugeMetric
 }
 
 func (m *defaultQueueMetrics) add(item t) {
@@ -103,6 +114,23 @@ func (m *defaultQueueMetrics) done(item t) {
 	}
 }
 
+func (m *defaultQueueMetrics) updateUnfinishedWork() {
+	var total float64
+	if m.processingStartTimes != nil {
+		for _, t := range m.processingStartTimes {
+			total += sinceInMicroseconds(t)
+		}
+	}
+	m.unfinishedWorkMicroseconds.Set(total)
+}
+
+type noMetrics struct{}
+
+func (noMetrics) add(item t)            {}
+func (noMetrics) get(item t)            {}
+func (noMetrics) done(item t)           {}
+func (noMetrics) updateUnfinishedWork() {}
+
 // Gets the time since the specified start in microseconds.
 func sinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
@@ -130,6 +158,7 @@ type MetricsProvider interface {
 	NewAddsMetric(name string) CounterMetric
 	NewLatencyMetric(name string) SummaryMetric
 	NewWorkDurationMetric(name string) SummaryMetric
+	NewUnfinishedWorkMicrosecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
 }
 
@@ -151,6 +180,10 @@ func (_ noopMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
 	return noopMetric{}
 }
 
+func (_ noopMetricsProvider) NewUnfinishedWorkMicrosecondsMetric(name string) SettableGaugeMetric {
+	return noopMetric{}
+}
+
 func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
@@ -163,17 +196,18 @@ var metricsFactory = struct {
 }
 
 func newQueueMetrics(name string) queueMetrics {
-	var ret *defaultQueueMetrics
-	if len(name) == 0 {
-		return ret
+	mp := metricsFactory.metricsProvider
+	if len(name) == 0 || mp == (noopMetricsProvider{}) {
+		return noMetrics{}
 	}
 	return &defaultQueueMetrics{
-		depth:                metricsFactory.metricsProvider.NewDepthMetric(name),
-		adds:                 metricsFactory.metricsProvider.NewAddsMetric(name),
-		latency:              metricsFactory.metricsProvider.NewLatencyMetric(name),
-		workDuration:         metricsFactory.metricsProvider.NewWorkDurationMetric(name),
-		addTimes:             map[t]time.Time{},
-		processingStartTimes: map[t]time.Time{},
+		depth:                      mp.NewDepthMetric(name),
+		adds:                       mp.NewAddsMetric(name),
+		latency:                    mp.NewLatencyMetric(name),
+		workDuration:               mp.NewWorkDurationMetric(name),
+		unfinishedWorkMicroseconds: mp.NewUnfinishedWorkMicrosecondsMetric(name),
+		addTimes:                   map[t]time.Time{},
+		processingStartTimes:       map[t]time.Time{},
 	}
 }
 

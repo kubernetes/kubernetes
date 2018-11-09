@@ -71,6 +71,16 @@ func (prometheusMetricsProvider) NewWorkDurationMetric(name string) workqueue.Su
 	return workDuration
 }
 
+func (prometheusMetricsProvider) NewUnfinishedWorkMicrosecondsMetric(name string) workqueue.SettableGaugeMetric {
+	unfinished := prometheus.NewGauge(prometheus.GaugeOpts{
+		Subsystem: name,
+		Name:      "unfinished_work_microseconds",
+		Help:      "How many microseconds of work has " + name + " done that is still in progress and hasn't yet been observed by work_duration.",
+	})
+	prometheus.Register(unfinished)
+	return unfinished
+}
+
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
 	retries := prometheus.NewCounter(prometheus.CounterOpts{
 		Subsystem: name,
