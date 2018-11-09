@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -216,11 +217,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "mynode",
 			},
-			CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-				{
-					Driver:       "com.example.csi/mydriver",
-					NodeID:       "com.example.csi/mynode",
-					TopologyKeys: []string{"com.example.csi/zone"},
+			Spec: csiv1alpha1.CSINodeInfoSpec{
+				Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+					{
+						Name:         "com.example.csi/mydriver",
+						NodeID:       "com.example.csi/mynode",
+						TopologyKeys: []string{"com.example.csi/zone"},
+					},
+				},
+			},
+			Status: csiv1alpha1.CSINodeInfoStatus{
+				Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+					{
+						Name:                  "com.example.csi/mydriver",
+						Available:             true,
+						VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+					},
 				},
 			},
 		}
@@ -228,11 +240,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
-			CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-				{
-					Driver:       "com.example.csi/mydriver",
-					NodeID:       "com.example.csi/foo",
-					TopologyKeys: []string{"com.example.csi/zone"},
+			Spec: csiv1alpha1.CSINodeInfoSpec{
+				Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+					{
+						Name:         "com.example.csi/mydriver",
+						NodeID:       "com.example.csi/foo",
+						TopologyKeys: []string{"com.example.csi/zone"},
+					},
+				},
+			},
+			Status: csiv1alpha1.CSINodeInfoStatus{
+				Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+					{
+						Name:                  "com.example.csi/mydriver",
+						Available:             true,
+						VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+					},
 				},
 			},
 		}
