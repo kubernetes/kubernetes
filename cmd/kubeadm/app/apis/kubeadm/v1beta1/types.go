@@ -45,8 +45,13 @@ type InitConfiguration struct {
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
-	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
-	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
+	// LocalAPIEndpoint represents the endpoint of the API server instance that's deployed on this control plane node
+	// In HA setups, this differs from ClusterConfiguration.ControlPlaneEndpoint in the sense that ControlPlaneEndpoint
+	// is the global endpoint for the cluster, which then loadbalances the requests to each individual API server. This
+	// configuration object lets you customize what IP/DNS name and port the local API server advertises it's accessible
+	// on. By default, kubeadm tries to auto-detect the IP of the default interface and use that, but in case that process
+	// fails you may set the desired value here.
+	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

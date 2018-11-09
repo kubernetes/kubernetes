@@ -50,10 +50,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true); err != nil {
 		return err
 	}
-	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.APIEndpoint.AdvertiseAddress, cfg.APIEndpoint.BindPort); err != nil {
+	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort); err != nil {
 		return err
 	}
 	return nil
