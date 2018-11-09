@@ -149,7 +149,7 @@ type volumeIOTestInput struct {
 }
 
 func execTestVolumeIO(input *volumeIOTestInput) {
-	It("should write files of various sizes, verify size, validate content [Slow]", func() {
+	It("should write files of various sizes, verify size, validate content [Slow][Privileged]", func() {
 		f := input.f
 		cs := f.ClientSet
 

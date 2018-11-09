@@ -271,7 +271,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVolType)
 				})
 
-				It("should be able to mount volume and write from pod1", func() {
+				It("should be able to mount volume and write from pod1 [Privileged]", func() {
 					// testFileContent was written in BeforeEach
 					testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVolType)
 
@@ -282,7 +282,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			})
 
 			Context("Two pods mounting a local volume at the same time", func() {
-				It("should be able to write from pod1 and read from pod2", func() {
+				It("should be able to write from pod1 and read from pod2 [Privileged]", func() {
 					twoPodsReadWriteTest(config, testVol)
 				})
 			})
@@ -307,7 +307,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					framework.DeletePodOrFail(config.client, config.ns, pod.Name)
 				})
 
-				It("should set same fsGroup for two pods simultaneously", func() {
+				It("should set same fsGroup for two pods simultaneously [Privileged]", func() {
 					fsGroup := int64(1234)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup, fsGroup)
@@ -319,7 +319,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
 
-				It("should set different fsGroup for second pod if first pod is deleted", func() {
+				It("should set different fsGroup for second pod if first pod is deleted [Privileged]", func() {
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
@@ -332,7 +332,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
 
-				It("should not set different fsGroups for two pods simultaneously", func() {
+				It("should not set different fsGroups for two pods simultaneously [Privileged]", func() {
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
@@ -585,7 +585,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			validateStatefulSet(config, ss, true)
 		})
 
-		It("should use volumes on one node when pod management is parallel and pod has affinity", func() {
+		It("should use volumes on one node when pod management is parallel and pod has affinity [Privileged]", func() {
 			By("Creating a StatefulSet with pod affinity on nodes")
 			ss := createStatefulSet(config, ssReplicas, 1, false, true)
 			validateStatefulSet(config, ss, false)

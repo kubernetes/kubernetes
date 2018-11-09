@@ -209,7 +209,7 @@ type subPathTestInput struct {
 }
 
 func testSubPath(input *subPathTestInput) {
-	It("should support non-existent path", func() {
+	It("should support non-existent path [Privileged]", func() {
 		// Write the file in the subPath from container 0
 		setWriteCommand(input.filePathInSubpath, &input.pod.Spec.Containers[0])
 
@@ -217,7 +217,7 @@ func testSubPath(input *subPathTestInput) {
 		testReadFile(input.f, input.filePathInVolume, input.pod, 1)
 	})
 
-	It("should support existing directory", func() {
+	It("should support existing directory [Privileged]", func() {
 		// Create the directory
 		setInitCommand(input.pod, fmt.Sprintf("mkdir -p %s", input.subPathDir))
 
@@ -236,14 +236,14 @@ func testSubPath(input *subPathTestInput) {
 		testReadFile(input.f, input.filePathInSubpath, input.pod, 0)
 	})
 
-	It("should support file as subpath", func() {
+	It("should support file as subpath [Privileged]", func() {
 		// Create the file in the init container
 		setInitCommand(input.pod, fmt.Sprintf("echo %s > %s", input.f.Namespace.Name, input.subPathDir))
 
 		TestBasicSubpath(input.f, input.f.Namespace.Name, input.pod)
 	})
 
-	It("should fail if subpath directory is outside the volume [Slow]", func() {
+	It("should fail if subpath directory is outside the volume [Slow][Privileged]", func() {
 		// Create the subpath outside the volume
 		setInitCommand(input.pod, fmt.Sprintf("ln -s /bin %s", input.subPathDir))
 
@@ -251,7 +251,7 @@ func testSubPath(input *subPathTestInput) {
 		testPodFailSubpath(input.f, input.pod)
 	})
 
-	It("should fail if subpath file is outside the volume [Slow]", func() {
+	It("should fail if subpath file is outside the volume [Slow][Privileged]", func() {
 		// Create the subpath outside the volume
 		setInitCommand(input.pod, fmt.Sprintf("ln -s /bin/sh %s", input.subPathDir))
 
@@ -259,7 +259,7 @@ func testSubPath(input *subPathTestInput) {
 		testPodFailSubpath(input.f, input.pod)
 	})
 
-	It("should fail if non-existent subpath is outside the volume [Slow]", func() {
+	It("should fail if non-existent subpath is outside the volume [Slow][Privileged]", func() {
 		// Create the subpath outside the volume
 		setInitCommand(input.pod, fmt.Sprintf("ln -s /bin/notanexistingpath %s", input.subPathDir))
 
@@ -267,7 +267,7 @@ func testSubPath(input *subPathTestInput) {
 		testPodFailSubpath(input.f, input.pod)
 	})
 
-	It("should fail if subpath with backstepping is outside the volume [Slow]", func() {
+	It("should fail if subpath with backstepping is outside the volume [Slow][Privileged]", func() {
 		// Create the subpath outside the volume
 		setInitCommand(input.pod, fmt.Sprintf("ln -s ../ %s", input.subPathDir))
 
@@ -275,7 +275,7 @@ func testSubPath(input *subPathTestInput) {
 		testPodFailSubpath(input.f, input.pod)
 	})
 
-	It("should support creating multiple subpath from same volumes [Slow]", func() {
+	It("should support creating multiple subpath from same volumes [Slow][Privileged]", func() {
 		subpathDir1 := filepath.Join(volumePath, "subpath1")
 		subpathDir2 := filepath.Join(volumePath, "subpath2")
 		filepath1 := filepath.Join("/test-subpath1", fileName)
@@ -297,27 +297,26 @@ func testSubPath(input *subPathTestInput) {
 		testMultipleReads(input.f, input.pod, 0, filepath1, filepath2)
 	})
 
-	It("should support restarting containers using directory as subpath [Slow]", func() {
+	It("should support restarting containers using directory as subpath [Slow][Privileged]", func() {
 		// Create the directory
 		setInitCommand(input.pod, fmt.Sprintf("mkdir -p %v; touch %v", input.subPathDir, probeFilePath))
 
 		testPodContainerRestart(input.f, input.pod)
 	})
 
-	It("should support restarting containers using file as subpath [Slow]", func() {
+	It("should support restarting containers using file as subpath [Slow][Privileged]", func() {
 		// Create the file
 		setInitCommand(input.pod, fmt.Sprintf("touch %v; touch %v", input.subPathDir, probeFilePath))
 
 		testPodContainerRestart(input.f, input.pod)
 	})
 
-	It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow]", func() {
+	It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][Privileged]", func() {
 		testSubpathReconstruction(input.f, input.pod, false)
 	})
 
-	It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow]", func() {
-		if strings.HasPrefix(input.volType, "hostPath") || strings.HasPrefix(input.volType, "csi-hostpath") {
-			// TODO: This skip should be removed once #61446 is fixed
+	It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][Privileged]", func() {
+		if input.volType == "hostPath" || input.volType == "hostPathSymlink" {
 			framework.Skipf("%s volume type does not support reconstruction, skipping", input.volType)
 		}
 		testSubpathReconstruction(input.f, input.pod, true)
@@ -347,7 +346,7 @@ func testSubPath(input *subPathTestInput) {
 		testReadFile(input.f, volumePath, input.pod, 0)
 	})
 
-	It("should support existing directories when readOnly specified in the volumeSource", func() {
+	It("should support existing directories when readOnly specified in the volumeSource [Privileged]", func() {
 		if input.roVol == nil {
 			framework.Skipf("Volume type %v doesn't support readOnly source", input.volType)
 		}
