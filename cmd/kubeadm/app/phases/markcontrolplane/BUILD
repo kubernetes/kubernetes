@@ -8,7 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["markmaster_test.go"],
+    srcs = ["markcontrolplane_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -23,8 +23,8 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["markmaster.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster",
+    srcs = ["markcontrolplane.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane",
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",

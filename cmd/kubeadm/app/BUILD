@@ -44,7 +44,7 @@ filegroup(
         "//cmd/kubeadm/app/phases/etcd:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/phases/kubelet:all-srcs",
-        "//cmd/kubeadm/app/phases/markmaster:all-srcs",
+        "//cmd/kubeadm/app/phases/markcontrolplane:all-srcs",
         "//cmd/kubeadm/app/phases/patchnode:all-srcs",
         "//cmd/kubeadm/app/phases/selfhosting:all-srcs",
         "//cmd/kubeadm/app/phases/upgrade:all-srcs",
