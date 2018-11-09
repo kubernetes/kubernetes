@@ -48,12 +48,10 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
@@ -489,19 +487,6 @@ func runInit(i *initData, out io.Writer) error {
 	klog.V(1).Infof("[init] creating kubelet configuration configmap")
 	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
-	}
-
-	// This feature is disabled by default
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
-		if err != nil {
-			return err
-		}
-
-		// Enable dynamic kubelet configuration for the node.
-		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
-			return errors.Wrap(err, "error enabling dynamic kubelet configuration")
-		}
 	}
 
 	klog.V(1).Infof("[init] ensuring DNS addon")
