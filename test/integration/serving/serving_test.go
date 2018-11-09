@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllermanager
+package serving
 
 import (
 	"crypto/tls"
@@ -33,15 +33,16 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/kubernetes"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
+	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type controllerManagerTester interface {
+type componentTester interface {
 	StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error)
 }
 
@@ -65,7 +66,17 @@ func (cloudControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger,
 	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
 }
 
-func TestControllerManagerServing(t *testing.T) {
+type kubeSchedulerTester struct{}
+
+func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+	gotResult, err := kubeschedulertesting.StartTestServer(t, customFlags)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+}
+
+func TestComponentSecureServingAndAuth(t *testing.T) {
 	if !cloudprovider.IsCloudProvider("fake") {
 		cloudprovider.RegisterCloudProvider("fake", fakeCloudProviderFactory)
 	}
@@ -188,20 +199,21 @@ users:
 
 	tests := []struct {
 		name       string
-		tester     controllerManagerTester
+		tester     componentTester
 		extraFlags []string
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
 		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}},
+		{"kube-scheduler", kubeSchedulerTester{}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testControllerManager(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
+			testComponent(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
 		})
 	}
 }
 
-func testControllerManager(t *testing.T, tester controllerManagerTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
+func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
 	tests := []struct {
 		name                             string
 		flags                            []string
@@ -228,8 +240,7 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
 		}, "/healthz", true, false, intPtr(http.StatusOK), nil},
-		{"/metrics without auhn/z", []string{
-			"--kubeconfig", kubeconfig,
+		{"/metrics without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
 			"--port=10253",
@@ -297,7 +308,7 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
 				serverCert, err := ioutil.ReadFile(serverCertPath)
 				if err != nil {
-					t.Fatalf("Failed to read controller-manager server cert %q: %v", serverCertPath, err)
+					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
 				}
 				pool.AppendCertsFromPEM(serverCert)
 				tr := &http.Transport{
@@ -316,13 +327,13 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 				}
 				r, err := client.Do(req)
 				if err != nil {
-					t.Fatalf("failed to GET %s from controller-manager: %v", tt.path, err)
+					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
 				body, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of controller-manager, got: %d %q", expected, tt.path, got, string(body))
+					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
 				}
 			}
 
@@ -332,12 +343,12 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 				url := fmt.Sprintf("http://%s%s", insecureInfo.Listener.Addr().String(), tt.path)
 				r, err := http.Get(url)
 				if err != nil {
-					t.Fatalf("failed to GET %s from controller-manager: %v", tt.path, err)
+					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 				body, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantInsecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of controller-manager, got: %d %q", expected, tt.path, got, string(body))
+					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
 				}
 			}
 		})
