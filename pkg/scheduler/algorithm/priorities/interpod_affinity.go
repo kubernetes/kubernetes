@@ -92,13 +92,15 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 	}
 	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
 	if match {
-		for _, node := range p.nodes {
-			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
-				p.Lock()
-				p.counts[node.Name] += weight
-				p.Unlock()
+		func() {
+			p.Lock()
+			defer p.Unlock()
+			for _, node := range p.nodes {
+				if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
+					p.counts[node.Name] += weight
+				}
 			}
-		}
+		}()
 	}
 }
 
