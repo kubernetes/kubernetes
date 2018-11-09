@@ -141,6 +141,8 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		pod = f.PodClient().CreateSync(pod)
 
 		defer func() {
