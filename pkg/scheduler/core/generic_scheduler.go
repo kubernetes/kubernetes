@@ -653,33 +653,38 @@ func PrioritizeNodes(
 
 	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
 
-	for i := range priorityConfigs {
-		results[i] = make(schedulerapi.HostPriorityList, len(nodes))
-	}
+	// DEPRECATED: we can remove this when all priorityConfigs implement the
+	// Map-Reduce pattern.
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(priorityConfigs), func(i int) {
+		priorityConfig := priorityConfigs[i]
+		if priorityConfig.Function == nil {
+			results[i] = make(schedulerapi.HostPriorityList, len(nodes))
+			return
+		}
 
-	processNode := func(index int) {
-		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		var err error
+		results[i], err = priorityConfig.Function(pod, nodeNameToInfo, nodes)
+		if err != nil {
+			appendError(err)
+		}
+	})
+
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
+		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		for i, priorityConfig := range priorityConfigs {
-			// DEPRECATED when ALL priorityConfigs have Map-Reduce pattern.
-			if priorityConfigs[i].Function != nil {
-				// Make sure that the old-style priority function only runs once.
-				if results[i][0].Host == "" {
-					results[i], err = priorityConfig.Function(pod, nodeNameToInfo, nodes)
-					if err != nil {
-						appendError(err)
-					}
-				}
+			if priorityConfig.Function != nil {
 				continue
 			}
+
+			var err error
 			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
 			if err != nil {
 				appendError(err)
 				results[i][index].Host = nodes[index].Name
 			}
 		}
-	}
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), processNode)
+	})
+
 	for i, priorityConfig := range priorityConfigs {
 		if priorityConfig.Reduce == nil {
 			continue
