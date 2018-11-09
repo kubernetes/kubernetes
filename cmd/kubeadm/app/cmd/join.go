@@ -609,7 +609,7 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 
 	// injects into the kubeadm configuration the information about the joining node
 	initConfiguration.NodeRegistration = cfg.NodeRegistration
-	initConfiguration.APIEndpoint = cfg.APIEndpoint
+	initConfiguration.LocalAPIEndpoint = cfg.APIEndpoint
 
 	return initConfiguration, tlsBootstrapCfg, nil
 }

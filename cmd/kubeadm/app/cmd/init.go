@@ -199,11 +199,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
-		&cfg.APIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.APIEndpoint.AdvertiseAddress,
+		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
 	)
 	flagSet.Int32Var(
-		&cfg.APIEndpoint.BindPort, options.APIServerBindPort, cfg.APIEndpoint.BindPort,
+		&cfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
 	flagSet.StringVar(
@@ -313,7 +313,7 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 	if err != nil {
 		return initData{}, err
 	}
-	if err := configutil.VerifyAPIServerBindAddress(cfg.APIEndpoint.AdvertiseAddress); err != nil {
+	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		return initData{}, err
 	}
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {

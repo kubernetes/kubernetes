@@ -24,6 +24,20 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
+		return err
+	}
+	return Convert_v1alpha3_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.LocalAPIEndpoint, s)
+}
+
+func Convert_kubeadm_InitConfiguration_To_v1alpha3_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_InitConfiguration_To_v1alpha3_InitConfiguration(in, out, s); err != nil {
+		return err
+	}
+	return Convert_kubeadm_APIEndpoint_To_v1alpha3_APIEndpoint(&in.LocalAPIEndpoint, &out.APIEndpoint, s)
+}
+
 func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s); err != nil {
 		return err

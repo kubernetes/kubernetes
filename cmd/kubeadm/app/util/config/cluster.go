@@ -121,7 +121,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 			return nil, err
 		}
 		// gets the APIEndpoint for the current node from then ClusterStatus in the kubeadm-config ConfigMap
-		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.APIEndpoint); err != nil {
+		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
 			return nil, err
 		}
 	}

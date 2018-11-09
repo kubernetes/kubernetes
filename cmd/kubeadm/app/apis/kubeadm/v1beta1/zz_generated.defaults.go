@@ -51,7 +51,7 @@ func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 		SetDefaults_BootstrapToken(a)
 	}
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
-	SetDefaults_APIEndpoint(&in.APIEndpoint)
+	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {

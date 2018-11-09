@@ -243,7 +243,7 @@ func getAllAPIObjectNames() []string {
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{
 		// TODO: Probably move to getDefaultedClusterConfig?
-		APIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
