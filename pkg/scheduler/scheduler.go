@@ -17,10 +17,13 @@ limitations under the License.
 package scheduler
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,13 +47,13 @@ import (
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-
-	"k8s.io/klog"
 )
 
 const (
 	// BindTimeoutSeconds defines the default bind timeout
 	BindTimeoutSeconds = 100
+	// SchedulerError is the reason recorded for events when an error occurs during scheduling a pod.
+	SchedulerError = "SchedulerError"
 )
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -286,19 +289,26 @@ func (sched *Scheduler) Config() *factory.Config {
 	return sched.config
 }
 
+// recordFailedSchedulingEvent records an event for the pod that indicates the
+// pod has failed to schedule.
+// NOTE: This function modifies "pod". "pod" should be copied before being passed.
+func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason string, message string) {
+	sched.config.Error(pod, err)
+	sched.config.Recorder.Event(pod, v1.EventTypeWarning, "FailedScheduling", message)
+	sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  reason,
+		Message: err.Error(),
+	})
+}
+
 // schedule implements the scheduling algorithm and returns the suggested host.
 func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
 		pod = pod.DeepCopy()
-		sched.config.Error(pod, err)
-		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
-		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-			Type:    v1.PodScheduled,
-			Status:  v1.ConditionFalse,
-			Reason:  v1.PodReasonUnschedulable,
-			Message: err.Error(),
-		})
+		sched.recordSchedulingFailure(pod, err, v1.PodReasonUnschedulable, err.Error())
 		return "", err
 	}
 	return host, err
@@ -362,14 +372,8 @@ func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bo
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		allBound, err = sched.config.VolumeBinder.Binder.AssumePodVolumes(assumed, host)
 		if err != nil {
-			sched.config.Error(assumed, err)
-			sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "AssumePodVolumes failed: %v", err)
-			sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
-				Type:    v1.PodScheduled,
-				Status:  v1.ConditionFalse,
-				Reason:  "SchedulerError",
-				Message: err.Error(),
-			})
+			sched.recordSchedulingFailure(assumed, err, SchedulerError,
+				fmt.Sprintf("AssumePodVolumes failed: %v", err))
 		}
 		// Invalidate ecache because assumed volumes could have affected the cached
 		// pvs for other pods
@@ -387,9 +391,6 @@ func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bo
 // If binding errors, times out or gets undone, then an error will be returned to
 // retry scheduling.
 func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
-	var reason string
-	var eventType string
-
 	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
 	err := sched.config.VolumeBinder.Binder.BindPodVolumes(assumed)
 	if err != nil {
@@ -404,15 +405,7 @@ func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 		// stale pod binding cache.
 		sched.config.VolumeBinder.DeletePodBindings(assumed)
 
-		reason = "VolumeBindingFailed"
-		eventType = v1.EventTypeWarning
-		sched.config.Error(assumed, err)
-		sched.config.Recorder.Eventf(assumed, eventType, "FailedScheduling", "%v", err)
-		sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
-			Type:   v1.PodScheduled,
-			Status: v1.ConditionFalse,
-			Reason: reason,
-		})
+		sched.recordSchedulingFailure(assumed, err, "VolumeBindingFailed", err.Error())
 		return err
 	}
 
@@ -441,14 +434,8 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		sched.config.Error(assumed, err)
-		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "AssumePod failed: %v", err)
-		sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
-			Type:    v1.PodScheduled,
-			Status:  v1.ConditionFalse,
-			Reason:  "SchedulerError",
-			Message: err.Error(),
-		})
+		sched.recordSchedulingFailure(assumed, err, SchedulerError,
+			fmt.Sprintf("AssumePod failed: %v", err))
 		return err
 	}
 	// if "assumed" is a nominated pod, we should remove it from internal cache
@@ -480,13 +467,8 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 		if err := sched.config.SchedulerCache.ForgetPod(assumed); err != nil {
 			klog.Errorf("scheduler cache ForgetPod failed: %v", err)
 		}
-		sched.config.Error(assumed, err)
-		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
-		sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
-			Type:   v1.PodScheduled,
-			Status: v1.ConditionFalse,
-			Reason: "BindingRejected",
-		})
+		sched.recordSchedulingFailure(assumed, err, SchedulerError,
+			fmt.Sprintf("Binding rejected: %v", err))
 		return err
 	}
 
@@ -498,6 +480,12 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 
 // scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne() {
+	plugins := sched.config.PluginSet
+	// Remove all plugin context data at the beginning of a scheduling cycle.
+	if plugins.Data().Ctx != nil {
+		plugins.Data().Ctx.Reset()
+	}
+
 	pod := sched.config.NextPod()
 	// pod could be nil when schedulerQueue is closed
 	if pod == nil {
@@ -554,6 +542,16 @@ func (sched *Scheduler) scheduleOne() {
 		return
 	}
 
+	// Run "reserve" plugins.
+	for _, pl := range plugins.ReservePlugins() {
+		if err := pl.Reserve(plugins, assumedPod, suggestedHost); err != nil {
+			klog.Errorf("error while running %v reserve plugin for pod %v: %v", pl.Name(), assumedPod.Name, err)
+			sched.recordSchedulingFailure(assumedPod, err, SchedulerError,
+				fmt.Sprintf("reserve plugin %v failed", pl.Name()))
+			metrics.PodScheduleErrors.Inc()
+			return
+		}
+	}
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
 	err = sched.assume(assumedPod, suggestedHost)
 	if err != nil {
@@ -569,6 +567,30 @@ func (sched *Scheduler) scheduleOne() {
 			if err != nil {
 				klog.Errorf("error binding volumes: %v", err)
 				metrics.PodScheduleErrors.Inc()
+				return
+			}
+		}
+
+		// Run "prebind" plugins.
+		for _, pl := range plugins.PrebindPlugins() {
+			approved, err := pl.Prebind(plugins, assumedPod, suggestedHost)
+			if err != nil {
+				approved = false
+				klog.Errorf("error while running %v prebind plugin for pod %v: %v", pl.Name(), assumedPod.Name, err)
+				metrics.PodScheduleErrors.Inc()
+			}
+			if !approved {
+				sched.Cache().ForgetPod(assumedPod)
+				var reason string
+				if err == nil {
+					msg := fmt.Sprintf("prebind plugin %v rejected pod %v.", pl.Name(), assumedPod.Name)
+					klog.V(4).Infof(msg)
+					err = errors.New(msg)
+					reason = v1.PodReasonUnschedulable
+				} else {
+					reason = SchedulerError
+				}
+				sched.recordSchedulingFailure(assumedPod, err, reason, err.Error())
 				return
 			}
 		}
