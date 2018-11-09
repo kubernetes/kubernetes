@@ -55,12 +55,32 @@ type describeClient struct {
 func TestDescribePod(t *testing.T) {
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
 	gracePeriod := int64(1234)
+	condition1 := api.PodConditionType("condition1")
+	condition2 := api.PodConditionType("condition2")
 	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:                       "bar",
 			Namespace:                  "foo",
 			DeletionTimestamp:          &deletionTimestamp,
 			DeletionGracePeriodSeconds: &gracePeriod,
+		},
+		Spec: api.PodSpec{
+			ReadinessGates: []api.PodReadinessGate{
+				{
+					ConditionType: condition1,
+				},
+				{
+					ConditionType: condition2,
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Conditions: []api.PodCondition{
+				{
+					Type:   condition1,
+					Status: api.ConditionTrue,
+				},
+			},
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}

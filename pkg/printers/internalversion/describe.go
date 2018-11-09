@@ -679,6 +679,21 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
+		if len(pod.Spec.ReadinessGates) > 0 {
+			w.Write(LEVEL_0, "Readiness Gates:\n  Type\tStatus\n")
+			for _, g := range pod.Spec.ReadinessGates {
+				status := "<none>"
+				for _, c := range pod.Status.Conditions {
+					if c.Type == g.ConditionType {
+						status = fmt.Sprintf("%v", c.Status)
+						break
+					}
+				}
+				w.Write(LEVEL_1, "%v \t%v \n",
+					g.ConditionType,
+					status)
+			}
+		}
 		if len(pod.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
