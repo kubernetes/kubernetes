@@ -17,9 +17,10 @@ limitations under the License.
 package preflight
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
@@ -38,7 +39,7 @@ func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
 	cleanOutput := strings.TrimSpace(string(out))
 	subs := kubeletVersionRegex.FindAllStringSubmatch(cleanOutput, -1)
 	if len(subs) != 1 || len(subs[0]) < 2 {
-		return nil, fmt.Errorf("Unable to parse output from Kubelet: %q", cleanOutput)
+		return nil, errors.Errorf("Unable to parse output from Kubelet: %q", cleanOutput)
 	}
 	return version.ParseSemantic(subs[0][1])
 }

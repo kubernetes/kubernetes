@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -63,12 +65,12 @@ func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool,
 	}
 	parsedExpVersion, err := version.ParseSemantic(requestedVersion)
 	if err != nil {
-		return fmt.Errorf("Error parsing version %s: %v", requestedVersion, err)
+		return errors.Wrapf(err, "error parsing version %s", requestedVersion)
 	}
 	for k := range requestedFeatures {
 		if minVersion := allFeatures[k].MinimumVersion; minVersion != nil {
 			if !parsedExpVersion.AtLeast(minVersion) {
-				return fmt.Errorf(
+				return errors.Errorf(
 					"the requested Kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
 					requestedVersion, k, minVersion)
 			}
@@ -134,7 +136,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 
 		arr := strings.SplitN(s, "=", 2)
 		if len(arr) != 2 {
-			return nil, fmt.Errorf("missing bool value for feature-gate key:%s", s)
+			return nil, errors.Errorf("missing bool value for feature-gate key:%s", s)
 		}
 
 		k := strings.TrimSpace(arr[0])
@@ -142,16 +144,16 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 
 		featureSpec, ok := (*f)[k]
 		if !ok {
-			return nil, fmt.Errorf("unrecognized feature-gate key: %s", k)
+			return nil, errors.Errorf("unrecognized feature-gate key: %s", k)
 		}
 
 		if featureSpec.PreRelease == utilfeature.Deprecated {
-			return nil, fmt.Errorf("feature-gate key is deprecated: %s", k)
+			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
 		}
 
 		boolValue, err := strconv.ParseBool(v)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
+			return nil, errors.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
 		}
 		featureGate[k] = boolValue
 	}

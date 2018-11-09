@@ -17,10 +17,11 @@ limitations under the License.
 package constants
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
 )
@@ -151,7 +152,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		{
 			kubernetesVersion: "1.99.0",
 			expectedVersion:   nil,
-			expectedError:     fmt.Errorf("Unsupported or unknown Kubernetes version(1.99.0)"),
+			expectedError:     errors.New("Unsupported or unknown Kubernetes version(1.99.0)"),
 		},
 		{
 			kubernetesVersion: "1.10.0",
