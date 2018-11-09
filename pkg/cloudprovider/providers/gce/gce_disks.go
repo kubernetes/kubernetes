@@ -158,7 +158,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 	fullyQualifiedReplicaZones := []string{}
 	for _, replicaZone := range replicaZones.UnsortedList() {
 		fullyQualifiedReplicaZones = append(
-			fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone, true))
+			fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone))
 	}
 
 	diskToCreate := &compute.Disk{
@@ -359,15 +359,8 @@ func (manager *gceServiceManager) getDiskTypeURI(
 	}
 }
 
-func (manager *gceServiceManager) getReplicaZoneURI(zone string, useBetaAPI bool) string {
-	var getProjectsAPIEndpoint string
-	if useBetaAPI {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointBeta()
-	} else {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpoint()
-	}
-
-	return getProjectsAPIEndpoint + fmt.Sprintf(
+func (manager *gceServiceManager) getReplicaZoneURI(zone string) string {
+	return manager.getProjectsAPIEndpoint() + fmt.Sprintf(
 		replicaZoneURITemplateSingleZone,
 		manager.gce.projectID,
 		zone)
