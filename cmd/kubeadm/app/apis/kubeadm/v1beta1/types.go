@@ -265,9 +265,6 @@ type JoinConfiguration struct {
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
 	Discovery Discovery `json:"discovery"`
 
-	// ClusterName is the name for the cluster in kubeconfig.
-	ClusterName string `json:"clusterName,omitempty"`
-
 	// ControlPlane flag specifies that the joining node should host an additional
 	// control plane instance.
 	ControlPlane bool `json:"controlPlane,omitempty"`
