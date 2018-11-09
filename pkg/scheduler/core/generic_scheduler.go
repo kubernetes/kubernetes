@@ -409,7 +409,6 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
 		if g.equivalenceCache != nil {
-			// getEquivalenceClassInfo will return immediately if no equivalence pod found
 			equivClass = equivalence.NewClass(pod)
 		}
 
