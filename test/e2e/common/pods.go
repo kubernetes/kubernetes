@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	*/
 	framework.ConformanceIt("should get a host IP [NodeConformance]", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
-		testHostIP(podClient, &v1.Pod{
+		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
@@ -152,7 +152,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 					},
 				},
 			},
-		})
+		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+		testHostIP(podClient, pod)
 	})
 
 	/*
@@ -181,6 +183,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
@@ -307,6 +310,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		By("submitting the pod to kubernetes")
 		pod = podClient.CreateSync(pod)
@@ -361,6 +365,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
@@ -405,6 +410,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		serverPod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
+
 		podClient.CreateSync(serverPod)
 
 		// This service exposes port 8080 of the test pod as a service on port 8765
@@ -454,6 +461,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		// It's possible for the Pod to be created before the Kubelet is updated with the new
 		// service. In that case, we just retry.
@@ -498,6 +506,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		By("submitting the pod to kubernetes")
 		pod = podClient.CreateSync(pod)
@@ -580,6 +589,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
@@ -636,6 +646,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		delay1, delay2 := startPodAndGetBackOffs(podClient, pod, buildBackOffDuration)
 
@@ -677,6 +688,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		podClient.CreateSync(pod)
 		time.Sleep(2 * kubelet.MaxContainerBackOff) // it takes slightly more than 2*x to get to a back-off of x
