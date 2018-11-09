@@ -1640,6 +1640,16 @@
 			"Rev": "d2eab7d93009e9215fc85b2faa2c2f2a98c2af48"
 		},
 		{
+			"ImportPath": "github.com/go-ozzo/ozzo-validation",
+			"Comment": "v3.5.0",
+			"Rev": "106681dbb37bfa3e7683c4c8129cb7f5925ea3e9"
+		},
+		{
+			"ImportPath": "github.com/go-ozzo/ozzo-validation/is",
+			"Comment": "v3.5.0",
+			"Rev": "106681dbb37bfa3e7683c4c8129cb7f5925ea3e9"
+		},
+		{
 			"ImportPath": "github.com/go-sql-driver/mysql",
 			"Comment": "v1.3.0",
 			"Rev": "a0583e0143b1624142adab07e0e97fe106d99561"
@@ -2285,18 +2295,18 @@
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
-			"Comment": "v4.0.0-95-gaaf40619d85fda",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v8.0.0-49-g558b29266ce0a8",
+			"Rev": "558b29266ce0a873991ecfb3edc41a668a998514"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/glusterfs/api",
-			"Comment": "v4.0.0-95-gaaf40619d85fda",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v8.0.0-49-g558b29266ce0a8",
+			"Rev": "558b29266ce0a873991ecfb3edc41a668a998514"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/utils",
-			"Comment": "v4.0.0-95-gaaf40619d85fda",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v8.0.0-49-g558b29266ce0a8",
+			"Rev": "558b29266ce0a873991ecfb3edc41a668a998514"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
@@ -2407,11 +2417,6 @@
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/volume",
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
-		},
-		{
-			"ImportPath": "github.com/lpabon/godbc",
-			"Comment": "v1.0-1-g9577782540c139",
-			"Rev": "9577782540c1398b710ddae1b86268ba03a19b0c"
 		},
 		{
 			"ImportPath": "github.com/magiconair/properties",
