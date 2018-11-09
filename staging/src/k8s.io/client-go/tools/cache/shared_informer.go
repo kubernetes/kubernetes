@@ -260,7 +260,8 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	defer s.startedLock.Unlock()
 
 	if s.started {
-		return fmt.Errorf("informer has already started")
+		s.blockDeltas.Lock()
+		defer s.blockDeltas.Unlock()
 	}
 
 	return s.indexer.AddIndexers(indexers)
