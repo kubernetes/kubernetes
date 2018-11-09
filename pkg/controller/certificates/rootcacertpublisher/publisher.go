@@ -36,9 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-// RootCACertCofigMapName is name of the configmap which stores certificates to
-// access api-server
-const RootCACertCofigMapName = "kube-root-ca.crt"
+// RootCACertConfigMapName is name of the configmap which stores certificates
+// to access api-server
+const RootCACertConfigMapName = "kube-root-ca.crt"
 
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
@@ -107,7 +107,7 @@ func (c *Publisher) configMapDeleted(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	if cm.Name != RootCACertCofigMapName {
+	if cm.Name != RootCACertConfigMapName {
 		return
 	}
 	c.queue.Add(cm.Namespace)
@@ -119,7 +119,7 @@ func (c *Publisher) configMapUpdated(_, newObj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	if cm.Name != RootCACertCofigMapName {
+	if cm.Name != RootCACertConfigMapName {
 		return
 	}
 	c.queue.Add(cm.Namespace)
@@ -168,12 +168,12 @@ func (c *Publisher) syncNamespace(ns string) error {
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 	}()
 
-	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertCofigMapName)
+	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
 	case apierrs.IsNotFound(err):
 		_, err := c.client.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: RootCACertCofigMapName,
+				Name: RootCACertConfigMapName,
 			},
 			Data: map[string]string{
 				"ca.crt": string(c.rootCA),
