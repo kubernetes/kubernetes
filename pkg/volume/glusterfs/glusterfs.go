@@ -106,30 +106,7 @@ func (plugin *glusterfsPlugin) GetPluginName() string {
 }
 
 func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	var endpointName string
-	var endpointsNsPtr *string
-
-	volPath, _, err := getVolumeInfo(spec)
-	if err != nil {
-		return "", err
-	}
-
-	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
-		endpointName = spec.Volume.Glusterfs.EndpointsName
-	} else if spec.PersistentVolume != nil &&
-		spec.PersistentVolume.Spec.Glusterfs != nil {
-		endpointName = spec.PersistentVolume.Spec.Glusterfs.EndpointsName
-		endpointsNsPtr = spec.PersistentVolume.Spec.Glusterfs.EndpointsNamespace
-		if endpointsNsPtr != nil && *endpointsNsPtr != "" {
-			return fmt.Sprintf("%v:%v:%v", endpointName, *endpointsNsPtr, volPath), nil
-		}
-		return "", fmt.Errorf("invalid endpointsnamespace in provided glusterfs PV spec")
-
-	} else {
-		return "", fmt.Errorf("unable to fetch required parameters from provided glusterfs spec")
-	}
-
-	return fmt.Sprintf("%v:%v", endpointName, volPath), nil
+	return "", fmt.Errorf("GetVolumeName() is unimplemented for GlusterFS")
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
