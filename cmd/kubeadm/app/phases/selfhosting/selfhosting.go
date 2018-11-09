@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
@@ -57,12 +57,12 @@ const (
 //      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
 func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.InitConfiguration, client clientset.Interface, waiter apiclient.Waiter, dryRun bool, certsInSecrets bool) error {
-	glog.V(1).Infoln("creating self hosted control plane")
+	klog.V(1).Infoln("creating self hosted control plane")
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
 	// Here the map of different mutators to use for the control plane's PodSpec is stored
-	glog.V(1).Infoln("getting mutators")
+	klog.V(1).Infoln("getting mutators")
 	mutators := GetMutatorsFromFeatureGates(certsInSecrets)
 
 	if certsInSecrets {

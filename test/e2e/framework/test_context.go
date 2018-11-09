@@ -23,13 +23,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
 	"github.com/pkg/errors"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -355,11 +355,11 @@ func AfterReadingAllFlags(t *TestContextType) {
 				kubeConfig := createKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
-				glog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
+				klog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
 			}
 		}
 		if len(t.KubeConfig) == 0 {
-			glog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
+			klog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
 			t.Host = defaultHost
 		}
 	}
@@ -382,7 +382,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	// TODO (https://github.com/kubernetes/kubernetes/issues/70200):
 	// - remove the fallback for unknown providers
 	// - proper error message instead of Failf (which panics)
-	glog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
+	klog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig("skeleton")
 	if err != nil {
 		Failf("Failed to setup fallback skeleton provider config: %v", err)

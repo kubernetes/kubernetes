@@ -41,7 +41,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/github.com/docker/libnetwork/ipvs:go_default_library",
-            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "//conditions:default": [],
     }),

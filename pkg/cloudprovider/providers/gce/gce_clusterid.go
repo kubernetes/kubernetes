@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 )
 
 const (
@@ -77,7 +77,7 @@ func (g *Cloud) watchClusterID(stop <-chan struct{}) {
 		AddFunc: func(obj interface{}) {
 			m, ok := obj.(*v1.ConfigMap)
 			if !ok || m == nil {
-				glog.Errorf("Expected v1.ConfigMap, item=%+v, typeIsOk=%v", obj, ok)
+				klog.Errorf("Expected v1.ConfigMap, item=%+v, typeIsOk=%v", obj, ok)
 				return
 			}
 			if m.Namespace != UIDNamespace ||
@@ -85,13 +85,13 @@ func (g *Cloud) watchClusterID(stop <-chan struct{}) {
 				return
 			}
 
-			glog.V(4).Infof("Observed new configmap for clusteriD: %v, %v; setting local values", m.Name, m.Data)
+			klog.V(4).Infof("Observed new configmap for clusteriD: %v, %v; setting local values", m.Name, m.Data)
 			g.ClusterID.update(m)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			m, ok := cur.(*v1.ConfigMap)
 			if !ok || m == nil {
-				glog.Errorf("Expected v1.ConfigMap, item=%+v, typeIsOk=%v", cur, ok)
+				klog.Errorf("Expected v1.ConfigMap, item=%+v, typeIsOk=%v", cur, ok)
 				return
 			}
 
@@ -104,7 +104,7 @@ func (g *Cloud) watchClusterID(stop <-chan struct{}) {
 				return
 			}
 
-			glog.V(4).Infof("Observed updated configmap for clusteriD %v, %v; setting local values", m.Name, m.Data)
+			klog.V(4).Infof("Observed updated configmap for clusteriD %v, %v; setting local values", m.Name, m.Data)
 			g.ClusterID.update(m)
 		},
 	}
@@ -185,7 +185,7 @@ func (ci *ClusterID) getOrInitialize() error {
 		return err
 	}
 
-	glog.V(4).Infof("Creating clusteriD: %v", newID)
+	klog.V(4).Infof("Creating clusteriD: %v", newID)
 	cfg := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      UIDConfigMapName,
@@ -198,11 +198,11 @@ func (ci *ClusterID) getOrInitialize() error {
 	}
 
 	if _, err := ci.client.CoreV1().ConfigMaps(UIDNamespace).Create(cfg); err != nil {
-		glog.Errorf("GCE cloud provider failed to create %v config map to store cluster id: %v", ci.cfgMapKey, err)
+		klog.Errorf("GCE cloud provider failed to create %v config map to store cluster id: %v", ci.cfgMapKey, err)
 		return err
 	}
 
-	glog.V(2).Infof("Created a config map containing clusteriD: %v", newID)
+	klog.V(2).Infof("Created a config map containing clusteriD: %v", newID)
 	ci.update(cfg)
 	return nil
 }
@@ -219,7 +219,7 @@ func (ci *ClusterID) getConfigMap() (bool, error) {
 	m, ok := item.(*v1.ConfigMap)
 	if !ok || m == nil {
 		err = fmt.Errorf("Expected v1.ConfigMap, item=%+v, typeIsOk=%v", item, ok)
-		glog.Error(err)
+		klog.Error(err)
 		return false, err
 	}
 	ci.update(m)

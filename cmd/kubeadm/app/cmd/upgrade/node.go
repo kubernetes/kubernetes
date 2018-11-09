@@ -22,10 +22,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -126,7 +126,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if flags.nodeName == "" {
-				glog.V(1).Infoln("[upgrade] found NodeName empty; considered OS hostname as NodeName")
+				klog.V(1).Infoln("[upgrade] found NodeName empty; considered OS hostname as NodeName")
 			}
 			nodeName, err := node.GetHostname(flags.nodeName)
 			if err != nil {

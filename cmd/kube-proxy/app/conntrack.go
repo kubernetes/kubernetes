@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sysctl"
@@ -49,7 +49,7 @@ func (rct realConntracker) SetMax(max int) error {
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
 		return err
 	}
-	glog.Infof("Setting nf_conntrack_max to %d", max)
+	klog.Infof("Setting nf_conntrack_max to %d", max)
 
 	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
 	// when the writer process is not in the initial network namespace
@@ -80,7 +80,7 @@ func (rct realConntracker) SetMax(max int) error {
 		return readOnlySysFSError
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
-	glog.Infof("Setting conntrack hashsize to %d", max/4)
+	klog.Infof("Setting conntrack hashsize to %d", max/4)
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
@@ -97,7 +97,7 @@ func (realConntracker) setIntSysCtl(name string, value int) error {
 
 	sys := sysctl.New()
 	if val, _ := sys.GetSysctl(entry); val != value {
-		glog.Infof("Set sysctl '%v' to %v", entry, value)
+		klog.Infof("Set sysctl '%v' to %v", entry, value)
 		if err := sys.SetSysctl(entry, value); err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func isSysFSWritable() (bool, error) {
 	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
-		glog.Errorf("failed to list mount points: %v", err)
+		klog.Errorf("failed to list mount points: %v", err)
 		return false, err
 	}
 
@@ -124,7 +124,7 @@ func isSysFSWritable() (bool, error) {
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
-		glog.Errorf("sysfs is not writable: %+v (mount options are %v)",
+		klog.Errorf("sysfs is not writable: %+v (mount options are %v)",
 			mountPoint, mountPoint.Opts)
 		return false, readOnlySysFSError
 	}

@@ -60,8 +60,8 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

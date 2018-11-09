@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -69,7 +69,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
-			glog.V(2).Infof("Using node IP: %q", nodeIP.String())
+			klog.V(2).Infof("Using node IP: %q", nodeIP.String())
 		}
 
 		if externalCloudProvider {
@@ -137,11 +137,11 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 
 				if existingHostnameAddress == nil {
 					// no existing Hostname address found, add it
-					glog.Warningf("adding overridden hostname of %v to cloudprovider-reported addresses", hostname)
+					klog.Warningf("adding overridden hostname of %v to cloudprovider-reported addresses", hostname)
 					nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
 				} else {
 					// override the Hostname address reported by the cloud provider
-					glog.Warningf("replacing cloudprovider-reported hostname of %v with overridden hostname of %v", existingHostnameAddress.Address, hostname)
+					klog.Warningf("replacing cloudprovider-reported hostname of %v with overridden hostname of %v", existingHostnameAddress.Address, hostname)
 					existingHostnameAddress.Address = hostname
 				}
 			}
@@ -239,7 +239,7 @@ func MachineInfo(nodeName string,
 			node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 			node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(maxPods), resource.DecimalSI)
-			glog.Errorf("Error getting machine info: %v", err)
+			klog.Errorf("Error getting machine info: %v", err)
 		} else {
 			node.Status.NodeInfo.MachineID = info.MachineID
 			node.Status.NodeInfo.SystemUUID = info.SystemUUID
@@ -278,14 +278,14 @@ func MachineInfo(nodeName string,
 			if devicePluginCapacity != nil {
 				for k, v := range devicePluginCapacity {
 					if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
-						glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
+						klog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
 					}
 					node.Status.Capacity[k] = v
 				}
 			}
 
 			for _, removedResource := range removedDevicePlugins {
-				glog.V(2).Infof("Set capacity for %s to 0 on device removal", removedResource)
+				klog.V(2).Infof("Set capacity for %s to 0 on device removal", removedResource)
 				// Set the capacity of the removed resource to 0 instead of
 				// removing the resource from the node status. This is to indicate
 				// that the resource is managed by device plugin and had been
@@ -326,7 +326,7 @@ func MachineInfo(nodeName string,
 		if devicePluginAllocatable != nil {
 			for k, v := range devicePluginAllocatable {
 				if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
-					glog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
+					klog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
 				}
 				node.Status.Allocatable[k] = v
 			}
@@ -357,7 +357,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 		verinfo, err := versionInfoFunc()
 		if err != nil {
 			// TODO(mtaufen): consider removing this log line, since returned error will be logged
-			glog.Errorf("Error getting version info: %v", err)
+			klog.Errorf("Error getting version info: %v", err)
 			return fmt.Errorf("error getting version info: %v", err)
 		}
 
@@ -397,7 +397,7 @@ func Images(nodeStatusMaxImages int32,
 		containerImages, err := imageListFunc()
 		if err != nil {
 			// TODO(mtaufen): consider removing this log line, since returned error will be logged
-			glog.Errorf("Error getting image list: %v", err)
+			klog.Errorf("Error getting image list: %v", err)
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)
 		}
@@ -515,7 +515,7 @@ func ReadyCondition(
 				recordEventFunc(v1.EventTypeNormal, events.NodeReady)
 			} else {
 				recordEventFunc(v1.EventTypeNormal, events.NodeNotReady)
-				glog.Infof("Node became not ready: %+v", newNodeReadyCondition)
+				klog.Infof("Node became not ready: %+v", newNodeReadyCondition)
 			}
 		}
 		return nil
@@ -733,7 +733,7 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 		for _, volumePlugin := range pluginWithLimits {
 			attachLimits, err := volumePlugin.GetVolumeLimits()
 			if err != nil {
-				glog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
+				klog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
 				continue
 			}
 			for limitKey, value := range attachLimits {

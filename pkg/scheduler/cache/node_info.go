@@ -22,7 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -529,7 +529,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	for i := range n.podsWithAffinity {
 		k2, err := GetPodKey(n.podsWithAffinity[i])
 		if err != nil {
-			glog.Errorf("Cannot get pod key, err: %v", err)
+			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
 		if k1 == k2 {
@@ -542,7 +542,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	for i := range n.pods {
 		k2, err := GetPodKey(n.pods[i])
 		if err != nil {
-			glog.Errorf("Cannot get pod key, err: %v", err)
+			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
 		if k1 == k2 {

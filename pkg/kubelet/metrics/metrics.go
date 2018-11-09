@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -270,7 +270,7 @@ func (pc *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
 func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
 	runningPods, err := pc.containerCache.GetPods()
 	if err != nil {
-		glog.Warningf("Failed to get running container information while collecting metrics: %v", err)
+		klog.Warningf("Failed to get running container information while collecting metrics: %v", err)
 		return
 	}
 

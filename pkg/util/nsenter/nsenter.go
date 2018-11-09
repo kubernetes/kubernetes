@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/utils/exec"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -127,7 +127,7 @@ func (ne *Nsenter) Exec(cmd string, args []string) exec.Cmd {
 	hostProcMountNsPath := filepath.Join(ne.hostRootFsPath, mountNsPath)
 	fullArgs := append([]string{fmt.Sprintf("--mount=%s", hostProcMountNsPath), "--"},
 		append([]string{ne.AbsHostPath(cmd)}, args...)...)
-	glog.V(5).Infof("Running nsenter command: %v %v", nsenterPath, fullArgs)
+	klog.V(5).Infof("Running nsenter command: %v %v", nsenterPath, fullArgs)
 	return ne.executor.Command(nsenterPath, fullArgs...)
 }
 
@@ -170,7 +170,7 @@ func (ne *Nsenter) EvalSymlinks(pathname string, mustExist bool) (string, error)
 	}
 	outBytes, err := ne.Exec("realpath", args).CombinedOutput()
 	if err != nil {
-		glog.Infof("failed to resolve symbolic links on %s: %v", pathname, err)
+		klog.Infof("failed to resolve symbolic links on %s: %v", pathname, err)
 		return "", err
 	}
 	return strings.TrimSpace(string(outBytes)), nil

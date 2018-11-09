@@ -24,10 +24,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -62,7 +62,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
-				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
+				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
@@ -88,8 +88,8 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 // RunPlan takes care of outputting available versions to upgrade to for the user
 func RunPlan(flags *planFlags) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
-	glog.V(1).Infof("[upgrade/plan] verifying health of cluster")
-	glog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
+	klog.V(1).Infof("[upgrade/plan] verifying health of cluster")
+	klog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
 	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, false, flags.newK8sVersionStr)
 	if err != nil {
 		return err
@@ -120,7 +120,7 @@ func RunPlan(flags *planFlags) error {
 	}
 
 	// Compute which upgrade possibilities there are
-	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
+	klog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
 	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")

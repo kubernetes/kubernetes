@@ -10,8 +10,8 @@ go_library(
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

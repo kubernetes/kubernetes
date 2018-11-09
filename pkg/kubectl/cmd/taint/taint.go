@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -255,7 +255,7 @@ func (o TaintOptions) RunTaint() error {
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 		createdPatch := err == nil
 		if err != nil {
-			glog.V(2).Infof("couldn't compute patch: %v", err)
+			klog.V(2).Infof("couldn't compute patch: %v", err)
 		}
 
 		mapping := info.ResourceMapping()

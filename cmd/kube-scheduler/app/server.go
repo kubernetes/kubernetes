@@ -59,16 +59,16 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 )
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters
 func NewSchedulerCommand() *cobra.Command {
 	opts, err := options.NewOptions()
 	if err != nil {
-		glog.Fatalf("unable to initialize command options: %v", err)
+		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
 	cmd := &cobra.Command{
@@ -113,7 +113,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
-		glog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
+		klog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
 	}
 
 	c, err := opts.Config()
@@ -128,7 +128,7 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 	cc := c.Complete()
 
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?

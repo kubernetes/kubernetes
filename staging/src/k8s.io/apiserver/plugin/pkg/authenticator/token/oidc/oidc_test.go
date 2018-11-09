@@ -36,9 +36,9 @@ import (
 	"time"
 
 	oidc "github.com/coreos/go-oidc"
-	"github.com/golang/glog"
 	jose "gopkg.in/square/go-jose.v2"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/klog"
 )
 
 // utilities for loading JOSE keys.
@@ -148,7 +148,7 @@ func replace(tmpl string, v interface{}) string {
 	buf := bytes.NewBuffer(nil)
 	t.Execute(buf, &v)
 	ret := buf.String()
-	glog.V(4).Infof("Replaced: %v into: %v", tmpl, ret)
+	klog.V(4).Infof("Replaced: %v into: %v", tmpl, ret)
 	return ret
 }
 
@@ -158,7 +158,7 @@ func replace(tmpl string, v interface{}) string {
 // responses that the server will return for each claim it is given.
 func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, claimToResponseMap map[string]string, openIDConfig *string) *httptest.Server {
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		glog.V(5).Infof("request: %+v", *r)
+		klog.V(5).Infof("request: %+v", *r)
 		switch r.URL.Path {
 		case "/.testing/keys":
 			w.Header().Set("Content-Type", "application/json")
@@ -166,12 +166,12 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 			if err != nil {
 				t.Fatalf("unexpected error while marshaling keys: %v", err)
 			}
-			glog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
+			klog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
 			w.Write(keyBytes)
 
 		case "/.well-known/openid-configuration":
 			w.Header().Set("Content-Type", "application/json")
-			glog.V(5).Infof("%v: returning: %+v", r.URL, *openIDConfig)
+			klog.V(5).Infof("%v: returning: %+v", r.URL, *openIDConfig)
 			w.Write([]byte(*openIDConfig))
 		// These claims are tested in the unit tests.
 		case "/groups":
@@ -200,7 +200,7 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 			fmt.Fprintf(w, "unexpected URL: %v", r.URL)
 		}
 	}))
-	glog.V(4).Infof("Serving OIDC at: %v", ts.URL)
+	klog.V(4).Infof("Serving OIDC at: %v", ts.URL)
 	return ts
 }
 

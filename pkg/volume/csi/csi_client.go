@@ -25,10 +25,10 @@ import (
 	"time"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -112,7 +112,7 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	maxVolumePerNode int64,
 	accessibleTopology *csipb.Topology,
 	err error) {
-	glog.V(4).Info(log("calling NodeGetInfo rpc"))
+	klog.V(4).Info(log("calling NodeGetInfo rpc"))
 
 	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
@@ -141,7 +141,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	fsType string,
 	mountOptions []string,
 ) error {
-	glog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
+	klog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -190,7 +190,7 @@ func (c *csiDriverClient) NodePublishVolume(
 }
 
 func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string, targetPath string) error {
-	glog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
+	klog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -222,7 +222,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	nodeStageSecrets map[string]string,
 	volumeAttribs map[string]string,
 ) error {
-	glog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -266,7 +266,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 }
 
 func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error {
-	glog.V(4).Info(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	klog.V(4).Info(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -289,7 +289,7 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 }
 
 func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
-	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
+	klog.V(4).Info(log("calling NodeGetCapabilities rpc"))
 
 	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
@@ -334,7 +334,7 @@ func newGrpcConn(driverName string) (*grpc.ClientConn, error) {
 		addr = driver.driverEndpoint
 	}
 	network := "unix"
-	glog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
+	klog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
 
 	return grpc.Dial(
 		addr,

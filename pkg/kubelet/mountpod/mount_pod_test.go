@@ -22,7 +22,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,7 +137,7 @@ func TestGetVolumeExec(t *testing.T) {
 		}
 		pod, container, err := mgr.GetMountPod("kubernetes.io/glusterfs")
 		if err != nil {
-			glog.V(5).Infof("test %q returned error %s", test.name, err)
+			klog.V(5).Infof("test %q returned error %s", test.name, err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)

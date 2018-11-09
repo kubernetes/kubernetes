@@ -21,7 +21,7 @@ import (
 
 	azs "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -82,7 +82,7 @@ func (f *azureFileClient) resizeFileShare(accountName, accountKey, name string, 
 	}
 	share := fileClient.GetShareReference(name)
 	if share.Properties.Quota >= sizeGiB {
-		glog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
+		klog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
 			share.Properties.Quota, sizeGiB, accountName, name)
 		return nil
 	}
@@ -90,7 +90,7 @@ func (f *azureFileClient) resizeFileShare(accountName, accountKey, name string, 
 	if err = share.SetProperties(nil); err != nil {
 		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
 	}
-	glog.V(4).Infof("resize file share completed, accountName: %s, shareName: %s, sizeGiB: %d", accountName, name, sizeGiB)
+	klog.V(4).Infof("resize file share completed, accountName: %s, shareName: %s, sizeGiB: %d", accountName, name, sizeGiB)
 	return nil
 }
 

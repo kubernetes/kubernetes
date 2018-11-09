@@ -24,7 +24,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -65,14 +65,14 @@ func (kl *Kubelet) registerWithAPIServer() {
 
 		node, err := kl.initialNode()
 		if err != nil {
-			glog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
+			klog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
 			continue
 		}
 
-		glog.Infof("Attempting to register node %s", node.Name)
+		klog.Infof("Attempting to register node %s", node.Name)
 		registered := kl.tryRegisterWithAPIServer(node)
 		if registered {
-			glog.Infof("Successfully registered node %s", node.Name)
+			klog.Infof("Successfully registered node %s", node.Name)
 			kl.registrationCompleted = true
 			return
 		}
@@ -91,27 +91,27 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	}
 
 	if !apierrors.IsAlreadyExists(err) {
-		glog.Errorf("Unable to register node %q with API server: %v", kl.nodeName, err)
+		klog.Errorf("Unable to register node %q with API server: %v", kl.nodeName, err)
 		return false
 	}
 
 	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
-		glog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
+		klog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
 		return false
 	}
 	if existingNode == nil {
-		glog.Errorf("Unable to register node %q with API server: no node instance returned", kl.nodeName)
+		klog.Errorf("Unable to register node %q with API server: no node instance returned", kl.nodeName)
 		return false
 	}
 
 	originalNode := existingNode.DeepCopy()
 	if originalNode == nil {
-		glog.Errorf("Nil %q node object", kl.nodeName)
+		klog.Errorf("Nil %q node object", kl.nodeName)
 		return false
 	}
 
-	glog.Infof("Node %s was previously registered", kl.nodeName)
+	klog.Infof("Node %s was previously registered", kl.nodeName)
 
 	// Edge case: the node was previously registered; reconcile
 	// the value of the controller-managed attach-detach
@@ -121,7 +121,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
-			glog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
+			klog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
 			return false
 		}
 	}
@@ -193,10 +193,10 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	// not have the same value, update the existing node with
 	// the correct value of the annotation.
 	if !newSet {
-		glog.Info("Controller attach-detach setting changed to false; updating existing Node")
+		klog.Info("Controller attach-detach setting changed to false; updating existing Node")
 		delete(existingNode.Annotations, volutil.ControllerManagedAttachAnnotation)
 	} else {
-		glog.Info("Controller attach-detach setting changed to true; updating existing Node")
+		klog.Info("Controller attach-detach setting changed to true; updating existing Node")
 		if existingNode.Annotations == nil {
 			existingNode.Annotations = make(map[string]string)
 		}
@@ -275,24 +275,24 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 
-		glog.Infof("Setting node annotation to enable volume controller attach/detach")
+		klog.Infof("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
-		glog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
+		klog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
 	if kl.keepTerminatedPodVolumes {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
-		glog.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
+		klog.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
 		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
-			glog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
+			klog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
 		}
 		node.ObjectMeta.Labels[k] = v
 	}
@@ -323,7 +323,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			return nil, err
 		}
 		if instanceType != "" {
-			glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
+			klog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
 			node.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
@@ -334,11 +334,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
+				klog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
 				node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
+				klog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
 				node.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
 			}
 		}
@@ -364,20 +364,20 @@ func (kl *Kubelet) syncNodeStatus() {
 		kl.registerWithAPIServer()
 	}
 	if err := kl.updateNodeStatus(); err != nil {
-		glog.Errorf("Unable to update node status: %v", err)
+		klog.Errorf("Unable to update node status: %v", err)
 	}
 }
 
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus() error {
-	glog.V(5).Infof("Updating node status")
+	klog.V(5).Infof("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
-			glog.Errorf("Error updating node status, will retry: %v", err)
+			klog.Errorf("Error updating node status, will retry: %v", err)
 		} else {
 			return nil
 		}
@@ -414,7 +414,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		// node.Spec.PodCIDR being non-empty. We also need to know if pod CIDR is
 		// actually changed.
 		if podCIDRChanged, err = kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
-			glog.Errorf(err.Error())
+			klog.Errorf(err.Error())
 		}
 	}
 
@@ -443,7 +443,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 // recordNodeStatusEvent records an event of the given type with the given
 // message for the node.
 func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
-	glog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
+	klog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
@@ -475,9 +475,9 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
-		glog.V(5).Infof("Setting node status at position %v", i)
+		klog.V(5).Infof("Setting node status at position %v", i)
 		if err := f(node); err != nil {
-			glog.Warningf("Failed to set some node status fields: %s", err)
+			klog.Warningf("Failed to set some node status fields: %s", err)
 		}
 	}
 }

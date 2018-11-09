@@ -22,10 +22,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/github.com/d2g/dhcp4:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/kardianos/osext:go_default_library",
         "//vendor/github.com/xanzy/go-cloudstack/cloudstack:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/d2g/dhcp4client:go_default_library",

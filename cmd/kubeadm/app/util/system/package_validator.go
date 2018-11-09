@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/blang/semver"
-	"github.com/golang/glog"
 	pkgerrors "github.com/pkg/errors"
+	"k8s.io/klog"
 )
 
 // semVerDotsCount is the number of dots in a valid semantic version.
@@ -127,7 +127,7 @@ func (self *packageValidator) validate(packageSpecs []PackageSpec, manager packa
 		// Get the version of the package on the running machine.
 		version, err := manager.getPackageVersion(packageName)
 		if err != nil {
-			glog.V(1).Infof("Failed to get the version for the package %q: %s\n", packageName, err)
+			klog.V(1).Infof("Failed to get the version for the package %q: %s\n", packageName, err)
 			errs = append(errs, err)
 			self.reporter.Report(nameWithVerRange, "not installed", bad)
 			continue
@@ -145,7 +145,7 @@ func (self *packageValidator) validate(packageSpecs []PackageSpec, manager packa
 		// the version is in the range.
 		sv, err := semver.Make(toSemVer(version))
 		if err != nil {
-			glog.Errorf("Failed to convert %q to semantic version: %s\n", version, err)
+			klog.Errorf("Failed to convert %q to semantic version: %s\n", version, err)
 			errs = append(errs, err)
 			self.reporter.Report(nameWithVerRange, "internal error", bad)
 			continue

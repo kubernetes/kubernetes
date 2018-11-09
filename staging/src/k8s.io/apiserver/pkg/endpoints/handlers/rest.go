@@ -25,7 +25,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -284,7 +284,7 @@ func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request,
 		return 0, err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
-		glog.V(4).Infof("Unable to set self link on object: %v", err)
+		klog.V(4).Infof("Unable to set self link on object: %v", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
@@ -327,7 +327,7 @@ func parseTimeout(str string) time.Duration {
 		if err == nil {
 			return timeout
 		}
-		glog.Errorf("Failed to parse %q: %v", str, err)
+		klog.Errorf("Failed to parse %q: %v", str, err)
 	}
 	return 30 * time.Second
 }

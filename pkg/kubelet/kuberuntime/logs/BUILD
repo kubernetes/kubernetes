@@ -12,7 +12,7 @@ go_library(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog:go_default_library",
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

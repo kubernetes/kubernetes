@@ -42,12 +42,12 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/flushwriter:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/metrics:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

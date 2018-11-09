@@ -23,7 +23,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -149,20 +149,20 @@ func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 
 	instances, ok := az.Instances()
 	if !ok {
-		glog.Warningf("Failed to get instances from cloud provider")
+		klog.Warningf("Failed to get instances from cloud provider")
 		return volumeLimits, nil
 	}
 
 	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
 	if err != nil {
-		glog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
+		klog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
 		return volumeLimits, nil
 	}
 
 	if vmSizeList == nil {
 		result, err := az.VirtualMachineSizesClient.List(context.TODO(), az.Location)
 		if err != nil || result.Value == nil {
-			glog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
+			klog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
 			return volumeLimits, nil
 		}
 		vmSizeList = result.Value
@@ -183,11 +183,11 @@ func getMaxDataDiskCount(instanceType string, sizeList *[]compute.VirtualMachine
 	vmsize := strings.ToUpper(instanceType)
 	for _, size := range *sizeList {
 		if size.Name == nil || size.MaxDataDiskCount == nil {
-			glog.Errorf("failed to get vm size in getMaxDataDiskCount")
+			klog.Errorf("failed to get vm size in getMaxDataDiskCount")
 			continue
 		}
 		if strings.ToUpper(*size.Name) == vmsize {
-			glog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %d", *size.Name, *size.MaxDataDiskCount)
+			klog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %d", *size.Name, *size.MaxDataDiskCount)
 			return int64(*size.MaxDataDiskCount)
 		}
 	}
@@ -208,7 +208,7 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessM
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	azure, err := getCloud(plugin.host)
 	if err != nil {
-		glog.Errorf("failed to get azure cloud in NewAttacher, plugin.host : %s, err:%v", plugin.host.GetHostName(), err)
+		klog.Errorf("failed to get azure cloud in NewAttacher, plugin.host : %s, err:%v", plugin.host.GetHostName(), err)
 		return nil, err
 	}
 
@@ -221,7 +221,7 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	azure, err := getCloud(plugin.host)
 	if err != nil {
-		glog.V(4).Infof("failed to get azure cloud in NewDetacher, plugin.host : %s", plugin.host.GetHostName())
+		klog.V(4).Infof("failed to get azure cloud in NewDetacher, plugin.host : %s", plugin.host.GetHostName())
 		return nil, err
 	}
 

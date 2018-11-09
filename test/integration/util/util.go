@@ -20,13 +20,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -49,9 +49,9 @@ func StartApiserver() (string, ShutdownFunc) {
 	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	shutdownFunc := func() {
-		glog.Infof("destroying API server")
+		klog.Infof("destroying API server")
 		s.Close()
-		glog.Infof("destroyed API server")
+		klog.Infof("destroyed API server")
 	}
 	return s.URL, shutdownFunc
 }
@@ -73,17 +73,17 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 		conf.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
 	})
 	if err != nil {
-		glog.Fatalf("Error creating scheduler: %v", err)
+		klog.Fatalf("Error creating scheduler: %v", err)
 	}
 
 	informerFactory.Start(stopCh)
 	sched.Run()
 
 	shutdownFunc := func() {
-		glog.Infof("destroying scheduler")
+		klog.Infof("destroying scheduler")
 		evtWatch.Stop()
 		close(stopCh)
-		glog.Infof("destroyed scheduler")
+		klog.Infof("destroyed scheduler")
 	}
 	return schedulerConfigurator, shutdownFunc
 }
