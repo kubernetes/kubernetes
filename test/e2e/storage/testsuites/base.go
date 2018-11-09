@@ -164,7 +164,7 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
-			claimSize := "5Gi"
+			claimSize := dDriver.GetClaimSize()
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)

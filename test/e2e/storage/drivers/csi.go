@@ -103,6 +103,10 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *stor
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (h *hostpathCSIDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (h *hostpathCSIDriver) CreateDriver() {
 	By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	f := h.driverInfo.Framework
@@ -205,6 +209,10 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (g *gcePDCSIDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (g *gcePDCSIDriver) CreateDriver() {
 	By("deploying csi gce-pd driver")
 	// It would be safer to rename the gcePD driver, but that
@@ -291,6 +299,10 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 	parameters := map[string]string{"type": "pd-standard"}
 
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (g *gcePDExternalCSIDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (g *gcePDExternalCSIDriver) CreateDriver() {

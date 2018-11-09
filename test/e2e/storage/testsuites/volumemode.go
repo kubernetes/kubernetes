@@ -196,7 +196,7 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 			}
 			s.sc.VolumeBindingMode = &volBindMode
 
-			claimSize := "5Gi"
+			claimSize := dDriver.GetClaimSize()
 			s.pvc = getClaim(claimSize, ns.Name)
 			s.pvc.Spec.StorageClassName = &s.sc.Name
 			s.pvc.Spec.VolumeMode = &volMode

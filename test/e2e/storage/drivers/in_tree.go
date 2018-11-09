@@ -138,6 +138,10 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (n *nfsDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (n *nfsDriver) CreateDriver() {
 	f := n.driverInfo.Framework
 	cs := f.ClientSet
@@ -1034,6 +1038,10 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (c *cinderDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (c *cinderDriver) CreateDriver() {
 }
 
@@ -1196,6 +1204,10 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (h *gcePdDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (g *gcePdDriver) CreateDriver() {
 }
 
@@ -1318,6 +1330,10 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(fsType string) *storagev
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (v *vSphereDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (v *vSphereDriver) CreateDriver() {
 }
 
@@ -1436,6 +1452,10 @@ func (a *azureDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (a *azureDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
 func (a *azureDriver) CreateDriver() {
 }
 
@@ -1541,6 +1561,10 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (a *awsDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (a *awsDriver) CreateDriver() {
