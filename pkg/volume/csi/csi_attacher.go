@@ -69,6 +69,8 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		volumeHandle string
 		pvSource     *v1.CSIPersistentVolumeSource
 		node         = string(nodeName)
+		err          error
+		csiVolume    *csipb.Volume
 	)
 	volSource, pvSource, err := getSourceFromSpec(spec)
 	if err != nil {
@@ -80,6 +82,13 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		driverName = volSource.Driver
 		if volSource.VolumeHandle != nil {
 			volumeHandle = *volSource.VolumeHandle
+		} else {
+			// TODO: if volumeHandle not provided, new volume should be created here.
+			csiVolume, err = c.inlineProvision("hostpath_inline_volume", spec.PodNamespace, volSource)
+			if err != nil {
+				return "", err
+			}
+			volumeHandle = csiVolume.Id
 		}
 	} else if pvSource != nil {
 		driverName = pvSource.Driver
@@ -87,8 +96,6 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	} else {
 		return "", errors.New("spec missing CSI volume source")
 	}
-
-	// TODO: if volumeHandle not provided, new volume should be created here.
 
 	skip, err := c.plugin.skipAttach(driverName)
 	if err != nil {
