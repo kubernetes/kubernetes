@@ -85,6 +85,7 @@ var _ = Describe("[sig-storage] Projected combined", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 		f.TestContainerOutput("Check all projections for projected volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s", podName),
 			"secret-value-1",
