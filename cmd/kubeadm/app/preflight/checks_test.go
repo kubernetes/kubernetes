@@ -191,7 +191,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}{
 		{name: "Test valid advertised address",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
@@ -224,7 +224,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},

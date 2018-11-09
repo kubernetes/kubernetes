@@ -359,7 +359,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -374,7 +374,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -389,7 +389,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -403,7 +403,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"valid master configuration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -419,7 +419,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -466,7 +466,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
 				},
