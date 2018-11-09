@@ -65,6 +65,7 @@ var _ = SIGDescribe("Events", func() {
 				},
 			},
 		}
+		pod.Spec.NodeSelector = framework.GetOSNodeSelectorForPod(true)
 
 		By("submitting the pod to kubernetes")
 		defer func() {
