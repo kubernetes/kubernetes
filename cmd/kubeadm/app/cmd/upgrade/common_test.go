@@ -63,7 +63,6 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: ""
 	scheduler: {}
-	unifiedControlPlaneImage: ""
 `),
 		},
 		{
@@ -102,7 +101,6 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	scheduler: {}
-	unifiedControlPlaneImage: ""
 `),
 		},
 	}

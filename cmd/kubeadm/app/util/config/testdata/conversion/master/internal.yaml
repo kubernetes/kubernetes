@@ -200,4 +200,4 @@ NodeRegistration:
 Scheduler:
   ExtraArgs: null
   ExtraVolumes: null
-UnifiedControlPlaneImage: ""
+UseHyperKubeImage: true

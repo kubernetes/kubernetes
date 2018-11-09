@@ -59,3 +59,75 @@ func TestJoinConfigurationConversion(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertToUseHyperKubeImage(t *testing.T) {
+	tests := []struct {
+		desc              string
+		in                *v1alpha3.ClusterConfiguration
+		useHyperKubeImage bool
+		expectedErr       bool
+	}{
+		{
+			desc:              "unset UnifiedControlPlaneImage sets UseHyperKubeImage to false",
+			in:                &v1alpha3.ClusterConfiguration{},
+			useHyperKubeImage: false,
+			expectedErr:       false,
+		},
+		{
+			desc: "matching UnifiedControlPlaneImage sets UseHyperKubeImage to true",
+			in: &v1alpha3.ClusterConfiguration{
+				ImageRepository:          "k8s.gcr.io",
+				KubernetesVersion:        "v1.12.2",
+				UnifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2",
+			},
+			useHyperKubeImage: true,
+			expectedErr:       false,
+		},
+		{
+			desc: "mismatching UnifiedControlPlaneImage tag causes an error",
+			in: &v1alpha3.ClusterConfiguration{
+				ImageRepository:          "k8s.gcr.io",
+				KubernetesVersion:        "v1.12.0",
+				UnifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2",
+			},
+			expectedErr: true,
+		},
+		{
+			desc: "mismatching UnifiedControlPlaneImage repo causes an error",
+			in: &v1alpha3.ClusterConfiguration{
+				ImageRepository:          "my.repo",
+				KubernetesVersion:        "v1.12.2",
+				UnifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2",
+			},
+			expectedErr: true,
+		},
+		{
+			desc: "mismatching UnifiedControlPlaneImage image name causes an error",
+			in: &v1alpha3.ClusterConfiguration{
+				ImageRepository:          "k8s.gcr.io",
+				KubernetesVersion:        "v1.12.2",
+				UnifiedControlPlaneImage: "k8s.gcr.io/otherimage:v1.12.2",
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			out := &kubeadm.ClusterConfiguration{}
+			err := v1alpha3.Convert_v1alpha3_UnifiedControlPlaneImage_To_kubeadm_UseHyperKubeImage(test.in, out)
+			if test.expectedErr {
+				if err == nil {
+					t.Fatalf("unexpected success, UseHyperKubeImage: %t", out.UseHyperKubeImage)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected failure: %v", err)
+				}
+				if out.UseHyperKubeImage != test.useHyperKubeImage {
+					t.Fatalf("mismatching result from conversion:\n\tExpected: %t\n\tReceived: %t", test.useHyperKubeImage, out.UseHyperKubeImage)
+				}
+			}
+		})
+	}
+}

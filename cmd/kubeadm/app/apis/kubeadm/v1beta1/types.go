@@ -96,9 +96,9 @@ type ClusterConfiguration struct {
 
 	// ImageRepository what container registry to pull control plane images from
 	ImageRepository string `json:"imageRepository"`
-	// UnifiedControlPlaneImage specifies if a specific container image should
-	// be used for all control plane components.
-	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
+
+	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
+	UseHyperKubeImage bool `json:"useHyperKubeImage,omitempty"`
 
 	// AuditPolicyConfiguration defines the options for the api server audit system
 	AuditPolicyConfiguration AuditPolicyConfiguration `json:"auditPolicy"`

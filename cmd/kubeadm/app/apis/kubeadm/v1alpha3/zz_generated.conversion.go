@@ -336,7 +336,7 @@ func autoConvert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(i
 	// WARNING: in.APIServerCertSANs requires manual conversion: does not exist in peer-type
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
-	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
+	// WARNING: in.UnifiedControlPlaneImage requires manual conversion: does not exist in peer-type
 	if err := Convert_v1alpha3_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
 	// INFO: in.CIImageRepository opted out of conversion generation
-	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
+	// WARNING: in.UseHyperKubeImage requires manual conversion: does not exist in peer-type
 	if err := Convert_kubeadm_AuditPolicyConfiguration_To_v1alpha3_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
 		return err
 	}

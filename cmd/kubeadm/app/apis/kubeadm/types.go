@@ -106,9 +106,8 @@ type ClusterConfiguration struct {
 	// +k8s:conversion-gen=false
 	CIImageRepository string
 
-	// UnifiedControlPlaneImage specifies if a specific container image should be
-	// used for all control plane components.
-	UnifiedControlPlaneImage string
+	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
+	UseHyperKubeImage bool
 
 	// AuditPolicyConfiguration defines the options for the api server audit system.
 	AuditPolicyConfiguration AuditPolicyConfiguration

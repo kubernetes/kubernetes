@@ -18,10 +18,13 @@ package v1alpha3
 
 import (
 	"github.com/pkg/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
@@ -126,7 +129,27 @@ func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *C
 		return err
 	}
 
+	if err := Convert_v1alpha3_UnifiedControlPlaneImage_To_kubeadm_UseHyperKubeImage(in, out); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func Convert_v1alpha3_UnifiedControlPlaneImage_To_kubeadm_UseHyperKubeImage(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration) error {
+	if len(in.UnifiedControlPlaneImage) == 0 {
+		out.UseHyperKubeImage = false
+		return nil
+	}
+
+	k8sImageTag := kubeadmutil.KubernetesVersionToImageTag(in.KubernetesVersion)
+	expectedImage := images.GetGenericImage(in.ImageRepository, constants.HyperKube, k8sImageTag)
+	if expectedImage == in.UnifiedControlPlaneImage {
+		out.UseHyperKubeImage = true
+		return nil
+	}
+
+	return errors.Errorf("cannot convert unifiedControlPlaneImage=%q to useHyperKubeImage", in.UnifiedControlPlaneImage)
 }
 
 func Convert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
@@ -148,6 +171,12 @@ func Convert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(in *k
 	out.SchedulerExtraArgs = in.Scheduler.ExtraArgs
 	if err := convertSlice_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(&in.Scheduler.ExtraVolumes, &out.SchedulerExtraVolumes, s); err != nil {
 		return err
+	}
+
+	if in.UseHyperKubeImage {
+		out.UnifiedControlPlaneImage = images.GetKubeControlPlaneImage("", in)
+	} else {
+		out.UnifiedControlPlaneImage = ""
 	}
 
 	return nil
