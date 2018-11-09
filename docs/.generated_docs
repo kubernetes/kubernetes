@@ -27,13 +27,6 @@ docs/admin/kubeadm_alpha_phase_addon.md
 docs/admin/kubeadm_alpha_phase_addon_all.md
 docs/admin/kubeadm_alpha_phase_addon_coredns.md
 docs/admin/kubeadm_alpha_phase_addon_kube-proxy.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token_all.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token_cluster-info.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token_create.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token_node.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-auto-approve.md
-docs/admin/kubeadm_alpha_phase_bootstrap-token_node_allow-post-csrs.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
 docs/admin/kubeadm_alpha_preflight.md
 docs/admin/kubeadm_alpha_preflight_node.md
@@ -54,6 +47,7 @@ docs/admin/kubeadm_config_upload_from-flags.md
 docs/admin/kubeadm_config_view.md
 docs/admin/kubeadm_init.md
 docs/admin/kubeadm_init_phase.md
+docs/admin/kubeadm_init_phase_bootstrap-token.md
 docs/admin/kubeadm_init_phase_certs.md
 docs/admin/kubeadm_init_phase_certs_apiserver-etcd-client.md
 docs/admin/kubeadm_init_phase_certs_apiserver-kubelet-client.md
@@ -123,13 +117,6 @@ docs/man/man1/kubeadm-alpha-phase-addon-all.1
 docs/man/man1/kubeadm-alpha-phase-addon-coredns.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-proxy.1
 docs/man/man1/kubeadm-alpha-phase-addon.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token-all.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token-cluster-info.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token-create.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-auto-approve.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node-allow-post-csrs.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token-node.1
-docs/man/man1/kubeadm-alpha-phase-bootstrap-token.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
 docs/man/man1/kubeadm-alpha-phase.1
 docs/man/man1/kubeadm-alpha-preflight-node.1
@@ -151,6 +138,7 @@ docs/man/man1/kubeadm-config-upload-from-flags.1
 docs/man/man1/kubeadm-config-upload.1
 docs/man/man1/kubeadm-config-view.1
 docs/man/man1/kubeadm-config.1
+docs/man/man1/kubeadm-init-phase-bootstrap-token.1
 docs/man/man1/kubeadm-init-phase-certs-apiserver-etcd-client.1
 docs/man/man1/kubeadm-init-phase-certs-apiserver-kubelet-client.1
 docs/man/man1/kubeadm-init-phase-certs-apiserver.1

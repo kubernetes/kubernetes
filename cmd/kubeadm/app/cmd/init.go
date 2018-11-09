@@ -44,8 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
-	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
@@ -182,6 +180,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 	initRunner.AppendPhase(phases.NewUploadConfigPhase())
+	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -511,51 +510,6 @@ func runInit(i *initData, out io.Writer) error {
 		}
 	}
 
-	// PHASE 5: Set up the node bootstrap tokens
-	tokens := []string{}
-	for _, bt := range i.cfg.BootstrapTokens {
-		tokens = append(tokens, bt.Token.String())
-	}
-	if !i.skipTokenPrint {
-		if len(tokens) == 1 {
-			fmt.Printf("[bootstraptoken] using token: %s\n", tokens[0])
-		} else if len(tokens) > 1 {
-			fmt.Printf("[bootstraptoken] using tokens: %v\n", tokens)
-		}
-	}
-
-	// Create the default node bootstrap token
-	glog.V(1).Infof("[init] creating RBAC rules to generate default bootstrap token")
-	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, i.cfg.BootstrapTokens); err != nil {
-		return errors.Wrap(err, "error updating or creating token")
-	}
-	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	glog.V(1).Infof("[init] creating RBAC rules to allow bootstrap tokens to post CSR")
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
-	}
-	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	glog.V(1).Infof("[init] creating RBAC rules to automatic approval of CSRs automatically")
-	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
-	}
-
-	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	glog.V(1).Infof("[init] creating/updating RBAC rules for rotating certificate")
-	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
-		return err
-	}
-
-	// Create the cluster-info ConfigMap with the associated RBAC rules
-	glog.V(1).Infof("[init] creating bootstrap configmap")
-	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
-		return errors.Wrap(err, "error creating bootstrap configmap")
-	}
-	glog.V(1).Infof("[init] creating ClusterInfo RBAC rules")
-	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
-		return errors.Wrap(err, "error creating clusterinfo RBAC rules")
-	}
-
 	glog.V(1).Infof("[init] ensuring DNS addon")
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error ensuring dns addon")
@@ -573,7 +527,7 @@ func runInit(i *initData, out io.Writer) error {
 	}
 
 	// Prints the join command, multiple times in case the user has multiple tokens
-	for _, token := range tokens {
+	for _, token := range i.Tokens() {
 		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
 			return errors.Wrap(err, "failed to print join command")
 		}
