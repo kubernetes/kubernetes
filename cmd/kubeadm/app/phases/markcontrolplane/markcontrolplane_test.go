@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package markmaster
+package markcontrolplane
 
 import (
 	"bytes"
@@ -110,7 +110,7 @@ func TestMarkMaster(t *testing.T) {
 	for _, tc := range tests {
 		hostname, err := node.GetHostname("")
 		if err != nil {
-			t.Fatalf("MarkMaster(%s): unexpected error: %v", tc.name, err)
+			t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
 		}
 		masterNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -131,7 +131,7 @@ func TestMarkMaster(t *testing.T) {
 
 		jsonNode, err := json.Marshal(masterNode)
 		if err != nil {
-			t.Fatalf("MarkMaster(%s): unexpected encoding error: %v", tc.name, err)
+			t.Fatalf("MarkControlPlane(%s): unexpected encoding error: %v", tc.name, err)
 		}
 
 		var patchRequest string
@@ -139,7 +139,7 @@ func TestMarkMaster(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 
 			if req.URL.Path != "/api/v1/nodes/"+hostname {
-				t.Errorf("MarkMaster(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
+				t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
 				http.Error(w, "", http.StatusNotFound)
 				return
 			}
@@ -149,7 +149,7 @@ func TestMarkMaster(t *testing.T) {
 			case "PATCH":
 				patchRequest = toString(req.Body)
 			default:
-				t.Errorf("MarkMaster(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
+				t.Errorf("MarkControlPlane(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
 				http.Error(w, "", http.StatusNotFound)
 				return
 			}
@@ -161,15 +161,15 @@ func TestMarkMaster(t *testing.T) {
 
 		cs, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 		if err != nil {
-			t.Fatalf("MarkMaster(%s): unexpected error building clientset: %v", tc.name, err)
+			t.Fatalf("MarkControlPlane(%s): unexpected error building clientset: %v", tc.name, err)
 		}
 
 		if err := MarkMaster(cs, hostname, tc.newTaints); err != nil {
-			t.Errorf("MarkMaster(%s) returned unexpected error: %v", tc.name, err)
+			t.Errorf("MarkControlPlane(%s) returned unexpected error: %v", tc.name, err)
 		}
 
 		if tc.expectedPatch != patchRequest {
-			t.Errorf("MarkMaster(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
+			t.Errorf("MarkControlPlane(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
 		}
 	}
 }

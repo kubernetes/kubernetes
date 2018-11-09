@@ -46,7 +46,7 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
+	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -572,9 +572,9 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 		return errors.Wrap(err, "error uploading configuration")
 	}
 
-	glog.V(1).Info("[join] marking the master with right label")
-	if err = markmasterphase.MarkMaster(client, initConfiguration.NodeRegistration.Name, initConfiguration.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error applying master label and taints")
+	glog.V(1).Info("[join] marking the control-plane with right label")
+	if err = markcontrolplanephase.MarkControlPlane(client, initConfiguration.NodeRegistration.Name, initConfiguration.NodeRegistration.Taints); err != nil {
+		return errors.Wrap(err, "error applying control-plane label and taints")
 	}
 
 	return nil
