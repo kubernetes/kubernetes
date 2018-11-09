@@ -58,6 +58,7 @@ var kindWhiteList = sets.NewString(
 	"ListOptions",
 	"CreateOptions",
 	"UpdateOptions",
+	"PatchOptions",
 	"NodeProxyOptions",
 	"PodAttachOptions",
 	"PodExecOptions",
