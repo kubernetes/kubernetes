@@ -17,14 +17,14 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"reflect"
 	"testing"
-	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -76,133 +76,91 @@ func TestConfigMapCreation(t *testing.T) {
 		name string
 	}
 	testcases := map[string]struct {
-		ExistingNamespace  *v1.Namespace
 		ExistingConfigMaps []*v1.ConfigMap
 		AddedNamespace     *v1.Namespace
 		UpdatedNamespace   *v1.Namespace
 		DeletedConfigMap   *v1.ConfigMap
-		UpdatedConfigMap   []*v1.ConfigMap
+		UpdatedConfigMap   *v1.ConfigMap
 		ExpectActions      []action
 	}{
 		"create new namesapce": {
 			AddedNamespace: newNs,
 			ExpectActions:  []action{{verb: "create", name: RootCACertCofigMapName}},
 		},
-
 		"delete other configmap": {
-			ExistingNamespace:  existNS,
 			ExistingConfigMaps: []*v1.ConfigMap{otherConfigMap, caConfigMap},
 			DeletedConfigMap:   otherConfigMap,
 		},
 		"delete ca configmap": {
-			ExistingNamespace:  existNS,
 			ExistingConfigMaps: []*v1.ConfigMap{otherConfigMap, caConfigMap},
 			DeletedConfigMap:   caConfigMap,
 			ExpectActions:      []action{{verb: "create", name: RootCACertCofigMapName}},
 		},
 		"update ca configmap with adding field": {
-			ExistingNamespace:  existNS,
 			ExistingConfigMaps: []*v1.ConfigMap{caConfigMap},
-			UpdatedConfigMap:   []*v1.ConfigMap{caConfigMap, addFieldCM},
+			UpdatedConfigMap:   addFieldCM,
 			ExpectActions:      []action{{verb: "update", name: RootCACertCofigMapName}},
 		},
 		"update ca configmap with modifying field": {
-			ExistingNamespace:  existNS,
 			ExistingConfigMaps: []*v1.ConfigMap{caConfigMap},
-			UpdatedConfigMap:   []*v1.ConfigMap{caConfigMap, modifyFieldCM},
+			UpdatedConfigMap:   modifyFieldCM,
 			ExpectActions:      []action{{verb: "update", name: RootCACertCofigMapName}},
 		},
 		"update with other configmap": {
-			ExistingNamespace:  existNS,
 			ExistingConfigMaps: []*v1.ConfigMap{caConfigMap, otherConfigMap},
-			UpdatedConfigMap:   []*v1.ConfigMap{otherConfigMap, updateOtherConfigMap},
+			UpdatedConfigMap:   updateOtherConfigMap,
 		},
 		"update namespace with terminating state": {
-			ExistingNamespace: existNS,
-			UpdatedNamespace:  terminatingNS,
+			UpdatedNamespace: terminatingNS,
 		},
 	}
 
 	for k, tc := range testcases {
-		client := fake.NewSimpleClientset(caConfigMap, existNS)
-		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
-		cmInformer := informers.Core().V1().ConfigMaps()
-		nsInformer := informers.Core().V1().Namespaces()
-		controller, err := NewPublisher(cmInformer, nsInformer, client, fakeRootCA)
-		if err != nil {
-			t.Fatalf("error creating ServiceAccounts controller: %v", err)
-		}
-		controller.cmListerSynced = alwaysReady
-		controller.nsListerSynced = alwaysReady
-
-		cmStore := cmInformer.Informer().GetStore()
-		nsStore := nsInformer.Informer().GetStore()
-
-		syncCalls := make(chan struct{})
-		controller.syncHandler = func(key string) error {
-			err := controller.syncNamespace(key)
+		t.Run(k, func(t *testing.T) {
+			client := fake.NewSimpleClientset(caConfigMap, existNS)
+			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
+			cmInformer := informers.Core().V1().ConfigMaps()
+			controller, err := NewPublisher(cmInformer, client, fakeRootCA)
 			if err != nil {
-				t.Logf("%s: %v", k, err)
+				t.Fatalf("error creating ServiceAccounts controller: %v", err)
 			}
-			syncCalls <- struct{}{}
-			return err
-		}
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-		go controller.Run(1, stopCh)
 
-		if tc.ExistingNamespace != nil {
-			nsStore.Add(tc.ExistingNamespace)
-		}
-		for _, s := range tc.ExistingConfigMaps {
-			cmStore.Add(s)
-		}
+			cmStore := cmInformer.Informer().GetStore()
 
-		if tc.AddedNamespace != nil {
-			nsStore.Add(tc.AddedNamespace)
-			controller.namespaceAdded(tc.AddedNamespace)
-		}
-		if tc.UpdatedNamespace != nil {
-			controller.namespaceUpdated(tc.ExistingNamespace, tc.UpdatedNamespace)
-		}
+			controller.syncHandler = controller.syncNamespace
 
-		if tc.DeletedConfigMap != nil {
-			cmStore.Delete(tc.DeletedConfigMap)
-			controller.configMapDeleted(tc.DeletedConfigMap)
-		}
-
-		if tc.UpdatedConfigMap != nil {
-			old := tc.UpdatedConfigMap[0]
-			new := tc.UpdatedConfigMap[1]
-			controller.configMapUpdated(old, new)
-		}
-
-		// wait to be called
-		select {
-		case <-syncCalls:
-		case <-time.After(5 * time.Second):
-		}
-
-		actions := client.Actions()
-		if len(tc.ExpectActions) != len(actions) {
-			t.Errorf("%s: Expected to create configmap %#v. Actual actions were: %#v", k, tc.ExpectActions, actions)
-			continue
-		}
-		for i, expectAction := range tc.ExpectActions {
-			action := actions[i]
-			if !action.Matches(expectAction.verb, "configmaps") {
-				t.Errorf("%s: Unexpected action %s", k, action)
-				break
+			for _, s := range tc.ExistingConfigMaps {
+				cmStore.Add(s)
 			}
-			cm := action.(core.CreateAction).GetObject().(*v1.ConfigMap)
-			if cm.Name != expectAction.name {
-				t.Errorf("%s: Expected %s to be %s, got %s be %s", k, expectAction.name, expectAction.verb, cm.Name, action.GetVerb())
+
+			if tc.AddedNamespace != nil {
+				controller.namespaceAdded(tc.AddedNamespace)
 			}
-		}
+			if tc.UpdatedNamespace != nil {
+				controller.namespaceUpdated(nil, tc.UpdatedNamespace)
+			}
+
+			if tc.DeletedConfigMap != nil {
+				cmStore.Delete(tc.DeletedConfigMap)
+				controller.configMapDeleted(tc.DeletedConfigMap)
+			}
+
+			if tc.UpdatedConfigMap != nil {
+				cmStore.Add(tc.UpdatedConfigMap)
+				controller.configMapUpdated(nil, tc.UpdatedConfigMap)
+			}
+
+			for controller.queue.Len() != 0 {
+				controller.processNextWorkItem()
+			}
+
+			actions := client.Actions()
+			if reflect.DeepEqual(actions, tc.ExpectActions) {
+				t.Errorf("Unexpected actions:\n%s", diff.ObjectGoPrintDiff(actions, tc.ExpectActions))
+			}
+		})
 	}
 }
-
-var alwaysReady = func() bool { return true }
 
 func defaultCrtConfigMapPtr(rootCA []byte) *v1.ConfigMap {
 	tmp := v1.ConfigMap{
