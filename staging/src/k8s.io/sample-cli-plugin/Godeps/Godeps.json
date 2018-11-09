@@ -571,6 +571,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/klog",
+			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+		},
+		{
 			"ImportPath": "sigs.k8s.io/yaml",
 			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
 		}
