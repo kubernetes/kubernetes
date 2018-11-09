@@ -34,7 +34,6 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/golang/glog"
-	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -123,7 +122,7 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 	diskType string,
 	zone string) error {
 	diskTypeURI, err := manager.getDiskTypeURI(
-		manager.gce.region /* diskRegion */, singleZone{zone}, diskType, false /* useBetaAPI */)
+		manager.gce.region /* diskRegion */, singleZone{zone}, diskType)
 	if err != nil {
 		return err
 	}
@@ -152,7 +151,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 	}
 
 	diskTypeURI, err := manager.getDiskTypeURI(
-		manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType, true /* useBetaAPI */)
+		manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType)
 	if err != nil {
 		return err
 	}
@@ -162,7 +161,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 			fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone, true))
 	}
 
-	diskToCreateBeta := &computebeta.Disk{
+	diskToCreate := &compute.Disk{
 		Name:         name,
 		SizeGb:       sizeGb,
 		Description:  tagsStr,
@@ -172,7 +171,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	return manager.gce.c.BetaRegionDisks().Insert(ctx, meta.RegionalKey(name, manager.gce.region), diskToCreateBeta)
+	return manager.gce.c.RegionDisks().Insert(ctx, meta.RegionalKey(name, manager.gce.region), diskToCreate)
 }
 
 func (manager *gceServiceManager) AttachDiskOnCloudProvider(
@@ -254,7 +253,7 @@ func (manager *gceServiceManager) GetRegionalDiskFromCloudProvider(
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	diskBeta, err := manager.gce.c.BetaRegionDisks().Get(ctx, meta.RegionalKey(diskName, manager.gce.region))
+	diskBeta, err := manager.gce.c.RegionDisks().Get(ctx, meta.RegionalKey(diskName, manager.gce.region))
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +290,7 @@ func (manager *gceServiceManager) DeleteRegionalDiskOnCloudProvider(
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	return manager.gce.c.BetaRegionDisks().Delete(ctx, meta.RegionalKey(diskName, manager.gce.region))
+	return manager.gce.c.RegionDisks().Delete(ctx, meta.RegionalKey(diskName, manager.gce.region))
 }
 
 func (manager *gceServiceManager) getDiskSourceURI(disk *Disk) (string, error) {
@@ -329,14 +328,9 @@ func (manager *gceServiceManager) getDiskSourceURI(disk *Disk) (string, error) {
 }
 
 func (manager *gceServiceManager) getDiskTypeURI(
-	diskRegion string, diskZoneInfo zoneType, diskType string, useBetaAPI bool) (string, error) {
+	diskRegion string, diskZoneInfo zoneType, diskType string) (string, error) {
 
-	var getProjectsAPIEndpoint string
-	if useBetaAPI {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointBeta()
-	} else {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpoint()
-	}
+	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
 
 	switch zoneInfo := diskZoneInfo.(type) {
 	case singleZone:
@@ -428,13 +422,13 @@ func (manager *gceServiceManager) RegionalResizeDiskOnCloudProvider(disk *Disk, 
 		return fmt.Errorf("the regional PD feature is only available with the %s Kubernetes feature gate enabled", features.GCERegionalPersistentDisk)
 	}
 
-	resizeServiceRequest := &computebeta.RegionDisksResizeRequest{
+	resizeServiceRequest := &compute.RegionDisksResizeRequest{
 		SizeGb: sizeGb,
 	}
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	return manager.gce.c.BetaRegionDisks().Resize(ctx, meta.RegionalKey(disk.Name, disk.Region), resizeServiceRequest)
+	return manager.gce.c.RegionDisks().Resize(ctx, meta.RegionalKey(disk.Name, disk.Region), resizeServiceRequest)
 }
 
 // Disks is interface for manipulation with GCE PDs.
