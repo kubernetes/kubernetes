@@ -17,7 +17,6 @@ limitations under the License.
 package cronjob
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -286,10 +285,9 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 		jc := &fakeJobControl{Job: job}
 		sjc := &fakeSJControl{}
-		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
-		syncOne(&sj, js, tc.now, jc, sjc, pc, recorder)
+		syncOne(&sj, js, tc.now, jc, sjc, recorder)
 		expectedCreates := 0
 		if tc.expectCreate {
 			expectedCreates = 1
@@ -485,16 +483,6 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", F, F, F, F},
 			}, justBeforeTheHour(), &limitZero, &limitZero, 6},
-
-		"failed list pod err": {
-			[]CleanupJobSpec{
-				{"2016-05-19T04:00:00Z", T, F, F, F},
-				{"2016-05-19T05:00:00Z", T, F, F, F},
-				{"2016-05-19T06:00:00Z", T, T, F, F},
-				{"2016-05-19T07:00:00Z", T, T, F, F},
-				{"2016-05-19T08:00:00Z", T, F, F, F},
-				{"2016-05-19T09:00:00Z", T, F, F, F},
-			}, justBeforeTheHour(), &limitZero, &limitZero, 0},
 	}
 
 	for name, tc := range testCases {
@@ -563,14 +551,10 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		}
 
 		jc := &fakeJobControl{Job: job}
-		pc := &fakePodControl{}
 		sjc := &fakeSJControl{}
 		recorder := record.NewFakeRecorder(10)
-		if name == "failed list pod err" {
-			pc.Err = errors.New("fakePodControl err")
-		}
 
-		cleanupFinishedJobs(&sj, js, jc, sjc, pc, recorder)
+		cleanupFinishedJobs(&sj, js, jc, sjc, recorder)
 
 		// Check we have actually deleted the correct jobs
 		if len(jc.DeleteJobName) != len(jobsToDelete) {
@@ -728,11 +712,10 @@ func TestSyncOne_Status(t *testing.T) {
 
 		jc := &fakeJobControl{}
 		sjc := &fakeSJControl{}
-		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
 		// Run the code
-		syncOne(&sj, jobs, tc.now, jc, sjc, pc, recorder)
+		syncOne(&sj, jobs, tc.now, jc, sjc, recorder)
 
 		// Status update happens once when ranging through job list, and another one if create jobs.
 		expectUpdates := 1
