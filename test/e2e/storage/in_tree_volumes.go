@@ -27,7 +27,7 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() drivers.TestDriver{
+var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -75,12 +75,12 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
-		Context(drivers.GetDriverNameWithFeatureTags(curDriver), func() {
+		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			driver := curDriver
 
 			BeforeEach(func() {
 				// setupDriver
-				drivers.SetCommonDriverParameters(driver, f, config)
+				testsuites.SetCommonDriverParameters(driver, f, config)
 				driver.CreateDriver()
 			})
 

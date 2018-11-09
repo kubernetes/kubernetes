@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -75,7 +74,7 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
 func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumeIOTestInput {
@@ -90,7 +89,7 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 	}
 
-	if dInfo.Capabilities[drivers.CapFsGroup] {
+	if dInfo.Capabilities[CapFsGroup] {
 		fsGroupVal := int64(1234)
 		fsGroup = &fsGroupVal
 	}
@@ -108,7 +107,7 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 	}
 }
 
-func (t *volumeIOTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
 			resource     genericVolumeTestResource

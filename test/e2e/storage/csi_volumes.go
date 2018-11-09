@@ -43,7 +43,7 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var csiTestDrivers = []func() drivers.TestDriver{
+var csiTestDrivers = []func() testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	drivers.InitGcePDExternalCSIDriver,
@@ -126,12 +126,12 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 	for _, initDriver := range csiTestDrivers {
 		curDriver := initDriver()
-		Context(drivers.GetDriverNameWithFeatureTags(curDriver), func() {
+		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			driver := curDriver
 
 			BeforeEach(func() {
 				// setupDriver
-				drivers.SetCommonDriverParameters(driver, f, config)
+				testsuites.SetCommonDriverParameters(driver, f, config)
 				driver.CreateDriver()
 			})
 
@@ -149,14 +149,14 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		var (
 			cs     clientset.Interface
 			csics  csiclient.Interface
-			driver drivers.TestDriver
+			driver testsuites.TestDriver
 		)
 
 		BeforeEach(func() {
 			cs = f.ClientSet
 			csics = f.CSIClientSet
 			driver = drivers.InitHostPathCSIDriver()
-			drivers.SetCommonDriverParameters(driver, f, config)
+			testsuites.SetCommonDriverParameters(driver, f, config)
 			driver.CreateDriver()
 		})
 
@@ -193,7 +193,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			test := t
 			It(test.name, func() {
 				if test.driverExists {
-					csiDriver := createCSIDriver(csics, drivers.GetUniqueDriverName(driver), test.driverAttachable)
+					csiDriver := createCSIDriver(csics, testsuites.GetUniqueDriverName(driver), test.driverAttachable)
 					if csiDriver != nil {
 						defer csics.CsiV1alpha1().CSIDrivers().Delete(csiDriver.Name, nil)
 					}
@@ -201,7 +201,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 				By("Creating pod")
 				var sc *storagev1.StorageClass
-				if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
+				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
 					sc = dDriver.GetDynamicProvisionStorageClass("")
 				}
 				nodeName := driver.GetDriverInfo().Config.ClientNodeName

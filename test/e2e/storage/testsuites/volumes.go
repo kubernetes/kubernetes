@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -73,19 +72,19 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
-func skipPersistenceTest(driver drivers.TestDriver) {
+func skipPersistenceTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[drivers.CapPersistence] {
+	if !dInfo.Capabilities[CapPersistence] {
 		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
 	}
 }
 
-func skipExecTest(driver drivers.TestDriver) {
+func skipExecTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[drivers.CapExec] {
+	if !dInfo.Capabilities[CapExec] {
 		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
 	}
 }
@@ -101,7 +100,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 	}
 
-	if dInfo.Capabilities[drivers.CapFsGroup] {
+	if dInfo.Capabilities[CapFsGroup] {
 		fsGroupVal := int64(1234)
 		fsGroup = &fsGroupVal
 	}
@@ -124,7 +123,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	}
 }
 
-func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
 			resource     genericVolumeTestResource

@@ -44,38 +44,39 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // hostpathCSI
 type hostpathCSIDriver struct {
 	cleanup    func()
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 	manifests  []string
 }
 
-func initHostPathCSIDriver(name string, manifests ...string) TestDriver {
+func initHostPathCSIDriver(name string, manifests ...string) testsuites.TestDriver {
 	return &hostpathCSIDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        name,
 			FeatureTag:  "",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
 			},
 		},
 		manifests: manifests,
 	}
 }
 
-var _ TestDriver = &hostpathCSIDriver{}
-var _ DynamicPVTestDriver = &hostpathCSIDriver{}
+var _ testsuites.TestDriver = &hostpathCSIDriver{}
+var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
-func InitHostPathCSIDriver() TestDriver {
+func InitHostPathCSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
@@ -87,7 +88,7 @@ func InitHostPathCSIDriver() TestDriver {
 	)
 }
 
-func (h *hostpathCSIDriver) GetDriverInfo() *DriverInfo {
+func (h *hostpathCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
 }
 
@@ -95,12 +96,12 @@ func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern
 }
 
 func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
-	provisioner := GetUniqueDriverName(h)
+	provisioner := testsuites.GetUniqueDriverName(h)
 	parameters := map[string]string{}
 	ns := h.driverInfo.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
 func (h *hostpathCSIDriver) GetClaimSize() string {
@@ -122,7 +123,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 	// settings are ignored for this test. We could patch the image definitions.
 	o := utils.PatchCSIOptions{
 		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            GetUniqueDriverName(h),
+		NewDriverName:            testsuites.GetUniqueDriverName(h),
 		DriverContainerName:      "hostpath",
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 h.driverInfo.Config.ServerNodeName,
@@ -145,7 +146,7 @@ func (h *hostpathCSIDriver) CleanupDriver() {
 }
 
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
-func InitHostPathV0CSIDriver() TestDriver {
+func InitHostPathV0CSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
@@ -160,16 +161,16 @@ func InitHostPathV0CSIDriver() TestDriver {
 // gce-pd
 type gcePDCSIDriver struct {
 	cleanup    func()
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
-var _ TestDriver = &gcePDCSIDriver{}
-var _ DynamicPVTestDriver = &gcePDCSIDriver{}
+var _ testsuites.TestDriver = &gcePDCSIDriver{}
+var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
-func InitGcePDCSIDriver() TestDriver {
+func InitGcePDCSIDriver() testsuites.TestDriver {
 	return &gcePDCSIDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "pd.csi.storage.gke.io",
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
@@ -180,16 +181,16 @@ func InitGcePDCSIDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapExec:        true,
 			},
 		},
 	}
 }
 
-func (g *gcePDCSIDriver) GetDriverInfo() *DriverInfo {
+func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
@@ -206,7 +207,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 
 	parameters := map[string]string{"type": "pd-standard"}
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
 func (g *gcePDCSIDriver) GetClaimSize() string {
@@ -223,7 +224,7 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	// These are the options which would have to be used:
 	// o := utils.PatchCSIOptions{
 	// 	OldDriverName:            g.driverInfo.Name,
-	// 	NewDriverName:            GetUniqueDriverName(g),
+	// 	NewDriverName:            testsuites.GetUniqueDriverName(g),
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }
@@ -252,17 +253,18 @@ func (g *gcePDCSIDriver) CleanupDriver() {
 
 // gcePd-external
 type gcePDExternalCSIDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
-var _ TestDriver = &gcePDExternalCSIDriver{}
-var _ DynamicPVTestDriver = &gcePDExternalCSIDriver{}
+var _ testsuites.TestDriver = &gcePDExternalCSIDriver{}
+var _ testsuites.DynamicPVTestDriver = &gcePDExternalCSIDriver{}
 
 // InitGcePDExternalCSIDriver returns gcePDExternalCSIDriver that implements TestDriver interface
-func InitGcePDExternalCSIDriver() TestDriver {
+func InitGcePDExternalCSIDriver() testsuites.TestDriver {
 	return &gcePDExternalCSIDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name: "pd.csi.storage.gke.io",
+
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
 			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,
@@ -273,16 +275,16 @@ func InitGcePDExternalCSIDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapExec:        true,
 			},
 		},
 	}
 }
 
-func (g *gcePDExternalCSIDriver) GetDriverInfo() *DriverInfo {
+func (g *gcePDExternalCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
@@ -298,7 +300,7 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 
 	parameters := map[string]string{"type": "pd-standard"}
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
 func (g *gcePDExternalCSIDriver) GetClaimSize() string {
