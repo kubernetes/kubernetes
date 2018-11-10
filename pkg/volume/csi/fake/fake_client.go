@@ -58,9 +58,10 @@ func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts
 }
 
 type CSIVolume struct {
-	Attributes map[string]string
-	Path       string
-	MountFlags []string
+	Attributes         map[string]string
+	Path               string
+	MountFlags         []string
+	NodePublishSecrets map[string]string
 }
 
 // NodeClient returns CSI node client
@@ -125,10 +126,12 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")
 	}
+
 	f.nodePublishedVolumes[req.GetVolumeId()] = CSIVolume{
-		Path:       req.GetTargetPath(),
-		Attributes: req.GetVolumeAttributes(),
-		MountFlags: req.GetVolumeCapability().GetMount().MountFlags,
+		Path:               req.GetTargetPath(),
+		Attributes:         req.GetVolumeAttributes(),
+		MountFlags:         req.GetVolumeCapability().GetMount().MountFlags,
+		NodePublishSecrets: req.NodePublishSecrets,
 	}
 	return &csipb.NodePublishVolumeResponse{}, nil
 }

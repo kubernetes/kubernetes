@@ -49,7 +49,7 @@ var (
 	bTrue  = true
 )
 
-func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttachment {
+func makeTestAttachment(attachID, nodeName string, volAttSrc storage.VolumeAttachmentSource) *storage.VolumeAttachment {
 	return &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
 			Name: attachID,
@@ -57,9 +57,7 @@ func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttach
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: nodeName,
 			Attacher: "mock",
-			Source: storage.VolumeAttachmentSource{
-				PersistentVolumeName: &pvName,
-			},
+			Source:   volAttSrc,
 		},
 		Status: storage.VolumeAttachmentStatus{
 			Attached:    false,
@@ -360,7 +358,9 @@ func TestAttacherPostVolumeAttachment(t *testing.T) {
 		pvName := fmt.Sprintf("test-pv-%d", i)
 		var attachment *storage.VolumeAttachment
 		if len(tc.attachID) > 0 {
-			attachment = makeTestAttachment(tc.attachID, nodeName, pvName)
+			attachment = makeTestAttachment(tc.attachID, nodeName, storage.VolumeAttachmentSource{
+				PersistentVolumeName: &pvName,
+			})
 		}
 
 		// go and watch/mark attachment as attached
@@ -443,7 +443,9 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		pvName := fmt.Sprintf("test-pv-%d", i)
 		volID := fmt.Sprintf("test-vol-%d", i)
 		attachID := getAttachmentName(volID, testDriver, nodeName)
-		attachment := makeTestAttachment(attachID, nodeName, pvName)
+		attachment := makeTestAttachment(attachID, nodeName, storage.VolumeAttachmentSource{
+			PersistentVolumeName: &pvName,
+		})
 		attachment.Status.Attached = tc.initAttached
 		attachment.Status.AttachError = tc.initAttachErr
 		_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
@@ -458,7 +460,9 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
 			go func() {
 				time.Sleep(trigerWatchEventTime)
-				attachment := makeTestAttachment(attachID, nodeName, pvName)
+				attachment := makeTestAttachment(attachID, nodeName, storage.VolumeAttachmentSource{
+					PersistentVolumeName: &pvName,
+				})
 				attachment.Status.Attached = finalAttached
 				attachment.Status.AttachError = finalAttachErr
 				fakeWatcher.Modify(attachment)
@@ -508,7 +512,10 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 			specs = append(specs, spec)
 			attachID := getAttachmentName(volName, testDriver, nodeName)
-			attachment := makeTestAttachment(attachID, nodeName, pv.GetName())
+			testPVName := pv.GetName()
+			attachment := makeTestAttachment(attachID, nodeName, storage.VolumeAttachmentSource{
+				PersistentVolumeName: &testPVName,
+			})
 			attachment.Status.Attached = stat
 			_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 			if err != nil {
@@ -582,7 +589,10 @@ func TestAttacherDetach(t *testing.T) {
 
 		pv := makeTestPV("test-pv", 10, testDriver, tc.volID)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
-		attachment := makeTestAttachment(tc.attachID, nodeName, "test-pv")
+		testPV := "test-pv"
+		attachment := makeTestAttachment(tc.attachID, nodeName, storage.VolumeAttachmentSource{
+			PersistentVolumeName: &testPV,
+		})
 		_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 		if err != nil {
 			t.Fatalf("failed to attach: %v", err)
@@ -748,7 +758,9 @@ func TestAttacherMountDevice(t *testing.T) {
 		attachID := getAttachmentName(tc.volName, testDriver, nodeName)
 
 		// Set up volume attachment
-		attachment := makeTestAttachment(attachID, nodeName, pvName)
+		attachment := makeTestAttachment(attachID, nodeName, storage.VolumeAttachmentSource{
+			PersistentVolumeName: &pvName,
+		})
 		_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 		if err != nil {
 			t.Fatalf("failed to attach: %v", err)

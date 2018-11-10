@@ -359,7 +359,9 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		csiMounter.csiClient = setupClient(t, true)
 
 		attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
-		attachment := makeTestAttachment(attachID, "test-node", pvName)
+		attachment := makeTestAttachment(attachID, "test-node", storage.VolumeAttachmentSource{
+			PersistentVolumeName: &pvName,
+		})
 
 		_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 		if err != nil {

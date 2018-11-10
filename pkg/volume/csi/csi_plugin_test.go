@@ -39,7 +39,7 @@ import (
 
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*csiPlugin, string) {
-	err := utilfeature.DefaultFeatureGate.Set("CSIBlockVolume=true")
+	err := utilfeature.DefaultFeatureGate.Set("CSIBlockVolume=true,CSIInlineVolume=true")
 	if err != nil {
 		t.Fatalf("Failed to enable feature gate for CSIBlockVolume: %v", err)
 	}

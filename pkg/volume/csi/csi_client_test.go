@@ -23,8 +23,6 @@ import (
 	"reflect"
 	"testing"
 
-	"reflect"
-
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"

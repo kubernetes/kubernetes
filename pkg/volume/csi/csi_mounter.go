@@ -123,6 +123,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		volAttribs         map[string]string
 		nodePublishSecrets map[string]string
 		stageUnstageSet    bool
+		mountOptions       []string
 	)
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
@@ -165,8 +166,10 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 		if volSrc.VolumeHandle != nil {
 			volumeHandle = *volSrc.VolumeHandle
+		} else {
+			// TODO what should happen if handle is not provided?
+			volumeHandle = "fake_inline_volume_id"
 		}
-		// TODO what should happen if handle is not provided?
 
 		if volSrc.FSType != nil {
 			fsType = *volSrc.FSType
@@ -188,6 +191,8 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 				return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v", ns, secretName, err)
 			}
 		}
+		mountOptions = []string{}
+
 		glog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource OK [driver:%d, volumeHandle:%s]", driverName, volumeHandle))
 	} else if pvSrc != nil {
 		// if source is a CSIPersistentVolumeSource (PV), prepare needed params (from PV)
@@ -221,6 +226,8 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		if c.spec.PersistentVolume.Spec.AccessModes != nil {
 			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 		}
+
+		mountOptions = c.spec.PersistentVolume.Spec.MountOptions
 	} else {
 		return errors.New("mounter.SetUpAt failed to get CSI volume source")
 	}
@@ -261,7 +268,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		volAttribs,
 		nodePublishSecrets,
 		fsType,
-		c.spec.PersistentVolume.Spec.MountOptions,
+		mountOptions,
 	)
 
 	if err != nil {

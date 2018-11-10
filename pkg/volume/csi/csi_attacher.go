@@ -81,6 +81,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		if volSource.VolumeHandle != nil {
 			volumeHandle = *volSource.VolumeHandle
 		} else {
+			// TODO, add volumeHandle generation
 			return "", errors.New("CSI volume source missing required volumeHandle")
 		}
 	} else if pvSource != nil {
