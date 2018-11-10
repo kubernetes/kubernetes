@@ -3778,18 +3778,16 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	}
 
 	// Determine the load balancer security group id
-	loadBalancerSecurityGroupID := ""
-	for _, securityGroup := range lb.SecurityGroups {
-		if aws.StringValue(securityGroup) == "" {
-			continue
-		}
-		if loadBalancerSecurityGroupID != "" {
-			// We create LBs with one SG
-			glog.Warningf("Multiple security groups for load balancer: %q", aws.StringValue(lb.LoadBalancerName))
-		}
-		loadBalancerSecurityGroupID = *securityGroup
+	request := &ec2.DescribeSecurityGroupsInput{
+		GroupNames: []*string{lb.SourceSecurityGroup.GroupName},
 	}
-	if loadBalancerSecurityGroupID == "" {
+	sg, err := c.ec2.DescribeSecurityGroups(request)
+	if err != nil {
+		return fmt.Errorf("error querying security groups: %q", err)
+	}
+	// err is nil, we have at least 1 security group
+	loadBalancerSecurityGroupID := aws.StringValue(sg[0].GroupId)
+	if len(sg) > 1 || loadBalancerSecurityGroupID == "" {
 		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
