@@ -19,6 +19,8 @@ package workqueue
 import (
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 type Interface interface {
@@ -36,22 +38,24 @@ func New() *Type {
 }
 
 func NewNamed(name string) *Type {
+	rc := clock.RealClock{}
 	return newQueue(
-		name,
-		newQueueMetrics(name),
+		rc,
+		globalMetricsFactory.newQueueMetrics(name, rc),
 		defaultUnfinishedWorkUpdatePeriod,
 	)
 }
 
-func newQueue(name string, metrics queueMetrics, updatePeriod time.Duration) *Type {
+func newQueue(c clock.Clock, metrics queueMetrics, updatePeriod time.Duration) *Type {
 	t := &Type{
+		clock:                      c,
 		dirty:                      set{},
 		processing:                 set{},
 		cond:                       sync.NewCond(&sync.Mutex{}),
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
 	}
-	go t.updateUnfinishedWorkLook()
+	go t.updateUnfinishedWorkLoop()
 	return t
 }
 
@@ -80,6 +84,7 @@ type Type struct {
 	metrics queueMetrics
 
 	unfinishedWorkUpdatePeriod time.Duration
+	clock                      clock.Clock
 }
 
 type empty struct{}
@@ -187,10 +192,10 @@ func (q *Type) ShuttingDown() bool {
 	return q.shuttingDown
 }
 
-func (q *Type) updateUnfinishedWorkLook() {
-	t := time.NewTicker(q.unfinishedWorkUpdatePeriod)
+func (q *Type) updateUnfinishedWorkLoop() {
+	t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
 	defer t.Stop()
-	for range t.C {
+	for range t.C() {
 		if !func() bool {
 			q.cond.L.Lock()
 			defer q.cond.L.Unlock()

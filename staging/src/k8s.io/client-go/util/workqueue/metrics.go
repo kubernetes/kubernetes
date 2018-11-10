@@ -19,6 +19,8 @@ package workqueue
 import (
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 // This file provides abstractions for setting the provider (e.g., prometheus)
@@ -63,6 +65,8 @@ func (noopMetric) Set(float64)     {}
 func (noopMetric) Observe(float64) {}
 
 type defaultQueueMetrics struct {
+	clock clock.Clock
+
 	// current depth of a workqueue
 	depth GaugeMetric
 	// total number of adds handled by a workqueue
@@ -86,7 +90,7 @@ func (m *defaultQueueMetrics) add(item t) {
 	m.adds.Inc()
 	m.depth.Inc()
 	if _, exists := m.addTimes[item]; !exists {
-		m.addTimes[item] = time.Now()
+		m.addTimes[item] = m.clock.Now()
 	}
 }
 
@@ -96,9 +100,9 @@ func (m *defaultQueueMetrics) get(item t) {
 	}
 
 	m.depth.Dec()
-	m.processingStartTimes[item] = time.Now()
+	m.processingStartTimes[item] = m.clock.Now()
 	if startTime, exists := m.addTimes[item]; exists {
-		m.latency.Observe(sinceInMicroseconds(startTime))
+		m.latency.Observe(m.sinceInMicroseconds(startTime))
 		delete(m.addTimes, item)
 	}
 }
@@ -109,17 +113,15 @@ func (m *defaultQueueMetrics) done(item t) {
 	}
 
 	if startTime, exists := m.processingStartTimes[item]; exists {
-		m.workDuration.Observe(sinceInMicroseconds(startTime))
+		m.workDuration.Observe(m.sinceInMicroseconds(startTime))
 		delete(m.processingStartTimes, item)
 	}
 }
 
 func (m *defaultQueueMetrics) updateUnfinishedWork() {
 	var total float64
-	if m.processingStartTimes != nil {
-		for _, t := range m.processingStartTimes {
-			total += sinceInMicroseconds(t)
-		}
+	for _, t := range m.processingStartTimes {
+		total += m.sinceInMicroseconds(t)
 	}
 	m.unfinishedWorkMicroseconds.Set(total)
 }
@@ -132,8 +134,8 @@ func (noMetrics) done(item t)           {}
 func (noMetrics) updateUnfinishedWork() {}
 
 // Gets the time since the specified start in microseconds.
-func sinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+func (m *defaultQueueMetrics) sinceInMicroseconds(start time.Time) float64 {
+	return float64(m.clock.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
 
 type retryMetrics interface {
@@ -188,19 +190,28 @@ func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-var metricsFactory = struct {
-	metricsProvider MetricsProvider
-	setProviders    sync.Once
-}{
+var globalMetricsFactory = metricsFactory{
 	metricsProvider: noopMetricsProvider{},
 }
 
-func newQueueMetrics(name string) queueMetrics {
-	mp := metricsFactory.metricsProvider
+type metricsFactory struct {
+	metricsProvider MetricsProvider
+	setProviders    sync.Once
+}
+
+func (f *metricsFactory) set(mp MetricsProvider) {
+	f.setProviders.Do(func() {
+		f.metricsProvider = mp
+	})
+}
+
+func (f *metricsFactory) newQueueMetrics(name string, clock clock.Clock) queueMetrics {
+	mp := f.metricsProvider
 	if len(name) == 0 || mp == (noopMetricsProvider{}) {
 		return noMetrics{}
 	}
 	return &defaultQueueMetrics{
+		clock:                      clock,
 		depth:                      mp.NewDepthMetric(name),
 		adds:                       mp.NewAddsMetric(name),
 		latency:                    mp.NewLatencyMetric(name),
@@ -217,13 +228,12 @@ func newRetryMetrics(name string) retryMetrics {
 		return ret
 	}
 	return &defaultRetryMetrics{
-		retries: metricsFactory.metricsProvider.NewRetriesMetric(name),
+		retries: globalMetricsFactory.metricsProvider.NewRetriesMetric(name),
 	}
 }
 
-// SetProvider sets the metrics provider of the metricsFactory.
+// SetProvider sets the metrics provider for all subsequently created work
+// queues. Only the first call has an effect.
 func SetProvider(metricsProvider MetricsProvider) {
-	metricsFactory.setProviders.Do(func() {
-		metricsFactory.metricsProvider = metricsProvider
-	})
+	globalMetricsFactory.set(metricsProvider)
 }
