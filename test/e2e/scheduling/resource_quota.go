@@ -365,7 +365,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 
 	It("should create a ResourceQuota and capture the life of a configMap.", func() {
-		found, unchanged := 0, 0
+		cms, _ := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(metav1.ListOptions{})
+		found := len(cms.Items)
+		unchanged := 0
 		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
