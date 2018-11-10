@@ -172,12 +172,17 @@ ControlPlaneEndpoint: ""
 ControllerManager:
   ExtraArgs: null
   ExtraVolumes: null
+DNS:
+  ImageRepository: ""
+  ImageTag: ""
+  Type: CoreDNS
 Etcd:
   External: null
   Local:
     DataDir: /var/lib/etcd
     ExtraArgs: null
-    Image: ""
+    ImageRepository: ""
+    ImageTag: ""
     PeerCertSANs: null
     ServerCertSANs: null
 FeatureGates: null

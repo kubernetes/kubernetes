@@ -44,7 +44,7 @@ func TestGetGenericImage(t *testing.T) {
 	}
 }
 
-func TestGetKubeControlPlaneImage(t *testing.T) {
+func TestGetKubernetesImage(t *testing.T) {
 	var tests = []struct {
 		image    string
 		expected string
@@ -84,10 +84,10 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := GetKubeControlPlaneImage(rt.image, rt.cfg)
+		actual := GetKubernetesImage(rt.image, rt.cfg)
 		if actual != rt.expected {
 			t.Errorf(
-				"failed GetKubeControlPlaneImage:\n\texpected: %s\n\t  actual: %s",
+				"failed GetKubernetesImage:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actual,
 			)
@@ -101,14 +101,42 @@ func TestGetEtcdImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "override",
 			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   "real.repo",
+				KubernetesVersion: "1.12.0",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{},
+				},
+			},
+			expected: "real.repo/etcd:3.2.24",
+		},
+		{
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   "real.repo",
+				KubernetesVersion: "1.12.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
-						Image: "override",
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageTag: "override",
+						},
 					},
 				},
 			},
+			expected: "real.repo/etcd:override",
+		},
+		{
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   "real.repo",
+				KubernetesVersion: "1.12.0",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "override",
+						},
+					},
+				},
+			},
+			expected: "override/etcd:3.2.24",
 		},
 		{
 			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
@@ -162,38 +190,38 @@ func TestGetAllImages(t *testing.T) {
 		{
 			name: "CoreDNS image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": true,
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
 				},
 			},
-			expect: constants.CoreDNS,
+			expect: constants.CoreDNSImageName,
 		},
 		{
 			name: "main kube-dns image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": false,
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
 				},
 			},
-			expect: "k8s-dns-kube-dns",
+			expect: constants.KubeDNSKubeDNSImageName,
 		},
 		{
 			name: "kube-dns sidecar image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": false,
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
 				},
 			},
-			expect: "k8s-dns-sidecar",
+			expect: constants.KubeDNSSidecarImageName,
 		},
 		{
 			name: "kube-dns dnsmasq-nanny image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": false,
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
 				},
 			},
-			expect: "k8s-dns-dnsmasq-nanny",
+			expect: constants.KubeDNSDnsMasqNannyImageName,
 		},
 	}
 	for _, tc := range testcases {

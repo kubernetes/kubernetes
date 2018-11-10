@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -605,14 +604,17 @@ func TestValidateFeatureGates(t *testing.T) {
 	}{
 		{featureFlag{"Unknown": true}, false},
 		{featureFlag{"Unknown": false}, false},
-		{featureFlag{"CoreDNS": true}, true},
-		{featureFlag{"CoreDNS": false}, true},
+		{featureFlag{"CoreDNS": true}, false},
+		{featureFlag{"CoreDNS": false}, false},
+		{featureFlag{"DynamicKubeletConfig": true}, true},
+		{featureFlag{"DynamicKubeletConfig": false}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateFeatureGates(rt.featureGates, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed featureGates:\n\texpected: %t\n\t  actual: %t",
+				"failed featureGates %v:\n\texpected: %t\n\t  actual: %t",
+				rt.featureGates,
 				rt.expected,
 				(len(actual) == 0),
 			)

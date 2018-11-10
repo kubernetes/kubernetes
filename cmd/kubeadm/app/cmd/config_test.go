@@ -29,11 +29,9 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
-
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
@@ -89,8 +87,6 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				apiVersion: kubeadm.k8s.io/v1beta1
 				kind: ClusterConfiguration
 				kubernetesVersion: v1.11.0
-				featureGates:
-				  CoreDNS: true
 			`)),
 		},
 	}
@@ -167,13 +163,22 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			name: "coredns enabled",
 			cfg: kubeadmapiv1beta1.InitConfiguration{
 				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						features.CoreDNS: true,
-					},
 					KubernetesVersion: dummyKubernetesVersion,
 				},
 			},
 			expectedImages: defaultNumberOfImages,
+		},
+		{
+			name: "kube-dns enabled",
+			cfg: kubeadmapiv1beta1.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+					KubernetesVersion: dummyKubernetesVersion,
+					DNS: kubeadmapiv1beta1.DNS{
+						Type: kubeadmapiv1beta1.KubeDNS,
+					},
+				},
+			},
+			expectedImages: defaultNumberOfImages + 2,
 		},
 	}
 

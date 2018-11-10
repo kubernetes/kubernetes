@@ -41,6 +41,9 @@ func TestPrintConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
@@ -51,10 +54,11 @@ func TestPrintConfiguration(t *testing.T) {
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
 	controllerManager: {}
+	dns:
+	  type: CoreDNS
 	etcd:
 	  local:
 	    dataDir: /some/path
-	    image: ""
 	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
@@ -76,6 +80,9 @@ func TestPrintConfiguration(t *testing.T) {
 						Endpoints: []string{"https://one-etcd-instance:2379"},
 					},
 				},
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
@@ -86,6 +93,8 @@ func TestPrintConfiguration(t *testing.T) {
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
 	controllerManager: {}
+	dns:
+	  type: CoreDNS
 	etcd:
 	  external:
 	    caFile: ""

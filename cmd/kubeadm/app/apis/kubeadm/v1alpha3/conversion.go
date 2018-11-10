@@ -17,15 +17,20 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"github.com/pkg/errors"
+	"regexp"
+	"strings"
 
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
+
+var imageRegEx = regexp.MustCompile(`(?P<repository>.+/)(?P<image>[^:]+)(?P<tag>:.+)`)
 
 func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
@@ -133,6 +138,14 @@ func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *C
 		return err
 	}
 
+	// converting v1alpha3 featureGate CoreDNS to internal DNS.Type
+	if features.Enabled(in.FeatureGates, features.CoreDNS) {
+		out.DNS.Type = kubeadm.CoreDNS
+	} else {
+		out.DNS.Type = kubeadm.KubeDNS
+	}
+	delete(out.FeatureGates, features.CoreDNS)
+
 	return nil
 }
 
@@ -174,9 +187,17 @@ func Convert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(in *k
 	}
 
 	if in.UseHyperKubeImage {
-		out.UnifiedControlPlaneImage = images.GetKubeControlPlaneImage("", in)
+		out.UnifiedControlPlaneImage = images.GetKubernetesImage("", in)
 	} else {
 		out.UnifiedControlPlaneImage = ""
+	}
+
+	// converting internal DNS.Type to v1alpha3 featureGate CoreDNS (this is only for getting roundtrip passing, but it is never used in reality)
+	if out.FeatureGates == nil {
+		out.FeatureGates = map[string]bool{}
+	}
+	if in.DNS.Type == kubeadm.KubeDNS {
+		out.FeatureGates[features.CoreDNS] = false
 	}
 
 	return nil
@@ -225,5 +246,52 @@ func convertSlice_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(in *[]kubeadm.
 	} else {
 		*out = nil
 	}
+
+	return nil
+}
+
+func Convert_v1alpha3_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.LocalEtcd, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_LocalEtcd_To_kubeadm_LocalEtcd(in, out, s); err != nil {
+		return err
+	}
+
+	var err error
+	out.ImageMeta, err = etcdImageToImageMeta(in.Image)
+	return err
+}
+
+func etcdImageToImageMeta(image string) (kubeadm.ImageMeta, error) {
+	// empty image -> empty image meta
+	if image == "" {
+		return kubeadm.ImageMeta{}, nil
+	}
+
+	matches := imageRegEx.FindStringSubmatch(image)
+	if len(matches) != 4 {
+		return kubeadm.ImageMeta{}, errors.New("Conversion Error: kubeadm does not support converting v1alpha3 configurations with etcd image without explicit repository or tag definition. Please fix the image name")
+	}
+
+	imageRepository := strings.TrimSuffix(matches[1], "/")
+	imageName := matches[2]
+	imageTag := strings.TrimPrefix(matches[3], ":")
+
+	if imageName != constants.Etcd {
+		return kubeadm.ImageMeta{}, errors.New("Conversion Error: kubeadm does not support converting v1alpha3 configurations with etcd imageName different than etcd. Please fix the image name")
+	}
+
+	return kubeadm.ImageMeta{
+		ImageRepository: imageRepository,
+		ImageTag:        imageTag,
+	}, nil
+}
+
+func Convert_kubeadm_LocalEtcd_To_v1alpha3_LocalEtcd(in *kubeadm.LocalEtcd, out *LocalEtcd, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_LocalEtcd_To_v1alpha3_LocalEtcd(in, out, s); err != nil {
+		return err
+	}
+
+	// converting internal LocalEtcd.ImageMeta to v1alpha3 LocalEtcd.Image (this is only for getting roundtrip passing, but it is
+	// never used in reality)
+
 	return nil
 }

@@ -29,10 +29,11 @@ certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
 controllerManager: {}
+dns:
+  type: CoreDNS
 etcd:
   local:
     dataDir: /var/lib/etcd
-    image: ""
 imageRepository: my-company.com
 kind: ClusterConfiguration
 kubernetesVersion: v1.12.0

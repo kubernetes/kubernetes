@@ -39,10 +39,11 @@ certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
 controllerManager: {}
+dns:
+  type: CoreDNS
 etcd:
   local:
     dataDir: /var/lib/etcd
-    image: ""
 imageRepository: k8s.gcr.io
 kind: ClusterConfiguration
 kubernetesVersion: v1.11.2
