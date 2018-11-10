@@ -175,10 +175,17 @@ func (w *Watcher) init() error {
 }
 
 // Walks through the plugin directory discover any existing plugin sockets.
+// Goroutines started here will be waited for in Stop() before cleaning up.
+// Ignore all errors except root dir not being walkable
 func (w *Watcher) traversePluginDir(dir string) error {
 	return w.fs.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error accessing path: %s error: %v", path, err)
+			if path == dir {
+				return fmt.Errorf("error accessing path: %s error: %v", path, err)
+			}
+
+			glog.Errorf("error accessing path: %s error: %v", path, err)
+			return nil
 		}
 
 		switch mode := info.Mode(); {
@@ -187,7 +194,9 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
 		case mode&os.ModeSocket != 0:
+			w.wg.Add(1)
 			go func() {
+				defer w.wg.Done()
 				w.fsWatcher.Events <- fsnotify.Event{
 					Name: path,
 					Op:   fsnotify.Create,
