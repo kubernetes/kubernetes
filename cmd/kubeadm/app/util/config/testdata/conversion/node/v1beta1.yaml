@@ -1,8 +1,9 @@
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
-  bindPort: 6443
 apiVersion: kubeadm.k8s.io/v1beta1
 caCertPath: /etc/kubernetes/pki/ca.crt
+controlPlane:
+  localAPIEndpoint:
+    advertiseAddress: 192.168.2.2
+    bindPort: 6443
 discovery:
   bootstrapToken:
     apiServerEndpoint: kube-apiserver:6443
@@ -14,3 +15,6 @@ kind: JoinConfiguration
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: master-1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
