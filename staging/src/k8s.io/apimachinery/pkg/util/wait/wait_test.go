@@ -499,3 +499,42 @@ func TestPollUntil(t *testing.T) {
 	// make sure we finished the poll
 	<-pollDone
 }
+
+func TestBackoff_Step(t *testing.T) {
+	tests := []struct {
+		name    string
+		initial *Backoff
+		want    []time.Duration
+	}{
+		{initial: &Backoff{Duration: time.Second, Steps: 0}, want: []time.Duration{time.Second, time.Second, time.Second}},
+		{initial: &Backoff{Duration: time.Second, Steps: 1}, want: []time.Duration{time.Second, time.Second, time.Second}},
+		{initial: &Backoff{Duration: time.Second, Factor: 1.0, Steps: 1}, want: []time.Duration{time.Second, time.Second, time.Second}},
+		{initial: &Backoff{Duration: time.Second, Factor: 2, Steps: 2}, want: []time.Duration{2 * time.Second, 4 * time.Second, 4 * time.Second}},
+		{initial: &Backoff{Duration: time.Second, Factor: 2, Steps: 2, Cap: 3 * time.Second}, want: []time.Duration{2 * time.Second, 3 * time.Second, 3 * time.Second}},
+		{initial: &Backoff{Duration: time.Second, Factor: 2, Steps: 2, Cap: 3 * time.Second, Jitter: 0.5}, want: []time.Duration{2 * time.Second, 3 * time.Second, 3 * time.Second}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for i := 0; i < len(tt.want); i++ {
+				got := tt.initial.Step()
+				if tt.initial.Jitter > 0 {
+					if got == tt.want[i] {
+						// this is statistically unlikely to happen by chance
+						t.Errorf("Backoff.Step(%d) = %v, no jitter", i, got)
+						continue
+					}
+					diff := float64(tt.want[i]-got) / float64(tt.want[i])
+					if diff > tt.initial.Jitter {
+						t.Errorf("Backoff.Step(%d) = %v, want %v, outside range", i, got, tt.want)
+						continue
+					}
+				} else {
+					if got != tt.want[i] {
+						t.Errorf("Backoff.Step(%d) = %v, want %v", i, got, tt.want)
+						continue
+					}
+				}
+			}
+		})
+	}
+}

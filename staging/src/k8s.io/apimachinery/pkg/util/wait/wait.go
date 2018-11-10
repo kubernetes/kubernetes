@@ -177,6 +177,32 @@ type Backoff struct {
 	Factor   float64       // Duration is multiplied by factor each iteration
 	Jitter   float64       // The amount of jitter applied each iteration
 	Steps    int           // Exit with error after this many steps
+	Cap      time.Duration // The maximum amount of time to wait if set
+}
+
+// Step returns the next interval in the exponential backoff.
+func (b *Backoff) Step() time.Duration {
+	if b.Steps < 1 {
+		if b.Jitter > 0 {
+			return Jitter(b.Duration, b.Jitter)
+		}
+		return b.Duration
+	}
+	b.Steps--
+	if b.Jitter > 0 {
+		b.Duration = Jitter(b.Duration, b.Jitter)
+	}
+	if b.Factor != 0 {
+		b.Duration = time.Duration(float64(b.Duration) * b.Factor)
+	}
+	if b.Cap > 0 && b.Duration > b.Cap {
+		b.Duration = b.Cap
+		b.Steps = 0
+		if b.Jitter > 0 {
+			return Jitter(b.Duration, b.Jitter)
+		}
+	}
+	return b.Duration
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
@@ -190,19 +216,11 @@ type Backoff struct {
 // If the condition never returns true, ErrWaitTimeout is returned. All other
 // errors terminate immediately.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
-	duration := backoff.Duration
-	for i := 0; i < backoff.Steps; i++ {
-		if i != 0 {
-			adjusted := duration
-			if backoff.Jitter > 0.0 {
-				adjusted = Jitter(duration, backoff.Jitter)
-			}
-			time.Sleep(adjusted)
-			duration = time.Duration(float64(duration) * backoff.Factor)
-		}
+	for backoff.Steps > 0 {
 		if ok, err := condition(); err != nil || ok {
 			return err
 		}
+		time.Sleep(backoff.Step())
 	}
 	return ErrWaitTimeout
 }
