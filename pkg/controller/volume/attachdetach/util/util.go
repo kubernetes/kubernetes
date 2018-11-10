@@ -82,7 +82,10 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 	clonedPodVolume := podVolume.DeepCopy()
 	volumeSpec := volume.NewSpecFromVolume(clonedPodVolume)
 	// Populating PodNamespace field of Volume Spec with podNamespace passed as a parameter.
-	volumeSpec.PodNamespace = podNamespace
+	volumeSpec.PodNamespace = v1.NamespaceDefault
+	if podNamespace != "" {
+		volumeSpec.PodNamespace = podNamespace
+	}
 
 	return volumeSpec, nil
 }
