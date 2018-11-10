@@ -67,6 +67,7 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -93,6 +94,8 @@ type crdHandler struct {
 	// MasterCount is used to implement sleep to improve
 	// CRD establishing process for HA clusters.
 	masterCount int
+
+	converterFactory *conversion.CRConverterFactory
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -129,7 +132,9 @@ func NewCustomResourceDefinitionHandler(
 	restOptionsGetter generic.RESTOptionsGetter,
 	admission admission.Interface,
 	establishingController *establish.EstablishingController,
-	masterCount int) *crdHandler {
+	serviceResolver webhook.ServiceResolver,
+	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	masterCount int) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -147,10 +152,15 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
+	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
+	if err != nil {
+		return nil, err
+	}
+	ret.converterFactory = crConverterFactory
 
 	ret.customStorage.Store(crdStorageMap{})
 
-	return ret
+	return ret, nil
 }
 
 func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -433,7 +443,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	scaleScopes := map[string]handlers.RequestScope{}
 
 	for _, v := range crd.Spec.Versions {
-		safeConverter, unsafeConverter := conversion.NewCRDConverter(crd)
+		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
+		if err != nil {
+			return nil, err
+		}
 		// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
 		// decode unversioned Options objects, so we delegate to parameterScheme for such types.
 		parameterScheme := runtime.NewScheme()
