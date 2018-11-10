@@ -184,7 +184,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				return fmt.Errorf("error accessing path: %s error: %v", path, err)
 			}
 
-			glog.Errorf("error accessing path: %s error: %v", path, err)
+			klog.Errorf("error accessing path: %s error: %v", path, err)
 			return nil
 		}
 
