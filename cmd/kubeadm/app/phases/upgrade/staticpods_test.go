@@ -56,9 +56,12 @@ kind: InitConfiguration
 nodeRegistration:
   name: foo
   criSocket: ""
-apiEndpoint:
-  advertiseAddress: 1.2.3.4
+localAPIEndpoint:
+  advertiseAddress: 192.168.2.2
   bindPort: 6443
+bootstrapTokens:
+- token: ce3aa5.5ec8455bb76b379f
+  ttl: 24h
 ---
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
@@ -67,21 +70,16 @@ apiServer:
   certSANs: null
   extraArgs: null
 certificatesDir: %s
-controllerManagerExtraArgs: null
 etcd:
   local:
     dataDir: %s
     image: ""
-featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-schedulerExtraArgs: null
-token: ce3aa5.5ec8455bb76b379f
-tokenTTL: 24h
 useHyperKubeImage: false
 `
 )

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -211,6 +212,9 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 	}
 
 	for gvk, fileContent := range gvkmap {
+		// verify the validity of the YAML
+		strict.VerifyUnmarshalStrict(fileContent, gvk)
+
 		// Try to get the registration for the ComponentConfig based on the kind
 		regKind := componentconfigs.RegistrationKind(gvk.Kind)
 		registration, found := componentconfigs.Known[regKind]

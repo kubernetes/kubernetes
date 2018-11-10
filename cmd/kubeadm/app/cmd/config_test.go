@@ -247,7 +247,6 @@ func TestMigrate(t *testing.T) {
 		# This is intentionally testing an old API version and the old kind naming and making sure the output is correct
 		apiVersion: kubeadm.k8s.io/v1alpha3
 		kind: InitConfiguration
-		kubernetesVersion: v1.12.0
 	`))
 	configFile, cleanup := tempConfig(t, cfg)
 	defer cleanup()
