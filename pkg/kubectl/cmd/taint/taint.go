@@ -98,15 +98,9 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Long:                  fmt.Sprintf(taintLong, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
 		Example:               taintExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, cmd, args); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
-			}
-			if err := options.RunTaint(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Validate())
+			cmdutil.CheckErr(options.RunTaint())
 		},
 		ValidArgs: validArgs,
 	}
