@@ -52,7 +52,8 @@ type Controller interface {
 }
 
 type controller struct {
-	client                     coordclientset.LeaseInterface
+	client                     clientset.Interface
+	leaseClient                coordclientset.LeaseInterface
 	holderIdentity             string
 	leaseDurationSeconds       int32
 	renewInterval              time.Duration
@@ -67,7 +68,8 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 		leaseClient = client.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
 	}
 	return &controller{
-		client:                     leaseClient,
+		client:                     client,
+		leaseClient:                leaseClient,
 		holderIdentity:             holderIdentity,
 		leaseDurationSeconds:       leaseDurationSeconds,
 		renewInterval:              renewInterval,
@@ -78,8 +80,8 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 
 // Run runs the controller
 func (c *controller) Run(stopCh <-chan struct{}) {
-	if c.client == nil {
-		glog.Infof("node lease controller has nil client, will not claim or renew leases")
+	if c.leaseClient == nil {
+		glog.Infof("node lease controller has nil lease client, will not claim or renew leases")
 		return
 	}
 	wait.Until(c.sync, c.renewInterval, stopCh)
@@ -120,10 +122,10 @@ func (c *controller) backoffEnsureLease() (*coordv1beta1.Lease, bool) {
 // ensureLease creates the lease if it does not exist. Returns the lease and
 // a bool (true if this call created the lease), or any error that occurs.
 func (c *controller) ensureLease() (*coordv1beta1.Lease, bool, error) {
-	lease, err := c.client.Get(c.holderIdentity, metav1.GetOptions{})
+	lease, err := c.leaseClient.Get(c.holderIdentity, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// lease does not exist, create it
-		lease, err := c.client.Create(c.newLease(nil))
+		lease, err := c.leaseClient.Create(c.newLease(nil))
 		if err != nil {
 			return nil, false, err
 		}
@@ -140,7 +142,7 @@ func (c *controller) ensureLease() (*coordv1beta1.Lease, bool, error) {
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(base *coordv1beta1.Lease) {
 	for i := 0; i < maxUpdateRetries; i++ {
-		_, err := c.client.Update(c.newLease(base))
+		_, err := c.leaseClient.Update(c.newLease(base))
 		if err == nil {
 			return
 		}
@@ -155,18 +157,44 @@ func (c *controller) retryUpdateLease(base *coordv1beta1.Lease) {
 // newLease constructs a new lease if base is nil, or returns a copy of base
 // with desired state asserted on the copy.
 func (c *controller) newLease(base *coordv1beta1.Lease) *coordv1beta1.Lease {
+	// Use the bare minimum set of fields; other fields exist for debugging/legacy,
+	// but we don't need to make node heartbeats more complicated by using them.
 	var lease *coordv1beta1.Lease
 	if base == nil {
-		lease = &coordv1beta1.Lease{}
+		lease = &coordv1beta1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      c.holderIdentity,
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordv1beta1.LeaseSpec{
+				HolderIdentity:       pointer.StringPtr(c.holderIdentity),
+				LeaseDurationSeconds: pointer.Int32Ptr(c.leaseDurationSeconds),
+			},
+		}
 	} else {
 		lease = base.DeepCopy()
 	}
-	// Use the bare minimum set of fields; other fields exist for debugging/legacy,
-	// but we don't need to make node heartbeats more complicated by using them.
-	lease.Name = c.holderIdentity
-	lease.Spec.HolderIdentity = pointer.StringPtr(c.holderIdentity)
-	lease.Spec.LeaseDurationSeconds = pointer.Int32Ptr(c.leaseDurationSeconds)
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
+
+	// Setting owner reference needs node's UID. Note that it is different from
+	// kubelet.nodeRef.UID. When lease is initially created, it is possible that
+	// the connection between master and node is not ready yet. So try to set
+	// owner reference every time when renewing the lease, until successful.
+	if lease.OwnerReferences == nil || len(lease.OwnerReferences) == 0 {
+		if node, err := c.client.CoreV1().Nodes().Get(c.holderIdentity, metav1.GetOptions{}); err == nil {
+			lease.OwnerReferences = []metav1.OwnerReference{
+				{
+					APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
+					Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
+					Name:       c.holderIdentity,
+					UID:        node.UID,
+				},
+			}
+		} else {
+			glog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
+		}
+	}
+
 	return lease
 }
 
