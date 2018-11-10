@@ -146,7 +146,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 		return err
 	}
 
-	err = nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
 		glog.Error(log("registrationHandler.RegisterPlugin failed at AddNodeInfo: %v", err))
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
@@ -187,6 +187,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	// Initializing csiDrivers map and label management channels
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
+
+	// TODO(#70514) Init CSINodeInfo object if the CRD exists and create Driver
+	// objects for migrated drivers.
 
 	return nil
 }
@@ -583,8 +586,8 @@ func unregisterDriver(driverName string) error {
 		delete(csiDrivers.driversMap, driverName)
 	}()
 
-	if err := nim.RemoveNodeInfo(driverName); err != nil {
-		glog.Errorf("Error unregistering CSI driver: %v", err)
+	if err := nim.UninstallCSIDriver(driverName); err != nil {
+		glog.Errorf("Error uninstalling CSI driver: %v", err)
 		return err
 	}
 

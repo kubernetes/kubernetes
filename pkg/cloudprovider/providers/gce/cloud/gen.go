@@ -48,7 +48,7 @@ type Cloud interface {
 	RegionBackendServices() RegionBackendServices
 	AlphaRegionBackendServices() AlphaRegionBackendServices
 	Disks() Disks
-	BetaRegionDisks() BetaRegionDisks
+	RegionDisks() RegionDisks
 	Firewalls() Firewalls
 	ForwardingRules() ForwardingRules
 	AlphaForwardingRules() AlphaForwardingRules
@@ -89,7 +89,7 @@ func NewGCE(s *Service) *GCE {
 		gceRegionBackendServices:      &GCERegionBackendServices{s},
 		gceAlphaRegionBackendServices: &GCEAlphaRegionBackendServices{s},
 		gceDisks:                      &GCEDisks{s},
-		gceBetaRegionDisks:            &GCEBetaRegionDisks{s},
+		gceRegionDisks:                &GCERegionDisks{s},
 		gceFirewalls:                  &GCEFirewalls{s},
 		gceForwardingRules:            &GCEForwardingRules{s},
 		gceAlphaForwardingRules:       &GCEAlphaForwardingRules{s},
@@ -134,7 +134,7 @@ type GCE struct {
 	gceRegionBackendServices      *GCERegionBackendServices
 	gceAlphaRegionBackendServices *GCEAlphaRegionBackendServices
 	gceDisks                      *GCEDisks
-	gceBetaRegionDisks            *GCEBetaRegionDisks
+	gceRegionDisks                *GCERegionDisks
 	gceFirewalls                  *GCEFirewalls
 	gceForwardingRules            *GCEForwardingRules
 	gceAlphaForwardingRules       *GCEAlphaForwardingRules
@@ -212,9 +212,9 @@ func (gce *GCE) Disks() Disks {
 	return gce.gceDisks
 }
 
-// BetaRegionDisks returns the interface for the beta RegionDisks.
-func (gce *GCE) BetaRegionDisks() BetaRegionDisks {
-	return gce.gceBetaRegionDisks
+// RegionDisks returns the interface for the ga RegionDisks.
+func (gce *GCE) RegionDisks() RegionDisks {
+	return gce.gceRegionDisks
 }
 
 // Firewalls returns the interface for the ga Firewalls.
@@ -381,7 +381,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 		MockRegionBackendServices:      NewMockRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
 		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
 		MockDisks:                      NewMockDisks(projectRouter, mockDisksObjs),
-		MockBetaRegionDisks:            NewMockBetaRegionDisks(projectRouter, mockRegionDisksObjs),
+		MockRegionDisks:                NewMockRegionDisks(projectRouter, mockRegionDisksObjs),
 		MockFirewalls:                  NewMockFirewalls(projectRouter, mockFirewallsObjs),
 		MockForwardingRules:            NewMockForwardingRules(projectRouter, mockForwardingRulesObjs),
 		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(projectRouter, mockForwardingRulesObjs),
@@ -426,7 +426,7 @@ type MockGCE struct {
 	MockRegionBackendServices      *MockRegionBackendServices
 	MockAlphaRegionBackendServices *MockAlphaRegionBackendServices
 	MockDisks                      *MockDisks
-	MockBetaRegionDisks            *MockBetaRegionDisks
+	MockRegionDisks                *MockRegionDisks
 	MockFirewalls                  *MockFirewalls
 	MockForwardingRules            *MockForwardingRules
 	MockAlphaForwardingRules       *MockAlphaForwardingRules
@@ -504,9 +504,9 @@ func (mock *MockGCE) Disks() Disks {
 	return mock.MockDisks
 }
 
-// BetaRegionDisks returns the interface for the beta RegionDisks.
-func (mock *MockGCE) BetaRegionDisks() BetaRegionDisks {
-	return mock.MockBetaRegionDisks
+// RegionDisks returns the interface for the ga RegionDisks.
+func (mock *MockGCE) RegionDisks() RegionDisks {
+	return mock.MockRegionDisks
 }
 
 // Firewalls returns the interface for the ga Firewalls.
@@ -1084,15 +1084,15 @@ type MockRegionDisksObj struct {
 	Obj interface{}
 }
 
-// ToBeta retrieves the given version of the object.
-func (m *MockRegionDisksObj) ToBeta() *beta.Disk {
-	if ret, ok := m.Obj.(*beta.Disk); ok {
+// ToGA retrieves the given version of the object.
+func (m *MockRegionDisksObj) ToGA() *ga.Disk {
+	if ret, ok := m.Obj.(*ga.Disk); ok {
 		return ret
 	}
 	// Convert the object via JSON copying to the type that was requested.
-	ret := &beta.Disk{}
+	ret := &ga.Disk{}
 	if err := copyViaJSON(ret, m.Obj); err != nil {
-		glog.Errorf("Could not convert %T to *beta.Disk via JSON: %v", m.Obj, err)
+		glog.Errorf("Could not convert %T to *ga.Disk via JSON: %v", m.Obj, err)
 	}
 	return ret
 }
@@ -5110,18 +5110,18 @@ func (g *GCEDisks) Resize(ctx context.Context, key *meta.Key, arg0 *ga.DisksResi
 	return err
 }
 
-// BetaRegionDisks is an interface that allows for mocking of RegionDisks.
-type BetaRegionDisks interface {
-	Get(ctx context.Context, key *meta.Key) (*beta.Disk, error)
-	List(ctx context.Context, region string, fl *filter.F) ([]*beta.Disk, error)
-	Insert(ctx context.Context, key *meta.Key, obj *beta.Disk) error
+// RegionDisks is an interface that allows for mocking of RegionDisks.
+type RegionDisks interface {
+	Get(ctx context.Context, key *meta.Key) (*ga.Disk, error)
+	List(ctx context.Context, region string, fl *filter.F) ([]*ga.Disk, error)
+	Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error
 	Delete(ctx context.Context, key *meta.Key) error
-	Resize(context.Context, *meta.Key, *beta.RegionDisksResizeRequest) error
+	Resize(context.Context, *meta.Key, *ga.RegionDisksResizeRequest) error
 }
 
-// NewMockBetaRegionDisks returns a new mock for RegionDisks.
-func NewMockBetaRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisksObj) *MockBetaRegionDisks {
-	mock := &MockBetaRegionDisks{
+// NewMockRegionDisks returns a new mock for RegionDisks.
+func NewMockRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisksObj) *MockRegionDisks {
+	mock := &MockRegionDisks{
 		ProjectRouter: pr,
 
 		Objects:     objs,
@@ -5132,8 +5132,8 @@ func NewMockBetaRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisks
 	return mock
 }
 
-// MockBetaRegionDisks is the mock for RegionDisks.
-type MockBetaRegionDisks struct {
+// MockRegionDisks is the mock for RegionDisks.
+type MockRegionDisks struct {
 	Lock sync.Mutex
 
 	ProjectRouter ProjectRouter
@@ -5152,11 +5152,11 @@ type MockBetaRegionDisks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(ctx context.Context, key *meta.Key, m *MockBetaRegionDisks) (bool, *beta.Disk, error)
-	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockBetaRegionDisks) (bool, []*beta.Disk, error)
-	InsertHook func(ctx context.Context, key *meta.Key, obj *beta.Disk, m *MockBetaRegionDisks) (bool, error)
-	DeleteHook func(ctx context.Context, key *meta.Key, m *MockBetaRegionDisks) (bool, error)
-	ResizeHook func(context.Context, *meta.Key, *beta.RegionDisksResizeRequest, *MockBetaRegionDisks) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockRegionDisks) (bool, *ga.Disk, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockRegionDisks) (bool, []*ga.Disk, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Disk, m *MockRegionDisks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockRegionDisks) (bool, error)
+	ResizeHook func(context.Context, *meta.Key, *ga.RegionDisksResizeRequest, *MockRegionDisks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -5164,10 +5164,10 @@ type MockBetaRegionDisks struct {
 }
 
 // Get returns the object from the mock.
-func (m *MockBetaRegionDisks) Get(ctx context.Context, key *meta.Key) (*beta.Disk, error) {
+func (m *MockRegionDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
 	if m.GetHook != nil {
 		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
-			glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
+			glog.V(5).Infof("MockRegionDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
 	}
@@ -5179,28 +5179,28 @@ func (m *MockBetaRegionDisks) Get(ctx context.Context, key *meta.Key) (*beta.Dis
 	defer m.Lock.Unlock()
 
 	if err, ok := m.GetError[*key]; ok {
-		glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
+		glog.V(5).Infof("MockRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
 		return nil, err
 	}
 	if obj, ok := m.Objects[*key]; ok {
-		typedObj := obj.ToBeta()
-		glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
+		typedObj := obj.ToGA()
+		glog.V(5).Infof("MockRegionDisks.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
 		return typedObj, nil
 	}
 
 	err := &googleapi.Error{
 		Code:    http.StatusNotFound,
-		Message: fmt.Sprintf("MockBetaRegionDisks %v not found", key),
+		Message: fmt.Sprintf("MockRegionDisks %v not found", key),
 	}
-	glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
+	glog.V(5).Infof("MockRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
 	return nil, err
 }
 
 // List all of the objects in the mock in the given region.
-func (m *MockBetaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*beta.Disk, error) {
+func (m *MockRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*ga.Disk, error) {
 	if m.ListHook != nil {
 		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
-			glog.V(5).Infof("MockBetaRegionDisks.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
+			glog.V(5).Infof("MockRegionDisks.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
 	}
@@ -5210,31 +5210,31 @@ func (m *MockBetaRegionDisks) List(ctx context.Context, region string, fl *filte
 
 	if m.ListError != nil {
 		err := *m.ListError
-		glog.V(5).Infof("MockBetaRegionDisks.List(%v, %q, %v) = nil, %v", ctx, region, fl, err)
+		glog.V(5).Infof("MockRegionDisks.List(%v, %q, %v) = nil, %v", ctx, region, fl, err)
 
 		return nil, *m.ListError
 	}
 
-	var objs []*beta.Disk
+	var objs []*ga.Disk
 	for key, obj := range m.Objects {
 		if key.Region != region {
 			continue
 		}
-		if !fl.Match(obj.ToBeta()) {
+		if !fl.Match(obj.ToGA()) {
 			continue
 		}
-		objs = append(objs, obj.ToBeta())
+		objs = append(objs, obj.ToGA())
 	}
 
-	glog.V(5).Infof("MockBetaRegionDisks.List(%v, %q, %v) = [%v items], nil", ctx, region, fl, len(objs))
+	glog.V(5).Infof("MockRegionDisks.List(%v, %q, %v) = [%v items], nil", ctx, region, fl, len(objs))
 	return objs, nil
 }
 
 // Insert is a mock for inserting/creating a new object.
-func (m *MockBetaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *beta.Disk) error {
+func (m *MockRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error {
 	if m.InsertHook != nil {
 		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
-			glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+			glog.V(5).Infof("MockRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
 	}
@@ -5246,32 +5246,32 @@ func (m *MockBetaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *be
 	defer m.Lock.Unlock()
 
 	if err, ok := m.InsertError[*key]; ok {
-		glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		glog.V(5).Infof("MockRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 		return err
 	}
 	if _, ok := m.Objects[*key]; ok {
 		err := &googleapi.Error{
 			Code:    http.StatusConflict,
-			Message: fmt.Sprintf("MockBetaRegionDisks %v exists", key),
+			Message: fmt.Sprintf("MockRegionDisks %v exists", key),
 		}
-		glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		glog.V(5).Infof("MockRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 		return err
 	}
 
 	obj.Name = key.Name
-	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "disks")
-	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "disks", key)
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "disks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "disks", key)
 
 	m.Objects[*key] = &MockRegionDisksObj{obj}
-	glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
+	glog.V(5).Infof("MockRegionDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
 	return nil
 }
 
 // Delete is a mock for deleting the object.
-func (m *MockBetaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
+func (m *MockRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
 		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
-			glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+			glog.V(5).Infof("MockRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
 	}
@@ -5283,207 +5283,207 @@ func (m *MockBetaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
 	defer m.Lock.Unlock()
 
 	if err, ok := m.DeleteError[*key]; ok {
-		glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+		glog.V(5).Infof("MockRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
 	if _, ok := m.Objects[*key]; !ok {
 		err := &googleapi.Error{
 			Code:    http.StatusNotFound,
-			Message: fmt.Sprintf("MockBetaRegionDisks %v not found", key),
+			Message: fmt.Sprintf("MockRegionDisks %v not found", key),
 		}
-		glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+		glog.V(5).Infof("MockRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
 
 	delete(m.Objects, *key)
-	glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = nil", ctx, key)
+	glog.V(5).Infof("MockRegionDisks.Delete(%v, %v) = nil", ctx, key)
 	return nil
 }
 
 // Obj wraps the object for use in the mock.
-func (m *MockBetaRegionDisks) Obj(o *beta.Disk) *MockRegionDisksObj {
+func (m *MockRegionDisks) Obj(o *ga.Disk) *MockRegionDisksObj {
 	return &MockRegionDisksObj{o}
 }
 
 // Resize is a mock for the corresponding method.
-func (m *MockBetaRegionDisks) Resize(ctx context.Context, key *meta.Key, arg0 *beta.RegionDisksResizeRequest) error {
+func (m *MockRegionDisks) Resize(ctx context.Context, key *meta.Key, arg0 *ga.RegionDisksResizeRequest) error {
 	if m.ResizeHook != nil {
 		return m.ResizeHook(ctx, key, arg0, m)
 	}
 	return nil
 }
 
-// GCEBetaRegionDisks is a simplifying adapter for the GCE RegionDisks.
-type GCEBetaRegionDisks struct {
+// GCERegionDisks is a simplifying adapter for the GCE RegionDisks.
+type GCERegionDisks struct {
 	s *Service
 }
 
 // Get the Disk named by key.
-func (g *GCEBetaRegionDisks) Get(ctx context.Context, key *meta.Key) (*beta.Disk, error) {
-	glog.V(5).Infof("GCEBetaRegionDisks.Get(%v, %v): called", ctx, key)
+func (g *GCERegionDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
+	glog.V(5).Infof("GCERegionDisks.Get(%v, %v): called", ctx, key)
 
 	if !key.Valid() {
-		glog.V(2).Infof("GCEBetaRegionDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCERegionDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Get",
-		Version:   meta.Version("beta"),
+		Version:   meta.Version("ga"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEBetaRegionDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCERegionDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
-	call := g.s.Beta.RegionDisks.Get(projectID, key.Region, key.Name)
+	call := g.s.GA.RegionDisks.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
 	v, err := call.Do()
-	glog.V(4).Infof("GCEBetaRegionDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	glog.V(4).Infof("GCERegionDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
 	return v, err
 }
 
 // List all Disk objects.
-func (g *GCEBetaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*beta.Disk, error) {
-	glog.V(5).Infof("GCEBetaRegionDisks.List(%v, %v, %v) called", ctx, region, fl)
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
+func (g *GCERegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*ga.Disk, error) {
+	glog.V(5).Infof("GCERegionDisks.List(%v, %v, %v) called", ctx, region, fl)
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "List",
-		Version:   meta.Version("beta"),
+		Version:   meta.Version("ga"),
 		Service:   "RegionDisks",
 	}
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("GCEBetaRegionDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
-	call := g.s.Beta.RegionDisks.List(projectID, region)
+	glog.V(5).Infof("GCERegionDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
+	call := g.s.GA.RegionDisks.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
-	var all []*beta.Disk
-	f := func(l *beta.DiskList) error {
-		glog.V(5).Infof("GCEBetaRegionDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
+	var all []*ga.Disk
+	f := func(l *ga.DiskList) error {
+		glog.V(5).Infof("GCERegionDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
+		glog.V(4).Infof("GCERegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
 
 	if glog.V(4) {
-		glog.V(4).Infof("GCEBetaRegionDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+		glog.V(4).Infof("GCERegionDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
 	} else if glog.V(5) {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
 		}
-		glog.V(5).Infof("GCEBetaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+		glog.V(5).Infof("GCERegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
 	}
 
 	return all, nil
 }
 
 // Insert Disk with key of value obj.
-func (g *GCEBetaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *beta.Disk) error {
-	glog.V(5).Infof("GCEBetaRegionDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
+func (g *GCERegionDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error {
+	glog.V(5).Infof("GCERegionDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
-		glog.V(2).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCERegionDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Insert",
-		Version:   meta.Version("beta"),
+		Version:   meta.Version("ga"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCERegionDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
-	call := g.s.Beta.RegionDisks.Insert(projectID, key.Region, obj)
+	call := g.s.GA.RegionDisks.Insert(projectID, key.Region, obj)
 	call.Context(ctx)
 
 	op, err := call.Do()
 	if err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
 
 	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEBetaRegionDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	glog.V(4).Infof("GCERegionDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
 	return err
 }
 
 // Delete the Disk referenced by key.
-func (g *GCEBetaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
-	glog.V(5).Infof("GCEBetaRegionDisks.Delete(%v, %v): called", ctx, key)
+func (g *GCERegionDisks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCERegionDisks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
-		glog.V(2).Infof("GCEBetaRegionDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCERegionDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Delete",
-		Version:   meta.Version("beta"),
+		Version:   meta.Version("ga"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEBetaRegionDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCERegionDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
-	call := g.s.Beta.RegionDisks.Delete(projectID, key.Region, key.Name)
+	call := g.s.GA.RegionDisks.Delete(projectID, key.Region, key.Name)
 	call.Context(ctx)
 
 	op, err := call.Do()
 	if err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
 
 	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+	glog.V(4).Infof("GCERegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 	return err
 }
 
-// Resize is a method on GCEBetaRegionDisks.
-func (g *GCEBetaRegionDisks) Resize(ctx context.Context, key *meta.Key, arg0 *beta.RegionDisksResizeRequest) error {
-	glog.V(5).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): called", ctx, key)
+// Resize is a method on GCERegionDisks.
+func (g *GCERegionDisks) Resize(ctx context.Context, key *meta.Key, arg0 *ga.RegionDisksResizeRequest) error {
+	glog.V(5).Infof("GCERegionDisks.Resize(%v, %v, ...): called", ctx, key)
 
 	if !key.Valid() {
-		glog.V(2).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCERegionDisks.Resize(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Resize",
-		Version:   meta.Version("beta"),
+		Version:   meta.Version("ga"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCERegionDisks.Resize(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Resize(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
-	call := g.s.Beta.RegionDisks.Resize(projectID, key.Region, key.Name, arg0)
+	call := g.s.GA.RegionDisks.Resize(projectID, key.Region, key.Name, arg0)
 	call.Context(ctx)
 	op, err := call.Do()
 	if err != nil {
-		glog.V(4).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
+		glog.V(4).Infof("GCERegionDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
 	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
+	glog.V(4).Infof("GCERegionDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 

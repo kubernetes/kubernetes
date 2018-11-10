@@ -45,8 +45,13 @@ type InitConfiguration struct {
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
-	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
-	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
+	// LocalAPIEndpoint represents the endpoint of the API server instance that's deployed on this control plane node
+	// In HA setups, this differs from ClusterConfiguration.ControlPlaneEndpoint in the sense that ControlPlaneEndpoint
+	// is the global endpoint for the cluster, which then loadbalances the requests to each individual API server. This
+	// configuration object lets you customize what IP/DNS name and port the local API server advertises it's accessible
+	// on. By default, kubeadm tries to auto-detect the IP of the default interface and use that, but in case that process
+	// fails you may set the desired value here.
+	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -91,9 +96,9 @@ type ClusterConfiguration struct {
 
 	// ImageRepository what container registry to pull control plane images from
 	ImageRepository string `json:"imageRepository"`
-	// UnifiedControlPlaneImage specifies if a specific container image should
-	// be used for all control plane components.
-	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
+
+	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
+	UseHyperKubeImage bool `json:"useHyperKubeImage,omitempty"`
 
 	// AuditPolicyConfiguration defines the options for the api server audit system
 	AuditPolicyConfiguration AuditPolicyConfiguration `json:"auditPolicy"`
@@ -264,9 +269,6 @@ type JoinConfiguration struct {
 
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
 	Discovery Discovery `json:"discovery"`
-
-	// ClusterName is the name for the cluster in kubeconfig.
-	ClusterName string `json:"clusterName,omitempty"`
 
 	// ControlPlane flag specifies that the joining node should host an additional
 	// control plane instance.

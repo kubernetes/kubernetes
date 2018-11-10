@@ -233,7 +233,7 @@ limitations under the License.
 //	    pathType: File
 //	certificatesDir: "/etc/kubernetes/pki"
 //	imageRepository: "k8s.gcr.io"
-//	unifiedControlPlaneImage: "k8s.gcr.io/controlplane:v1.12.0"
+//	useHyperKubeImage: false
 //	auditPolicy:
 //	  # https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#audit-policy
 //	  path: "/var/log/audit/audit.json"

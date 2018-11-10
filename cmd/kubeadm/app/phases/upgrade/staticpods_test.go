@@ -82,7 +82,7 @@ networking:
 schedulerExtraArgs: null
 token: ce3aa5.5ec8455bb76b379f
 tokenTTL: 24h
-unifiedControlPlaneImage: ""
+useHyperKubeImage: false
 `
 )
 

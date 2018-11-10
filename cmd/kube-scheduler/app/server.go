@@ -81,7 +81,7 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := run(cmd, args, opts); err != nil {
+			if err := runCommand(cmd, args, opts); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -94,8 +94,8 @@ through the API as necessary.`,
 	return cmd
 }
 
-// run runs the scheduler.
-func run(cmd *cobra.Command, args []string, opts *options.Options) error {
+// runCommand runs the scheduler.
+func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error {
 	verflag.PrintAndExitIfRequested()
 	utilflag.PrintFlags(cmd.Flags())
 
@@ -136,36 +136,42 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
-		cz.Set(c.ComponentConfig)
+		cz.Set(cc.ComponentConfig)
 	} else {
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
+	return Run(cc, stopCh)
+}
+
+// Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
+func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
 	var storageClassInformer storageinformers.StorageClassInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		storageClassInformer = c.InformerFactory.Storage().V1().StorageClasses()
+		storageClassInformer = cc.InformerFactory.Storage().V1().StorageClasses()
 	}
 
 	// Create the scheduler.
-	sched, err := scheduler.New(c.Client,
-		c.InformerFactory.Core().V1().Nodes(),
-		c.PodInformer,
-		c.InformerFactory.Core().V1().PersistentVolumes(),
-		c.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		c.InformerFactory.Core().V1().ReplicationControllers(),
-		c.InformerFactory.Apps().V1().ReplicaSets(),
-		c.InformerFactory.Apps().V1().StatefulSets(),
-		c.InformerFactory.Core().V1().Services(),
-		c.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+	sched, err := scheduler.New(cc.Client,
+		cc.InformerFactory.Core().V1().Nodes(),
+		cc.PodInformer,
+		cc.InformerFactory.Core().V1().PersistentVolumes(),
+		cc.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		cc.InformerFactory.Core().V1().ReplicationControllers(),
+		cc.InformerFactory.Apps().V1().ReplicaSets(),
+		cc.InformerFactory.Apps().V1().StatefulSets(),
+		cc.InformerFactory.Core().V1().Services(),
+		cc.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		storageClassInformer,
-		c.Recorder,
-		c.ComponentConfig.AlgorithmSource,
-		scheduler.WithName(c.ComponentConfig.SchedulerName),
-		scheduler.WithHardPodAffinitySymmetricWeight(c.ComponentConfig.HardPodAffinitySymmetricWeight),
-		scheduler.WithEquivalenceClassCacheEnabled(c.ComponentConfig.EnableContentionProfiling),
-		scheduler.WithPreemptionDisabled(c.ComponentConfig.DisablePreemption),
-		scheduler.WithPercentageOfNodesToScore(c.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*c.ComponentConfig.BindTimeoutSeconds))
+		cc.Recorder,
+		cc.ComponentConfig.AlgorithmSource,
+		stopCh,
+		scheduler.WithName(cc.ComponentConfig.SchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
+		scheduler.WithEquivalenceClassCacheEnabled(cc.ComponentConfig.EnableContentionProfiling),
+		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
+		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds))
 	if err != nil {
 		return err
 	}
@@ -205,7 +211,7 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 	cc.InformerFactory.WaitForCacheSync(stopCh)
 	controller.WaitForCacheSync("scheduler", stopCh, cc.PodInformer.Informer().HasSynced)
 
-	// Prepare a reusable run function.
+	// Prepare a reusable runCommand function.
 	run := func(ctx context.Context) {
 		sched.Run()
 		<-ctx.Done()
@@ -222,7 +228,7 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 		}
 	}()
 
-	// If leader election is enabled, run via LeaderElector until done and exit.
+	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
@@ -240,7 +246,7 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 		return fmt.Errorf("lost lease")
 	}
 
-	// Leader election is disabled, so run inline until done.
+	// Leader election is disabled, so runCommand inline until done.
 	run(ctx)
 	return fmt.Errorf("finished without leader elect")
 }

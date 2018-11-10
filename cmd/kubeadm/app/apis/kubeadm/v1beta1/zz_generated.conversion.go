@@ -402,7 +402,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	}
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
-	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
+	out.UseHyperKubeImage = in.UseHyperKubeImage
 	if err := Convert_v1beta1_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
 	// INFO: in.CIImageRepository opted out of conversion generation
-	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
+	out.UseHyperKubeImage = in.UseHyperKubeImage
 	if err := Convert_kubeadm_AuditPolicyConfiguration_To_v1beta1_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
 		return err
 	}
@@ -624,7 +624,7 @@ func autoConvert_v1beta1_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 	if err := Convert_v1beta1_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
+	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
 	return nil
@@ -643,7 +643,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kube
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
+	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
 	return nil
@@ -662,7 +662,6 @@ func autoConvert_v1beta1_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Join
 	if err := Convert_v1beta1_Discovery_To_kubeadm_Discovery(&in.Discovery, &out.Discovery, s); err != nil {
 		return err
 	}
-	out.ClusterName = in.ClusterName
 	out.ControlPlane = in.ControlPlane
 	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err
@@ -683,7 +682,6 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(in *kube
 	if err := Convert_kubeadm_Discovery_To_v1beta1_Discovery(&in.Discovery, &out.Discovery, s); err != nil {
 		return err
 	}
-	out.ClusterName = in.ClusterName
 	out.ControlPlane = in.ControlPlane
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err

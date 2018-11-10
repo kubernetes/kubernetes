@@ -70,7 +70,7 @@ func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_BootstrapTokens(obj)
-	SetDefaults_APIEndpoint(&obj.APIEndpoint)
+	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
@@ -129,10 +129,6 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
-	}
-
-	if obj.ClusterName == "" {
-		obj.ClusterName = DefaultClusterName
 	}
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)

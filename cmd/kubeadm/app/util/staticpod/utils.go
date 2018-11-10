@@ -238,8 +238,8 @@ func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) st
 		// future hosts that do not have the same address. Furthermore, since liveness and readiness
 		// probes do not support the Downward API we cannot dynamically set the advertise address to
 		// the node's IP. The only option then is to use localhost.
-		if cfg.APIEndpoint.AdvertiseAddress != "" {
-			return cfg.APIEndpoint.AdvertiseAddress
+		if cfg.LocalAPIEndpoint.AdvertiseAddress != "" {
+			return cfg.LocalAPIEndpoint.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:
 		if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {

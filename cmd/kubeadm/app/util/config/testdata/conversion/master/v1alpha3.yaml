@@ -47,7 +47,7 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-unifiedControlPlaneImage: ""
+unifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.11.2"
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0

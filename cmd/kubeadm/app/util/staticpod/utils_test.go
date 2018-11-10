@@ -55,7 +55,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "default apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
 				},
 			},
@@ -68,7 +68,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "default apiserver advertise address with https",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
 				},
 			},
@@ -81,7 +81,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "valid ipv4 apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 			},
@@ -94,7 +94,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "valid ipv6 apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "2001:db8::1",
 				},
 			},

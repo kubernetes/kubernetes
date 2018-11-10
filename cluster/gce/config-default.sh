@@ -246,6 +246,10 @@ fi
 # Optional: customize runtime config
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
+if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
+  RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
+fi
+
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
@@ -254,18 +258,6 @@ if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
-fi
-
-if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
-  RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
-  if ! [[ "${KUBE_FEATURE_GATES:-}" =~ "CSIDriverRegistry" ]]; then
-    # If not explicitly specified, default to true.
-    FEATURE_GATES="${FEATURE_GATES},CSIDriverRegistry=true"
-  fi
-  if ! [[ "${KUBE_FEATURE_GATES:-}" =~ "CSINodeInfo" ]]; then
-    # If not explicitly specified, default to true.
-    FEATURE_GATES="${FEATURE_GATES},CSINodeInfo=true"
-  fi
 fi
 
 # Optional: Install cluster DNS.

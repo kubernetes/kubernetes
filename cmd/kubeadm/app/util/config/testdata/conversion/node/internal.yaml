@@ -2,7 +2,6 @@ APIEndpoint:
   AdvertiseAddress: 192.168.2.2
   BindPort: 6443
 CACertPath: /etc/kubernetes/pki/ca.crt
-ClusterName: kubernetes
 ControlPlane: false
 Discovery:
   BootstrapToken:

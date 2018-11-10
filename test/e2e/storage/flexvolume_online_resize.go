@@ -59,6 +59,9 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "local")
+		framework.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		framework.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
+		framework.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
@@ -117,6 +120,8 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		node := nodeList.Items[0]
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
 		installFlex(c, &node, "k8s", driver, path.Join(driverDir, driver))
+		By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
+		installFlex(c, nil, "k8s", driver, path.Join(driverDir, driver))
 
 		pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
 			PVSource: v1.PersistentVolumeSource{

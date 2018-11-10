@@ -112,7 +112,7 @@ func InstallPathHandler(mux mux, path string, checks ...HealthzChecker) {
 		checks = []HealthzChecker{PingHealthz}
 	}
 
-	glog.V(5).Info("Installing healthz checkers:", strings.Join(checkerNames(checks...), ", "))
+	glog.V(5).Info("Installing healthz checkers:", formatQuoted(checkerNames(checks...)...))
 
 	mux.Handle(path, handleRootHealthz(checks...))
 	for _, check := range checks {
@@ -187,14 +187,20 @@ func adaptCheckToHandler(c func(r *http.Request) error) http.HandlerFunc {
 
 // checkerNames returns the names of the checks in the same order as passed in.
 func checkerNames(checks ...HealthzChecker) []string {
-	if len(checks) > 0 {
-		// accumulate the names of checks for printing them out.
-		checkerNames := make([]string, 0, len(checks))
-		for _, check := range checks {
-			// quote the Name so we can disambiguate
-			checkerNames = append(checkerNames, fmt.Sprintf("%q", check.Name()))
-		}
-		return checkerNames
+	// accumulate the names of checks for printing them out.
+	checkerNames := make([]string, 0, len(checks))
+	for _, check := range checks {
+		checkerNames = append(checkerNames, check.Name())
 	}
-	return nil
+	return checkerNames
+}
+
+// formatQuoted returns a formatted string of the health check names,
+// preserving the order passed in.
+func formatQuoted(names ...string) string {
+	quoted := make([]string, 0, len(names))
+	for _, name := range names {
+		quoted = append(quoted, fmt.Sprintf("%q", name))
+	}
+	return strings.Join(quoted, ",")
 }

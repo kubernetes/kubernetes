@@ -1,9 +1,9 @@
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: InitConfiguration	
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
 bootstrapTokens:
 - token: s73ybu.6tw6wnqgp5z0wb77
+localAPIEndpoint:
+  advertiseAddress: 192.168.2.2
 nodeRegistration:
   criSocket: /var/run/criruntime.sock
   name: master-1
