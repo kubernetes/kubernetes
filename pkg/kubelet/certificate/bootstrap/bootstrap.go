@@ -21,6 +21,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -30,7 +32,7 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	certificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -114,11 +116,6 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
 	}
 
-	bootstrapClient, err := certificatesv1beta1.NewForConfig(bootstrapClientConfig)
-	if err != nil {
-		return fmt.Errorf("unable to create certificates signing request client: %v", err)
-	}
-
 	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap cert store")
@@ -147,18 +144,61 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		}
 	}
 
-	certData, err := requestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
+	interval := wait.Backoff{
+		Duration: time.Second,
+		Factor:   1.1,
+		Steps:    20,
+		Jitter:   0.2,
+		Cap:      30 * time.Second,
+	}
+
+	// get the correct transport from our config
+	transportCfg, err := bootstrapClientConfig.TransportConfig()
 	if err != nil {
 		return err
 	}
-	if _, err := store.Update(certData, keyData); err != nil {
+	tlsConfig, err := transport.TLSConfigFor(transportCfg)
+	if err != nil {
 		return err
 	}
-	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
-		klog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
-	}
+	timeoutClientConfig := restclient.CopyConfig(bootstrapClientConfig)
+	timeoutClientConfig.TLSClientConfig = restclient.TLSClientConfig{}
 
-	return writeKubeconfigFromBootstrapping(bootstrapClientConfig, kubeconfigPath, store.CurrentPath())
+	for interval.Steps > 0 {
+		// use a custom transport that disables keep alives
+		t := interval.Step()
+		timeoutClientConfig.Transport = &http.Transport{
+			TLSClientConfig:   tlsConfig,
+			DisableKeepAlives: true,
+			DialContext:       (&net.Dialer{Timeout: t}).DialContext,
+		}
+
+		bootstrapClient, err := certificatesv1beta1.NewForConfig(timeoutClientConfig)
+		if err != nil {
+			return fmt.Errorf("unable to create certificates signing request client: %v", err)
+		}
+
+		certData, err := requestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
+		if err != nil {
+			if t, ok := err.(timeoutError); ok && t.Timeout() {
+				continue
+			}
+			return err
+		}
+		if _, err := store.Update(certData, keyData); err != nil {
+			return err
+		}
+		if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
+			klog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
+		}
+
+		return writeKubeconfigFromBootstrapping(bootstrapClientConfig, kubeconfigPath, store.CurrentPath())
+	}
+	return fmt.Errorf("timed out attempting to connect to the CSR endpoint")
+}
+
+type timeoutError interface {
+	Timeout() bool
 }
 
 func writeKubeconfigFromBootstrapping(bootstrapClientConfig *restclient.Config, kubeconfigPath, pemPath string) error {
