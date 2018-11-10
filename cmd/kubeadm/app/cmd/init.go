@@ -25,13 +25,13 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -460,7 +460,7 @@ func (d initData) Tokens() []string {
 func runInit(i *initData, out io.Writer) error {
 
 	// Get directories to write files to; can be faked if we're dry-running
-	glog.V(1).Infof("[init] Getting certificates directory from configuration")
+	klog.V(1).Infof("[init] Getting certificates directory from configuration")
 	certsDirToWriteTo, kubeConfigDir, _, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
 		return errors.Wrap(err, "error getting directories to use")
@@ -481,18 +481,18 @@ func runInit(i *initData, out io.Writer) error {
 	// Upload currently used configuration to the cluster
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
 	// depend on centralized information from this source in the future
-	glog.V(1).Infof("[init] uploading currently used configuration to the cluster")
+	klog.V(1).Infof("[init] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error uploading configuration")
 	}
 
-	glog.V(1).Infof("[init] creating kubelet configuration configmap")
+	klog.V(1).Infof("[init] creating kubelet configuration configmap")
 	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
-	glog.V(1).Infof("[init] marking the master with right label")
+	klog.V(1).Infof("[init] marking the master with right label")
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
 		return errors.Wrap(err, "error marking master")
 	}
@@ -510,12 +510,12 @@ func runInit(i *initData, out io.Writer) error {
 		}
 	}
 
-	glog.V(1).Infof("[init] ensuring DNS addon")
+	klog.V(1).Infof("[init] ensuring DNS addon")
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error ensuring dns addon")
 	}
 
-	glog.V(1).Infof("[init] ensuring proxy addon")
+	klog.V(1).Infof("[init] ensuring proxy addon")
 	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error ensuring proxy addon")
 	}

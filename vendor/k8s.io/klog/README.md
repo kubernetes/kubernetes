@@ -1,3 +1,10 @@
+klog
+====
+
+klog is a permanant fork of https://github.com/golang/glog. original README from glog is below
+
+----
+
 glog
 ====
 
@@ -5,7 +12,7 @@ Leveled execution logs for Go.
 
 This is an efficient pure Go implementation of leveled logs in the
 manner of the open source C++ package
-	http://code.google.com/p/google-glog
+	https://github.com/google/glog
 
 By binding methods to booleans it is possible to use the log package
 without paying the expense of evaluating the arguments to the log.

@@ -24,7 +24,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
@@ -118,7 +118,7 @@ func NewExpandController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	expc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
@@ -150,8 +150,8 @@ func NewExpandController(
 
 func (expc *expandController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
-	glog.Infof("Starting expand controller")
-	defer glog.Infof("Shutting down expand controller")
+	klog.Infof("Starting expand controller")
+	defer klog.Infof("Shutting down expand controller")
 
 	if !controller.WaitForCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced) {
 		return
@@ -204,7 +204,7 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	if newSize.Cmp(oldSize) > 0 {
 		pv, err := getPersistentVolume(newPVC, expc.pvLister)
 		if err != nil {
-			glog.V(5).Infof("Error getting Persistent Volume for PVC %q : %v", newPVC.UID, err)
+			klog.V(5).Infof("Error getting Persistent Volume for PVC %q : %v", newPVC.UID, err)
 			return
 		}
 
@@ -219,7 +219,7 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 			}
 			expc.recorder.Event(newPVC, eventType, events.ExternalExpanding,
 				fmt.Sprintf("Ignoring the PVC: %v.", err))
-			glog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
+			klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
 				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, err)
 			return
 		}
@@ -319,7 +319,7 @@ func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *
 
 func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		glog.Errorf("DeleteServiceAccountToken unsupported in expandController")
+		klog.Errorf("DeleteServiceAccountToken unsupported in expandController")
 	}
 }
 

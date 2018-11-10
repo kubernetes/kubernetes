@@ -19,8 +19,8 @@ package convert
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -226,7 +226,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 		if len(actualVersion.Version) > 0 {
 			defaultVersionInfo = fmt.Sprintf("Defaulting to %q", actualVersion.Version)
 		}
-		glog.V(1).Infof("info: the output version specified is invalid. %s\n", defaultVersionInfo)
+		klog.V(1).Infof("info: the output version specified is invalid. %s\n", defaultVersionInfo)
 	}
 	return object, nil
 }

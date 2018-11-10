@@ -23,7 +23,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,10 +64,10 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 			return true, cloudprovider.InstanceNotFound
 		}
 		if retryErr != nil {
-			glog.Errorf("GetVirtualMachineWithRetry(%s): backoff failure, will retry, err=%v", name, retryErr)
+			klog.Errorf("GetVirtualMachineWithRetry(%s): backoff failure, will retry, err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(2).Infof("GetVirtualMachineWithRetry(%s): backoff success", name)
+		klog.V(2).Infof("GetVirtualMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -86,12 +86,12 @@ func (az *Cloud) VirtualMachineClientListWithRetry(resourceGroup string) ([]comp
 		defer cancel()
 		allNodes, retryErr = az.VirtualMachinesClient.List(ctx, resourceGroup)
 		if retryErr != nil {
-			glog.Errorf("VirtualMachinesClient.List(%v) - backoff: failure, will retry,err=%v",
+			klog.Errorf("VirtualMachinesClient.List(%v) - backoff: failure, will retry,err=%v",
 				resourceGroup,
 				retryErr)
 			return false, retryErr
 		}
-		glog.V(2).Infof("VirtualMachinesClient.List(%v) - backoff: success", resourceGroup)
+		klog.V(2).Infof("VirtualMachinesClient.List(%v) - backoff: success", resourceGroup)
 		return true, nil
 	})
 	if err != nil {
@@ -108,10 +108,10 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 		var retryErr error
 		ip, publicIP, retryErr = az.getIPForMachine(name)
 		if retryErr != nil {
-			glog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
+			klog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(2).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
+		klog.V(2).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	return ip, publicIP, err
@@ -124,7 +124,7 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.Secur
 		defer cancel()
 
 		resp, err := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg)
-		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
+		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
 		done, err := az.processHTTPRetryResponse(service, "CreateOrUpdateSecurityGroup", resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after updating
@@ -141,7 +141,7 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(service *v1.Service, lb network.LoadB
 		defer cancel()
 
 		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb)
-		glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
+		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		done, err := az.processHTTPRetryResponse(service, "CreateOrUpdateLoadBalancer", resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after updating
@@ -163,12 +163,12 @@ func (az *Cloud) ListLBWithRetry(service *v1.Service) ([]network.LoadBalancer, e
 		allLBs, retryErr = az.LoadBalancerClient.List(ctx, az.ResourceGroup)
 		if retryErr != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", retryErr.Error())
-			glog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
+			klog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
 				az.ResourceGroup,
 				retryErr)
 			return false, retryErr
 		}
-		glog.V(2).Infof("LoadBalancerClient.List(%v) - backoff: success", az.ResourceGroup)
+		klog.V(2).Infof("LoadBalancerClient.List(%v) - backoff: success", az.ResourceGroup)
 		return true, nil
 	})
 	if err != nil {
@@ -190,12 +190,12 @@ func (az *Cloud) ListPIPWithRetry(service *v1.Service, pipResourceGroup string) 
 		allPIPs, retryErr = az.PublicIPAddressesClient.List(ctx, pipResourceGroup)
 		if retryErr != nil {
 			az.Event(service, v1.EventTypeWarning, "ListPublicIPs", retryErr.Error())
-			glog.Errorf("PublicIPAddressesClient.List(%v) - backoff: failure, will retry,err=%v",
+			klog.Errorf("PublicIPAddressesClient.List(%v) - backoff: failure, will retry,err=%v",
 				pipResourceGroup,
 				retryErr)
 			return false, retryErr
 		}
-		glog.V(2).Infof("PublicIPAddressesClient.List(%v) - backoff: success", pipResourceGroup)
+		klog.V(2).Infof("PublicIPAddressesClient.List(%v) - backoff: success", pipResourceGroup)
 		return true, nil
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func (az *Cloud) CreateOrUpdatePIPWithRetry(service *v1.Service, pipResourceGrou
 		defer cancel()
 
 		resp, err := az.PublicIPAddressesClient.CreateOrUpdate(ctx, pipResourceGroup, *pip.Name, pip)
-		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
+		klog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
 		return az.processHTTPRetryResponse(service, "CreateOrUpdatePublicIPAddress", resp, err)
 	})
 }
@@ -224,7 +224,7 @@ func (az *Cloud) CreateOrUpdateInterfaceWithRetry(service *v1.Service, nic netwo
 		defer cancel()
 
 		resp, err := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic)
-		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
+		klog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
 		return az.processHTTPRetryResponse(service, "CreateOrUpdateInterface", resp, err)
 	})
 }
@@ -274,7 +274,7 @@ func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
 		defer cancel()
 
 		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, *route.Name, route)
-		glog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
+		klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }
@@ -286,7 +286,7 @@ func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 		defer cancel()
 
 		resp, err := az.RoutesClient.Delete(ctx, az.ResourceGroup, az.RouteTableName, routeName)
-		glog.V(10).Infof("RoutesClient.Delete(%s): end", az.RouteTableName)
+		klog.V(10).Infof("RoutesClient.Delete(%s): end", az.RouteTableName)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }
@@ -298,7 +298,7 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(resourceGroup, vmName string, newVM c
 		defer cancel()
 
 		resp, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, resourceGroup, vmName, newVM)
-		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
+		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }
@@ -307,7 +307,7 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(resourceGroup, vmName string, newVM c
 func (az *Cloud) UpdateVmssVMWithRetry(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
-		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
+		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }
@@ -345,10 +345,10 @@ func (az *Cloud) processHTTPRetryResponse(service *v1.Service, reason string, re
 	if shouldRetryHTTPRequest(resp, err) {
 		if err != nil {
 			az.Event(service, v1.EventTypeWarning, reason, err.Error())
-			glog.Errorf("processHTTPRetryResponse: backoff failure, will retry, err=%v", err)
+			klog.Errorf("processHTTPRetryResponse: backoff failure, will retry, err=%v", err)
 		} else {
 			az.Event(service, v1.EventTypeWarning, reason, fmt.Sprintf("Azure HTTP response %d", resp.StatusCode))
-			glog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d", resp.StatusCode)
+			klog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d", resp.StatusCode)
 		}
 
 		// suppress the error object so that backoff process continues

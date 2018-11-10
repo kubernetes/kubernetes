@@ -19,8 +19,8 @@ package config
 import (
 	"io/ioutil"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -56,7 +56,7 @@ func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags, TODO: fix this
-		glog.V(1).Infoln("loading configuration from the given file")
+		klog.V(1).Infoln("loading configuration from the given file")
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {

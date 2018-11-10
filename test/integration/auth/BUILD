@@ -90,8 +90,8 @@ go_test(
         "//test/integration:go_default_library",
         "//test/integration/etcd:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

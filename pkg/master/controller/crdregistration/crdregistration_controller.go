@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
@@ -88,12 +88,12 @@ func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefini
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
 				cast, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
 				if !ok {
-					glog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
+					klog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
 					return
 				}
 			}
@@ -109,8 +109,8 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting crd-autoregister controller")
-	defer glog.Infof("Shutting down crd-autoregister controller")
+	klog.Infof("Starting crd-autoregister controller")
+	defer klog.Infof("Shutting down crd-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
 	if !controller.WaitForCacheSync("crd-autoregister", stopCh, c.crdSynced) {

@@ -22,7 +22,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -74,7 +74,7 @@ func (t *awsTagging) init(legacyClusterID string, clusterID string) error {
 	t.ClusterID = clusterID
 
 	if clusterID != "" {
-		glog.Infof("AWS cloud filtering on ClusterID: %v", clusterID)
+		klog.Infof("AWS cloud filtering on ClusterID: %v", clusterID)
 	} else {
 		return fmt.Errorf("AWS cloud failed to find ClusterID")
 	}
@@ -92,7 +92,7 @@ func (t *awsTagging) initFromTags(tags []*ec2.Tag) error {
 	}
 
 	if legacyClusterID == "" && newClusterID == "" {
-		glog.Errorf("Tag %q nor %q not found; Kubernetes may behave unexpectedly.", TagNameKubernetesClusterLegacy, TagNameKubernetesClusterPrefix+"...")
+		klog.Errorf("Tag %q nor %q not found; Kubernetes may behave unexpectedly.", TagNameKubernetesClusterLegacy, TagNameKubernetesClusterPrefix+"...")
 	}
 
 	return t.init(legacyClusterID, newClusterID)
@@ -168,7 +168,7 @@ func (t *awsTagging) readRepairClusterTags(client EC2, resourceID string, lifecy
 			continue
 		}
 		if actual == "" {
-			glog.Warningf("Resource %q was missing expected cluster tag %q.  Will add (with value %q)", resourceID, k, expected)
+			klog.Warningf("Resource %q was missing expected cluster tag %q.  Will add (with value %q)", resourceID, k, expected)
 			addTags[k] = expected
 		} else {
 			return fmt.Errorf("resource %q has tag belonging to another cluster: %q=%q (expected %q)", resourceID, k, actual, expected)
@@ -223,7 +223,7 @@ func (t *awsTagging) createTags(client EC2, resourceID string, lifecycle Resourc
 
 		// We could check that the error is retryable, but the error code changes based on what we are tagging
 		// SecurityGroup: InvalidGroup.NotFound
-		glog.V(2).Infof("Failed to create tags; will retry.  Error was %q", err)
+		klog.V(2).Infof("Failed to create tags; will retry.  Error was %q", err)
 		lastErr = err
 		return false, nil
 	})

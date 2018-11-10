@@ -15,7 +15,7 @@ go_library(
         "//test/e2e/framework/ingress:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/network/scale:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

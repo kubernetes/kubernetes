@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 type RecycleEventRecorder func(eventtype, message string)
@@ -51,7 +51,7 @@ func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, kubeC
 // same as above func comments, except 'recyclerClient' is a narrower pod API
 // interface to ease testing
 func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, recyclerClient recyclerClient) error {
-	glog.V(5).Infof("creating recycler pod for volume %s\n", pod.Name)
+	klog.V(5).Infof("creating recycler pod for volume %s\n", pod.Name)
 
 	// Generate unique name for the recycler pod - we need to get "already
 	// exists" error when a previous controller has already started recycling
@@ -63,7 +63,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	defer close(stopChannel)
 	podCh, err := recyclerClient.WatchPod(pod.Name, pod.Namespace, stopChannel)
 	if err != nil {
-		glog.V(4).Infof("cannot start watcher for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.V(4).Infof("cannot start watcher for pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		return err
 	}
 
@@ -84,10 +84,10 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	err = waitForPod(pod, recyclerClient, podCh)
 
 	// In all cases delete the recycler pod and log its result.
-	glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
 	deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
 	if deleteErr != nil {
-		glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
 	// Returning recycler error is preferred, the pod will be deleted again on
@@ -117,7 +117,7 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 		case *v1.Pod:
 			// POD changed
 			pod := event.Object.(*v1.Pod)
-			glog.V(4).Infof("recycler pod update received: %s %s/%s %s", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
+			klog.V(4).Infof("recycler pod update received: %s %s/%s %s", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
 			switch event.Type {
 			case watch.Added, watch.Modified:
 				if pod.Status.Phase == v1.PodSucceeded {
@@ -142,7 +142,7 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 		case *v1.Event:
 			// Event received
 			podEvent := event.Object.(*v1.Event)
-			glog.V(4).Infof("recycler event received: %s %s/%s %s/%s %s", event.Type, podEvent.Namespace, podEvent.Name, podEvent.InvolvedObject.Namespace, podEvent.InvolvedObject.Name, podEvent.Message)
+			klog.V(4).Infof("recycler event received: %s %s/%s %s/%s %s", event.Type, podEvent.Namespace, podEvent.Name, podEvent.InvolvedObject.Namespace, podEvent.InvolvedObject.Name, podEvent.Message)
 			if event.Type == watch.Added {
 				recyclerClient.Event(podEvent.Type, podEvent.Message)
 			}

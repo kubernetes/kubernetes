@@ -21,11 +21,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -83,13 +83,13 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			// Ensure the user is root
-			glog.V(1).Infof("running preflight checks")
+			klog.V(1).Infof("running preflight checks")
 			err = runPreflightChecks(flags.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
-				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
+				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 				// Note that cfg isn't preserved here, it's just an one-off to populate flags.newK8sVersionStr based on --config
 				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
@@ -147,8 +147,8 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 func RunApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	glog.V(1).Infof("[upgrade/apply] verifying health of cluster")
-	glog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
+	klog.V(1).Infof("[upgrade/apply] verifying health of cluster")
+	klog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
 	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Validate requested and validate actual version
-	glog.V(1).Infof("[upgrade/apply] validating requested and actual version")
+	klog.V(1).Infof("[upgrade/apply] validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(&upgradeVars.cfg.ClusterConfiguration); err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Enforce the version skew policies
-	glog.V(1).Infof("[upgrade/version] enforcing version skew policies")
+	klog.V(1).Infof("[upgrade/version] enforcing version skew policies")
 	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
 		return errors.Wrap(err, "[upgrade/version] FATAL")
 	}
@@ -192,7 +192,7 @@ func RunApply(flags *applyFlags) error {
 
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
-	glog.V(1).Infof("[upgrade/apply] creating prepuller")
+	klog.V(1).Infof("[upgrade/apply] creating prepuller")
 	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, &upgradeVars.cfg.ClusterConfiguration)
 	componentsToPrepull := constants.MasterComponents
 	if upgradeVars.cfg.Etcd.External != nil {
@@ -203,13 +203,13 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Now; perform the upgrade procedure
-	glog.V(1).Infof("[upgrade/apply] performing upgrade")
+	klog.V(1).Infof("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
 	// Upgrade RBAC rules and addons.
-	glog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
+	klog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, upgradeVars.cfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}

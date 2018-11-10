@@ -37,8 +37,8 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 
-	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog"
 )
 
 func TestEnsureNodeExistsByProviderID(t *testing.T) {
@@ -250,7 +250,7 @@ func TestNodeShutdown(t *testing.T) {
 				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 				nodeStatusUpdateFrequency: 1 * time.Second,
 			}
-			eventBroadcaster.StartLogging(glog.Infof)
+			eventBroadcaster.StartLogging(klog.Infof)
 
 			cloudNodeController.Run(wait.NeverStop)
 
@@ -349,7 +349,7 @@ func TestNodeDeleted(t *testing.T) {
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.Run(wait.NeverStop)
 
@@ -429,7 +429,7 @@ func TestNodeInitialized(t *testing.T) {
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
@@ -494,7 +494,7 @@ func TestNodeIgnored(t *testing.T) {
 		nodeMonitorPeriod: 5 * time.Second,
 		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 	assert.Equal(t, 0, len(fnh.UpdatedNodes), "Node was wrongly updated")
@@ -568,7 +568,7 @@ func TestGCECondition(t *testing.T) {
 		nodeMonitorPeriod: 1 * time.Second,
 		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
@@ -658,7 +658,7 @@ func TestZoneInitialized(t *testing.T) {
 		nodeMonitorPeriod: 5 * time.Second,
 		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
@@ -749,7 +749,7 @@ func TestNodeAddresses(t *testing.T) {
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
@@ -864,7 +864,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
@@ -1156,7 +1156,7 @@ func TestNodeProviderID(t *testing.T) {
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
@@ -1240,7 +1240,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 		nodeStatusUpdateFrequency: 1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 

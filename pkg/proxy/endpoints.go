@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -197,7 +197,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
 			if port.Port == 0 {
-				glog.Warningf("ignoring invalid endpoint port %s", port.Name)
+				klog.Warningf("ignoring invalid endpoint port %s", port.Name)
 				continue
 			}
 			svcPortName := ServicePortName{
@@ -207,7 +207,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 			for i := range ss.Addresses {
 				addr := &ss.Addresses[i]
 				if addr.IP == "" {
-					glog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
+					klog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
 				// Filter out the incorrect IP version case.
@@ -226,12 +226,12 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], baseEndpointInfo)
 				}
 			}
-			if glog.V(3) {
+			if klog.V(3) {
 				newEPList := []string{}
 				for _, ep := range endpointsMap[svcPortName] {
 					newEPList = append(newEPList, ep.String())
 				}
-				glog.Infof("Setting endpoints for %q to %+v", svcPortName, newEPList)
+				klog.Infof("Setting endpoints for %q to %+v", svcPortName, newEPList)
 			}
 		}
 	}
@@ -299,7 +299,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				glog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.String())
+				klog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.String())
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}

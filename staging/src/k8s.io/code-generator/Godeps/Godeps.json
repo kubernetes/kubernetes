@@ -107,10 +107,6 @@
 			"Rev": "342cbe0a04158f6dcb03ca0079991a51a4248c02"
 		},
 		{
-			"ImportPath": "github.com/golang/glog",
-			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
-		},
-		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "583c0c0531f06d5278b7d917446061adc344b5cd"
 		},
@@ -124,43 +120,47 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
+			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+		},
+		{
+			"ImportPath": "k8s.io/klog",
+			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
 		}
 	]
 }

@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -55,23 +55,23 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, hash string) 
 
 	// for oldPods delete all not running pods
 	var oldPodsToDelete []string
-	glog.V(4).Infof("Marking all unavailable old pods for deletion")
+	klog.V(4).Infof("Marking all unavailable old pods for deletion")
 	for _, pod := range oldUnavailablePods {
 		// Skip terminating pods. We won't delete them again
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		glog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
+		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
 	}
 
-	glog.V(4).Infof("Marking old pods for deletion")
+	klog.V(4).Infof("Marking old pods for deletion")
 	for _, pod := range oldAvailablePods {
 		if numUnavailable >= maxUnavailable {
-			glog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
+			klog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
 			break
 		}
-		glog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
+		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
 		numUnavailable++
 	}
@@ -364,7 +364,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 		if updateErr != nil {
 			return nil, updateErr
 		}
-		glog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
+		klog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
 		return nil, outerErr
 	}
 	return history, err
@@ -393,7 +393,7 @@ func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *apps.DaemonSet, nodeToD
 }
 
 func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) (int, int, error) {
-	glog.V(4).Infof("Getting unavailable numbers")
+	klog.V(4).Infof("Getting unavailable numbers")
 	// TODO: get nodeList once in syncDaemonSet and pass it to other functions
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
@@ -432,7 +432,7 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeT
 	if err != nil {
 		return -1, -1, fmt.Errorf("Invalid value for MaxUnavailable: %v", err)
 	}
-	glog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
+	klog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil
 }
 

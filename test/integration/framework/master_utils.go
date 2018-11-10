@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1beta1"
 	auditreg "k8s.io/api/auditregistration/v1alpha1"
@@ -178,14 +178,14 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	clientset, err := clientset.NewForConfig(masterConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		closeFn()
-		glog.Fatalf("error in bringing up the master: %v", err)
+		klog.Fatalf("error in bringing up the master: %v", err)
 	}
 	if masterReceiver != nil {
 		masterReceiver.SetMaster(m)
@@ -202,7 +202,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
 		closeFn()
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -217,8 +217,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	})
 	if err != nil {
 		closeFn()
-		glog.Errorf("last health content: %q", string(lastHealthContent))
-		glog.Fatal(err)
+		klog.Errorf("last health content: %q", string(lastHealthContent))
+		klog.Fatal(err)
 	}
 
 	return m, s, closeFn

@@ -27,8 +27,8 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/util/wsstream",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

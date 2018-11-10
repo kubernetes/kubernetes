@@ -32,8 +32,8 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -142,7 +142,7 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
 	server, err := CreateServerChain(completeOptions, stopCh)
 	if err != nil {
@@ -585,7 +585,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 				return options, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
-		glog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
+		klog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
@@ -601,13 +601,13 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
 				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 			} else {
-				glog.Warning("No TLS key provided, service account token authentication disabled")
+				klog.Warning("No TLS key provided, service account token authentication disabled")
 			}
 		}
 	}
 
 	if s.Etcd.EnableWatchCache {
-		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		klog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		if userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err == nil {
 			for resource, size := range userSpecified {

@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -253,7 +253,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		return nil, nil, nil, err
 	}
 	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
-		glog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
+		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
 	allNodes, err := nodeLister.List()
@@ -265,7 +265,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	}
 	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError.FailedPredicates)
 	if len(potentialNodes) == 0 {
-		glog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
+		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return nil, nil, []*v1.Pod{pod}, nil
 	}
@@ -321,7 +321,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 				)
 				if err != nil {
 					if extender.IsIgnorable() {
-						glog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
+						klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
 							extender, err)
 						continue
 					}
@@ -468,7 +468,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 			filteredList, failedMap, err := extender.Filter(pod, filtered, g.cachedNodeInfoMap)
 			if err != nil {
 				if extender.IsIgnorable() {
-					glog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
+					klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
 						extender, err)
 					continue
 				} else {
@@ -599,7 +599,7 @@ func podFitsOnNode(
 					failedPredicates = append(failedPredicates, reasons...)
 					// if alwaysCheckAllPredicates is false, short circuit all predicates when one predicate fails.
 					if !alwaysCheckAllPredicates {
-						glog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate " +
+						klog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate " +
 							"evaluation is short circuited and there are chances " +
 							"of other predicates failing as well.")
 						break
@@ -695,9 +695,9 @@ func PrioritizeNodes(
 			if err := config.Reduce(pod, meta, nodeNameToInfo, results[index]); err != nil {
 				appendError(err)
 			}
-			if glog.V(10) {
+			if klog.V(10) {
 				for _, hostPriority := range results[index] {
-					glog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), hostPriority.Host, config.Name, hostPriority.Score)
+					klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), hostPriority.Host, config.Name, hostPriority.Score)
 				}
 			}
 		}(i, priorityConfig)
@@ -735,8 +735,8 @@ func PrioritizeNodes(
 				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					if glog.V(10) {
-						glog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, ext.Name(), score)
+					if klog.V(10) {
+						klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, ext.Name(), score)
 					}
 					combinedScores[host] += score * weight
 				}
@@ -750,9 +750,9 @@ func PrioritizeNodes(
 		}
 	}
 
-	if glog.V(10) {
+	if klog.V(10) {
 		for i := range result {
-			glog.Infof("Host %s => Score %d", result[i].Host, result[i].Score)
+			klog.Infof("Host %s => Score %d", result[i].Host, result[i].Score)
 		}
 	}
 	return result, nil
@@ -881,7 +881,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 	if lenNodes2 > 0 {
 		return minNodes2[0]
 	}
-	glog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
+	klog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
 	return nil
 }
 
@@ -1016,7 +1016,7 @@ func selectVictimsOnNode(
 	// TODO(bsalamat): Consider checking affinity to lower priority pods if feasible with reasonable performance.
 	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false, nil); !fits {
 		if err != nil {
-			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
+			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
 		return nil, 0, false
 	}
@@ -1032,7 +1032,7 @@ func selectVictimsOnNode(
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
-			glog.V(5).Infof("Pod %v is a potential preemption victim on node %v.", p.Name, nodeInfo.Node().Name)
+			klog.V(5).Infof("Pod %v is a potential preemption victim on node %v.", p.Name, nodeInfo.Node().Name)
 		}
 		return fits
 	}
@@ -1087,7 +1087,7 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 			}
 		}
 		if !found || !unresolvableReasonExist {
-			glog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
+			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
 			potentialNodes = append(potentialNodes, node)
 		}
 	}

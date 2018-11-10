@@ -19,9 +19,9 @@ package audit
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/klog"
 )
 
 const (
@@ -83,5 +83,5 @@ func HandlePluginError(plugin string, err error, impacted ...*auditinternal.Even
 	for _, ev := range impacted {
 		msg = msg + EventString(ev) + "\n"
 	}
-	glog.Error(msg)
+	klog.Error(msg)
 }

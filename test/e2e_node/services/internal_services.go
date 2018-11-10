@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // e2eService manages e2e services in current process.
@@ -55,7 +55,7 @@ func (es *e2eServices) run(t *testing.T) error {
 
 // start starts the tests embedded services or returns an error.
 func (es *e2eServices) start(t *testing.T) error {
-	glog.Info("Starting e2e services...")
+	klog.Info("Starting e2e services...")
 	err := es.startEtcd(t)
 	if err != nil {
 		return err
@@ -68,48 +68,48 @@ func (es *e2eServices) start(t *testing.T) error {
 	if err != nil {
 		return nil
 	}
-	glog.Info("E2E services started.")
+	klog.Info("E2E services started.")
 	return nil
 }
 
 // stop stops the embedded e2e services.
 func (es *e2eServices) stop(t *testing.T) {
-	glog.Info("Stopping e2e services...")
+	klog.Info("Stopping e2e services...")
 	// TODO(random-liu): Use a loop to stop all services after introducing
 	// service interface.
-	glog.Info("Stopping namespace controller")
+	klog.Info("Stopping namespace controller")
 	if es.nsController != nil {
 		if err := es.nsController.Stop(); err != nil {
-			glog.Errorf("Failed to stop %q: %v", es.nsController.Name(), err)
+			klog.Errorf("Failed to stop %q: %v", es.nsController.Name(), err)
 		}
 	}
 
-	glog.Info("Stopping API server")
+	klog.Info("Stopping API server")
 	if es.apiServer != nil {
 		if err := es.apiServer.Stop(); err != nil {
-			glog.Errorf("Failed to stop %q: %v", es.apiServer.Name(), err)
+			klog.Errorf("Failed to stop %q: %v", es.apiServer.Name(), err)
 		}
 	}
 
-	glog.Info("Stopping etcd")
+	klog.Info("Stopping etcd")
 	if es.etcdServer != nil {
 		es.etcdServer.Terminate(t)
 	}
 
 	for _, d := range es.rmDirs {
-		glog.Infof("Deleting directory %v", d)
+		klog.Infof("Deleting directory %v", d)
 		err := os.RemoveAll(d)
 		if err != nil {
-			glog.Errorf("Failed to delete directory %s.\n%v", d, err)
+			klog.Errorf("Failed to delete directory %s.\n%v", d, err)
 		}
 	}
 
-	glog.Info("E2E services stopped.")
+	klog.Info("E2E services stopped.")
 }
 
 // startEtcd starts the embedded etcd instance or returns an error.
 func (es *e2eServices) startEtcd(t *testing.T) error {
-	glog.Info("Starting etcd")
+	klog.Info("Starting etcd")
 	server, etcdStorage := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	es.etcdServer = server
 	es.etcdStorage = etcdStorage
@@ -118,14 +118,14 @@ func (es *e2eServices) startEtcd(t *testing.T) error {
 
 // startApiServer starts the embedded API server or returns an error.
 func (es *e2eServices) startApiServer(etcdStorage *storagebackend.Config) error {
-	glog.Info("Starting API server")
+	klog.Info("Starting API server")
 	es.apiServer = NewAPIServer(*etcdStorage)
 	return es.apiServer.Start()
 }
 
 // startNamespaceController starts the embedded namespace controller or returns an error.
 func (es *e2eServices) startNamespaceController() error {
-	glog.Info("Starting namespace controller")
+	klog.Info("Starting namespace controller")
 	es.nsController = NewNamespaceController(framework.TestContext.Host)
 	return es.nsController.Start()
 }

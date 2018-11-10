@@ -30,7 +30,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"github.com/fatih/camelcase"
 
@@ -185,7 +185,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.Describer, bool) {
 	describers, err := describerMap(clientConfig)
 	if err != nil {
-		glog.V(1).Info(err)
+		klog.V(1).Info(err)
 		return nil, false
 	}
 
@@ -323,7 +323,7 @@ func init() {
 		describeNamespace,
 	)
 	if err != nil {
-		glog.Fatalf("Cannot register describers: %v", err)
+		klog.Fatalf("Cannot register describers: %v", err)
 	}
 	DefaultObjectDescriber = d
 }
@@ -626,7 +626,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, pod); err != nil {
-			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
 			events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, ref)
@@ -2795,7 +2795,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, node); err != nil {
-			glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
 			ref.UID = types.UID(ref.Name)

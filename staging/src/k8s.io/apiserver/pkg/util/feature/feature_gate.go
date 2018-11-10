@@ -24,8 +24,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 type Feature string
@@ -193,9 +193,9 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 		}
 
 		if featureSpec.PreRelease == Deprecated {
-			glog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
+			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
 		} else if featureSpec.PreRelease == GA {
-			glog.Warningf("Setting GA feature gate %s=%t. It will be removed in a future release.", k, v)
+			klog.Warningf("Setting GA feature gate %s=%t. It will be removed in a future release.", k, v)
 		}
 	}
 
@@ -203,7 +203,7 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 	f.known.Store(known)
 	f.enabled.Store(enabled)
 
-	glog.V(1).Infof("feature gates: %v", f.enabled)
+	klog.V(1).Infof("feature gates: %v", f.enabled)
 	return nil
 }
 

@@ -31,7 +31,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh/terminal"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/connrotation"
+	"k8s.io/klog"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
@@ -228,7 +228,7 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			Code:   int32(res.StatusCode),
 		}
 		if err := r.a.maybeRefreshCreds(creds, resp); err != nil {
-			glog.Errorf("refreshing credentials: %v", err)
+			klog.Errorf("refreshing credentials: %v", err)
 		}
 	}
 	return res, nil

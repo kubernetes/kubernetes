@@ -25,11 +25,11 @@ import (
 	"time"
 
 	units "github.com/docker/go-units"
-	"github.com/golang/glog"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -271,7 +271,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	}
 
 	if len(missingPaths) > 0 {
-		glog.V(4).Infof("The Cgroup %v has some missing paths: %v", name, missingPaths)
+		klog.V(4).Infof("The Cgroup %v has some missing paths: %v", name, missingPaths)
 		return false
 	}
 
@@ -350,7 +350,7 @@ func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error {
 				return fmt.Errorf("Failed to find subsystem mount for required subsystem: %v", sys.Name())
 			}
 			// the cgroup is not mounted, but its not required so continue...
-			glog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
+			klog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
 			continue
 		}
 		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
@@ -512,7 +512,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// WalkFunc which is called for each file and directory in the pod cgroup dir
 		visitor := func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				glog.V(4).Infof("cgroup manager encountered error scanning cgroup path %q: %v", path, err)
+				klog.V(4).Infof("cgroup manager encountered error scanning cgroup path %q: %v", path, err)
 				return filepath.SkipDir
 			}
 			if !info.IsDir() {
@@ -520,7 +520,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			}
 			pids, err = getCgroupProcs(path)
 			if err != nil {
-				glog.V(4).Infof("cgroup manager encountered error getting procs for cgroup path %q: %v", path, err)
+				klog.V(4).Infof("cgroup manager encountered error getting procs for cgroup path %q: %v", path, err)
 				return filepath.SkipDir
 			}
 			pidsToKill.Insert(pids...)
@@ -530,7 +530,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// container cgroups haven't been GCed yet. Get attached processes to
 		// all such unwanted containers under the pod cgroup
 		if err = filepath.Walk(dir, visitor); err != nil {
-			glog.V(4).Infof("cgroup manager encountered error scanning pids for directory: %q: %v", dir, err)
+			klog.V(4).Infof("cgroup manager encountered error scanning pids for directory: %q: %v", dir, err)
 		}
 	}
 	return pidsToKill.List()
@@ -558,7 +558,7 @@ func getStatsSupportedSubsystems(cgroupPaths map[string]string) (*libcontainercg
 				return nil, fmt.Errorf("Failed to find subsystem mount for required subsystem: %v", sys.Name())
 			}
 			// the cgroup is not mounted, but its not required so continue...
-			glog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
+			klog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
 			continue
 		}
 		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {

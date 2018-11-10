@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/system"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -62,7 +62,7 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 		return nil, err
 	}
 	if len(nodeList.Items) < 1 {
-		glog.Warning("Can't find any Nodes in the API server to grab metrics from")
+		klog.Warning("Can't find any Nodes in the API server to grab metrics from")
 	}
 	for _, node := range nodeList.Items {
 		if system.IsMasterNode(node.Name) {
@@ -76,9 +76,9 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 		controllers = false
 		clusterAutoscaler = ec != nil
 		if clusterAutoscaler {
-			glog.Warningf("Master node is not registered. Grabbing metrics from Scheduler, ControllerManager is disabled.")
+			klog.Warningf("Master node is not registered. Grabbing metrics from Scheduler, ControllerManager is disabled.")
 		} else {
-			glog.Warningf("Master node is not registered. Grabbing metrics from Scheduler, ControllerManager and ClusterAutoscaler is disabled.")
+			klog.Warningf("Master node is not registered. Grabbing metrics from Scheduler, ControllerManager and ClusterAutoscaler is disabled.")
 		}
 	}
 

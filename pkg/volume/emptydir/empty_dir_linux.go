@@ -21,8 +21,8 @@ package emptydir
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -40,7 +40,7 @@ type realMountDetector struct {
 }
 
 func (m *realMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool, error) {
-	glog.V(5).Infof("Determining mount medium of %v", path)
+	klog.V(5).Infof("Determining mount medium of %v", path)
 	notMnt, err := m.mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
 		return v1.StorageMediumDefault, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
@@ -50,7 +50,7 @@ func (m *realMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool,
 		return v1.StorageMediumDefault, false, fmt.Errorf("statfs(%q): %v", path, err)
 	}
 
-	glog.V(5).Infof("Statfs_t of %v: %+v", path, buf)
+	klog.V(5).Infof("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
 		return v1.StorageMediumMemory, !notMnt, nil
 	} else if int64(buf.Type) == linuxHugetlbfsMagic {

@@ -27,7 +27,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -4301,7 +4301,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
-		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
+		klog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 

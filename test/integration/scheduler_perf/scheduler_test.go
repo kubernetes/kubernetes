@@ -18,11 +18,11 @@ package benchmark
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
 	"math"
@@ -137,7 +137,7 @@ func schedulePods(config *testConfig) int32 {
 		time.Sleep(50 * time.Millisecond)
 		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
 		// TODO Find out why sometimes there may be scheduling blips in the beginning.
@@ -155,7 +155,7 @@ func schedulePods(config *testConfig) int32 {
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
 		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 
 		// We will be completed when all pods are done being scheduled.

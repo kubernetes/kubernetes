@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +43,7 @@ func (plugin *awsElasticBlockStorePlugin) ConstructBlockVolumeSpec(podUID types.
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("globalMapPathUUID: %s", globalMapPathUUID)
+	klog.V(5).Infof("globalMapPathUUID: %s", globalMapPathUUID)
 
 	globalMapPath := filepath.Dir(globalMapPathUUID)
 	if len(globalMapPath) <= 1 {

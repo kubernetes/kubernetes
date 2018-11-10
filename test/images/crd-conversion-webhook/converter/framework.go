@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,12 +68,12 @@ func doConversion(convertRequest *v1beta1.ConversionRequest, convert convertFunc
 	for _, obj := range convertRequest.Objects {
 		cr := unstructured.Unstructured{}
 		if err := cr.UnmarshalJSON(obj.Raw); err != nil {
-			glog.Error(err)
+			klog.Error(err)
 			return conversionResponseFailureWithMessagef("failed to unmarshall object (%v) with error: %v", string(obj.Raw), err)
 		}
 		convertedCR, status := convert(&cr, convertRequest.DesiredAPIVersion)
 		if status.Status != metav1.StatusSuccess {
-			glog.Error(status.String())
+			klog.Error(status.String())
 			return &v1beta1.ConversionResponse{
 				Result: status,
 			}
@@ -99,21 +99,21 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	serializer := getInputSerializer(contentType)
 	if serializer == nil {
 		msg := fmt.Sprintf("invalid Content-Type header `%s`", contentType)
-		glog.Errorf(msg)
+		klog.Errorf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	glog.V(2).Infof("handling request: %v", body)
+	klog.V(2).Infof("handling request: %v", body)
 	convertReview := v1beta1.ConversionReview{}
 	if _, _, err := serializer.Decode(body, nil, &convertReview); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 		convertReview.Response = conversionResponseFailureWithMessagef("failed to deserialize body (%v) with error %v", string(body), err)
 	} else {
 		convertReview.Response = doConversion(convertReview.Request, convert)
 		convertReview.Response.UID = convertReview.Request.UID
 	}
-	glog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
+	klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
 
 	// reset the request, it is not needed in a response.
 	convertReview.Request = &v1beta1.ConversionRequest{}
@@ -122,13 +122,13 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	outSerializer := getOutputSerializer(accept)
 	if outSerializer == nil {
 		msg := fmt.Sprintf("invalid accept header `%s`", accept)
-		glog.Errorf(msg)
+		klog.Errorf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 	err := outSerializer.Encode(&convertReview, w)
 	if err != nil {
-		glog.Error(err)
+		klog.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -96,7 +96,7 @@ func TestControllerSync(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("starting test %q", test.name)
+		klog.V(4).Infof("starting test %q", test.name)
 
 		// Initialize the controller
 		client := &fake.Clientset{}
@@ -140,7 +140,7 @@ func TestControllerSync(t *testing.T) {
 
 			time.Sleep(10 * time.Millisecond)
 		}
-		glog.V(4).Infof("controller synced, starting test")
+		klog.V(4).Infof("controller synced, starting test")
 
 		// Call the tested function
 		err = test.test(ctrl, reactor, test)

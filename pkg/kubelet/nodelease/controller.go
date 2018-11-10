@@ -29,7 +29,7 @@ import (
 	coordclientset "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	"k8s.io/utils/pointer"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -81,7 +81,7 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 // Run runs the controller
 func (c *controller) Run(stopCh <-chan struct{}) {
 	if c.leaseClient == nil {
-		glog.Infof("node lease controller has nil lease client, will not claim or renew leases")
+		klog.Infof("node lease controller has nil lease client, will not claim or renew leases")
 		return
 	}
 	wait.Until(c.sync, c.renewInterval, stopCh)
@@ -112,7 +112,7 @@ func (c *controller) backoffEnsureLease() (*coordv1beta1.Lease, bool) {
 			break
 		}
 		sleep = minDuration(2*sleep, maxBackoff)
-		glog.Errorf("failed to ensure node lease exists, will retry in %v, error: %v", sleep, err)
+		klog.Errorf("failed to ensure node lease exists, will retry in %v, error: %v", sleep, err)
 		// backoff wait
 		c.clock.Sleep(sleep)
 	}
@@ -146,12 +146,12 @@ func (c *controller) retryUpdateLease(base *coordv1beta1.Lease) {
 		if err == nil {
 			return
 		}
-		glog.Errorf("failed to update node lease, error: %v", err)
+		klog.Errorf("failed to update node lease, error: %v", err)
 		if i > 0 && c.onRepeatedHeartbeatFailure != nil {
 			c.onRepeatedHeartbeatFailure()
 		}
 	}
-	glog.Errorf("failed %d attempts to update node lease, will retry after %v", maxUpdateRetries, c.renewInterval)
+	klog.Errorf("failed %d attempts to update node lease, will retry after %v", maxUpdateRetries, c.renewInterval)
 }
 
 // newLease constructs a new lease if base is nil, or returns a copy of base
@@ -191,7 +191,7 @@ func (c *controller) newLease(base *coordv1beta1.Lease) *coordv1beta1.Lease {
 				},
 			}
 		} else {
-			glog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
+			klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
 		}
 	}
 

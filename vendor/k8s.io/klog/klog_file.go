@@ -16,11 +16,10 @@
 
 // File I/O for logs.
 
-package glog
+package klog
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/user"
@@ -36,13 +35,9 @@ var MaxSize uint64 = 1024 * 1024 * 1800
 // logDirs lists the candidate directories for new log files.
 var logDirs []string
 
-// If non-empty, overrides the choice of directory in which to write logs.
-// See createLogDirs for the full list of possible destinations.
-var logDir = flag.String("log_dir", "", "If non-empty, write log files in this directory")
-
 func createLogDirs() {
-	if *logDir != "" {
-		logDirs = append(logDirs, *logDir)
+	if logging.logDir != "" {
+		logDirs = append(logDirs, logging.logDir)
 	}
 	logDirs = append(logDirs, os.TempDir())
 }
@@ -103,6 +98,13 @@ var onceLogDirs sync.Once
 // successfully, create also attempts to update the symlink for that tag, ignoring
 // errors.
 func create(tag string, t time.Time) (f *os.File, filename string, err error) {
+	if logging.logFile != "" {
+		f, err := os.Create(logging.logFile)
+		if err == nil {
+			return f, logging.logFile, nil
+		}
+		return nil, "", fmt.Errorf("log: unable to create log: %v", err)
+	}
 	onceLogDirs.Do(createLogDirs)
 	if len(logDirs) == 0 {
 		return nil, "", errors.New("log: no log dirs")

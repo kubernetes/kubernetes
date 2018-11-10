@@ -22,7 +22,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type traceStep struct {
@@ -63,17 +63,17 @@ func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 	lastStepTime := t.startTime
 	for _, step := range t.steps {
 		stepDuration := step.stepTime.Sub(lastStepTime)
-		if stepThreshold == 0 || stepDuration > stepThreshold || glog.V(4) {
+		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4) {
 			buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] %v\n", tracenum, step.stepTime.Sub(t.startTime), stepDuration, step.msg))
 		}
 		lastStepTime = step.stepTime
 	}
 	stepDuration := endTime.Sub(lastStepTime)
-	if stepThreshold == 0 || stepDuration > stepThreshold || glog.V(4) {
+	if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4) {
 		buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] END\n", tracenum, endTime.Sub(t.startTime), stepDuration))
 	}
 
-	glog.Info(buffer.String())
+	klog.Info(buffer.String())
 }
 
 func (t *Trace) LogIfLong(threshold time.Duration) {

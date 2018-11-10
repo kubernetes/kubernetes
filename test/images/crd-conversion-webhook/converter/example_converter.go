@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func convertExampleCRD(Object *unstructured.Unstructured, toVersion string) (*unstructured.Unstructured, metav1.Status) {
-	glog.V(2).Info("converting crd")
+	klog.V(2).Info("converting crd")
 
 	convertedObject := Object.DeepCopy()
 	fromVersion := Object.GetAPIVersion()

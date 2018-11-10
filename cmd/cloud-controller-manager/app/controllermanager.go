@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -58,7 +58,7 @@ const (
 func NewCloudControllerManagerCommand() *cobra.Command {
 	s, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
-		glog.Fatalf("unable to initialize command options: %v", err)
+		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
 	cmd := &cobra.Command{
@@ -106,21 +106,21 @@ the cloud specific control loops shipped with Kubernetes.`,
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
 	cloud, err := cloudprovider.InitCloudProvider(c.ComponentConfig.KubeCloudShared.CloudProvider.Name, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
 	if err != nil {
-		glog.Fatalf("Cloud provider could not be initialized: %v", err)
+		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 	if cloud == nil {
-		glog.Fatalf("cloud provider is nil")
+		klog.Fatalf("cloud provider is nil")
 	}
 
 	if cloud.HasClusterID() == false {
 		if c.ComponentConfig.KubeCloudShared.AllowUntaggedCloud == true {
-			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
-			glog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
+			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}
 	}
 
@@ -128,7 +128,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	if cz, err := configz.New(ConfigzName); err == nil {
 		cz.Set(c.ComponentConfig)
 	} else {
-		glog.Errorf("unable to register configz: %c", err)
+		klog.Errorf("unable to register configz: %c", err)
 	}
 
 	// Start the controller manager HTTP server
@@ -150,7 +150,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	run := func(ctx context.Context) {
 		if err := startControllers(c, ctx.Done(), cloud); err != nil {
-			glog.Fatalf("error running controllers: %v", err)
+			klog.Fatalf("error running controllers: %v", err)
 		}
 	}
 
@@ -177,7 +177,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 			EventRecorder: c.EventRecorder,
 		})
 	if err != nil {
-		glog.Fatalf("error creating lock: %v", err)
+		klog.Fatalf("error creating lock: %v", err)
 	}
 
 	// Try and become the leader and start cloud controller manager loops
@@ -189,7 +189,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
-				glog.Fatalf("leaderelection lost")
+				klog.Fatalf("leaderelection lost")
 			},
 		},
 	})
@@ -230,7 +230,7 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 		c.ComponentConfig.KubeCloudShared.ClusterName,
 	)
 	if err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
+		klog.Errorf("Failed to start service controller: %v", err)
 	} else {
 		go serviceController.Run(stop, int(c.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 		time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
@@ -239,13 +239,13 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	// If CIDRs should be allocated for pods and set on the CloudProvider, then start the route controller
 	if c.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs && c.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
 		if routes, ok := cloud.Routes(); !ok {
-			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
+			klog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
 			var clusterCIDR *net.IPNet
 			if len(strings.TrimSpace(c.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
 				_, clusterCIDR, err = net.ParseCIDR(c.ComponentConfig.KubeCloudShared.ClusterCIDR)
 				if err != nil {
-					glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", c.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+					klog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", c.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 				}
 			}
 
@@ -254,14 +254,14 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 			time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
-		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", c.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, c.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
+		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", c.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, c.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 	}
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
 	err = genericcontrollermanager.WaitForAPIServer(c.VersionedClient, 10*time.Second)
 	if err != nil {
-		glog.Fatalf("Failed to wait for apiserver being healthy: %v", err)
+		klog.Fatalf("Failed to wait for apiserver being healthy: %v", err)
 	}
 
 	c.SharedInformers.Start(stop)

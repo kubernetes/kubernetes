@@ -23,7 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +88,7 @@ func (d *delegate) gracefulShutdown() {
 // based on a shared informer.
 func NewBackend(c *Config) (audit.Backend, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(c.EventConfig.Sink)
 
 	scheme := runtime.NewScheme()
@@ -139,12 +139,12 @@ func NewBackend(c *Config) (audit.Backend, error) {
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
 				sink, ok = tombstone.Obj.(*auditregv1alpha1.AuditSink)
 				if !ok {
-					glog.V(2).Infof("Tombstone contained object that is not an AuditSink: %#v", obj)
+					klog.V(2).Infof("Tombstone contained object that is not an AuditSink: %#v", obj)
 					return
 				}
 			}
@@ -235,20 +235,20 @@ func (b *backend) addSink(sink *auditregv1alpha1.AuditSink) {
 	defer b.delegateUpdateMutex.Unlock()
 	delegates := b.copyDelegates()
 	if _, ok := delegates[sink.UID]; ok {
-		glog.Errorf("Audit sink %q uid: %s already exists, could not readd", sink.Name, sink.UID)
+		klog.Errorf("Audit sink %q uid: %s already exists, could not readd", sink.Name, sink.UID)
 		return
 	}
 	d, err := b.createAndStartDelegate(sink)
 	if err != nil {
 		msg := fmt.Sprintf("Could not add audit sink %q: %v", sink.Name, err)
-		glog.Error(msg)
+		klog.Error(msg)
 		b.recorder.Event(sink, corev1.EventTypeWarning, "CreateFailed", msg)
 		return
 	}
 	delegates[sink.UID] = d
 	b.setDelegates(delegates)
-	glog.V(2).Infof("Added audit sink: %s", sink.Name)
-	glog.V(2).Infof("Current audit sinks: %v", delegates.Names())
+	klog.V(2).Infof("Added audit sink: %s", sink.Name)
+	klog.V(2).Infof("Current audit sinks: %v", delegates.Names())
 }
 
 // updateSink is called by the shared informer when a sink is updated.
@@ -261,7 +261,7 @@ func (b *backend) updateSink(oldSink, newSink *auditregv1alpha1.AuditSink) {
 	delegates := b.copyDelegates()
 	oldDelegate, ok := delegates[oldSink.UID]
 	if !ok {
-		glog.Errorf("Could not update audit sink %q uid: %s, old sink does not exist",
+		klog.Errorf("Could not update audit sink %q uid: %s, old sink does not exist",
 			oldSink.Name, oldSink.UID)
 		return
 	}
@@ -276,7 +276,7 @@ func (b *backend) updateSink(oldSink, newSink *auditregv1alpha1.AuditSink) {
 		d, err := b.createAndStartDelegate(newSink)
 		if err != nil {
 			msg := fmt.Sprintf("Could not update audit sink %q: %v", oldSink.Name, err)
-			glog.Error(msg)
+			klog.Error(msg)
 			b.recorder.Event(newSink, corev1.EventTypeWarning, "UpdateFailed", msg)
 			return
 		}
@@ -286,8 +286,8 @@ func (b *backend) updateSink(oldSink, newSink *auditregv1alpha1.AuditSink) {
 		oldDelegate.gracefulShutdown()
 	}
 
-	glog.V(2).Infof("Updated audit sink: %s", newSink.Name)
-	glog.V(2).Infof("Current audit sinks: %v", delegates.Names())
+	klog.V(2).Infof("Updated audit sink: %s", newSink.Name)
+	klog.V(2).Infof("Current audit sinks: %v", delegates.Names())
 }
 
 // deleteSink is called by the shared informer when a sink is deleted
@@ -297,14 +297,14 @@ func (b *backend) deleteSink(sink *auditregv1alpha1.AuditSink) {
 	delegates := b.copyDelegates()
 	delegate, ok := delegates[sink.UID]
 	if !ok {
-		glog.Errorf("Could not delete audit sink %q uid: %s, does not exist", sink.Name, sink.UID)
+		klog.Errorf("Could not delete audit sink %q uid: %s, does not exist", sink.Name, sink.UID)
 		return
 	}
 	delete(delegates, sink.UID)
 	b.setDelegates(delegates)
 	delegate.gracefulShutdown()
-	glog.V(2).Infof("Deleted audit sink: %s", sink.Name)
-	glog.V(2).Infof("Current audit sinks: %v", delegates.Names())
+	klog.V(2).Infof("Deleted audit sink: %s", sink.Name)
+	klog.V(2).Infof("Current audit sinks: %v", delegates.Names())
 }
 
 // createAndStartDelegate will build a delegate from an audit sink configuration and run it

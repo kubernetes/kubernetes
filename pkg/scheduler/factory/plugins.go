@@ -30,7 +30,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
@@ -233,12 +233,12 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 		}
 	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
-		glog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
+		klog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
 		return policy.Name
 	}
 
 	if predicateFactory == nil {
-		glog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
+		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
 	}
 
 	return RegisterFitPredicateFactory(policy.Name, predicateFactory)
@@ -345,7 +345,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			}
 		}
 	} else if existingPcf, ok := priorityFunctionMap[policy.Name]; ok {
-		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
+		klog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
 			Function:          existingPcf.Function,
@@ -355,7 +355,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	if pcf == nil {
-		glog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
+		klog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
@@ -369,7 +369,7 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 	}
 	shape, err := priorities.NewFunctionShape(points)
 	if err != nil {
-		glog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
+		klog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
 	}
 	return shape
 }
@@ -500,7 +500,7 @@ var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")
 
 func validateAlgorithmNameOrDie(name string) {
 	if !validName.MatchString(name) {
-		glog.Fatalf("Algorithm name %v does not match the name validation regexp \"%v\".", name, validName)
+		klog.Fatalf("Algorithm name %v does not match the name validation regexp \"%v\".", name, validName)
 	}
 }
 
@@ -514,7 +514,7 @@ func validatePredicateOrDie(predicate schedulerapi.PredicatePolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			glog.Fatalf("Exactly 1 predicate argument is required, numArgs: %v, Predicate: %s", numArgs, predicate.Name)
+			klog.Fatalf("Exactly 1 predicate argument is required, numArgs: %v, Predicate: %s", numArgs, predicate.Name)
 		}
 	}
 }
@@ -532,7 +532,7 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			glog.Fatalf("Exactly 1 priority argument is required, numArgs: %v, Priority: %s", numArgs, priority.Name)
+			klog.Fatalf("Exactly 1 priority argument is required, numArgs: %v, Priority: %s", numArgs, priority.Name)
 		}
 	}
 }

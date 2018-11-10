@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -232,7 +232,7 @@ func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName t
 		return "", errors.New("Unexpected AttachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
 
 	return expected.retDeviceName, expected.ret
 }
@@ -257,7 +257,7 @@ func (testcase *testcase) DetachDisk(diskName aws.KubernetesVolumeID, nodeName t
 		return "", errors.New("Unexpected DetachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
 
 	return expected.retDeviceName, expected.ret
 }

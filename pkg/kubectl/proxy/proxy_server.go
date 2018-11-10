@@ -26,11 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
@@ -87,7 +87,7 @@ func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
 func MakeRegexpArrayOrDie(str string) []*regexp.Regexp {
 	result, err := MakeRegexpArray(str)
 	if err != nil {
-		glog.Fatalf("Error compiling re: %v", err)
+		klog.Fatalf("Error compiling re: %v", err)
 	}
 	return result
 }
@@ -95,7 +95,7 @@ func MakeRegexpArrayOrDie(str string) []*regexp.Regexp {
 func matchesRegexp(str string, regexps []*regexp.Regexp) bool {
 	for _, re := range regexps {
 		if re.MatchString(str) {
-			glog.V(6).Infof("%v matched %s", str, re)
+			klog.V(6).Infof("%v matched %s", str, re)
 			return true
 		}
 	}
@@ -135,11 +135,11 @@ func extractHost(header string) (host string) {
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	host := extractHost(req.Host)
 	if f.accept(req.Method, req.URL.Path, host) {
-		glog.V(3).Infof("Filter accepting %v %v %v", req.Method, req.URL.Path, host)
+		klog.V(3).Infof("Filter accepting %v %v %v", req.Method, req.URL.Path, host)
 		f.delegate.ServeHTTP(rw, req)
 		return
 	}
-	glog.V(3).Infof("Filter rejecting %v %v %v", req.Method, req.URL.Path, host)
+	klog.V(3).Infof("Filter rejecting %v %v %v", req.Method, req.URL.Path, host)
 	http.Error(rw, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 }
 
@@ -151,7 +151,7 @@ type Server struct {
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	glog.Errorf("Error while proxying request: %v", err)
+	klog.Errorf("Error while proxying request: %v", err)
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 

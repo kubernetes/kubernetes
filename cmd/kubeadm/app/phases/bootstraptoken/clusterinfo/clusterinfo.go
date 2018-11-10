@@ -19,8 +19,8 @@ package clusterinfo
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -44,7 +44,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 
 	fmt.Printf("[bootstraptoken] creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
-	glog.V(1).Infoln("[bootstraptoken] loading admin kubeconfig")
+	klog.V(1).Infoln("[bootstraptoken] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
 	if err != nil {
 		return errors.Wrap(err, "failed to load admin kubeconfig")
@@ -52,7 +52,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
 	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL
-	glog.V(1).Infoln("[bootstraptoken] copying the cluster from admin.conf to the bootstrap kubeconfig")
+	klog.V(1).Infoln("[bootstraptoken] copying the cluster from admin.conf to the bootstrap kubeconfig")
 	bootstrapConfig := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"": adminConfig.Clusters[adminCluster],
@@ -64,7 +64,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	}
 
 	// Create or update the ConfigMap in the kube-public namespace
-	glog.V(1).Infoln("[bootstraptoken] creating/updating ConfigMap in kube-public namespace")
+	klog.V(1).Infoln("[bootstraptoken] creating/updating ConfigMap in kube-public namespace")
 	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bootstrapapi.ConfigMapClusterInfo,
@@ -78,7 +78,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 
 // CreateClusterInfoRBACRules creates the RBAC rules for exposing the cluster-info ConfigMap in the kube-public namespace to unauthenticated users
 func CreateClusterInfoRBACRules(client clientset.Interface) error {
-	glog.V(1).Infoln("creating the RBAC rules for exposing the cluster-info ConfigMap in the kube-public namespace")
+	klog.V(1).Infoln("creating the RBAC rules for exposing the cluster-info ConfigMap in the kube-public namespace")
 	err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,

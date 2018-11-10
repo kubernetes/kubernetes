@@ -25,10 +25,10 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"k8s.io/klog"
 
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -82,7 +82,7 @@ func (w *Watcher) getHandler(pluginType string) (PluginHandler, bool) {
 
 // Start watches for the creation of plugin sockets at the path
 func (w *Watcher) Start() error {
-	glog.V(2).Infof("Plugin Watcher Start at %s", w.path)
+	klog.V(2).Infof("Plugin Watcher Start at %s", w.path)
 	w.stopCh = make(chan interface{})
 
 	// Creating the directory to be watched if it doesn't exist yet,
@@ -112,12 +112,12 @@ func (w *Watcher) Start() error {
 					if event.Op&fsnotify.Create == fsnotify.Create {
 						err := w.handleCreateEvent(event)
 						if err != nil {
-							glog.Errorf("error %v when handling create event: %s", err, event)
+							klog.Errorf("error %v when handling create event: %s", err, event)
 						}
 					} else if event.Op&fsnotify.Remove == fsnotify.Remove {
 						err := w.handleDeleteEvent(event)
 						if err != nil {
-							glog.Errorf("error %v when handling delete event: %s", err, event)
+							klog.Errorf("error %v when handling delete event: %s", err, event)
 						}
 					}
 					return
@@ -125,7 +125,7 @@ func (w *Watcher) Start() error {
 				continue
 			case err := <-fsWatcher.Errors:
 				if err != nil {
-					glog.Errorf("fsWatcher received error: %v", err)
+					klog.Errorf("fsWatcher received error: %v", err)
 				}
 				continue
 			case <-w.stopCh:
@@ -165,7 +165,7 @@ func (w *Watcher) Stop() error {
 }
 
 func (w *Watcher) init() error {
-	glog.V(4).Infof("Ensuring Plugin directory at %s ", w.path)
+	klog.V(4).Infof("Ensuring Plugin directory at %s ", w.path)
 
 	if err := w.fs.MkdirAll(w.path, 0755); err != nil {
 		return fmt.Errorf("error (re-)creating root %s: %v", w.path, err)
@@ -184,7 +184,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				return fmt.Errorf("error accessing path: %s error: %v", path, err)
 			}
 
-			glog.Errorf("error accessing path: %s error: %v", path, err)
+			klog.Errorf("error accessing path: %s error: %v", path, err)
 			return nil
 		}
 
@@ -203,7 +203,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				}
 			}()
 		default:
-			glog.V(5).Infof("Ignoring file %s with mode %v", path, mode)
+			klog.V(5).Infof("Ignoring file %s with mode %v", path, mode)
 		}
 
 		return nil
@@ -212,7 +212,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 
 // Handle filesystem notify event.
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
-	glog.V(6).Infof("Handling create event: %v", event)
+	klog.V(6).Infof("Handling create event: %v", event)
 
 	fi, err := os.Stat(event.Name)
 	if err != nil {
@@ -220,7 +220,7 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	}
 
 	if strings.HasPrefix(fi.Name(), ".") {
-		glog.Errorf("Ignoring file: %s", fi.Name())
+		klog.Errorf("Ignoring file: %s", fi.Name())
 		return nil
 	}
 
@@ -286,7 +286,7 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 }
 
 func (w *Watcher) handleDeleteEvent(event fsnotify.Event) error {
-	glog.V(6).Infof("Handling delete event: %v", event)
+	klog.V(6).Infof("Handling delete event: %v", event)
 
 	plugin, ok := w.getPlugin(event.Name)
 	if !ok {
@@ -304,7 +304,7 @@ func (w *Watcher) handleDeleteEvent(event fsnotify.Event) error {
 	// When ReRegistering, the new plugin will have removed the current mapping (map[socketPath] = plugin) and replaced
 	// it with it's own socketPath.
 	if _, ok = w.getPlugin(event.Name); !ok {
-		glog.V(2).Infof("A newer plugin watcher has been registered for plugin %v, dropping DeRegister call", plugin)
+		klog.V(2).Infof("A newer plugin watcher has been registered for plugin %v, dropping DeRegister call", plugin)
 		return nil
 	}
 
@@ -313,7 +313,7 @@ func (w *Watcher) handleDeleteEvent(event fsnotify.Event) error {
 		return fmt.Errorf("could not find handler %s for plugin %s at path %s", plugin.pluginType, plugin.pluginName, event.Name)
 	}
 
-	glog.V(2).Infof("DeRegistering plugin %v at path %s", plugin, event.Name)
+	klog.V(2).Infof("DeRegistering plugin %v at path %s", plugin, event.Name)
 	w.deRegisterPlugin(event.Name, plugin.pluginType, plugin.pluginName)
 	h.DeRegisterPlugin(plugin.pluginName)
 
