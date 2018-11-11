@@ -371,17 +371,6 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	}
 
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
-
-	fsMode := api.PersistentVolumeFilesystem
-	pv := &api.PersistentVolume{
-		ObjectMeta: meta.ObjectMeta{
-			Name: volData[volDataKey.specVolID],
-		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					Driver:       volData[volDataKey.driverName],
-					VolumeHandle: volData[volDataKey.volHandle],
 	var spec *volume.Spec
 
 	if p.inlineFeatureEnabled && volData[volDataKey.sourceKind] == volumeKind {
@@ -635,14 +624,14 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 
 func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
 	attachID := getAttachmentName(handle, driver, nodeName)
-	glog.V(4).Info(log("csiPlugin.getPublishVolumeInfo [attachID:%s", attachID))
+	klog.V(4).Info(log("csiPlugin.getPublishVolumeInfo [attachID:%s", attachID))
 
 	skip, err := p.skipAttach(driver)
 	if err != nil {
 		return nil, err
 	}
 	if skip {
-		glog.V(4).Info(log("driver %s does not support attachment, skipping PublishVolumeInfo", driver))
+		klog.V(4).Info(log("driver %s does not support attachment, skipping PublishVolumeInfo", driver))
 		return nil, nil
 	}
 

@@ -157,7 +157,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	//   - then continue below for remaining mount steps
 	// else check for SetUp of normal CSIPersistentVolumeSource
 	if c.plugin.inlineFeatureEnabled && volSrc != nil {
-		glog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource"))
+		klog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource"))
 
 		// attachID, volHandle, err := c.setUpInline(volSource)
 		// if err != nil {
@@ -176,10 +176,10 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		}
 
 		volAttribs = volSrc.VolumeAttributes
-		glog.V(4).Info(log("mounter.SetUpAt getting PublishVolumeInfo"))
+		klog.V(4).Info(log("mounter.SetUpAt getting PublishVolumeInfo"))
 		volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, volumeHandle, driverName, nodeName)
 		if err != nil {
-			glog.V(4).Info(log("mounter.SetUpAt failed to get VolumeInfo: %v", err))
+			klog.V(4).Info(log("mounter.SetUpAt failed to get VolumeInfo: %v", err))
 			return err
 		}
 
@@ -193,27 +193,27 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		}
 		mountOptions = []string{}
 
-		glog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource OK [driver:%d, volumeHandle:%s]", driverName, volumeHandle))
+		klog.V(4).Info(log("mounter.SetUpAt inline from CSIVolumeSource OK [driver:%d, volumeHandle:%s]", driverName, volumeHandle))
 	} else if pvSrc != nil {
 		// if source is a CSIPersistentVolumeSource (PV), prepare needed params (from PV)
-		glog.V(4).Info(log("mounter.SetUpAt from CSIPersistentVolumeSource"))
+		klog.V(4).Info(log("mounter.SetUpAt from CSIPersistentVolumeSource"))
 		fsType = pvSrc.FSType
 		volAttribs = pvSrc.VolumeAttributes
 
 		// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
-		glog.V(4).Info(log("mounter.SetUpAt getting PublishVolumeInfo"))
+		klog.V(4).Info(log("mounter.SetUpAt getting PublishVolumeInfo"))
 		c.volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, volumeHandle, driverName, nodeName)
 		if err != nil {
 			return err
 		}
 		volumeInfo = c.volumeInfo
 
-	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
-		return err
-	}
-	klog.V(4).Info(log("created target path successfully [%s]", dir))
+		// create target_dir before call to NodePublish
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			klog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
+			return err
+		}
+		klog.V(4).Info(log("created target path successfully [%s]", dir))
 		if pvSrc.NodePublishSecretRef != nil {
 			nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, pvSrc.NodePublishSecretRef)
 			if err != nil {
@@ -232,7 +232,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return errors.New("mounter.SetUpAt failed to get CSI volume source")
 	}
 
-	glog.V(4).Info(log("mounter.SetUpAt continuing with normal mount flow"))
+	klog.V(4).Info(log("mounter.SetUpAt continuing with normal mount flow"))
 
 	// Inject pod information into volume_attributes
 	podAttrs, err := c.podAttributes()
@@ -252,10 +252,10 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
+		klog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
 		return err
 	}
-	glog.V(4).Info(log("created target path successfully [%s]", dir))
+	klog.V(4).Info(log("created target path successfully [%s]", dir))
 
 	err = csi.NodePublishVolume(
 		ctx,

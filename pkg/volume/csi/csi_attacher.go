@@ -97,25 +97,25 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", err
 	}
 	if skip {
-		klog.V(4).Infof(log("skipping attach for driver %s", csiSource.Driver))
+		klog.V(4).Infof(log("skipping attach for driver %s", driverName))
 		return "", nil
 	}
 
 	attachID := getAttachmentName(volumeHandle, driverName, node)
 	attachment, err := c.newVolumeAttachment(attachID, node, driverName, spec)
 	if err != nil {
-		glog.Error(log("attacher.Attach unable to create VolumeAttachment object: %v", err))
+		klog.Error(log("attacher.Attach unable to create VolumeAttachment object: %v", err))
 		return "", err
 	}
 
 	// post attachment object and wait for attachment to be created
 	createdAttchID, err := c.postVolumeAttachment(driverName, volumeHandle, attachment, csiDefaultTimeout)
 	if err != nil {
-		glog.Error(log("attacher.Attach failed to post VolumeAttachment: %v", err))
+		klog.Error(log("attacher.Attach failed to post VolumeAttachment: %v", err))
 		return "", err
 	}
 
-	glog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", createdAttchID))
+	klog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", createdAttchID))
 
 	return createdAttchID, nil
 }
@@ -123,49 +123,48 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 // postVolumeAttachment posts the VolumeAttachment object to the server and waits for
 // the attachment to be marked attached.
 func (c *csiAttacher) postVolumeAttachment(driverName, volumeHandle string, attachment *storage.VolumeAttachment, attachmentTimeout time.Duration) (string, error) {
+
 	if attachment == nil {
 		return "", errors.New("VolumeAttachment nil")
 	}
 
-	glog.V(4).Info(log("attacher.postVolumeAttachment posting attachment [driver:%s, volumeHandle: %s, attachID:%s]", driverName, volumeHandle, attachment.Name))
+	klog.V(4).Info(log("attacher.postVolumeAttachment posting attachment [driver:%s, volumeHandle: %s, attachID:%s]", driverName, volumeHandle, attachment.Name))
 
 	createdAttachment, err := c.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 	alreadyExist := false
 	if err != nil {
 		if !apierrs.IsAlreadyExists(err) {
-			klog.Error(log("attacher.Attach failed: %v", err))
+			klog.Error(log("attacher.postVolumeAttachment VolumeAttachments().Create() failed: %v", err))
 			return "", err
 		}
 		alreadyExist = true
 	}
 
 	if alreadyExist {
-		klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, csiSource.VolumeHandle))
+		klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", createdAttachment.Name, volumeHandle))
 	} else {
-		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, csiSource.VolumeHandle))
+		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", createdAttachment.Name, volumeHandle))
 	}
 
 	attachID, err := c.waitForVolumeAttachment(driverName, volumeHandle, createdAttachment.Name, attachmentTimeout)
 	if err != nil {
-		glog.Error(log("attacher.postVolumeAttachment failed: %v", err))
+		klog.Error(log("attacher.postVolumeAttachment failed: %v", err))
 		return "", err
 	}
-
-	klog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
 
 	return attachID, nil
 }
 
 func (c *csiAttacher) WaitForAttach(spec *volume.Spec, attachID string, pod *v1.Pod, timeout time.Duration) (string, error) {
-	glog.V(4).Info(log("attacher.WaitForAttach called [attachment.ID=%v]", attachID))
+	klog.V(4).Info(log("attacher.WaitForAttach called [attachment.ID=%v]", attachID))
 	if spec == nil {
-		glog.Error(log("attacher.WaitForAttach missing volume.Spec"))
+		klog.Error(log("attacher.WaitForAttach missing volume.Spec"))
 		return "", errors.New("missing spec")
 	}
 
 	csiSource, err := getCSISourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
+		klog.Error(log("attacher.WaitForAttach failed to get CSI persistent source: %v", err))
 		return "", err
 	}
 
@@ -173,23 +172,17 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, attachID string, pod *v1.
 }
 
 func (c *csiAttacher) waitForVolumeAttachment(driverName, volumeHandle, attachID string, timeout time.Duration) (string, error) {
-	glog.V(4).Info(log("attacher.waitForVolumeAttachment waiting for attached status [attachment.ID=%v]", attachID))
+	klog.V(4).Info(log("attacher.waitForVolumeAttachment waiting for attached status [attachment.ID=%v]", attachID))
 
 	skip, err := c.plugin.skipAttach(driverName)
 	if err != nil {
-		klog.Error(log("attacher.Attach failed to find if driver is attachable: %v", err))
+		klog.Error(log("attacher.waitForVolumeAttachment failed to determine if driver is attachable: %v", err))
 		return "", err
 	}
 	if skip {
 		klog.V(4).Infof(log("Driver is not attachable, skip waiting for attach"))
 		return "", nil
 	}
-
-	return c.waitForVolumeAttachment(source.VolumeHandle, attachID, timeout)
-}
-
-func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, timeout time.Duration) (string, error) {
-	klog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
 
 	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
 	defer timer.Stop()
@@ -301,13 +294,13 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			driver = pvSrc.Driver
 			handle = pvSrc.VolumeHandle
 		} else {
-			glog.Error(log("attacher.VolumesAreAttached failed to get CSI volume source"))
+			klog.Error(log("attacher.VolumesAreAttached failed to get CSI volume source"))
 			continue
 		}
 
 		skip, err := c.plugin.skipAttach(driver)
 		if err != nil {
-			klog.Error(log("Failed to check CSIDriver for %s: %s", source.Driver, err))
+			klog.Error(log("Failed to check CSIDriver for %s: %s", driver, err))
 		} else {
 			if skip {
 				// This volume is not attachable, pretend it's attached
@@ -316,7 +309,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			}
 		}
 
-		attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(nodeName))
+		attachID := getAttachmentName(handle, driver, string(nodeName))
 		klog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
 		attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {

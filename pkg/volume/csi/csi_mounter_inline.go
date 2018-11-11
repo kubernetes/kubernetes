@@ -23,8 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/klog"
+
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	"github.com/golang/glog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
@@ -53,7 +54,7 @@ import (
 // - Wait for VolumeAttachment.ID from csiAttacher.Attach()
 // - if attachment ok, return attachID.
 func (c *csiMountMgr) setUpInline(csiSource *api.CSIVolumeSource) (string, string, error) {
-	glog.V(4).Info(log("mounter.setupInline called for CSIVolumeSource"))
+	klog.V(4).Info(log("mounter.setupInline called for CSIVolumeSource"))
 
 	if csiSource == nil {
 		return "", "", errors.New("missing CSIVolumeSource")
@@ -68,7 +69,7 @@ func (c *csiMountMgr) setUpInline(csiSource *api.CSIVolumeSource) (string, strin
 
 	// missing volHandle means we should provision
 	if volHandle == nil {
-		glog.V(4).Info(log("mounter.setupInline No CSIVolumeSource.VolumeHandle provided, attempting to provision new volume"))
+		klog.V(4).Info(log("mounter.setupInline No CSIVolumeSource.VolumeHandle provided, attempting to provision new volume"))
 		vol, err := c.inlineProvision(volSpecName, namespace, c.spec.Volume)
 		if err != nil {
 			return "", "", err
@@ -80,13 +81,13 @@ func (c *csiMountMgr) setUpInline(csiSource *api.CSIVolumeSource) (string, strin
 
 	skip, err := c.plugin.skipAttach(driverName)
 	if err != nil {
-		glog.Error(log("mounter.setupInline failed to get attachability setting for driver: %v", err))
+		klog.Error(log("mounter.setupInline failed to get attachability setting for driver: %v", err))
 		return "", "", err
 	}
 
 	// trigger attachment and wait for attach.Name (if necessary)
 	if skip {
-		glog.V(4).Info(log("mounter.setupInline skipping volume attachment"))
+		klog.V(4).Info(log("mounter.setupInline skipping volume attachment"))
 		return "", *volHandle, nil
 	}
 
@@ -103,7 +104,7 @@ func (c *csiMountMgr) setUpInline(csiSource *api.CSIVolumeSource) (string, strin
 // it will create a volume with default size of zero.
 // Returns csi.Volume or error if failure.
 func (c *csiMountMgr) inlineProvision(volSpecName, namespace string, volSource *api.Volume) (*csipb.Volume, error) {
-	glog.V(4).Info(log("mounter.inlineProvision called for volume %s", volSpecName))
+	klog.V(4).Info(log("mounter.inlineProvision called for volume %s", volSpecName))
 
 	if volSource == nil {
 		return nil, errors.New("missing inline VolumeSource")
@@ -124,18 +125,18 @@ func (c *csiMountMgr) inlineProvision(volSpecName, namespace string, volSource *
 
 		if err != nil {
 			if !apierrs.IsNotFound(err) {
-				glog.Error(log("mounter.inlineProvision failed to get referenced PVC: %v", err))
+				klog.Error(log("mounter.inlineProvision failed to get referenced PVC: %v", err))
 				return nil, err
 			}
-			glog.V(4).Info(log("WARNING: mounter.inlineProvision PersistentVolumeClaim reference not found, setting capacity to zero."))
+			klog.V(4).Info(log("WARNING: mounter.inlineProvision PersistentVolumeClaim reference not found, setting capacity to zero."))
 		} else {
 			cap := pvc.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 			volSizeBytes = cap.Value()
-			glog.V(4).Info(log("mounter.inlineProvision set capacity from referenced PVC [%d bytes]", volSizeBytes))
+			klog.V(4).Info(log("mounter.inlineProvision set capacity from referenced PVC [%d bytes]", volSizeBytes))
 		}
 
 	} else {
-		glog.V(4).Info(log("WARNING: mounter.inlineProvision PersistentVolumeClaim reference not provided, capacity set to zero."))
+		klog.V(4).Info(log("WARNING: mounter.inlineProvision PersistentVolumeClaim reference not provided, capacity set to zero."))
 	}
 
 	// get controller pub secrets
@@ -164,7 +165,7 @@ func (c *csiMountMgr) inlineProvision(volSpecName, namespace string, volSource *
 		if status, ok := status.FromError(createErr); ok {
 			if status.Code() == codes.DeadlineExceeded {
 				// CreateVolume timed out, give it another chance to complete
-				glog.Warningf("Mounter.inlineProvision CreateVolume timed out, operation will be retried")
+				klog.Warningf("Mounter.inlineProvision CreateVolume timed out, operation will be retried")
 				return false, nil
 			}
 		}
@@ -174,11 +175,11 @@ func (c *csiMountMgr) inlineProvision(volSpecName, namespace string, volSource *
 	})
 
 	if err != nil {
-		glog.Errorf(log("mount.inlineProvision inline volume provision failed %s: %v", volSpecName, err))
+		klog.Errorf(log("mount.inlineProvision inline volume provision failed %s: %v", volSpecName, err))
 		return nil, err
 	}
 
-	glog.V(4).Info(log("mounter.inlineProvision volume provisioned OK [Name: %s, ID:%s]", volSpecName, volume.Id))
+	klog.V(4).Info(log("mounter.inlineProvision volume provisioned OK [Name: %s, ID:%s]", volSpecName, volume.Id))
 
 	return volume, nil
 }
@@ -188,7 +189,7 @@ func (c *csiMountMgr) inlineProvision(volSpecName, namespace string, volSource *
 // the external-attacher to contact the CSI driver to create the attachment.
 // Returns the ID for the VolumeAttachment API ovbject or an error if failure.
 func (c *csiMountMgr) inlineAttach(volHandle string, csiSource *api.CSIVolumeSource, attachTimeout time.Duration) (string, error) {
-	glog.V(4).Info(log("mounter.inlineAttach called for volumeHandle %s", volHandle))
+	klog.V(4).Info(log("mounter.inlineAttach called for volumeHandle %s", volHandle))
 
 	if csiSource == nil {
 		return "", errors.New("missing inline CSIVolumeSource")
@@ -225,11 +226,11 @@ func (c *csiMountMgr) inlineAttach(volHandle string, csiSource *api.CSIVolumeSou
 	// create and wait for attachment
 	attachID, err := attacher.postVolumeAttachment(driverName, volHandle, attachment, attachTimeout)
 	if err != nil {
-		glog.Errorf(log("mount.inlineAttach failed to post attachment [attachID %s]: %v", attachID, err))
+		klog.Errorf(log("mount.inlineAttach failed to post attachment [attachID %s]: %v", attachID, err))
 		return "", err
 	}
 
-	glog.V(4).Info(log("mounter.inlineAttach attached OK [driver:%s, volumeHandle: %s, attachID:%s]", driverName, volHandle, attachID))
+	klog.V(4).Info(log("mounter.inlineAttach attached OK [driver:%s, volumeHandle: %s, attachID:%s]", driverName, volHandle, attachID))
 	return attachID, nil
 }
 

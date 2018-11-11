@@ -299,7 +299,7 @@ func (c *csiDriverClient) CreateVolume(
 	sizeInBytes int64,
 	creationSecrets map[string]string,
 ) (*csipb.Volume, error) {
-	glog.V(4).Info(log("calling CreateVolume rpc [volHandle=%s,size=%d]", volName, sizeInBytes))
+	klog.V(4).Info(log("calling CreateVolume rpc [volHandle=%s,size=%d]", volName, sizeInBytes))
 	conn, err := newGrpcConn(c.driverName)
 	if err != nil {
 		return nil, err
