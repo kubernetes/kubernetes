@@ -44,7 +44,7 @@ type Phase struct {
 	Phases []Phase
 
 	// Run defines a function implementing the phase action.
-	// It is recommended to implent type assertion, e.g. using golang type switch,
+	// It is recommended to implement type assertion, e.g. using golang type switch,
 	// for validating the RunData type.
 	Run func(data RunData) error
 

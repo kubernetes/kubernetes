@@ -679,6 +679,6 @@ func TestRequiresRemount(t *testing.T) {
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/rbd")
 	has := plug.RequiresRemount()
 	if has {
-		t.Errorf("Exepcted RequiresRemount to be false, got %t", has)
+		t.Errorf("Expected RequiresRemount to be false, got %t", has)
 	}
 }
