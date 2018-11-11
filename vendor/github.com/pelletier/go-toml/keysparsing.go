@@ -9,12 +9,14 @@ import (
 	"unicode"
 )
 
+// Convert the bare key group string to an array.
+// The input supports double quotation to allow "." inside the key name,
+// but escape sequences are not supported. Lexers must unescape them beforehand.
 func parseKey(key string) ([]string, error) {
 	groups := []string{}
 	var buffer bytes.Buffer
 	inQuotes := false
 	wasInQuotes := false
-	escapeNext := false
 	ignoreSpace := true
 	expectDot := false
 
@@ -25,15 +27,7 @@ func parseKey(key string) ([]string, error) {
 			}
 			ignoreSpace = false
 		}
-		if escapeNext {
-			buffer.WriteRune(char)
-			escapeNext = false
-			continue
-		}
 		switch char {
-		case '\\':
-			escapeNext = true
-			continue
 		case '"':
 			if inQuotes {
 				groups = append(groups, buffer.String())
@@ -76,9 +70,6 @@ func parseKey(key string) ([]string, error) {
 	}
 	if inQuotes {
 		return nil, errors.New("mismatched quotes")
-	}
-	if escapeNext {
-		return nil, errors.New("unfinished escape sequence")
 	}
 	if buffer.Len() > 0 {
 		groups = append(groups, buffer.String())

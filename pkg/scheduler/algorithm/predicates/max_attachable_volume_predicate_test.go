@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -741,60 +742,12 @@ func TestVolumeCountConflicts(t *testing.T) {
 		},
 	}
 
-	pvInfo := func(filterName string) FakePersistentVolumeInfo {
-		return FakePersistentVolumeInfo{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: strings.ToLower(filterName) + "Vol"},
-					},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{},
-				},
-			},
-		}
-	}
-
-	pvcInfo := func(filterName string) FakePersistentVolumeClaimInfo {
-		return FakePersistentVolumeClaimInfo{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-			},
-		}
-	}
-
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	// running attachable predicate tests without feature gate and no limit present on nodes
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		pred := NewMaxPDVolumeCountPredicate(test.filterName, pvInfo(test.filterName), pvcInfo(test.filterName))
+		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
@@ -812,7 +765,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		node := getNodeWithPodAndVolumeLimits(test.existingPods, int64(test.maxVols), test.filterName)
-		pred := NewMaxPDVolumeCountPredicate(test.filterName, pvInfo(test.filterName), pvcInfo(test.filterName))
+		pred := NewMaxPDVolumeCountPredicate(test.filterName, getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName))
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
@@ -823,6 +776,122 @@ func TestVolumeCountConflicts(t *testing.T) {
 		if fits != test.fits {
 			t.Errorf("Using allocatable [%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
 		}
+	}
+}
+
+func getFakePVInfo(filterName string) FakePersistentVolumeInfo {
+	return FakePersistentVolumeInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: strings.ToLower(filterName) + "Vol"},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{},
+			},
+		},
+	}
+}
+
+func getFakePVCInfo(filterName string) FakePersistentVolumeClaimInfo {
+	return FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "some" + filterName + "Vol"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "someNon" + filterName + "Vol"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNon" + filterName + "Vol"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "anotherPVCWithDeletedPV"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "anotherPVCWithDeletedPV"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVC"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "anotherUnboundPVC"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+		},
+	}
+}
+
+func TestMaxVolumeFuncM5(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-m5-instance",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "m5.large",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != volumeutil.DefaultMaxEBSNitroVolumeLimit {
+		t.Errorf("Expected max volume to be %d got %d", volumeutil.DefaultMaxEBSNitroVolumeLimit, maxVolume)
+	}
+}
+
+func TestMaxVolumeFuncT3(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-t3-instance",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "t3.medium",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != volumeutil.DefaultMaxEBSNitroVolumeLimit {
+		t.Errorf("Expected max volume to be %d got %d", volumeutil.DefaultMaxEBSNitroVolumeLimit, maxVolume)
+	}
+}
+
+func TestMaxVolumeFuncR5(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-r5-instance",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "r5d.xlarge",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != volumeutil.DefaultMaxEBSNitroVolumeLimit {
+		t.Errorf("Expected max volume to be %d got %d", volumeutil.DefaultMaxEBSNitroVolumeLimit, maxVolume)
+	}
+}
+
+func TestMaxVolumeFuncM4(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-m4-instance",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "m4.2xlarge",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != volumeutil.DefaultMaxEBSVolumes {
+		t.Errorf("Expected max volume to be %d got %d", volumeutil.DefaultMaxEBSVolumes, maxVolume)
 	}
 }
 
@@ -849,6 +918,6 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 	case AzureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
 	default:
-		return ""
+		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
 	}
 }

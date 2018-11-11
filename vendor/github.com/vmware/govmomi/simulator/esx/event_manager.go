@@ -162,6 +162,12 @@ var EventInfo = []types.EventDescriptionEventDetail{
 		FullFormat:  "{{.Vm.Name}} on host {{.Host.Name}} in {{.Datacenter.Name}} is starting",
 	},
 	{
+		Key:         "VmStoppingEvent",
+		Description: "VM stopping",
+		Category:    "info",
+		FullFormat:  "{{.Vm.Name}} on host {{.Host.Name}} in {{.Datacenter.Name}} is stopping",
+	},
+	{
 		Key:         "VmSuspendingEvent",
 		Description: "VM being suspended",
 		Category:    "info",

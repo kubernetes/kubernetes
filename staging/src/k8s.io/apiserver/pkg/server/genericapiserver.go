@@ -25,7 +25,7 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful-swagger12"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,7 @@ import (
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -137,6 +138,11 @@ type GenericAPIServer struct {
 
 	// auditing. The backend is started after the server starts listening.
 	AuditBackend audit.Backend
+
+	// Authorizer determines whether a user is allowed to make a certain request. The Handler does a preliminary
+	// authorization check using the request URI but it may be necessary to make additional checks, such as in
+	// the create-on-update case
+	Authorizer authorizer.Authorizer
 
 	// enableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding
@@ -306,7 +312,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	s.RunPostStartHooks(stopCh)
 
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
-		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
 	return nil
@@ -316,7 +322,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
-			glog.Warningf("Skipping API %v because it has no resources.", groupVersion)
+			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
 			continue
 		}
 
@@ -422,6 +428,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		MinRequestTimeout:            s.minRequestTimeout,
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
 		OpenAPIConfig:                s.openAPIConfig,
+		Authorizer:                   s.Authorizer,
 	}
 }
 

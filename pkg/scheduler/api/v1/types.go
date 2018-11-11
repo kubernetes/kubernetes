@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	gojson "encoding/json"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -193,6 +194,18 @@ type ExtenderConfig struct {
 	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
 	// fail when the extender returns an error or is not reachable.
 	Ignorable bool `json:"ignorable,omitempty"`
+}
+
+// caseInsensitiveExtenderConfig is a type alias which lets us use the stdlib case-insensitive decoding
+// to preserve compatibility with incorrectly specified scheduler config fields:
+// * BindVerb, which originally did not specify a json tag, and required upper-case serialization in 1.7
+// * TLSConfig, which uses a struct not intended for serialization, and does not include any json tags
+type caseInsensitiveExtenderConfig *ExtenderConfig
+
+// UnmarshalJSON implements the json.Unmarshaller interface.
+// This preserves compatibility with incorrect case-insensitive configuration fields.
+func (t *ExtenderConfig) UnmarshalJSON(b []byte) error {
+	return gojson.Unmarshal(b, caseInsensitiveExtenderConfig(t))
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize

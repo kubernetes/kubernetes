@@ -22,6 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,8 +37,8 @@ import (
 // TestAdmit tests that MutatingWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
-	v1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
@@ -48,7 +51,10 @@ func TestAdmit(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	for _, tt := range webhooktesting.NewTestCases(serverURL) {
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
+		webhooktesting.NewNonMutatingTestCases(serverURL)...)
+
+	for _, tt := range testCases {
 		wh, err := NewMutatingWebhook(nil)
 		if err != nil {
 			t.Errorf("%s: failed to create mutating webhook: %v", tt.Name, err)
@@ -74,9 +80,9 @@ func TestAdmit(t *testing.T) {
 
 		var attr admission.Attributes
 		if tt.IsCRD {
-			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels)
+			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
 		} else {
-			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels)
+			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
 		}
 
 		err = wh.Admit(attr)
@@ -97,14 +103,24 @@ func TestAdmit(t *testing.T) {
 		if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
 			t.Errorf("%s: expected a StatusError, got %T", tt.Name, err)
 		}
+		fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
+		if !ok {
+			t.Errorf("Unexpected error, failed to convert attr to webhooktesting.FakeAttributes")
+			continue
+		}
+		if len(tt.ExpectAnnotations) == 0 {
+			assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+		} else {
+			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+		}
 	}
 }
 
 // TestAdmitCachedClient tests that MutatingWebhook#Admit should cache restClient
 func TestAdmitCachedClient(t *testing.T) {
 	scheme := runtime.NewScheme()
-	v1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
@@ -142,7 +158,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns, nil))
+		err = wh.Admit(webhooktesting.NewAttribute(ns, nil, false))
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

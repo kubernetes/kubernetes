@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/audit/install"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 )
 
 func cleanup(t *testing.T, path string) {
@@ -54,7 +54,7 @@ func TestCreateDefaultAuditLogPolicy(t *testing.T) {
 	scheme := runtime.NewScheme()
 	install.Install(scheme)
 	codecs := serializer.NewCodecFactory(scheme)
-	policy := auditv1beta1.Policy{}
+	policy := auditv1.Policy{}
 	err = runtime.DecodeInto(codecs.UniversalDecoder(), policyBytes, &policy)
 	if err != nil {
 		t.Fatalf("failed to decode written policy: %v", err)

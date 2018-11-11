@@ -18,12 +18,11 @@ package apiserver
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"sync/atomic"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -113,7 +112,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Scheme = "https"
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
 	if err != nil {
-		glog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -162,7 +161,8 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 		return nil, true, err
 	}
 	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects)
+	requireSameHostRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects, requireSameHostRedirects)
 	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
 	if err != nil {
 		return nil, true, err
@@ -208,15 +208,12 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		serviceNamespace: apiService.Spec.Service.Namespace,
 		serviceAvailable: apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available),
 	}
+	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
+		newInfo.restConfig.Dial = r.proxyTransport.DialContext
+	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
-	if newInfo.transportBuildingError == nil && r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
-		switch transport := newInfo.proxyRoundTripper.(type) {
-		case *http.Transport:
-			transport.DialContext = r.proxyTransport.DialContext
-		default:
-			newInfo.transportBuildingError = fmt.Errorf("unable to set dialer for %s/%s as rest transport is of type %T", apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, newInfo.proxyRoundTripper)
-			glog.Warning(newInfo.transportBuildingError.Error())
-		}
+	if newInfo.transportBuildingError != nil {
+		klog.Warning(newInfo.transportBuildingError.Error())
 	}
 	r.handlingInfo.Store(newInfo)
 }

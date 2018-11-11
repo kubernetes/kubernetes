@@ -27,15 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestPlugin(t *testing.T) (*csiPlugin, string) {
+func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*csiPlugin, string) {
 	err := utilfeature.DefaultFeatureGate.Set("CSIBlockVolume=true")
 	if err != nil {
 		t.Fatalf("Failed to enable feature gate for CSIBlockVolume: %v", err)
@@ -46,11 +49,18 @@ func newTestPlugin(t *testing.T) (*csiPlugin, string) {
 		t.Fatalf("can't create temp dir: %v", err)
 	}
 
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHost(
+	if client == nil {
+		client = fakeclient.NewSimpleClientset()
+	}
+	if csiClient == nil {
+		csiClient = fakecsi.NewSimpleClientset()
+	}
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
-		fakeClient,
+		client,
+		csiClient,
 		nil,
+		"fakeNode",
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -63,6 +73,13 @@ func newTestPlugin(t *testing.T) (*csiPlugin, string) {
 	csiPlug, ok := plug.(*csiPlugin)
 	if !ok {
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		// Wait until the informer in CSI volume plugin has all CSIDrivers.
+		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
+			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
+		})
 	}
 
 	return csiPlug, tmpDir
@@ -92,7 +109,7 @@ func makeTestPV(name string, sizeGig int, driverName, volID string) *api.Persist
 }
 
 func TestPluginGetPluginName(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	if plug.GetPluginName() != "kubernetes.io/csi" {
 		t.Errorf("unexpected plugin name %v", plug.GetPluginName())
@@ -100,7 +117,7 @@ func TestPluginGetPluginName(t *testing.T) {
 }
 
 func TestPluginGetVolumeName(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
 		name       string
@@ -129,7 +146,7 @@ func TestPluginGetVolumeName(t *testing.T) {
 }
 
 func TestPluginCanSupport(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
@@ -141,7 +158,7 @@ func TestPluginCanSupport(t *testing.T) {
 }
 
 func TestPluginConstructVolumeSpec(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -186,6 +203,14 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			t.Errorf("expected volID %s, got volID %s", tc.data[volDataKey.volHandle], volHandle)
 		}
 
+		if spec.PersistentVolume.Spec.VolumeMode == nil {
+			t.Fatalf("Volume mode has not been set.")
+		}
+
+		if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
+			t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+		}
+
 		if spec.Name() != tc.specVolID {
 			t.Errorf("Unexpected spec name %s", spec.Name())
 		}
@@ -193,7 +218,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 }
 
 func TestPluginNewMounter(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
@@ -241,7 +266,7 @@ func TestPluginNewMounter(t *testing.T) {
 }
 
 func TestPluginNewUnmounter(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
@@ -286,7 +311,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 }
 
 func TestPluginNewAttacher(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	attacher, err := plug.NewAttacher()
@@ -304,7 +329,7 @@ func TestPluginNewAttacher(t *testing.T) {
 }
 
 func TestPluginNewDetacher(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	detacher, err := plug.NewDetacher()
@@ -322,7 +347,7 @@ func TestPluginNewDetacher(t *testing.T) {
 }
 
 func TestPluginNewBlockMapper(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	pv := makeTestPV("test-block-pv", 10, testDriver, testVol)
@@ -367,7 +392,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 }
 
 func TestPluginNewUnmapper(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
@@ -424,7 +449,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 }
 
 func TestPluginConstructBlockVolumeSpec(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -461,6 +486,14 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 				t.Fatal("expecting ConstructVolumeSpec to fail, but got nil error")
 			}
 			continue
+		}
+
+		if spec.PersistentVolume.Spec.VolumeMode == nil {
+			t.Fatalf("Volume mode has not been set.")
+		}
+
+		if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeBlock {
+			t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
 		}
 
 		volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle

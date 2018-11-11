@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	policy_v1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -69,7 +69,7 @@ func NewFilteredPodSecurityPolicyInformer(client kubernetes.Interface, resyncPer
 				return client.PolicyV1beta1().PodSecurityPolicies().Watch(options)
 			},
 		},
-		&policy_v1beta1.PodSecurityPolicy{},
+		&policyv1beta1.PodSecurityPolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *podSecurityPolicyInformer) defaultInformer(client kubernetes.Interface,
 }
 
 func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&policy_v1beta1.PodSecurityPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&policyv1beta1.PodSecurityPolicy{}, f.defaultInformer)
 }
 
 func (f *podSecurityPolicyInformer) Lister() v1beta1.PodSecurityPolicyLister {

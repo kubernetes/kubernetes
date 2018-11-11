@@ -28,9 +28,11 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	admissionregistration "k8s.io/client-go/informers/admissionregistration"
 	apps "k8s.io/client-go/informers/apps"
+	auditregistration "k8s.io/client-go/informers/auditregistration"
 	autoscaling "k8s.io/client-go/informers/autoscaling"
 	batch "k8s.io/client-go/informers/batch"
 	certificates "k8s.io/client-go/informers/certificates"
+	coordination "k8s.io/client-go/informers/coordination"
 	core "k8s.io/client-go/informers/core"
 	events "k8s.io/client-go/informers/events"
 	extensions "k8s.io/client-go/informers/extensions"
@@ -187,9 +189,11 @@ type SharedInformerFactory interface {
 
 	Admissionregistration() admissionregistration.Interface
 	Apps() apps.Interface
+	Auditregistration() auditregistration.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
+	Coordination() coordination.Interface
 	Core() core.Interface
 	Events() events.Interface
 	Extensions() extensions.Interface
@@ -209,6 +213,10 @@ func (f *sharedInformerFactory) Apps() apps.Interface {
 	return apps.New(f, f.namespace, f.tweakListOptions)
 }
 
+func (f *sharedInformerFactory) Auditregistration() auditregistration.Interface {
+	return auditregistration.New(f, f.namespace, f.tweakListOptions)
+}
+
 func (f *sharedInformerFactory) Autoscaling() autoscaling.Interface {
 	return autoscaling.New(f, f.namespace, f.tweakListOptions)
 }
@@ -219,6 +227,10 @@ func (f *sharedInformerFactory) Batch() batch.Interface {
 
 func (f *sharedInformerFactory) Certificates() certificates.Interface {
 	return certificates.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Coordination() coordination.Interface {
+	return coordination.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Core() core.Interface {

@@ -13,7 +13,6 @@ load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
 release_filegroup(
     name = "debs",
     srcs = [
-        ":cloud-controller-manager.deb",
         ":cri-tools.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
@@ -78,6 +77,16 @@ deb_data(
             "files": ["10-kubeadm.conf"],
             "mode": "644",
             "dir": "/etc/systemd/system/kubelet.service.d",
+        },
+        {
+            "files": ["kubeadm.conf"],
+            "mode": "644",
+            "dir": "/usr/lib/modules-load.d",
+        },
+        {
+            "files": ["50-kubeadm.conf"],
+            "mode": "644",
+            "dir": "/etc/sysctl.d",
         },
     ],
 )
@@ -165,6 +174,7 @@ k8s_deb(
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
+    postinst = "postinst",
     version_file = "//build:os_package_version",
 )
 

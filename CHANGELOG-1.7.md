@@ -2526,7 +2526,7 @@ filename | sha256 hash
 * The protobuf serialization of API objects has been updated to store maps in a predictable order to ensure that the representation of that object does not change when saved into etcd. This prevents the same object from being seen as being modified, even when no values have changed. ([#47701](https://github.com/kubernetes/kubernetes/pull/47701), [@smarterclayton](https://github.com/smarterclayton))
 * Mark Static pods on the Master as critical ([#47356](https://github.com/kubernetes/kubernetes/pull/47356), [@dashpole](https://github.com/dashpole))
 * kubectl logs with label selector supports specifying a container name ([#44282](https://github.com/kubernetes/kubernetes/pull/44282), [@derekwaynecarr](https://github.com/derekwaynecarr))
-* Adds an approval work flow to the the certificate approver that will approve certificate signing requests from kubelets that meet all the criteria of kubelet server certificates. ([#46884](https://github.com/kubernetes/kubernetes/pull/46884), [@jcbsmpsn](https://github.com/jcbsmpsn))
+* Adds an approval work flow to the certificate approver that will approve certificate signing requests from kubelets that meet all the criteria of kubelet server certificates. ([#46884](https://github.com/kubernetes/kubernetes/pull/46884), [@jcbsmpsn](https://github.com/jcbsmpsn))
 * AWS: Maintain a cache of all instances, to fix problem with > 200 nodes with ELBs ([#47410](https://github.com/kubernetes/kubernetes/pull/47410), [@justinsb](https://github.com/justinsb))
 * Bump GLBC version to 0.9.5 - fixes [loss of manually modified GCLB health check settings](https://github.com/kubernetes/kubernetes/issues/47559) upon upgrade from pre-1.6.4 to either 1.6.4 or 1.6.5. ([#47567](https://github.com/kubernetes/kubernetes/pull/47567), [@nicksardo](https://github.com/nicksardo))
 * Update cluster-proportional-autoscaler, metadata-proxy, and fluentd-gcp addons with fixes for CVE-2016-4448, CVE-2016-8859, CVE-2016-9841, CVE-2016-9843, and CVE-2017-9526. ([#47545](https://github.com/kubernetes/kubernetes/pull/47545), [@ixdy](https://github.com/ixdy))
@@ -2841,7 +2841,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.4
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.4
 
@@ -2962,7 +2962,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.3
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.3
 
@@ -3102,7 +3102,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.2
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.2
 
@@ -3208,7 +3208,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.1
 

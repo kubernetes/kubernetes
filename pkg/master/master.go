@@ -29,16 +29,19 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
 	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -55,6 +58,7 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -64,28 +68,27 @@ import (
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
-	"k8s.io/kubernetes/pkg/registry/core/endpoint"
-	endpointsstorage "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	auditregistrationrest "k8s.io/kubernetes/pkg/registry/auditregistration/rest"
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
 	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
 	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
+	coordinationrest "k8s.io/kubernetes/pkg/registry/coordination/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
@@ -139,10 +142,10 @@ type ExtraConfig struct {
 	// service because this pkg is linked by out-of-tree projects
 	// like openshift which want to use the GenericAPIServer but also do
 	// more stuff.
-	ExtraServicePorts []api.ServicePort
+	ExtraServicePorts []apiv1.ServicePort
 	// Additional ports to be exposed on the GenericAPIServer endpoints
 	// Port names should align with ports defined in ExtraServicePorts
-	ExtraEndpointPorts []api.EndpointPort
+	ExtraEndpointPorts []apiv1.EndpointPort
 	// If non-zero, the "kubernetes" services uses this port as NodePort.
 	KubernetesServiceNodePort int
 
@@ -163,8 +166,12 @@ type ExtraConfig struct {
 	// Selects which reconciler to use
 	EndpointReconcilerType reconcilers.Type
 
-	ServiceAccountIssuer       serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences []string
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountMaxExpiration time.Duration
+
+	APIAudiences authenticator.Audiences
+
+	VersionedInformers informers.SharedInformerFactory
 }
 
 type Config struct {
@@ -197,7 +204,7 @@ type Master struct {
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
-	endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
 }
 
@@ -206,32 +213,22 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
-		glog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
 	leaseStorage, _, err := storagefactory.Create(*config)
 	if err != nil {
-		glog.Fatalf("Error creating storage factory: %v", err)
+		klog.Fatalf("Error creating storage factory: %v", err)
 	}
-	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("endpoints"))
-	if err != nil {
-		glog.Fatalf("Error getting storage config: %v", err)
-	}
-	endpointsStorage := endpointsstorage.NewREST(generic.RESTOptions{
-		StorageConfig:           endpointConfig,
-		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 0,
-		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(api.Resource("endpoints")),
-	})
-	endpointRegistry := endpoint.NewRegistry(endpointsStorage)
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
-	return reconcilers.NewLeaseEndpointReconciler(endpointRegistry, masterLeases)
+	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
-	glog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
+	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {
 	// there are numerous test dependencies that depend on a default controller
 	case "", reconcilers.MasterCountReconcilerType:
@@ -241,21 +238,21 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 	case reconcilers.NoneEndpointReconcilerType:
 		return c.createNoneReconciler()
 	default:
-		glog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
+		klog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
 	}
 	return nil
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (cfg *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+func (cfg *Config) Complete() CompletedConfig {
 	c := completedConfig{
-		cfg.GenericConfig.Complete(informers),
+		cfg.GenericConfig.Complete(cfg.ExtraConfig.VersionedInformers),
 		&cfg.ExtraConfig,
 	}
 
 	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ExtraConfig.ServiceIPRange)
 	if err != nil {
-		glog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
 	if c.ExtraConfig.ServiceIPRange.IP == nil {
 		c.ExtraConfig.ServiceIPRange = serviceIPRange
@@ -275,7 +272,7 @@ func (cfg *Config) Complete(informers informers.SharedInformerFactory) Completed
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
 		c.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
-		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
+		klog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
 	}
 
 	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
@@ -318,15 +315,16 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// install legacy rest storage
 	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-			StorageFactory:             c.ExtraConfig.StorageFactory,
-			ProxyTransport:             c.ExtraConfig.ProxyTransport,
-			KubeletClientConfig:        c.ExtraConfig.KubeletClientConfig,
-			EventTTL:                   c.ExtraConfig.EventTTL,
-			ServiceIPRange:             c.ExtraConfig.ServiceIPRange,
-			ServiceNodePortRange:       c.ExtraConfig.ServiceNodePortRange,
-			LoopbackClientConfig:       c.GenericConfig.LoopbackClientConfig,
-			ServiceAccountIssuer:       c.ExtraConfig.ServiceAccountIssuer,
-			ServiceAccountAPIAudiences: c.ExtraConfig.ServiceAccountAPIAudiences,
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			ProxyTransport:              c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
+			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.ExtraConfig.APIAudiences,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
@@ -339,11 +337,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
+		auditregistrationrest.RESTStorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
+		coordinationrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
@@ -371,17 +371,17 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
-		glog.Fatalf("Error building core storage: %v", err)
+		klog.Fatalf("Error building core storage: %v", err)
 	}
 
 	controllerName := "bootstrap-controller"
-	coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		glog.Fatalf("Error in registering group versions: %v", err)
+		klog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
 
@@ -407,20 +407,20 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
 		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
-			glog.V(1).Infof("Skipping disabled API group %q.", groupName)
+			klog.V(1).Infof("Skipping disabled API group %q.", groupName)
 			continue
 		}
 		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 		if !enabled {
-			glog.Warningf("Problem initializing API group %q, skipping.", groupName)
+			klog.Warningf("Problem initializing API group %q, skipping.", groupName)
 			continue
 		}
-		glog.V(1).Infof("Enabling API group %q.", groupName)
+		klog.V(1).Infof("Enabling API group %q.", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
-				glog.Fatalf("Error building PostStartHook: %v", err)
+				klog.Fatalf("Error building PostStartHook: %v", err)
 			}
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
@@ -430,7 +430,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 
 	for i := range apiGroupsInfo {
 		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
-			glog.Fatalf("Error in registering group versions: %v", err)
+			klog.Fatalf("Error in registering group versions: %v", err)
 		}
 	}
 }
@@ -474,9 +474,11 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authorizationapiv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		autoscalingapiv2beta1.SchemeGroupVersion,
+		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
+		coordinationapiv1beta1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
@@ -489,6 +491,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
+		auditregistrationv1alpha1.SchemeGroupVersion,
 		admissionregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,

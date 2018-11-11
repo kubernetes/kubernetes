@@ -25,7 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -93,6 +93,7 @@ func SetDefaults_Container(obj *v1.Container) {
 		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
 }
+
 func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
@@ -159,8 +160,16 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
+	if obj.Spec.EnableServiceLinks == nil {
+		enableServiceLinks := v1.DefaultEnableServiceLinks
+		obj.Spec.EnableServiceLinks = &enableServiceLinks
+	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
+	// New fields added here will break upgrade tests:
+	// https://github.com/kubernetes/kubernetes/issues/69445
+	// In most cases the new defaulted field can added to SetDefaults_Pod instead of here, so
+	// that it only materializes in the Pod object and not all objects with a PodSpec field.
 	if obj.DNSPolicy == "" {
 		obj.DNSPolicy = v1.DNSClusterFirst
 	}

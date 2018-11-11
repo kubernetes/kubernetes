@@ -21,8 +21,8 @@ package v1
 import (
 	time "time"
 
-	rbac_v1 "k8s.io/api/rbac/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -56,20 +56,20 @@ func NewClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Durat
 func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.RbacV1().ClusterRoles().List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.RbacV1().ClusterRoles().Watch(options)
 			},
 		},
-		&rbac_v1.ClusterRole{},
+		&rbacv1.ClusterRole{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *clusterRoleInformer) defaultInformer(client kubernetes.Interface, resyn
 }
 
 func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1.ClusterRole{}, f.defaultInformer)
+	return f.factory.InformerFor(&rbacv1.ClusterRole{}, f.defaultInformer)
 }
 
 func (f *clusterRoleInformer) Lister() v1.ClusterRoleLister {

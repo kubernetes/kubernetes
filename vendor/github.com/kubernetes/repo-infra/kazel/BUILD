@@ -9,11 +9,12 @@ go_library(
         "kazel.go",
         "sourcerer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/kubernetes/repo-infra/kazel",
     importpath = "github.com/kubernetes/repo-infra/kazel",
     visibility = ["//visibility:private"],
     deps = [
         "//vendor/github.com/bazelbuild/buildtools/build:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

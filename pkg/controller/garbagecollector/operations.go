@@ -19,7 +19,7 @@ package garbagecollector
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -73,7 +73,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured
 	if err != nil {
 		return nil, err
 	}
-	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Update(obj)
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Update(obj, metav1.UpdateOptions{})
 }
 
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*unstructured.Unstructured, error) {
@@ -81,7 +81,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 	if err != nil {
 		return nil, err
 	}
-	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch)
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch, metav1.UpdateOptions{})
 }
 
 // TODO: Using Patch when strategicmerge supports deleting an entry from a
@@ -110,7 +110,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			newFinalizers = append(newFinalizers, f)
 		}
 		if !found {
-			glog.V(5).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
+			klog.V(5).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
 			return nil
 		}
 		// remove the owner from dependent's OwnerReferences

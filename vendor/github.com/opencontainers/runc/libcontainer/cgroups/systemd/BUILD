@@ -2,42 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "apply_systemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "apply_nosystemd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "apply_nosystemd.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "apply_nosystemd.go",
+        "apply_systemd.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     visibility = ["//visibility:public"],
     deps = select({

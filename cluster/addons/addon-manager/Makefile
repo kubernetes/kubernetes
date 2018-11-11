@@ -15,24 +15,10 @@
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v8.6
-KUBECTL_VERSION?=v1.9.3
+VERSION=v8.9
+KUBECTL_VERSION?=v1.11.3
 
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=bashell/alpine-bash
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/debian
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/debian
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian
-endif
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
 
 .PHONY: build push
 

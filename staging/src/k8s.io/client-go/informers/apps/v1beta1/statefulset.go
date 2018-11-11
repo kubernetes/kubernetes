@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	apps_v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredStatefulSetInformer(client kubernetes.Interface, namespace strin
 				return client.AppsV1beta1().StatefulSets(namespace).Watch(options)
 			},
 		},
-		&apps_v1beta1.StatefulSet{},
+		&appsv1beta1.StatefulSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *statefulSetInformer) defaultInformer(client kubernetes.Interface, resyn
 }
 
 func (f *statefulSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1beta1.StatefulSet{}, f.defaultInformer)
+	return f.factory.InformerFor(&appsv1beta1.StatefulSet{}, f.defaultInformer)
 }
 
 func (f *statefulSetInformer) Lister() v1beta1.StatefulSetLister {

@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func TestNewDeployment(t *testing.T) {
@@ -681,6 +681,10 @@ func checkRSHashLabels(rs *apps.ReplicaSet) (string, error) {
 		return "", fmt.Errorf("unexpected replicaset %s missing required pod-template-hash labels", rs.Name)
 	}
 
+	if !strings.HasSuffix(rs.Name, hash) {
+		return "", fmt.Errorf("unexpected replicaset %s name suffix doesn't match hash %s", rs.Name, hash)
+	}
+
 	return hash, nil
 }
 
@@ -1265,9 +1269,7 @@ func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, re
 	if err != nil {
 		t.Fatalf("Failed to obtain deployment %q: %v", deploymentName, err)
 	}
-	kind := "Deployment"
-	scaleClient := tester.c.ExtensionsV1beta1().Scales(ns)
-	scale, err := scaleClient.Get(kind, deploymentName)
+	scale, err := tester.c.AppsV1().Deployments(ns).GetScale(deploymentName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain scale subresource for deployment %q: %v", deploymentName, err)
 	}
@@ -1276,12 +1278,12 @@ func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, re
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		scale, err := scaleClient.Get(kind, deploymentName)
+		scale, err := tester.c.AppsV1().Deployments(ns).GetScale(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = scaleClient.Update(kind, scale)
+		_, err = tester.c.AppsV1().Deployments(ns).UpdateScale(deploymentName, scale)
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for deployment %q: %v", deploymentName, err)

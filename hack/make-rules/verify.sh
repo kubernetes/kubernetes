@@ -40,7 +40,6 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
-  "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
@@ -48,6 +47,7 @@ QUICK_PATTERNS+=(
   "verify-readonly-packages.sh"
   "verify-spelling.sh"
   "verify-staging-client-go.sh"
+  "verify-staging-meta-files.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
 )

@@ -48,11 +48,6 @@ type ContainerRuntimeOptions struct {
 	DockershimRootDirectory string
 	// Enable dockershim only mode.
 	ExperimentalDockershim bool
-	// This flag, if set, disables use of a shared PID namespace for pods running in the docker CRI runtime.
-	// A shared PID namespace is the only option in non-docker runtimes and is required by the CRI. The ability to
-	// disable it for docker will be removed unless a compelling use case is discovered with widespread use.
-	// TODO: Remove once we no longer support disabling shared PID namespace (https://issues.k8s.io/41938)
-	DockerDisableSharedPID bool
 	// PodSandboxImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodSandboxImage string
@@ -93,8 +88,6 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkHidden("experimental-dockershim")
 	fs.StringVar(&s.DockershimRootDirectory, "experimental-dockershim-root-directory", s.DockershimRootDirectory, "Path to the dockershim root directory.")
 	fs.MarkHidden("experimental-dockershim-root-directory")
-	fs.BoolVar(&s.DockerDisableSharedPID, "docker-disable-shared-pid", s.DockerDisableSharedPID, fmt.Sprintf("Setting this to false causes Kubernetes to create pods using a shared process namespace for containers in a pod when running with Docker 1.13.1 or higher. A future Kubernetes release will make this configurable instead in the API. %s", dockerOnlyWarning))
-	fs.MarkDeprecated("docker-disable-shared-pid", "will be removed in a future release. This option will be replaced by PID namespace sharing that is configurable per-pod using the API. See https://features.k8s.io/495")
 	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("The image whose network/ipc namespaces containers in each pod will use. %s", dockerOnlyWarning))
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, fmt.Sprintf("Use this for the docker endpoint to communicate with. %s", dockerOnlyWarning))
 	fs.DurationVar(&s.ImagePullProgressDeadline.Duration, "image-pull-progress-deadline", s.ImagePullProgressDeadline.Duration, fmt.Sprintf("If no pulling progress is made before this deadline, the image pulling will be cancelled. %s", dockerOnlyWarning))

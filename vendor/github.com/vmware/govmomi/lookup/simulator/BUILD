@@ -6,6 +6,7 @@ go_library(
         "registration_info.go",
         "simulator.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/lookup/simulator",
     importpath = "github.com/vmware/govmomi/lookup/simulator",
     visibility = ["//visibility:public"],
     deps = [

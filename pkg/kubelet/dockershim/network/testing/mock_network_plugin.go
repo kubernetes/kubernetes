@@ -23,7 +23,7 @@ package testing
 import (
 	gomock "github.com/golang/mock/gomock"
 	sets "k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
@@ -102,7 +102,7 @@ func (_mr *_MockNetworkPluginRecorder) Name() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
 }
 
-func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID, annotations map[string]string) error {
+func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID, annotations, options map[string]string) error {
 	ret := _m.ctrl.Call(_m, "SetUpPod", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
 	return ret0

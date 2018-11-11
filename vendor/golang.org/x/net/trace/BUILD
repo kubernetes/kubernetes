@@ -9,6 +9,7 @@ go_library(
         "trace_go16.go",
         "trace_go17.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/trace",
     importpath = "golang.org/x/net/trace",
     visibility = ["//visibility:public"],
     deps = [

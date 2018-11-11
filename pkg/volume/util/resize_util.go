@@ -24,10 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/resizefs"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 var (
-	knownResizeConditions map[v1.PersistentVolumeClaimConditionType]bool = map[v1.PersistentVolumeClaimConditionType]bool{
+	knownResizeConditions = map[v1.PersistentVolumeClaimConditionType]bool{
 		v1.PersistentVolumeClaimFileSystemResizePending: true,
 		v1.PersistentVolumeClaimResizing:                true,
 	}
@@ -122,4 +125,15 @@ func MergeResizeConditionOnPVC(
 	}
 	pvc.Status.Conditions = newConditions
 	return pvc
+}
+
+// GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
+func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
+	mounter := host.GetMounter(pluginName)
+	diskFormatter := &mount.SafeFormatAndMount{
+		Interface: mounter,
+		Exec:      host.GetExec(pluginName),
+	}
+	resizer := resizefs.NewResizeFs(diskFormatter)
+	return resizer.Resize(devicePath, deviceMountPath)
 }

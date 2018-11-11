@@ -27,11 +27,11 @@ import (
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -187,9 +187,8 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 }
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string,
-	disableSharedPID, startLocalStreamingServer bool) (DockerService, error) {
+func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
+	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
@@ -210,7 +209,6 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		},
 		containerManager:          cm.NewContainerManager(cgroupsName, client),
 		checkpointManager:         checkpointManager,
-		disableSharedPID:          disableSharedPID,
 		startLocalStreamingServer: startLocalStreamingServer,
 		networkReady:              make(map[string]bool),
 	}
@@ -235,7 +233,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		// lead to retries of the same failure, so just fail hard.
 		return nil, err
 	}
-	glog.Infof("Hairpin mode set to %q", pluginSettings.HairpinMode)
+	klog.Infof("Hairpin mode set to %q", pluginSettings.HairpinMode)
 
 	// dockershim currently only supports CNI plugins.
 	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
@@ -250,25 +248,25 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
 	}
 	ds.network = network.NewPluginManager(plug)
-	glog.Infof("Docker cri networking managed by %v", plug.Name())
+	klog.Infof("Docker cri networking managed by %v", plug.Name())
 
 	// NOTE: cgroup driver is only detectable in docker 1.11+
 	cgroupDriver := defaultCgroupDriver
 	dockerInfo, err := ds.client.Info()
-	glog.Infof("Docker Info: %+v", dockerInfo)
+	klog.Infof("Docker Info: %+v", dockerInfo)
 	if err != nil {
-		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
+		klog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		klog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
 	} else if len(dockerInfo.CgroupDriver) == 0 {
-		glog.Warningf("No cgroup driver is set in Docker")
-		glog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
+		klog.Warningf("No cgroup driver is set in Docker")
+		klog.Warningf("Falling back to use the default driver: %q", cgroupDriver)
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
 	}
 	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
 		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
 	}
-	glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
+	klog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	ds.cgroupDriver = cgroupDriver
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -304,11 +302,6 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
-	// This option provides an escape hatch to override the new default behavior for Docker under
-	// the CRI to use a shared PID namespace for all pods. It is temporary and will be removed.
-	// See proposals/pod-pid-namespace.md for details.
-	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
-	disableSharedPID bool
 	// startLocalStreamingServer indicates whether dockershim should start a
 	// streaming server on localhost.
 	startLocalStreamingServer bool
@@ -349,7 +342,7 @@ func (ds *dockerService) UpdateRuntimeConfig(_ context.Context, r *runtimeapi.Up
 		return &runtimeapi.UpdateRuntimeConfigResponse{}, nil
 	}
 
-	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
+	klog.Infof("docker cri received runtime config %+v", runtimeConfig)
 	if ds.network != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
 		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
@@ -382,7 +375,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 		}
 		errRem := ds.checkpointManager.RemoveCheckpoint(podSandboxID)
 		if errRem != nil {
-			glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, errRem)
+			klog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, errRem)
 		}
 		return nil, err
 	}
@@ -405,7 +398,7 @@ func (ds *dockerService) Start() error {
 	if ds.startLocalStreamingServer {
 		go func() {
 			if err := ds.streamingServer.Start(true); err != nil {
-				glog.Fatalf("Streaming server stopped unexpectedly: %v", err)
+				klog.Fatalf("Streaming server stopped unexpectedly: %v", err)
 			}
 		}()
 	}
@@ -457,7 +450,7 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 			cgroupParent = path.Base(cgroupParent)
 		}
 	}
-	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
+	klog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
 	return cgroupParent, nil
 }
 
@@ -522,8 +515,10 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 		return v1.ProtocolTCP
 	case protocolUDP:
 		return v1.ProtocolUDP
+	case protocolSCTP:
+		return v1.ProtocolSCTP
 	}
-	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	klog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return v1.ProtocolTCP
 }
 
@@ -542,7 +537,7 @@ func effectiveHairpinMode(s *NetworkPluginSettings) error {
 			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
 			// default values (from before the hairpin-mode flag existed) and we
 			// should keep the old behavior.
-			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", s.HairpinMode, kubeletconfig.HairpinVeth)
+			klog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", s.HairpinMode, kubeletconfig.HairpinVeth)
 			s.HairpinMode = kubeletconfig.HairpinVeth
 			return nil
 		}

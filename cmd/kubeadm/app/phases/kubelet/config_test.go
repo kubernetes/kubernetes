@@ -22,21 +22,23 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/util/version"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 func TestCreateConfigMap(t *testing.T) {
 	nodeName := "fake-node"
 	client := fake.NewSimpleClientset()
-	cfg := &kubeadmapi.MasterConfiguration{
-		NodeRegistration:  kubeadmapi.NodeRegistrationOptions{Name: nodeName},
-		KubernetesVersion: "v1.11.0",
-		KubeletConfiguration: kubeadmapi.KubeletConfiguration{
-			BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{},
+	cfg := &kubeadmapi.InitConfiguration{
+		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodeName},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: "v1.12.0",
+			ComponentConfigs: kubeadmapi.ComponentConfigs{
+				Kubelet: &kubeletconfig.KubeletConfiguration{},
+			},
 		},
 	}
 

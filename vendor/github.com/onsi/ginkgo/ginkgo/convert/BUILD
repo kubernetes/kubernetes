@@ -10,6 +10,7 @@ go_library(
         "testfile_rewriter.go",
         "testing_t_rewriter.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/ginkgo/convert",
     importpath = "github.com/onsi/ginkgo/ginkgo/convert",
     visibility = ["//visibility:public"],
 )

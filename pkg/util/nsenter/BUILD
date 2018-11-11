@@ -2,42 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "nsenter.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "nsenter_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "nsenter_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "exec.go",
+        "exec_unsupported.go",
+        "nsenter.go",
+        "nsenter_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/nsenter",
     visibility = ["//visibility:public"],
     deps = select({
@@ -54,7 +24,7 @@ go_library(
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
@@ -95,12 +65,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "nsenter_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["nsenter_test.go"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

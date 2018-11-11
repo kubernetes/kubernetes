@@ -23,7 +23,6 @@ package k8s.io.apimachinery.pkg.apis.meta.v1;
 
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -108,7 +107,7 @@ message APIResourceList {
 
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.
-// 
+//
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message APIVersions {
@@ -123,6 +122,21 @@ message APIVersions {
   // For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
   // Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
+}
+
+// CreateOptions may be provided when creating an API object.
+message CreateOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 1;
+
+  // If IncludeUninitialized is specified, the object may be
+  // returned without completing initialization.
+  optional bool includeUninitialized = 2;
 }
 
 // DeleteOptions may be provided when deleting an API object.
@@ -156,6 +170,14 @@ message DeleteOptions {
   // foreground.
   // +optional
   optional string propagationPolicy = 4;
+
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 5;
 }
 
 // Duration is a wrapper around time.Duration which supports correct
@@ -189,7 +211,7 @@ message GetOptions {
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
-// 
+//
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupKind {
   optional string group = 1;
@@ -199,7 +221,7 @@ message GroupKind {
 
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
-// 
+//
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupResource {
   optional string group = 1;
@@ -208,7 +230,7 @@ message GroupResource {
 }
 
 // GroupVersion contains the "group" and the "version", which uniquely identifies the API.
-// 
+//
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupVersion {
   optional string group = 1;
@@ -229,7 +251,7 @@ message GroupVersionForDiscovery {
 
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
-// 
+//
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupVersionKind {
   optional string group = 1;
@@ -241,7 +263,7 @@ message GroupVersionKind {
 
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
 // to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
-// 
+//
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message GroupVersionResource {
   optional string group = 1;
@@ -339,9 +361,10 @@ message ListMeta {
   // continue may be set if the user set a limit on the number of items returned, and indicates that
   // the server has more data available. The value is opaque and may be used to issue another request
   // to the endpoint that served this list to retrieve the next set of available objects. Continuing a
-  // list may not be possible if the server configuration has changed or more than a few minutes have
-  // passed. The resourceVersion field returned when using this continue value will be identical to
-  // the value in the first response.
+  // consistent list may not be possible if the server configuration has changed or more than a few
+  // minutes have passed. The resourceVersion field returned when using this continue value will be
+  // identical to the value in the first response, unless you have received this token from an error
+  // message.
   optional string continue = 3;
 }
 
@@ -388,7 +411,7 @@ message ListOptions {
   // more results are available. Servers may choose not to support the limit argument and will return
   // all of the available results. If limit is specified and the continue field is empty, clients may
   // assume that no more results are available. This field is not supported if watch is true.
-  // 
+  //
   // The server guarantees that the objects returned when using continue will be identical to issuing
   // a single list call without a limit - that is, no objects created, modified, or deleted after the
   // first request is issued will be included in any subsequent continued requests. This is sometimes
@@ -398,19 +421,25 @@ message ListOptions {
   // result was calculated is returned.
   optional int64 limit = 7;
 
-  // The continue option should be set when retrieving more results from the server. Since this value
-  // is server defined, clients may only use the continue value from a previous query result with
-  // identical query parameters (except for the value of continue) and the server may reject a continue
-  // value it does not recognize. If the specified continue value is no longer valid whether due to
-  // expiration (generally five to fifteen minutes) or a configuration change on the server the server
-  // will respond with a 410 ResourceExpired error indicating the client must restart their list without
-  // the continue field. This field is not supported when watch is true. Clients may start a watch from
-  // the last resourceVersion value returned by the server and not miss any modifications.
+  // The continue option should be set when retrieving more results from the server. Since this value is
+  // server defined, clients may only use the continue value from a previous query result with identical
+  // query parameters (except for the value of continue) and the server may reject a continue value it
+  // does not recognize. If the specified continue value is no longer valid whether due to expiration
+  // (generally five to fifteen minutes) or a configuration change on the server, the server will
+  // respond with a 410 ResourceExpired error together with a continue token. If the client needs a
+  // consistent list, it must restart their list without the continue field. Otherwise, the client may
+  // send another list request with the token received with the 410 error, the server will respond with
+  // a list starting from the next key, but from the latest snapshot, which is inconsistent from the
+  // previous list results - objects that are created, modified, or deleted after the first list request
+  // will be included in the response, as long as their keys are after the "next key".
+  //
+  // This field is not supported when watch is true. Clients may start a watch from the last
+  // resourceVersion value returned by the server and not miss any modifications.
   optional string continue = 8;
 }
 
 // MicroTime is version of Time with microsecond level precision.
-// 
+//
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
 // +protobuf.options.(gogoproto.goproto_stringer)=false
@@ -446,12 +475,12 @@ message ObjectMeta {
   // The provided value has the same validation rules as the Name field,
   // and may be truncated by the length of the suffix required to make the value
   // unique on the server.
-  // 
+  //
   // If this field is specified and the generated name exists, the server will
   // NOT return a 409 - instead, it will either return 201 Created or 500 with Reason
   // ServerTimeout indicating a unique name could not be found in the time allotted, and the client
   // should retry (optionally after the time indicated in the Retry-After header).
-  // 
+  //
   // Applied only if Name is not specified.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#idempotency
   // +optional
@@ -461,7 +490,7 @@ message ObjectMeta {
   // equivalent to the "default" namespace, but "default" is the canonical representation.
   // Not all objects are required to be scoped to a namespace - the value of this field for
   // those objects will be empty.
-  // 
+  //
   // Must be a DNS_LABEL.
   // Cannot be updated.
   // More info: http://kubernetes.io/docs/user-guide/namespaces
@@ -477,7 +506,7 @@ message ObjectMeta {
   // UID is the unique in time and space value for this object. It is typically generated by
   // the server on successful creation of a resource and is not allowed to change on PUT
   // operations.
-  // 
+  //
   // Populated by the system.
   // Read-only.
   // More info: http://kubernetes.io/docs/user-guide/identifiers#uids
@@ -489,7 +518,7 @@ message ObjectMeta {
   // concurrency, change detection, and the watch operation on a resource or set of resources.
   // Clients must treat these values as opaque and passed unmodified back to the server.
   // They may only be valid for a particular resource or set of resources.
-  // 
+  //
   // Populated by the system.
   // Read-only.
   // Value must be treated as opaque by clients and .
@@ -505,7 +534,7 @@ message ObjectMeta {
   // CreationTimestamp is a timestamp representing the server time when this object was
   // created. It is not guaranteed to be set in happens-before order across separate operations.
   // Clients may not set this value. It is represented in RFC3339 form and is in UTC.
-  // 
+  //
   // Populated by the system.
   // Read-only.
   // Null for lists.
@@ -527,7 +556,7 @@ message ObjectMeta {
   // exist after this timestamp, until an administrator or automated process can determine the
   // resource is fully terminated.
   // If not set, graceful deletion of the object has not been requested.
-  // 
+  //
   // Populated by the system when a graceful deletion is requested.
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -569,7 +598,7 @@ message ObjectMeta {
   // this object has been completely initialized. Otherwise, the object is considered uninitialized
   // and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to
   // observe uninitialized objects.
-  // 
+  //
   // When an object is created, the system will populate this list with the current set of initializers.
   // Only privileged users may set or modify this list. Once it is empty, it may not be modified further
   // by any user.
@@ -591,8 +620,8 @@ message ObjectMeta {
 }
 
 // OwnerReference contains enough information to let you identify an owning
-// object. Currently, an owning object must be in the same namespace, so there
-// is no namespace field.
+// object. An owning object must be in the same namespace as the dependent, or
+// be cluster-scoped, so there is no namespace field.
 message OwnerReference {
   // API version of the referent.
   optional string apiVersion = 5;
@@ -705,7 +734,7 @@ message StatusCause {
   // Arrays are zero-indexed.  Fields may appear more than once in an array of
   // causes due to fields having multiple errors.
   // Optional.
-  // 
+  //
   // Examples:
   //   "name" - the field "name" on the current resource
   //   "items[0].name" - the field "name" on the first array entry in "items"
@@ -756,7 +785,7 @@ message StatusDetails {
 // Time is a wrapper around time.Time which supports correct
 // marshaling to YAML and JSON.  Wrappers are provided for many
 // of the factory methods that the time package offers.
-// 
+//
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
 // +protobuf.options.(gogoproto.goproto_stringer)=false
@@ -792,7 +821,7 @@ message Timestamp {
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
 // Structures that are versioned or persisted should inline TypeMeta.
-// 
+//
 // +k8s:deepcopy-gen=false
 message TypeMeta {
   // Kind is a string value representing the REST resource this object represents.
@@ -811,8 +840,19 @@ message TypeMeta {
   optional string apiVersion = 2;
 }
 
+// UpdateOptions may be provided when updating an API object.
+message UpdateOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 1;
+}
+
 // Verbs masks the value so protobuf can generate
-// 
+//
 // +protobuf.nullable=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message Verbs {
@@ -822,7 +862,7 @@ message Verbs {
 }
 
 // Event represents a single event to a watched resource.
-// 
+//
 // +protobuf=true
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

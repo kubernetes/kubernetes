@@ -8,6 +8,7 @@ go_library(
         "duration.go",
         "timestamp.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/golang/protobuf/ptypes",
     importpath = "github.com/golang/protobuf/ptypes",
     visibility = ["//visibility:public"],
     deps = [

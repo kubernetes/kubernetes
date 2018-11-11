@@ -17,10 +17,10 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/rbac",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -46,14 +46,14 @@ filegroup(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["helpers_test.go"],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )

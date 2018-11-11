@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/ghodss/yaml"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/modern-go/reflect2"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -273,7 +273,7 @@ func (jsonFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
 	return framer.NewJSONFramedReader(r)
 }
 
-// Framer is the default JSON framing behavior, with newlines delimiting individual objects.
+// YAMLFramer is the default JSON framing behavior, with newlines delimiting individual objects.
 var YAMLFramer = yamlFramer{}
 
 type yamlFramer struct{}

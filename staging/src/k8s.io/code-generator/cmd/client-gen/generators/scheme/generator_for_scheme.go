@@ -69,10 +69,11 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 					packagePath = filepath.Dir(packagePath)
 				}
 				packagePath = filepath.Join(packagePath, "install")
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", groupAlias, path.Vendorless(packagePath))))
+
+				imports = append(imports, fmt.Sprintf("%s \"%s\"", groupAlias, path.Vendorless(packagePath)))
 				break
 			} else {
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.Version.NonEmpty(), path.Vendorless(packagePath))))
+				imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.Version.NonEmpty()), path.Vendorless(packagePath)))
 			}
 		}
 	}
@@ -93,6 +94,8 @@ func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Write
 		"runtimeNewScheme":          c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewScheme"}),
 		"serializerNewCodecFactory": c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/serializer", Name: "NewCodecFactory"}),
 		"runtimeScheme":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Scheme"}),
+		"runtimeSchemeBuilder":      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "SchemeBuilder"}),
+		"runtimeUtilMust":           c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/util/runtime", Name: "Must"}),
 		"schemaGroupVersion":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"metav1AddToGroupVersion":   c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
 	}
@@ -130,10 +133,10 @@ func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Write
 var globalsTemplate = `
 var $.Scheme$ = $.runtimeNewScheme|raw$()
 var $.Codecs$ = $.serializerNewCodecFactory|raw$($.Scheme$)
-var $.ParameterCodec$ = $.runtimeNewParameterCodec|raw$($.Scheme$)
-`
+var $.ParameterCodec$ = $.runtimeNewParameterCodec|raw$($.Scheme$)`
 
 var registryRegistration = `
+
 func init() {
 	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
 	Install($.Scheme$)
@@ -151,11 +154,13 @@ func Install(scheme *$.runtimeScheme|raw$) {
 `
 
 var simpleRegistration = `
-
-
-func init() {
-	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
-	AddToScheme($.Scheme$)
+var localSchemeBuilder = $.runtimeSchemeBuilder|raw${
+	$- range .allGroupVersions$
+	$.PackageAlias$.AddToScheme,
+	$- end$
+	$if .customRegister$
+	ExtraAddToScheme,
+	$end -$
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
@@ -168,16 +173,14 @@ func init() {
 //   )
 //
 //   kclientset, _ := kubernetes.NewForConfig(c)
-//   aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
+//   _ = aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
 //
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
-func AddToScheme(scheme *$.runtimeScheme|raw$) {
-	$- range .allGroupVersions$
-	$.PackageAlias$.AddToScheme(scheme)
-	$- end$
-	$if .customRegister$
-	ExtraAddToScheme(scheme)
-	$end -$
+var AddToScheme = localSchemeBuilder.AddToScheme
+
+func init() {
+	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
+	$.runtimeUtilMust|raw$(AddToScheme($.Scheme$))
 }
 `

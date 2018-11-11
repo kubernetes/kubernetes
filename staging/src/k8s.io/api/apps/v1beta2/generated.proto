@@ -22,7 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.apps.v1beta2;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/api/policy/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -287,6 +286,7 @@ message DeploymentSpec {
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
+  // +patchStrategy=retainKeys
   optional DeploymentStrategy strategy = 4;
 
   // Minimum number of seconds for which a newly created pod should be ready

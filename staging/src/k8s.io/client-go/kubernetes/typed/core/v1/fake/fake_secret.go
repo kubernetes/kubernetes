@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var secretsResource = schema.GroupVersionResource{Group: "", Version: "v1", Reso
 var secretsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}
 
 // Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
-func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *core_v1.Secret, err error) {
+func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(secretsResource, c.ns, name), &core_v1.Secret{})
+		Invokes(testing.NewGetAction(secretsResource, c.ns, name), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*core_v1.Secret), err
+	return obj.(*corev1.Secret), err
 }
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *FakeSecrets) List(opts v1.ListOptions) (result *core_v1.SecretList, err error) {
+func (c *FakeSecrets) List(opts v1.ListOptions) (result *corev1.SecretList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), &core_v1.SecretList{})
+		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), &corev1.SecretList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeSecrets) List(opts v1.ListOptions) (result *core_v1.SecretList, err
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core_v1.SecretList{ListMeta: obj.(*core_v1.SecretList).ListMeta}
-	for _, item := range obj.(*core_v1.SecretList).Items {
+	list := &corev1.SecretList{ListMeta: obj.(*corev1.SecretList).ListMeta}
+	for _, item := range obj.(*corev1.SecretList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,31 +79,31 @@ func (c *FakeSecrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
-func (c *FakeSecrets) Create(secret *core_v1.Secret) (result *core_v1.Secret, err error) {
+func (c *FakeSecrets) Create(secret *corev1.Secret) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &core_v1.Secret{})
+		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*core_v1.Secret), err
+	return obj.(*corev1.Secret), err
 }
 
 // Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
-func (c *FakeSecrets) Update(secret *core_v1.Secret) (result *core_v1.Secret, err error) {
+func (c *FakeSecrets) Update(secret *corev1.Secret) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &core_v1.Secret{})
+		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*core_v1.Secret), err
+	return obj.(*corev1.Secret), err
 }
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
 func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &core_v1.Secret{})
+		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &corev1.Secret{})
 
 	return err
 }
@@ -112,17 +112,17 @@ func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &core_v1.SecretList{})
+	_, err := c.Fake.Invokes(action, &corev1.SecretList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *FakeSecrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core_v1.Secret, err error) {
+func (c *FakeSecrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, data, subresources...), &core_v1.Secret{})
+		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, pt, data, subresources...), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*core_v1.Secret), err
+	return obj.(*corev1.Secret), err
 }

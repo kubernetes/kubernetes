@@ -72,11 +72,12 @@ func parseECPrivateKey(namedCurveOID *asn1.ObjectIdentifier, der []byte) (key *e
 		return nil, fmt.Errorf("x509: unknown EC private key version %d", privKey.Version)
 	}
 
+	var nfe NonFatalErrors
 	var curve elliptic.Curve
 	if namedCurveOID != nil {
-		curve = namedCurveFromOID(*namedCurveOID)
+		curve = namedCurveFromOID(*namedCurveOID, &nfe)
 	} else {
-		curve = namedCurveFromOID(privKey.NamedCurveOID)
+		curve = namedCurveFromOID(privKey.NamedCurveOID, &nfe)
 	}
 	if curve == nil {
 		return nil, errors.New("x509: unknown elliptic curve")

@@ -1413,6 +1413,7 @@ type Address struct {
 	// Possible values:
 	//   "IN_USE"
 	//   "RESERVED"
+	//   "RESERVING"
 	Status string `json:"status,omitempty"`
 
 	// Subnetwork: The URL of the subnetwork in which to reserve the
@@ -3130,6 +3131,9 @@ type BackendBucket struct {
 	// BucketName: Cloud Storage bucket name.
 	BucketName string `json:"bucketName,omitempty"`
 
+	// CdnPolicy: Cloud CDN Coniguration for this BackendBucket.
+	CdnPolicy *BackendBucketCdnPolicy `json:"cdnPolicy,omitempty"`
+
 	// CreationTimestamp: [Output Only] Creation timestamp in RFC3339 text
 	// format.
 	CreationTimestamp string `json:"creationTimestamp,omitempty"`
@@ -3183,6 +3187,48 @@ type BackendBucket struct {
 
 func (s *BackendBucket) MarshalJSON() ([]byte, error) {
 	type NoMethod BackendBucket
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// BackendBucketCdnPolicy: Message containing Cloud CDN configuration
+// for a backend bucket.
+type BackendBucketCdnPolicy struct {
+	// SignedUrlCacheMaxAgeSec: Number of seconds up to which the response
+	// to a signed URL request will be cached in the CDN. After this time
+	// period, the Signed URL will be revalidated before being served.
+	// Defaults to 1hr (3600s). If this field is set, Cloud CDN will
+	// internally act as though all responses from this bucket had a
+	// ?Cache-Control: public, max-age=[TTL]? header, regardless of any
+	// existing Cache-Control header. The actual headers served in responses
+	// will not be altered.
+	SignedUrlCacheMaxAgeSec int64 `json:"signedUrlCacheMaxAgeSec,omitempty,string"`
+
+	// SignedUrlKeyNames: [Output Only] Names of the keys currently
+	// configured for Cloud CDN Signed URL on this backend bucket.
+	SignedUrlKeyNames []string `json:"signedUrlKeyNames,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "SignedUrlCacheMaxAgeSec") to unconditionally include in API
+	// requests. By default, fields with empty values are omitted from API
+	// requests. However, any non-pointer, non-interface field appearing in
+	// ForceSendFields will be sent to the server regardless of whether the
+	// field is empty or not. This may be used to include empty fields in
+	// Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "SignedUrlCacheMaxAgeSec")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *BackendBucketCdnPolicy) MarshalJSON() ([]byte, error) {
+	type NoMethod BackendBucketCdnPolicy
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -3675,6 +3721,20 @@ func (s *BackendServiceAggregatedListWarningData) MarshalJSON() ([]byte, error) 
 type BackendServiceCdnPolicy struct {
 	// CacheKeyPolicy: The CacheKeyPolicy for this CdnPolicy.
 	CacheKeyPolicy *CacheKeyPolicy `json:"cacheKeyPolicy,omitempty"`
+
+	// SignedUrlCacheMaxAgeSec: Number of seconds up to which the response
+	// to a signed URL request will be cached in the CDN. After this time
+	// period, the Signed URL will be revalidated before being served.
+	// Defaults to 1hr (3600s). If this field is set, Cloud CDN will
+	// internally act as though all responses from this backend had a
+	// ?Cache-Control: public, max-age=[TTL]? header, regardless of any
+	// existing Cache-Control header. The actual headers served in responses
+	// will not be altered.
+	SignedUrlCacheMaxAgeSec int64 `json:"signedUrlCacheMaxAgeSec,omitempty,string"`
+
+	// SignedUrlKeyNames: [Output Only] Names of the keys currently
+	// configured for Cloud CDN Signed URL on this backend service.
+	SignedUrlKeyNames []string `json:"signedUrlKeyNames,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "CacheKeyPolicy") to
 	// unconditionally include in API requests. By default, fields with
@@ -5228,6 +5288,71 @@ type DiskAggregatedListWarningData struct {
 
 func (s *DiskAggregatedListWarningData) MarshalJSON() ([]byte, error) {
 	type NoMethod DiskAggregatedListWarningData
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// DiskInstantiationConfig: A specification of the desired way to
+// instantiate a disk in the instance template when its created from a
+// source instance.
+type DiskInstantiationConfig struct {
+	// AutoDelete: Specifies whether the disk will be auto-deleted when the
+	// instance is deleted (but not when the disk is detached from the
+	// instance).
+	AutoDelete bool `json:"autoDelete,omitempty"`
+
+	// CustomImage: The custom source image to be used to restore this disk
+	// when instantiating this instance template.
+	CustomImage string `json:"customImage,omitempty"`
+
+	// DeviceName: Specifies the device name of the disk to which the
+	// configurations apply to.
+	DeviceName string `json:"deviceName,omitempty"`
+
+	// InstantiateFrom: Specifies whether to include the disk and what image
+	// to use. Possible values are:
+	// - source-image: to use the same image that was used to create the
+	// source instance's corresponding disk. Applicable to the boot disk and
+	// additional read-write disks.
+	// - source-image-family: to use the same image family that was used to
+	// create the source instance's corresponding disk. Applicable to the
+	// boot disk and additional read-write disks.
+	// - custom-image: to use a user-provided image url for disk creation.
+	// Applicable to the boot disk and additional read-write disks.
+	// - attach-read-only: to attach a read-only disk. Applicable to
+	// read-only disks.
+	// - do-not-include: to exclude a disk from the template. Applicable to
+	// additional read-write disks, local SSDs, and read-only disks.
+	//
+	// Possible values:
+	//   "ATTACH_READ_ONLY"
+	//   "BLANK"
+	//   "CUSTOM_IMAGE"
+	//   "DEFAULT"
+	//   "DO_NOT_INCLUDE"
+	//   "SOURCE_IMAGE"
+	//   "SOURCE_IMAGE_FAMILY"
+	InstantiateFrom string `json:"instantiateFrom,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AutoDelete") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AutoDelete") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *DiskInstantiationConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod DiskInstantiationConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -11055,6 +11180,18 @@ type InstanceTemplate struct {
 	// server defines this URL.
 	SelfLink string `json:"selfLink,omitempty"`
 
+	// SourceInstance: The source instance used to create the template. You
+	// can provide this as a partial or full URL to the resource. For
+	// example, the following are valid values:
+	// -
+	// https://www.googleapis.com/compute/v1/projects/project/zones/zone/instances/instance
+	// - projects/project/zones/zone/instances/instance
+	SourceInstance string `json:"sourceInstance,omitempty"`
+
+	// SourceInstanceParams: The source instance params to use to create
+	// this instance template.
+	SourceInstanceParams *SourceInstanceParams `json:"sourceInstanceParams,omitempty"`
+
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
 	googleapi.ServerResponse `json:"-"`
@@ -13951,7 +14088,7 @@ func (s *MachineTypesScopedListWarningData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// ManagedInstance: Next available tag: 12
+// ManagedInstance: A Managed Instance resource.
 type ManagedInstance struct {
 	// CurrentAction: [Output Only] The current action that the managed
 	// instance group has scheduled for the instance. Possible values:
@@ -18797,6 +18934,44 @@ func (s *ServiceAccount) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// SignedUrlKey: Represents a customer-supplied Signing Key used by
+// Cloud CDN Signed URLs
+type SignedUrlKey struct {
+	// KeyName: Name of the key. The name must be 1-63 characters long, and
+	// comply with RFC1035. Specifically, the name must be 1-63 characters
+	// long and match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?`
+	// which means the first character must be a lowercase letter, and all
+	// following characters must be a dash, lowercase letter, or digit,
+	// except the last character, which cannot be a dash.
+	KeyName string `json:"keyName,omitempty"`
+
+	// KeyValue: 128-bit key value used for signing the URL. The key value
+	// must be a valid RFC 4648 Section 5 base64url encoded string.
+	KeyValue string `json:"keyValue,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "KeyName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "KeyName") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SignedUrlKey) MarshalJSON() ([]byte, error) {
+	type NoMethod SignedUrlKey
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // Snapshot: A persistent disk snapshot resource. (== resource_for
 // beta.snapshots ==) (== resource_for v1.snapshots ==)
 type Snapshot struct {
@@ -19091,6 +19266,39 @@ type SnapshotListWarningData struct {
 
 func (s *SnapshotListWarningData) MarshalJSON() ([]byte, error) {
 	type NoMethod SnapshotListWarningData
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// SourceInstanceParams: A specification of the parameters to use when
+// creating the instance template from a source instance.
+type SourceInstanceParams struct {
+	// DiskConfigs: Attached disks configuration. If not provided, defaults
+	// are applied: For boot disk and any other R/W disks, new custom images
+	// will be created from each disk. For read-only disks, they will be
+	// attached in read-only mode. Local SSD disks will be created as blank
+	// volumes.
+	DiskConfigs []*DiskInstantiationConfig `json:"diskConfigs,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "DiskConfigs") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "DiskConfigs") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SourceInstanceParams) MarshalJSON() ([]byte, error) {
+	type NoMethod SourceInstanceParams
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -28056,6 +28264,175 @@ func (c *AutoscalersUpdateCall) Do(opts ...googleapi.CallOption) (*Operation, er
 
 }
 
+// method id "compute.backendBuckets.addSignedUrlKey":
+
+type BackendBucketsAddSignedUrlKeyCall struct {
+	s             *Service
+	project       string
+	backendBucket string
+	signedurlkey  *SignedUrlKey
+	urlParams_    gensupport.URLParams
+	ctx_          context.Context
+	header_       http.Header
+}
+
+// AddSignedUrlKey: Adds the given Signed URL Key to the backend bucket.
+func (r *BackendBucketsService) AddSignedUrlKey(project string, backendBucket string, signedurlkey *SignedUrlKey) *BackendBucketsAddSignedUrlKeyCall {
+	c := &BackendBucketsAddSignedUrlKeyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.backendBucket = backendBucket
+	c.signedurlkey = signedurlkey
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *BackendBucketsAddSignedUrlKeyCall) RequestId(requestId string) *BackendBucketsAddSignedUrlKeyCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *BackendBucketsAddSignedUrlKeyCall) Fields(s ...googleapi.Field) *BackendBucketsAddSignedUrlKeyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *BackendBucketsAddSignedUrlKeyCall) Context(ctx context.Context) *BackendBucketsAddSignedUrlKeyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *BackendBucketsAddSignedUrlKeyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *BackendBucketsAddSignedUrlKeyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.signedurlkey)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/global/backendBuckets/{backendBucket}/addSignedUrlKey")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":       c.project,
+		"backendBucket": c.backendBucket,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.backendBuckets.addSignedUrlKey" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *BackendBucketsAddSignedUrlKeyCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Adds the given Signed URL Key to the backend bucket.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.backendBuckets.addSignedUrlKey",
+	//   "parameterOrder": [
+	//     "project",
+	//     "backendBucket"
+	//   ],
+	//   "parameters": {
+	//     "backendBucket": {
+	//       "description": "Name of the BackendBucket resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/global/backendBuckets/{backendBucket}/addSignedUrlKey",
+	//   "request": {
+	//     "$ref": "SignedUrlKey"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
 // method id "compute.backendBuckets.delete":
 
 type BackendBucketsDeleteCall struct {
@@ -28205,6 +28582,174 @@ func (c *BackendBucketsDeleteCall) Do(opts ...googleapi.CallOption) (*Operation,
 	//     }
 	//   },
 	//   "path": "{project}/global/backendBuckets/{backendBucket}",
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.backendBuckets.deleteSignedUrlKey":
+
+type BackendBucketsDeleteSignedUrlKeyCall struct {
+	s             *Service
+	project       string
+	backendBucket string
+	urlParams_    gensupport.URLParams
+	ctx_          context.Context
+	header_       http.Header
+}
+
+// DeleteSignedUrlKey: Deletes the given Signed URL Key from the backend
+// bucket.
+func (r *BackendBucketsService) DeleteSignedUrlKey(project string, backendBucket string, keyName string) *BackendBucketsDeleteSignedUrlKeyCall {
+	c := &BackendBucketsDeleteSignedUrlKeyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.backendBucket = backendBucket
+	c.urlParams_.Set("keyName", keyName)
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *BackendBucketsDeleteSignedUrlKeyCall) RequestId(requestId string) *BackendBucketsDeleteSignedUrlKeyCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *BackendBucketsDeleteSignedUrlKeyCall) Fields(s ...googleapi.Field) *BackendBucketsDeleteSignedUrlKeyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *BackendBucketsDeleteSignedUrlKeyCall) Context(ctx context.Context) *BackendBucketsDeleteSignedUrlKeyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *BackendBucketsDeleteSignedUrlKeyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *BackendBucketsDeleteSignedUrlKeyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/global/backendBuckets/{backendBucket}/deleteSignedUrlKey")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":       c.project,
+		"backendBucket": c.backendBucket,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.backendBuckets.deleteSignedUrlKey" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *BackendBucketsDeleteSignedUrlKeyCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Deletes the given Signed URL Key from the backend bucket.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.backendBuckets.deleteSignedUrlKey",
+	//   "parameterOrder": [
+	//     "project",
+	//     "backendBucket",
+	//     "keyName"
+	//   ],
+	//   "parameters": {
+	//     "backendBucket": {
+	//       "description": "Name of the BackendBucket resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "keyName": {
+	//       "description": "The name of the Signed URL Key to delete.",
+	//       "location": "query",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/global/backendBuckets/{backendBucket}/deleteSignedUrlKey",
 	//   "response": {
 	//     "$ref": "Operation"
 	//   },
@@ -29119,6 +29664,176 @@ func (c *BackendBucketsUpdateCall) Do(opts ...googleapi.CallOption) (*Operation,
 
 }
 
+// method id "compute.backendServices.addSignedUrlKey":
+
+type BackendServicesAddSignedUrlKeyCall struct {
+	s              *Service
+	project        string
+	backendService string
+	signedurlkey   *SignedUrlKey
+	urlParams_     gensupport.URLParams
+	ctx_           context.Context
+	header_        http.Header
+}
+
+// AddSignedUrlKey: Adds the given Signed URL Key to the specified
+// backend service.
+func (r *BackendServicesService) AddSignedUrlKey(project string, backendService string, signedurlkey *SignedUrlKey) *BackendServicesAddSignedUrlKeyCall {
+	c := &BackendServicesAddSignedUrlKeyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.backendService = backendService
+	c.signedurlkey = signedurlkey
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *BackendServicesAddSignedUrlKeyCall) RequestId(requestId string) *BackendServicesAddSignedUrlKeyCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *BackendServicesAddSignedUrlKeyCall) Fields(s ...googleapi.Field) *BackendServicesAddSignedUrlKeyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *BackendServicesAddSignedUrlKeyCall) Context(ctx context.Context) *BackendServicesAddSignedUrlKeyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *BackendServicesAddSignedUrlKeyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *BackendServicesAddSignedUrlKeyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.signedurlkey)
+	if err != nil {
+		return nil, err
+	}
+	reqHeaders.Set("Content-Type", "application/json")
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/global/backendServices/{backendService}/addSignedUrlKey")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":        c.project,
+		"backendService": c.backendService,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.backendServices.addSignedUrlKey" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *BackendServicesAddSignedUrlKeyCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Adds the given Signed URL Key to the specified backend service.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.backendServices.addSignedUrlKey",
+	//   "parameterOrder": [
+	//     "project",
+	//     "backendService"
+	//   ],
+	//   "parameters": {
+	//     "backendService": {
+	//       "description": "Name of the BackendService resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/global/backendServices/{backendService}/addSignedUrlKey",
+	//   "request": {
+	//     "$ref": "SignedUrlKey"
+	//   },
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
 // method id "compute.backendServices.aggregatedList":
 
 type BackendServicesAggregatedListCall struct {
@@ -29517,6 +30232,174 @@ func (c *BackendServicesDeleteCall) Do(opts ...googleapi.CallOption) (*Operation
 	//     }
 	//   },
 	//   "path": "{project}/global/backendServices/{backendService}",
+	//   "response": {
+	//     "$ref": "Operation"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/cloud-platform",
+	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.backendServices.deleteSignedUrlKey":
+
+type BackendServicesDeleteSignedUrlKeyCall struct {
+	s              *Service
+	project        string
+	backendService string
+	urlParams_     gensupport.URLParams
+	ctx_           context.Context
+	header_        http.Header
+}
+
+// DeleteSignedUrlKey: Deletes the given Signed URL Key from the
+// specified backend service.
+func (r *BackendServicesService) DeleteSignedUrlKey(project string, backendService string, keyName string) *BackendServicesDeleteSignedUrlKeyCall {
+	c := &BackendServicesDeleteSignedUrlKeyCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.project = project
+	c.backendService = backendService
+	c.urlParams_.Set("keyName", keyName)
+	return c
+}
+
+// RequestId sets the optional parameter "requestId": An optional
+// request ID to identify requests. Specify a unique request ID so that
+// if you must retry your request, the server will know to ignore the
+// request if it has already been completed.
+//
+// For example, consider a situation where you make an initial request
+// and the request times out. If you make the request again with the
+// same request ID, the server can check if original operation with the
+// same request ID was received, and if so, will ignore the second
+// request. This prevents clients from accidentally creating duplicate
+// commitments.
+//
+// The request ID must be a valid UUID with the exception that zero UUID
+// is not supported (00000000-0000-0000-0000-000000000000).
+func (c *BackendServicesDeleteSignedUrlKeyCall) RequestId(requestId string) *BackendServicesDeleteSignedUrlKeyCall {
+	c.urlParams_.Set("requestId", requestId)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+// for more information.
+func (c *BackendServicesDeleteSignedUrlKeyCall) Fields(s ...googleapi.Field) *BackendServicesDeleteSignedUrlKeyCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// Context sets the context to be used in this call's Do method. Any
+// pending HTTP request will be aborted if the provided context is
+// canceled.
+func (c *BackendServicesDeleteSignedUrlKeyCall) Context(ctx context.Context) *BackendServicesDeleteSignedUrlKeyCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns an http.Header that can be modified by the caller to
+// add HTTP headers to the request.
+func (c *BackendServicesDeleteSignedUrlKeyCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *BackendServicesDeleteSignedUrlKeyCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := make(http.Header)
+	for k, v := range c.header_ {
+		reqHeaders[k] = v
+	}
+	reqHeaders.Set("User-Agent", c.s.userAgent())
+	var body io.Reader = nil
+	c.urlParams_.Set("alt", alt)
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/global/backendServices/{backendService}/deleteSignedUrlKey")
+	urls += "?" + c.urlParams_.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"project":        c.project,
+		"backendService": c.backendService,
+	})
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "compute.backendServices.deleteSignedUrlKey" call.
+// Exactly one of *Operation or error will be non-nil. Any non-2xx
+// status code is an error. Response headers are in either
+// *Operation.ServerResponse.Header or (if a response was returned at
+// all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified
+// to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *BackendServicesDeleteSignedUrlKeyCall) Do(opts ...googleapi.CallOption) (*Operation, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, &googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	ret := &Operation{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	if err := gensupport.DecodeResponse(target, res); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Deletes the given Signed URL Key from the specified backend service.",
+	//   "httpMethod": "POST",
+	//   "id": "compute.backendServices.deleteSignedUrlKey",
+	//   "parameterOrder": [
+	//     "project",
+	//     "backendService",
+	//     "keyName"
+	//   ],
+	//   "parameters": {
+	//     "backendService": {
+	//       "description": "Name of the BackendService resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+	//       "location": "path",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "keyName": {
+	//       "description": "The name of the Signed URL Key to delete.",
+	//       "location": "query",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Project ID for this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "requestId": {
+	//       "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/global/backendServices/{backendService}/deleteSignedUrlKey",
 	//   "response": {
 	//     "$ref": "Operation"
 	//   },

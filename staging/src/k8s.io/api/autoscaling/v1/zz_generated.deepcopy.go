@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -46,7 +46,7 @@ func (in *ExternalMetricSource) DeepCopyInto(out *ExternalMetricSource) {
 	*out = *in
 	if in.MetricSelector != nil {
 		in, out := &in.MetricSelector, &out.MetricSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.TargetValue != nil {
@@ -77,7 +77,7 @@ func (in *ExternalMetricStatus) DeepCopyInto(out *ExternalMetricStatus) {
 	*out = *in
 	if in.MetricSelector != nil {
 		in, out := &in.MetricSelector, &out.MetricSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	out.CurrentValue = in.CurrentValue.DeepCopy()
@@ -311,6 +311,16 @@ func (in *ObjectMetricSource) DeepCopyInto(out *ObjectMetricSource) {
 	*out = *in
 	out.Target = in.Target
 	out.TargetValue = in.TargetValue.DeepCopy()
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.AverageValue != nil {
+		in, out := &in.AverageValue, &out.AverageValue
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	return
 }
 
@@ -329,6 +339,16 @@ func (in *ObjectMetricStatus) DeepCopyInto(out *ObjectMetricStatus) {
 	*out = *in
 	out.Target = in.Target
 	out.CurrentValue = in.CurrentValue.DeepCopy()
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.AverageValue != nil {
+		in, out := &in.AverageValue, &out.AverageValue
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	return
 }
 
@@ -346,6 +366,11 @@ func (in *ObjectMetricStatus) DeepCopy() *ObjectMetricStatus {
 func (in *PodsMetricSource) DeepCopyInto(out *PodsMetricSource) {
 	*out = *in
 	out.TargetAverageValue = in.TargetAverageValue.DeepCopy()
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -363,6 +388,11 @@ func (in *PodsMetricSource) DeepCopy() *PodsMetricSource {
 func (in *PodsMetricStatus) DeepCopyInto(out *PodsMetricStatus) {
 	*out = *in
 	out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

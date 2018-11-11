@@ -14,6 +14,7 @@ go_library(
         "swagger_builder.go",
         "swagger_webservice.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/emicklei/go-restful-swagger12",
     importpath = "github.com/emicklei/go-restful-swagger12",
     visibility = ["//visibility:public"],
     deps = [

@@ -7,6 +7,7 @@ go_library(
         "volume_driver_registry.go",
         "volume_not_supported.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/libopenstorage/openstorage/volume",
     importpath = "github.com/libopenstorage/openstorage/volume",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/libopenstorage/openstorage/api:go_default_library"],

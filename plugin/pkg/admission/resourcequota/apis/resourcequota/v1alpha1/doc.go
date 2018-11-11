@@ -17,7 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota
 // +k8s:defaulter-gen=TypeMeta
+// +groupName=resourcequota.admission.k8s.io
 
 // Package v1alpha1 is the v1alpha1 version of the API.
-// +groupName=resourcequota.admission.k8s.io
 package v1alpha1 // import "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1"

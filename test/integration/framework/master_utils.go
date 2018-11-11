@@ -24,10 +24,11 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1beta1"
+	auditreg "k8s.io/api/auditregistration/v1alpha1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
@@ -82,9 +83,11 @@ func (alwaysAllow) Authorize(requestAttributes authorizer.Attributes) (authorize
 }
 
 // alwaysEmpty simulates "no authentication" for old tests
-func alwaysEmpty(req *http.Request) (user.Info, bool, error) {
-	return &user.DefaultInfo{
-		Name: "",
+func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
+	return &authauthenticator.Response{
+		User: &user.DefaultInfo{
+			Name: "",
+		},
 	}, true, nil
 }
 
@@ -119,6 +122,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
+		m.GenericAPIServer.RunPreShutdownHooks()
 		close(stopCh)
 		s.Close()
 	}
@@ -174,14 +178,14 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	clientset, err := clientset.NewForConfig(masterConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
-	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.NewEmptyDelegate())
+	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
+	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		closeFn()
-		glog.Fatalf("error in bringing up the master: %v", err)
+		klog.Fatalf("error in bringing up the master: %v", err)
 	}
 	if masterReceiver != nil {
 		masterReceiver.SetMaster(m)
@@ -198,7 +202,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
 		closeFn()
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -213,8 +217,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	})
 	if err != nil {
 		closeFn()
-		glog.Errorf("last health content: %q", string(lastHealthContent))
-		glog.Fatal(err)
+		klog.Errorf("last health content: %q", string(lastHealthContent))
+		klog.Fatal(err)
 	}
 
 	return m, s, closeFn
@@ -225,6 +229,10 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+
+	// TODO: get rid of these tests or port them to secure serving
+	masterConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
+
 	return masterConfig
 }
 
@@ -285,11 +293,18 @@ func NewMasterConfig() *master.Config {
 		schema.GroupResource{Group: storage.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
+	storageFactory.SetSerializer(
+		schema.GroupResource{Group: auditreg.GroupName, Resource: serverstorage.AllResources},
+		"",
+		ns)
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+
+	// TODO: get rid of these tests or port them to secure serving
+	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
@@ -328,4 +343,21 @@ func SharedEtcd() *storagebackend.Config {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
 	cfg.ServerList = []string{GetEtcdURL()}
 	return cfg
+}
+
+type fakeLocalhost443Listener struct{}
+
+func (fakeLocalhost443Listener) Accept() (net.Conn, error) {
+	return nil, nil
+}
+
+func (fakeLocalhost443Listener) Close() error {
+	return nil
+}
+
+func (fakeLocalhost443Listener) Addr() net.Addr {
+	return &net.TCPAddr{
+		IP:   net.IPv4(127, 0, 0, 1),
+		Port: 443,
+	}
 }

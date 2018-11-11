@@ -16,10 +16,10 @@ go_test(
         "//pkg/registry/core/service/allocator/storage:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
     ],
 )
 

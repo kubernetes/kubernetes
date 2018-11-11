@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,9 +46,9 @@ var sampleCRD = unstructured.Unstructured{
 
 func TestDispatch(t *testing.T) {
 	scheme := runtime.NewScheme()
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
-	example2v1.AddToScheme(scheme)
+	require.NoError(t, example.AddToScheme(scheme))
+	require.NoError(t, examplev1.AddToScheme(scheme))
+	require.NoError(t, example2v1.AddToScheme(scheme))
 
 	tests := []struct {
 		name        string
@@ -121,7 +123,7 @@ func TestDispatch(t *testing.T) {
 				},
 			}
 			attr := generic.VersionedAttributes{
-				Attributes:         admission.NewAttributesRecord(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), nil),
+				Attributes:         admission.NewAttributesRecord(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), false, nil),
 				VersionedOldObject: nil,
 				VersionedObject:    test.in,
 			}

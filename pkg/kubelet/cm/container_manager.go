@@ -28,6 +28,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"fmt"
@@ -94,6 +95,11 @@ type ContainerManager interface {
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
+
+	// GetPluginRegistrationHandler returns a plugin registration handler
+	// The pluginwatcher's Handlers allow to have a single module for handling
+	// registration.
+	GetPluginRegistrationHandler() pluginwatcher.PluginHandler
 }
 
 type NodeConfig struct {
@@ -112,6 +118,7 @@ type NodeConfig struct {
 	ExperimentalCPUManagerReconcilePeriod time.Duration
 	ExperimentalPodPidsLimit              int64
 	EnforceCPULimits                      bool
+	CPUCFSQuotaPeriod                     time.Duration
 }
 
 type NodeAllocatableConfig struct {

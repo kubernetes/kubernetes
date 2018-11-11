@@ -1,15 +1,19 @@
-# This file _should_ set TypeMeta, but at some point earlier we supported deserializing MasterConfigurations without TypeMeta, so we need to support that as long as we
-# support the v1alpha1 API. In the meantime kubeadm will treat this as v1alpha1 automatically when unmarshalling.
-api:
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: InitConfiguration	
+bootstrapTokens:
+- token: s73ybu.6tw6wnqgp5z0wb77
+localAPIEndpoint:
   advertiseAddress: 192.168.2.2
-  bindPort: 6443
+nodeRegistration:
+  criSocket: /var/run/criruntime.sock
+  name: master-1
+---
+apiVersion: kubeadm.k8s.io/v1beta1
 certificatesDir: /var/lib/kubernetes/pki
-clusterName: kubernetes
-criSocket: /var/run/criruntime.sock
 imageRepository: my-company.com
-kubernetesVersion: v1.10.2
+kind: ClusterConfiguration
+kubernetesVersion: v1.12.0
 networking:
   dnsDomain: cluster.global
+  podSubnet: 10.148.0.0/16
   serviceSubnet: 10.196.0.0/12
-nodeName: master-1
-token: s73ybu.6tw6wnqgp5z0wb77

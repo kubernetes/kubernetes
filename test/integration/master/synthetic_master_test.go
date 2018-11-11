@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -862,7 +862,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 							Reason: "bar",
 						},
 					}
-				case i%4 == 1:
+				case i%4 == 2:
 					lastCount = 0
 					n.Status.Conditions = nil
 				}

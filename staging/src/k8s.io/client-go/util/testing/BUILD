@@ -18,6 +18,7 @@ go_library(
         "fake_handler.go",
         "tmpdir.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/testing",
     importpath = "k8s.io/client-go/util/testing",
 )
 

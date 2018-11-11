@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 // Upgrade defines an upgrade possibility to upgrade from a current version to a new one
@@ -302,7 +302,7 @@ func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionut
 func getSuggestedEtcdVersion(kubernetesVersion string) string {
 	etcdVersion, err := kubeadmconstants.EtcdSupportedVersion(kubernetesVersion)
 	if err != nil {
-		fmt.Printf("[upgrade/versions] WARNING: No recommended etcd for requested kubernetes version (%s)\n", kubernetesVersion)
+		fmt.Printf("[upgrade/versions] WARNING: No recommended etcd for requested Kubernetes version (%s)\n", kubernetesVersion)
 		return "N/A"
 	}
 	return etcdVersion.String()

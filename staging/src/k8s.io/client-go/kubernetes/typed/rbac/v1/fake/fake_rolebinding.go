@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	rbac_v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 var rolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *rbac_v1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *rbacv1.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rolebindingsResource, c.ns, name), &rbac_v1.RoleBinding{})
+		Invokes(testing.NewGetAction(rolebindingsResource, c.ns, name), &rbacv1.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.RoleBinding), err
+	return obj.(*rbacv1.RoleBinding), err
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbac_v1.RoleBindingList, err error) {
+func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbacv1.RoleBindingList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolebindingsResource, rolebindingsKind, c.ns, opts), &rbac_v1.RoleBindingList{})
+		Invokes(testing.NewListAction(rolebindingsResource, rolebindingsKind, c.ns, opts), &rbacv1.RoleBindingList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbac_v1.RoleBindin
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rbac_v1.RoleBindingList{ListMeta: obj.(*rbac_v1.RoleBindingList).ListMeta}
-	for _, item := range obj.(*rbac_v1.RoleBindingList).Items {
+	list := &rbacv1.RoleBindingList{ListMeta: obj.(*rbacv1.RoleBindingList).ListMeta}
+	for _, item := range obj.(*rbacv1.RoleBindingList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,31 +79,31 @@ func (c *FakeRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *FakeRoleBindings) Create(roleBinding *rbac_v1.RoleBinding) (result *rbac_v1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Create(roleBinding *rbacv1.RoleBinding) (result *rbacv1.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &rbac_v1.RoleBinding{})
+		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &rbacv1.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.RoleBinding), err
+	return obj.(*rbacv1.RoleBinding), err
 }
 
 // Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *FakeRoleBindings) Update(roleBinding *rbac_v1.RoleBinding) (result *rbac_v1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Update(roleBinding *rbacv1.RoleBinding) (result *rbacv1.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), &rbac_v1.RoleBinding{})
+		Invokes(testing.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), &rbacv1.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.RoleBinding), err
+	return obj.(*rbacv1.RoleBinding), err
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(rolebindingsResource, c.ns, name), &rbac_v1.RoleBinding{})
+		Invokes(testing.NewDeleteAction(rolebindingsResource, c.ns, name), &rbacv1.RoleBinding{})
 
 	return err
 }
@@ -112,17 +112,17 @@ func (c *FakeRoleBindings) Delete(name string, options *v1.DeleteOptions) error 
 func (c *FakeRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &rbac_v1.RoleBindingList{})
+	_, err := c.Fake.Invokes(action, &rbacv1.RoleBindingList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *FakeRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac_v1.RoleBinding, err error) {
+func (c *FakeRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbacv1.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, data, subresources...), &rbac_v1.RoleBinding{})
+		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, pt, data, subresources...), &rbacv1.RoleBinding{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.RoleBinding), err
+	return obj.(*rbacv1.RoleBinding), err
 }

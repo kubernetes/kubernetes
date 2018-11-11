@@ -173,7 +173,7 @@ func stackdriverExporterContainerSpec(name string, namespace string, metricName 
 }
 
 // PrometheusExporterDeployment is a Deployment of simple application with two containers
-// one exposing a metric in prometheus fromat and second a prometheus-to-sd container
+// one exposing a metric in prometheus format and second a prometheus-to-sd container
 // that scrapes the metric and pushes it to stackdriver.
 func PrometheusExporterDeployment(name, namespace string, replicas int32, metricValue int64) *extensions.Deployment {
 	return &extensions.Deployment{
@@ -211,7 +211,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 			},
 			{
 				Name:            "prometheus-to-sd",
-				Image:           "k8s.gcr.io/prometheus-to-sd:v0.2.3",
+				Image:           "k8s.gcr.io/prometheus-to-sd:v0.3.1",
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
 					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},

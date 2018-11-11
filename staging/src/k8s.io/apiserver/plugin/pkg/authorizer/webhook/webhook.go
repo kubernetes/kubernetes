@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	authorization "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -189,7 +189,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 		})
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
-			glog.Errorf("Failed to make webhook authorizer request: %v", err)
+			klog.Errorf("Failed to make webhook authorizer request: %v", err)
 			return w.decisionOnError, "", err
 		}
 		r.Status = result.Status
@@ -239,8 +239,12 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
 	localScheme := runtime.NewScheme()
-	scheme.AddToScheme(localScheme)
-	localScheme.SetVersionPriority(groupVersions...)
+	if err := scheme.AddToScheme(localScheme); err != nil {
+		return nil, err
+	}
+	if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
+		return nil, err
+	}
 
 	gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {

@@ -6,6 +6,7 @@ go_library(
         "api.go",
         "conf.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containernetworking/cni/libcni",
     importpath = "github.com/containernetworking/cni/libcni",
     visibility = ["//visibility:public"],
     deps = [

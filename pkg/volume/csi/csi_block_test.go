@@ -31,7 +31,7 @@ import (
 )
 
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	// TODO (vladimirvivien) specName with slashes will not work
@@ -77,12 +77,13 @@ func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 }
 
 func TestBlockMapperSetupDevice(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)
@@ -128,18 +129,23 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 
 	vols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
-	if vols[csiMapper.volumeID] != devicePath {
+	vol, ok := vols[csiMapper.volumeID]
+	if !ok {
 		t.Error("csi server may not have received NodePublishVolume call")
+	}
+	if vol.Path != devicePath {
+		t.Errorf("csi server expected device path %s, got %s", devicePath, vol.Path)
 	}
 }
 
 func TestBlockMapperMapDevice(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)
@@ -196,18 +202,23 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	}
 
 	pubs := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
-	if pubs[csiMapper.volumeID] != podVolumeBlockFilePath {
+	vol, ok := pubs[csiMapper.volumeID]
+	if !ok {
 		t.Error("csi server may not have received NodePublishVolume call")
+	}
+	if vol.Path != podVolumeBlockFilePath {
+		t.Errorf("csi server expected path %s, got %s", podVolumeBlockFilePath, vol.Path)
 	}
 }
 
 func TestBlockMapperTearDownDevice(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)

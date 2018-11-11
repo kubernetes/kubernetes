@@ -122,6 +122,7 @@
                 "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util",
                 "k8s.io/kubernetes/pkg/scheduler/api",
                 "k8s.io/kubernetes/pkg/scheduler/cache",
+                "k8s.io/kubernetes/pkg/scheduler/internal/cache",
                 "k8s.io/kubernetes/pkg/scheduler/util",
                 "k8s.io/kubernetes/pkg/scheduler/volumebinder",
                 "k8s.io/kubernetes/pkg/security/apparmor",
@@ -138,13 +139,13 @@
                 "k8s.io/kubernetes/pkg/util/node",
                 "k8s.io/kubernetes/pkg/util/nsenter",
                 "k8s.io/kubernetes/pkg/util/parsers",
-                "k8s.io/kubernetes/pkg/util/pointer",
                 "k8s.io/kubernetes/pkg/util/slice",
                 "k8s.io/kubernetes/pkg/util/taints",
                 "k8s.io/kubernetes/pkg/version",
                 "k8s.io/kubernetes/pkg/version/prometheus",
                 "k8s.io/kubernetes/pkg/volume",
-                "k8s.io/kubernetes/pkg/volume/util"
+                "k8s.io/kubernetes/pkg/volume/util",
+                "k8s.io/utils/pointer"
 		],
 		"ForbiddenPrefixes": []
 	}]

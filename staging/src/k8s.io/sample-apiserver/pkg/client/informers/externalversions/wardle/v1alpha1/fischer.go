@@ -25,7 +25,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	wardle_v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	versioned "k8s.io/sample-apiserver/pkg/client/clientset/versioned"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/client/informers/externalversions/internalinterfaces"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/client/listers/wardle/v1alpha1"
@@ -69,7 +69,7 @@ func NewFilteredFischerInformer(client versioned.Interface, resyncPeriod time.Du
 				return client.WardleV1alpha1().Fischers().Watch(options)
 			},
 		},
-		&wardle_v1alpha1.Fischer{},
+		&wardlev1alpha1.Fischer{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *fischerInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *fischerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardle_v1alpha1.Fischer{}, f.defaultInformer)
+	return f.factory.InformerFor(&wardlev1alpha1.Fischer{}, f.defaultInformer)
 }
 
 func (f *fischerInformer) Lister() v1alpha1.FischerLister {

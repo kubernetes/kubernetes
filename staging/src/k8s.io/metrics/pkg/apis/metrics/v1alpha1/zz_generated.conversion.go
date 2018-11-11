@@ -35,19 +35,58 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_ContainerMetrics_To_metrics_ContainerMetrics,
-		Convert_metrics_ContainerMetrics_To_v1alpha1_ContainerMetrics,
-		Convert_v1alpha1_NodeMetrics_To_metrics_NodeMetrics,
-		Convert_metrics_NodeMetrics_To_v1alpha1_NodeMetrics,
-		Convert_v1alpha1_NodeMetricsList_To_metrics_NodeMetricsList,
-		Convert_metrics_NodeMetricsList_To_v1alpha1_NodeMetricsList,
-		Convert_v1alpha1_PodMetrics_To_metrics_PodMetrics,
-		Convert_metrics_PodMetrics_To_v1alpha1_PodMetrics,
-		Convert_v1alpha1_PodMetricsList_To_metrics_PodMetricsList,
-		Convert_metrics_PodMetricsList_To_v1alpha1_PodMetricsList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*ContainerMetrics)(nil), (*metrics.ContainerMetrics)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ContainerMetrics_To_metrics_ContainerMetrics(a.(*ContainerMetrics), b.(*metrics.ContainerMetrics), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*metrics.ContainerMetrics)(nil), (*ContainerMetrics)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_metrics_ContainerMetrics_To_v1alpha1_ContainerMetrics(a.(*metrics.ContainerMetrics), b.(*ContainerMetrics), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*NodeMetrics)(nil), (*metrics.NodeMetrics)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NodeMetrics_To_metrics_NodeMetrics(a.(*NodeMetrics), b.(*metrics.NodeMetrics), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*metrics.NodeMetrics)(nil), (*NodeMetrics)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_metrics_NodeMetrics_To_v1alpha1_NodeMetrics(a.(*metrics.NodeMetrics), b.(*NodeMetrics), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*NodeMetricsList)(nil), (*metrics.NodeMetricsList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NodeMetricsList_To_metrics_NodeMetricsList(a.(*NodeMetricsList), b.(*metrics.NodeMetricsList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*metrics.NodeMetricsList)(nil), (*NodeMetricsList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_metrics_NodeMetricsList_To_v1alpha1_NodeMetricsList(a.(*metrics.NodeMetricsList), b.(*NodeMetricsList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodMetrics)(nil), (*metrics.PodMetrics)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodMetrics_To_metrics_PodMetrics(a.(*PodMetrics), b.(*metrics.PodMetrics), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*metrics.PodMetrics)(nil), (*PodMetrics)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_metrics_PodMetrics_To_v1alpha1_PodMetrics(a.(*metrics.PodMetrics), b.(*PodMetrics), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodMetricsList)(nil), (*metrics.PodMetricsList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodMetricsList_To_metrics_PodMetricsList(a.(*PodMetricsList), b.(*metrics.PodMetricsList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*metrics.PodMetricsList)(nil), (*PodMetricsList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_metrics_PodMetricsList_To_v1alpha1_PodMetricsList(a.(*metrics.PodMetricsList), b.(*PodMetricsList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_ContainerMetrics_To_metrics_ContainerMetrics(in *ContainerMetrics, out *metrics.ContainerMetrics, s conversion.Scope) error {

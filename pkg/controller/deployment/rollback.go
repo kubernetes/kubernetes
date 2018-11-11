@@ -20,18 +20,17 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rollback the deployment to the specified revision. In any case cleanup the rollback spec.
-func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID]*v1.PodList) error {
-	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, true)
+func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)
 	if err != nil {
 		return err
 	}
@@ -50,11 +49,11 @@ func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.Repl
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
-			glog.V(4).Infof("Unable to extract revision from deployment's replica set %q: %v", rs.Name, err)
+			klog.V(4).Infof("Unable to extract revision from deployment's replica set %q: %v", rs.Name, err)
 			continue
 		}
 		if v == rollbackTo.Revision {
-			glog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, v)
+			klog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, v)
 			// rollback by copying podTemplate.Spec from the replica set
 			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
 			// no-op if the spec matches current deployment's podTemplate.Spec
@@ -76,7 +75,7 @@ func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.Repl
 func (dc *DeploymentController) rollbackToTemplate(d *apps.Deployment, rs *apps.ReplicaSet) (bool, error) {
 	performedRollback := false
 	if !deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template) {
-		glog.V(4).Infof("Rolling back deployment %q to template spec %+v", d.Name, rs.Spec.Template.Spec)
+		klog.V(4).Infof("Rolling back deployment %q to template spec %+v", d.Name, rs.Spec.Template.Spec)
 		deploymentutil.SetFromReplicaSetTemplate(d, rs.Spec.Template)
 		// set RS (the old RS we'll rolling back to) annotations back to the deployment;
 		// otherwise, the deployment's current annotations (should be the same as current new RS) will be copied to the RS after the rollback.
@@ -92,7 +91,7 @@ func (dc *DeploymentController) rollbackToTemplate(d *apps.Deployment, rs *apps.
 		deploymentutil.SetDeploymentAnnotationsTo(d, rs)
 		performedRollback = true
 	} else {
-		glog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %q, skipping rollback...", d.Name)
+		klog.V(4).Infof("Rolling back to a revision that contains the same template as current deployment %q, skipping rollback...", d.Name)
 		eventMsg := fmt.Sprintf("The rollback revision contains the same template as current deployment %q", d.Name)
 		dc.emitRollbackWarningEvent(d, deploymentutil.RollbackTemplateUnchanged, eventMsg)
 	}
@@ -112,7 +111,7 @@ func (dc *DeploymentController) emitRollbackNormalEvent(d *apps.Deployment, mess
 // It is assumed that the caller will have updated the deployment template appropriately (in case
 // we want to rollback).
 func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(d *apps.Deployment) error {
-	glog.V(4).Infof("Cleans up rollbackTo of deployment %q", d.Name)
+	klog.V(4).Infof("Cleans up rollbackTo of deployment %q", d.Name)
 	setRollbackTo(d, nil)
 	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(d)
 	return err

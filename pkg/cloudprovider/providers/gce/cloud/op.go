@@ -20,11 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	alpha "google.golang.org/api/compute/v0.alpha"
 	beta "google.golang.org/api/compute/v0.beta"
 	ga "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
@@ -66,13 +67,13 @@ func (o *gaOperation) isDone(ctx context.Context) (bool, error) {
 	switch o.key.Type() {
 	case meta.Regional:
 		op, err = o.s.GA.RegionOperations.Get(o.projectID, o.key.Region, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("GA.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("GA.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
 	case meta.Zonal:
 		op, err = o.s.GA.ZoneOperations.Get(o.projectID, o.key.Zone, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("GA.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("GA.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
 	case meta.Global:
 		op, err = o.s.GA.GlobalOperations.Get(o.projectID, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("GA.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("GA.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
 	default:
 		return false, fmt.Errorf("invalid key type: %#v", o.key)
 	}
@@ -85,7 +86,7 @@ func (o *gaOperation) isDone(ctx context.Context) (bool, error) {
 
 	if op.Error != nil && len(op.Error.Errors) > 0 && op.Error.Errors[0] != nil {
 		e := op.Error.Errors[0]
-		o.err = &GCEOperationError{HTTPStatusCode: op.HTTPStatusCode, Code: e.Code, Message: e.Message}
+		o.err = &googleapi.Error{Code: int(op.HttpErrorStatusCode), Message: fmt.Sprintf("%v - %v", e.Code, e.Message)}
 	}
 	return true, nil
 }
@@ -123,13 +124,13 @@ func (o *alphaOperation) isDone(ctx context.Context) (bool, error) {
 	switch o.key.Type() {
 	case meta.Regional:
 		op, err = o.s.Alpha.RegionOperations.Get(o.projectID, o.key.Region, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("Alpha.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("Alpha.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
 	case meta.Zonal:
 		op, err = o.s.Alpha.ZoneOperations.Get(o.projectID, o.key.Zone, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("Alpha.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("Alpha.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
 	case meta.Global:
 		op, err = o.s.Alpha.GlobalOperations.Get(o.projectID, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("Alpha.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("Alpha.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
 	default:
 		return false, fmt.Errorf("invalid key type: %#v", o.key)
 	}
@@ -142,7 +143,7 @@ func (o *alphaOperation) isDone(ctx context.Context) (bool, error) {
 
 	if op.Error != nil && len(op.Error.Errors) > 0 && op.Error.Errors[0] != nil {
 		e := op.Error.Errors[0]
-		o.err = &GCEOperationError{HTTPStatusCode: op.HTTPStatusCode, Code: e.Code, Message: e.Message}
+		o.err = &googleapi.Error{Code: int(op.HttpErrorStatusCode), Message: fmt.Sprintf("%v - %v", e.Code, e.Message)}
 	}
 	return true, nil
 }
@@ -180,13 +181,13 @@ func (o *betaOperation) isDone(ctx context.Context) (bool, error) {
 	switch o.key.Type() {
 	case meta.Regional:
 		op, err = o.s.Beta.RegionOperations.Get(o.projectID, o.key.Region, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("Beta.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("Beta.RegionOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Region, o.key.Name, op, err, ctx)
 	case meta.Zonal:
 		op, err = o.s.Beta.ZoneOperations.Get(o.projectID, o.key.Zone, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("Beta.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("Beta.ZoneOperations.Get(%v, %v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Zone, o.key.Name, op, err, ctx)
 	case meta.Global:
 		op, err = o.s.Beta.GlobalOperations.Get(o.projectID, o.key.Name).Context(ctx).Do()
-		glog.V(5).Infof("Beta.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
+		klog.V(5).Infof("Beta.GlobalOperations.Get(%v, %v) = %+v, %v; ctx = %v", o.projectID, o.key.Name, op, err, ctx)
 	default:
 		return false, fmt.Errorf("invalid key type: %#v", o.key)
 	}
@@ -199,7 +200,7 @@ func (o *betaOperation) isDone(ctx context.Context) (bool, error) {
 
 	if op.Error != nil && len(op.Error.Errors) > 0 && op.Error.Errors[0] != nil {
 		e := op.Error.Errors[0]
-		o.err = &GCEOperationError{HTTPStatusCode: op.HTTPStatusCode, Code: e.Code, Message: e.Message}
+		o.err = &googleapi.Error{Code: int(op.HttpErrorStatusCode), Message: fmt.Sprintf("%v - %v", e.Code, e.Message)}
 	}
 	return true, nil
 }

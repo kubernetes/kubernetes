@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -111,7 +113,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(sst.CheckServiceName(ss, headlessSvcName))
 
-			cmd := "echo $(hostname) > /data/hostname; sync;"
+			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(sst.ExecInStatefulPods(ss, cmd))
 
@@ -248,6 +250,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 		})
 
+		// This can't be Conformance yet because it depends on a default
+		// StorageClass and a dynamic provisioner.
+		It("should perform rolling updates and roll backs of template modifications with PVCs", func() {
+			By("Creating a new StatefulSet with PVCs")
+			*(ss.Spec.Replicas) = 3
+			rollbackTest(c, ns, ss)
+		})
+
 		/*
 			Release : v1.9
 			Testname: StatefulSet, Rolling Update
@@ -256,116 +266,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func() {
 			By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
-			sst := framework.NewStatefulSetTester(c)
-			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
-			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
-			ss = sst.WaitForStatus(ss)
-			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			Expect(currentRevision).To(Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
-					ss.Namespace, ss.Name, updateRevision, currentRevision))
-			pods := sst.GetPodList(ss)
-			for i := range pods.Items {
-				Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(Equal(currentRevision),
-					fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
-						currentRevision))
-			}
-			sst.SortStatefulPods(pods)
-			sst.BreakPodHttpProbe(ss, &pods.Items[1])
-			Expect(err).NotTo(HaveOccurred())
-			ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
-			newImage := NewNginxImage
-			oldImage := ss.Spec.Template.Spec.Containers[0].Image
-
-			By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
-			Expect(oldImage).NotTo(Equal(newImage), "Incorrect test setup: should update to a different image")
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
-				update.Spec.Template.Spec.Containers[0].Image = newImage
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Creating a new revision")
-			ss = sst.WaitForStatus(ss)
-			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			Expect(currentRevision).NotTo(Equal(updateRevision),
-				"Current revision should not equal update revision during rolling update")
-
-			By("Updating Pods in reverse ordinal order")
-			pods = sst.GetPodList(ss)
-			sst.SortStatefulPods(pods)
-			sst.RestorePodHttpProbe(ss, &pods.Items[1])
-			ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
-			ss, pods = sst.WaitForRollingUpdate(ss)
-			Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
-					ss.Namespace,
-					ss.Name,
-					ss.Status.CurrentRevision,
-					updateRevision))
-			for i := range pods.Items {
-				Expect(pods.Items[i].Spec.Containers[0].Image).To(Equal(newImage),
-					fmt.Sprintf(" Pod %s/%s has image %s not have new image %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Spec.Containers[0].Image,
-						newImage))
-				Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(Equal(updateRevision),
-					fmt.Sprintf("Pod %s/%s revision %s is not equal to update revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
-						updateRevision))
-			}
-
-			By("Rolling back to a previous revision")
-			sst.BreakPodHttpProbe(ss, &pods.Items[1])
-			Expect(err).NotTo(HaveOccurred())
-			ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
-			priorRevision := currentRevision
-			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
-				update.Spec.Template.Spec.Containers[0].Image = oldImage
-			})
-			Expect(err).NotTo(HaveOccurred())
-			ss = sst.WaitForStatus(ss)
-			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			Expect(currentRevision).NotTo(Equal(updateRevision),
-				"Current revision should not equal update revision during roll back")
-			Expect(priorRevision).To(Equal(updateRevision),
-				"Prior revision should equal update revision during roll back")
-
-			By("Rolling back update in reverse ordinal order")
-			pods = sst.GetPodList(ss)
-			sst.SortStatefulPods(pods)
-			sst.RestorePodHttpProbe(ss, &pods.Items[1])
-			ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
-			ss, pods = sst.WaitForRollingUpdate(ss)
-			Expect(ss.Status.CurrentRevision).To(Equal(priorRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal prior revision %s on rollback completion",
-					ss.Namespace,
-					ss.Name,
-					ss.Status.CurrentRevision,
-					updateRevision))
-
-			for i := range pods.Items {
-				Expect(pods.Items[i].Spec.Containers[0].Image).To(Equal(oldImage),
-					fmt.Sprintf("Pod %s/%s has image %s not equal to previous image %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Spec.Containers[0].Image,
-						oldImage))
-				Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(Equal(priorRevision),
-					fmt.Sprintf("Pod %s/%s revision %s is not equal to prior revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
-						priorRevision))
-			}
+			rollbackTest(c, ns, ss)
 		})
 
 		/*
@@ -700,7 +601,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Verifying that stateful set " + ssName + " was scaled up in order")
 			expectedOrder := []string{ssName + "-0", ssName + "-1", ssName + "-2"}
-			_, err = watch.Until(framework.StatefulSetTimeout, watcher, func(event watch.Event) (bool, error) {
+			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.StatefulSetTimeout)
+			defer cancel()
+			_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
 				if event.Type != watch.Added {
 					return false, nil
 				}
@@ -731,7 +634,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Verifying that stateful set " + ssName + " was scaled down in reverse order")
 			expectedOrder = []string{ssName + "-2", ssName + "-1", ssName + "-0"}
-			_, err = watch.Until(framework.StatefulSetTimeout, watcher, func(event watch.Event) (bool, error) {
+			ctx, cancel = watchtools.ContextWithOptionalTimeout(context.Background(), framework.StatefulSetTimeout)
+			defer cancel()
+			_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
 				if event.Type != watch.Deleted {
 					return false, nil
 				}
@@ -810,7 +715,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},
@@ -837,8 +742,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
 			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
-			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
-			_, err = watch.Until(framework.StatefulPodTimeout, w, func(event watch.Event) (bool, error) {
+			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.StatefulPodTimeout)
+			defer cancel()
+			// we need to get UID from pod in any state and wait until stateful set controller will remove pod at least once
+			_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				switch event.Type {
 				case watch.Deleted:
@@ -862,7 +769,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
-			// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
+			// we may catch delete event, that's why we are waiting for running phase like this, and not with watchtools.UntilWithoutRetry
 			Eventually(func() error {
 				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(statefulPodName, metav1.GetOptions{})
 				if err != nil {
@@ -1076,7 +983,7 @@ func (m *mysqlGaleraTester) deploy(ns string) *apps.StatefulSet {
 func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
-		cmd := fmt.Sprintf("use  statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
+		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
 		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }
@@ -1175,4 +1082,120 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 		return fmt.Errorf("timed out when trying to read value for key %v from stateful pod %d", key, statefulPodNumber)
 	}
 	return err
+}
+
+// This function is used by two tests to test StatefulSet rollbacks: one using
+// PVCs and one using no storage.
+func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
+	sst := framework.NewStatefulSetTester(c)
+	sst.SetHttpProbe(ss)
+	ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+	Expect(err).NotTo(HaveOccurred())
+	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+	ss = sst.WaitForStatus(ss)
+	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+	Expect(currentRevision).To(Equal(updateRevision),
+		fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+			ss.Namespace, ss.Name, updateRevision, currentRevision))
+	pods := sst.GetPodList(ss)
+	for i := range pods.Items {
+		Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(Equal(currentRevision),
+			fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+				pods.Items[i].Namespace,
+				pods.Items[i].Name,
+				pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+				currentRevision))
+	}
+	sst.SortStatefulPods(pods)
+	err = sst.BreakPodHttpProbe(ss, &pods.Items[1])
+	Expect(err).NotTo(HaveOccurred())
+	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
+	newImage := NewNginxImage
+	oldImage := ss.Spec.Template.Spec.Containers[0].Image
+
+	By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
+	Expect(oldImage).NotTo(Equal(newImage), "Incorrect test setup: should update to a different image")
+	ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+		update.Spec.Template.Spec.Containers[0].Image = newImage
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Creating a new revision")
+	ss = sst.WaitForStatus(ss)
+	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+	Expect(currentRevision).NotTo(Equal(updateRevision),
+		"Current revision should not equal update revision during rolling update")
+
+	By("Updating Pods in reverse ordinal order")
+	pods = sst.GetPodList(ss)
+	sst.SortStatefulPods(pods)
+	err = sst.RestorePodHttpProbe(ss, &pods.Items[1])
+	Expect(err).NotTo(HaveOccurred())
+	ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
+	ss, pods = sst.WaitForRollingUpdate(ss)
+	Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
+		fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
+			ss.Namespace,
+			ss.Name,
+			ss.Status.CurrentRevision,
+			updateRevision))
+	for i := range pods.Items {
+		Expect(pods.Items[i].Spec.Containers[0].Image).To(Equal(newImage),
+			fmt.Sprintf(" Pod %s/%s has image %s not have new image %s",
+				pods.Items[i].Namespace,
+				pods.Items[i].Name,
+				pods.Items[i].Spec.Containers[0].Image,
+				newImage))
+		Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(Equal(updateRevision),
+			fmt.Sprintf("Pod %s/%s revision %s is not equal to update revision %s",
+				pods.Items[i].Namespace,
+				pods.Items[i].Name,
+				pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+				updateRevision))
+	}
+
+	By("Rolling back to a previous revision")
+	err = sst.BreakPodHttpProbe(ss, &pods.Items[1])
+	Expect(err).NotTo(HaveOccurred())
+	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
+	priorRevision := currentRevision
+	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+	ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+		update.Spec.Template.Spec.Containers[0].Image = oldImage
+	})
+	Expect(err).NotTo(HaveOccurred())
+	ss = sst.WaitForStatus(ss)
+	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+	Expect(currentRevision).NotTo(Equal(updateRevision),
+		"Current revision should not equal update revision during roll back")
+	Expect(priorRevision).To(Equal(updateRevision),
+		"Prior revision should equal update revision during roll back")
+
+	By("Rolling back update in reverse ordinal order")
+	pods = sst.GetPodList(ss)
+	sst.SortStatefulPods(pods)
+	sst.RestorePodHttpProbe(ss, &pods.Items[1])
+	ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
+	ss, pods = sst.WaitForRollingUpdate(ss)
+	Expect(ss.Status.CurrentRevision).To(Equal(priorRevision),
+		fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal prior revision %s on rollback completion",
+			ss.Namespace,
+			ss.Name,
+			ss.Status.CurrentRevision,
+			updateRevision))
+
+	for i := range pods.Items {
+		Expect(pods.Items[i].Spec.Containers[0].Image).To(Equal(oldImage),
+			fmt.Sprintf("Pod %s/%s has image %s not equal to previous image %s",
+				pods.Items[i].Namespace,
+				pods.Items[i].Name,
+				pods.Items[i].Spec.Containers[0].Image,
+				oldImage))
+		Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(Equal(priorRevision),
+			fmt.Sprintf("Pod %s/%s revision %s is not equal to prior revision %s",
+				pods.Items[i].Namespace,
+				pods.Items[i].Name,
+				pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+				priorRevision))
+	}
 }

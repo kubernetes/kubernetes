@@ -12,6 +12,7 @@ go_library(
         "syntax.go",
         "walk.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/buildtools/build",
     importpath = "github.com/bazelbuild/buildtools/build",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/bazelbuild/buildtools/tables:go_default_library"],

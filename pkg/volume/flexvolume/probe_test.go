@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -173,7 +174,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 func TestEmptyPluginDir(t *testing.T) {
 	// Arrange
 	fs := utilfs.NewFakeFs()
-	watcher := NewFakeWatcher()
+	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -267,7 +268,7 @@ func TestProberMultipleEvents(t *testing.T) {
 
 func TestProberError(t *testing.T) {
 	fs := utilfs.NewFakeFs()
-	watcher := NewFakeWatcher()
+	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -295,7 +296,7 @@ func initTestEnvironment(t *testing.T) (
 	watcher *fakeWatcher,
 	prober volume.DynamicPluginProber) {
 	fs = utilfs.NewFakeFs()
-	watcher = NewFakeWatcher()
+	watcher = newFakeWatcher()
 	prober = &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -318,7 +319,7 @@ type fakePluginFactory struct {
 
 var _ PluginFactory = fakePluginFactory{}
 
-func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string) (volume.VolumePlugin, error) {
+func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string, _ exec.Interface) (volume.VolumePlugin, error) {
 	if m.error {
 		return nil, fmt.Errorf("Flexvolume plugin error")
 	}

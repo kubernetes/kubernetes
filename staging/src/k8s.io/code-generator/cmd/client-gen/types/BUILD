@@ -12,6 +12,7 @@ go_library(
         "helpers.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/types",
     importpath = "k8s.io/code-generator/cmd/client-gen/types",
     deps = ["//vendor/k8s.io/gengo/namer:go_default_library"],
 )

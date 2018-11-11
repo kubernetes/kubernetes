@@ -1,12 +1,11 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
-
-	"golang.org/x/net/context"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"

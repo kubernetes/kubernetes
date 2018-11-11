@@ -223,6 +223,10 @@ func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) Se
 					return resp, err
 				}
 				resp, err = s.Do(rr.Request())
+				// if the error isn't temporary don't bother retrying
+				if err != nil && !IsTemporaryNetworkError(err) {
+					return nil, err
+				}
 				// we want to retry if err is not nil (e.g. transient network failure).  note that for failed authentication
 				// resp and err will both have a value, so in this case we don't want to retry as it will never succeed.
 				if err == nil && !ResponseHasStatusCode(resp, codes...) || IsTokenRefreshError(err) {
@@ -230,7 +234,7 @@ func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) Se
 				}
 				delayed := DelayWithRetryAfter(resp, r.Context().Done())
 				if !delayed && !DelayForBackoff(backoff, attempt, r.Context().Done()) {
-					return nil, r.Context().Err()
+					return resp, r.Context().Err()
 				}
 				// don't count a 429 against the number of attempts
 				// so that we continue to retry until it succeeds

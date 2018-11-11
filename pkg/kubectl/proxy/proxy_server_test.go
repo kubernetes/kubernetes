@@ -452,7 +452,7 @@ func TestPathHandling(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := NewServer("", tt.prefix, "/not/used/for/this/test", nil, cc)
+			p, err := NewServer("", tt.prefix, "/not/used/for/this/test", nil, cc, 0)
 			if err != nil {
 				t.Fatalf("%#v: %v", tt, err)
 			}

@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,10 +38,10 @@ type ServiceInterface interface {
 	Create(*v1.Service) (*v1.Service, error)
 	Update(*v1.Service) (*v1.Service, error)
 	UpdateStatus(*v1.Service) (*v1.Service, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Service, error)
-	List(opts meta_v1.ListOptions) (*v1.ServiceList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Service, error)
+	List(opts metav1.ListOptions) (*v1.ServiceList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Service, err error)
 	ServiceExpansion
 }
@@ -61,7 +61,7 @@ func newServices(c *CoreV1Client, namespace string) *services {
 }
 
 // Get takes name of the service, and returns the corresponding service object, and an error if there is any.
-func (c *services) Get(name string, options meta_v1.GetOptions) (result *v1.Service, err error) {
+func (c *services) Get(name string, options metav1.GetOptions) (result *v1.Service, err error) {
 	result = &v1.Service{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -74,7 +74,7 @@ func (c *services) Get(name string, options meta_v1.GetOptions) (result *v1.Serv
 }
 
 // List takes label and field selectors, and returns the list of Services that match those selectors.
-func (c *services) List(opts meta_v1.ListOptions) (result *v1.ServiceList, err error) {
+func (c *services) List(opts metav1.ListOptions) (result *v1.ServiceList, err error) {
 	result = &v1.ServiceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -86,7 +86,7 @@ func (c *services) List(opts meta_v1.ListOptions) (result *v1.ServiceList, err e
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *services) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *services) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -137,7 +137,7 @@ func (c *services) UpdateStatus(service *v1.Service) (result *v1.Service, err er
 }
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
-func (c *services) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *services) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("services").

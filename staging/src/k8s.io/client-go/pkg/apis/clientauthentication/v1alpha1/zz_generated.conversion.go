@@ -35,17 +35,48 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_ExecCredential_To_clientauthentication_ExecCredential,
-		Convert_clientauthentication_ExecCredential_To_v1alpha1_ExecCredential,
-		Convert_v1alpha1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec,
-		Convert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec,
-		Convert_v1alpha1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus,
-		Convert_clientauthentication_ExecCredentialStatus_To_v1alpha1_ExecCredentialStatus,
-		Convert_v1alpha1_Response_To_clientauthentication_Response,
-		Convert_clientauthentication_Response_To_v1alpha1_Response,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*ExecCredential)(nil), (*clientauthentication.ExecCredential)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ExecCredential_To_clientauthentication_ExecCredential(a.(*ExecCredential), b.(*clientauthentication.ExecCredential), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*clientauthentication.ExecCredential)(nil), (*ExecCredential)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_clientauthentication_ExecCredential_To_v1alpha1_ExecCredential(a.(*clientauthentication.ExecCredential), b.(*ExecCredential), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ExecCredentialSpec)(nil), (*clientauthentication.ExecCredentialSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(a.(*ExecCredentialSpec), b.(*clientauthentication.ExecCredentialSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*clientauthentication.ExecCredentialSpec)(nil), (*ExecCredentialSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec(a.(*clientauthentication.ExecCredentialSpec), b.(*ExecCredentialSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ExecCredentialStatus)(nil), (*clientauthentication.ExecCredentialStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(a.(*ExecCredentialStatus), b.(*clientauthentication.ExecCredentialStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*clientauthentication.ExecCredentialStatus)(nil), (*ExecCredentialStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_clientauthentication_ExecCredentialStatus_To_v1alpha1_ExecCredentialStatus(a.(*clientauthentication.ExecCredentialStatus), b.(*ExecCredentialStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*Response)(nil), (*clientauthentication.Response)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Response_To_clientauthentication_Response(a.(*Response), b.(*clientauthentication.Response), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*clientauthentication.Response)(nil), (*Response)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_clientauthentication_Response_To_v1alpha1_Response(a.(*clientauthentication.Response), b.(*Response), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_ExecCredential_To_clientauthentication_ExecCredential(in *ExecCredential, out *clientauthentication.ExecCredential, s conversion.Scope) error {

@@ -21,8 +21,8 @@ limitations under the License.
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -170,7 +170,7 @@ func (in *DaemonSetSpec) DeepCopyInto(out *DaemonSetSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
@@ -331,7 +331,7 @@ func (in *DeploymentSpec) DeepCopyInto(out *DeploymentSpec) {
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
@@ -496,7 +496,7 @@ func (in *ReplicaSetSpec) DeepCopyInto(out *ReplicaSetSpec) {
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
@@ -692,13 +692,13 @@ func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-		*out = make([]core_v1.PersistentVolumeClaim, len(*in))
+		*out = make([]corev1.PersistentVolumeClaim, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

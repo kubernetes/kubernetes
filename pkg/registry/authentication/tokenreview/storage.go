@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -45,7 +46,7 @@ func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }
 
-func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	tokenReview, ok := obj.(*authentication.TokenReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a TokenReview: %#v", obj))
@@ -67,19 +68,23 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	fakeReq := &http.Request{Header: http.Header{}}
 	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
 
-	tokenUser, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
+	resp, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
 	tokenReview.Status.Authenticated = ok
 	if err != nil {
 		tokenReview.Status.Error = err.Error()
 	}
-	if tokenUser != nil {
+
+	// TODO(mikedanese): verify the response audience matches one of apiAuds if
+	// non-empty
+
+	if resp != nil && resp.User != nil {
 		tokenReview.Status.User = authentication.UserInfo{
-			Username: tokenUser.GetName(),
-			UID:      tokenUser.GetUID(),
-			Groups:   tokenUser.GetGroups(),
+			Username: resp.User.GetName(),
+			UID:      resp.User.GetUID(),
+			Groups:   resp.User.GetGroups(),
 			Extra:    map[string]authentication.ExtraValue{},
 		}
-		for k, v := range tokenUser.GetExtra() {
+		for k, v := range resp.User.GetExtra() {
 			tokenReview.Status.User.Extra[k] = authentication.ExtraValue(v)
 		}
 	}

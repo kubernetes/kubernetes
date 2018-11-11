@@ -15,7 +15,7 @@ go get -u github.com/evanphx/json-patch
 ```
 
 **Stable Versions**:
-* Version 3: `go get -u gopkg.in/evanphx/json-patch.v3`
+* Version 4: `go get -u gopkg.in/evanphx/json-patch.v4`
 
 (previous versions below `v3` are unavailable)
 

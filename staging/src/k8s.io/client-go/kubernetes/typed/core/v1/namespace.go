@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,10 +38,10 @@ type NamespaceInterface interface {
 	Create(*v1.Namespace) (*v1.Namespace, error)
 	Update(*v1.Namespace) (*v1.Namespace, error)
 	UpdateStatus(*v1.Namespace) (*v1.Namespace, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Namespace, error)
-	List(opts meta_v1.ListOptions) (*v1.NamespaceList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Namespace, error)
+	List(opts metav1.ListOptions) (*v1.NamespaceList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error)
 	NamespaceExpansion
 }
@@ -59,7 +59,7 @@ func newNamespaces(c *CoreV1Client) *namespaces {
 }
 
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
-func (c *namespaces) Get(name string, options meta_v1.GetOptions) (result *v1.Namespace, err error) {
+func (c *namespaces) Get(name string, options metav1.GetOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Get().
 		Resource("namespaces").
@@ -71,7 +71,7 @@ func (c *namespaces) Get(name string, options meta_v1.GetOptions) (result *v1.Na
 }
 
 // List takes label and field selectors, and returns the list of Namespaces that match those selectors.
-func (c *namespaces) List(opts meta_v1.ListOptions) (result *v1.NamespaceList, err error) {
+func (c *namespaces) List(opts metav1.ListOptions) (result *v1.NamespaceList, err error) {
 	result = &v1.NamespaceList{}
 	err = c.client.Get().
 		Resource("namespaces").
@@ -82,7 +82,7 @@ func (c *namespaces) List(opts meta_v1.ListOptions) (result *v1.NamespaceList, e
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *namespaces) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("namespaces").
@@ -129,7 +129,7 @@ func (c *namespaces) UpdateStatus(namespace *v1.Namespace) (result *v1.Namespace
 }
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
-func (c *namespaces) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *namespaces) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("namespaces").
 		Name(name).

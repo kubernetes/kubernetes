@@ -346,7 +346,7 @@ function create-master-audit-policy {
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
-apiVersion: audit.k8s.io/v1beta1
+apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
   # The following requests were manually identified as high-volume and low-risk,
@@ -519,9 +519,6 @@ function compute-kube-apiserver-params {
 	fi
 	if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
 		params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
-	fi
-	if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
-		params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
 	fi
   if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
     params+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"

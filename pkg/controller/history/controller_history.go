@@ -47,12 +47,12 @@ const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
 // ControllerRevisionName returns the Name for a ControllerRevision in the form prefix-hash. If the length
 // of prefix is greater than 223 bytes, it is truncated to allow for a name that is no larger than 253 bytes.
-func ControllerRevisionName(prefix string, hash uint32) string {
+func ControllerRevisionName(prefix string, hash string) string {
 	if len(prefix) > 223 {
 		prefix = prefix[:223]
 	}
 
-	return fmt.Sprintf("%s-%s", prefix, rand.SafeEncodeString(strconv.FormatInt(int64(hash), 10)))
+	return fmt.Sprintf("%s-%s", prefix, hash)
 }
 
 // NewControllerRevision returns a ControllerRevision with a ControllerRef pointing to parent and indicating that
@@ -91,13 +91,13 @@ func NewControllerRevision(parent metav1.Object,
 	}
 	hash := HashControllerRevision(cr, collisionCount)
 	cr.Name = ControllerRevisionName(parent.GetName(), hash)
-	cr.Labels[ControllerRevisionHashLabel] = strconv.FormatInt(int64(hash), 10)
+	cr.Labels[ControllerRevisionHashLabel] = hash
 	return cr, nil
 }
 
 // HashControllerRevision hashes the contents of revision's Data using FNV hashing. If probe is not nil, the byte value
-// of probe is added written to the hash as well.
-func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) uint32 {
+// of probe is added written to the hash as well. The returned hash will be a safe encoded string to avoid bad words.
+func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) string {
 	hf := fnv.New32()
 	if len(revision.Data.Raw) > 0 {
 		hf.Write(revision.Data.Raw)
@@ -108,8 +108,7 @@ func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) uin
 	if probe != nil {
 		hf.Write([]byte(strconv.FormatInt(int64(*probe), 10)))
 	}
-	return hf.Sum32()
-
+	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32()))
 }
 
 // SortControllerRevisions sorts revisions by their Revision.
@@ -249,10 +248,18 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 	// Continue to attempt to create the revision updating the name with a new hash on each iteration
 	for {
 		hash := HashControllerRevision(revision, collisionCount)
-		// Update the revisions name and labels
+		// Update the revisions name
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
-		created, err := rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Create(clone)
+		ns := parent.GetNamespace()
+		created, err := rh.client.AppsV1().ControllerRevisions(ns).Create(clone)
 		if errors.IsAlreadyExists(err) {
+			exists, err := rh.client.AppsV1().ControllerRevisions(ns).Get(clone.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if bytes.Equal(exists.Data.Raw, clone.Data.Raw) {
+				return exists, nil
+			}
 			*collisionCount++
 			continue
 		}

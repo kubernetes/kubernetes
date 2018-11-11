@@ -3,6 +3,8 @@ package aws
 import (
 	"io"
 	"sync"
+
+	"github.com/aws/aws-sdk-go/internal/sdkio"
 )
 
 // ReadSeekCloser wraps a io.Reader returning a ReaderSeekerCloser. Should
@@ -20,6 +22,22 @@ func ReadSeekCloser(r io.Reader) ReaderSeekerCloser {
 // io.Closer interfaces to the underlying object if they are available.
 type ReaderSeekerCloser struct {
 	r io.Reader
+}
+
+// IsReaderSeekable returns if the underlying reader type can be seeked. A
+// io.Reader might not actually be seekable if it is the ReaderSeekerCloser
+// type.
+func IsReaderSeekable(r io.Reader) bool {
+	switch v := r.(type) {
+	case ReaderSeekerCloser:
+		return v.IsSeeker()
+	case *ReaderSeekerCloser:
+		return v.IsSeeker()
+	case io.ReadSeeker:
+		return true
+	default:
+		return false
+	}
 }
 
 // Read reads from the reader up to size of p. The number of bytes read, and
@@ -54,6 +72,71 @@ func (r ReaderSeekerCloser) Seek(offset int64, whence int) (int64, error) {
 func (r ReaderSeekerCloser) IsSeeker() bool {
 	_, ok := r.r.(io.Seeker)
 	return ok
+}
+
+// HasLen returns the length of the underlying reader if the value implements
+// the Len() int method.
+func (r ReaderSeekerCloser) HasLen() (int, bool) {
+	type lenner interface {
+		Len() int
+	}
+
+	if lr, ok := r.r.(lenner); ok {
+		return lr.Len(), true
+	}
+
+	return 0, false
+}
+
+// GetLen returns the length of the bytes remaining in the underlying reader.
+// Checks first for Len(), then io.Seeker to determine the size of the
+// underlying reader.
+//
+// Will return -1 if the length cannot be determined.
+func (r ReaderSeekerCloser) GetLen() (int64, error) {
+	if l, ok := r.HasLen(); ok {
+		return int64(l), nil
+	}
+
+	if s, ok := r.r.(io.Seeker); ok {
+		return seekerLen(s)
+	}
+
+	return -1, nil
+}
+
+// SeekerLen attempts to get the number of bytes remaining at the seeker's
+// current position.  Returns the number of bytes remaining or error.
+func SeekerLen(s io.Seeker) (int64, error) {
+	// Determine if the seeker is actually seekable. ReaderSeekerCloser
+	// hides the fact that a io.Readers might not actually be seekable.
+	switch v := s.(type) {
+	case ReaderSeekerCloser:
+		return v.GetLen()
+	case *ReaderSeekerCloser:
+		return v.GetLen()
+	}
+
+	return seekerLen(s)
+}
+
+func seekerLen(s io.Seeker) (int64, error) {
+	curOffset, err := s.Seek(0, sdkio.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	endOffset, err := s.Seek(0, sdkio.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = s.Seek(curOffset, sdkio.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+
+	return endOffset - curOffset, nil
 }
 
 // Close closes the ReaderSeekerCloser.

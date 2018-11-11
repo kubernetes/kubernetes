@@ -1,12 +1,7 @@
-api:
-  bindPort: 0
-certificatesDir: relativepath
-clusterName: kubernetes
-criSocket: relativepath
-imageRepository: my-company.com
-kubernetesVersion: v1.10.2
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: ClusterConfiguration
 networking:
-  dnsDomain: cluster.GLOBAL
-  serviceSubnet: 10.196.1000.0/100
-nodeName: MASTER
-token: s7bu.6tw6wn
+  dnsDomain: INVALID-DOMAIN-!!!!
+  podSubnet: ""
+  serviceSubnet: 10.96.0.0/12
+useHyperKubeImage: false

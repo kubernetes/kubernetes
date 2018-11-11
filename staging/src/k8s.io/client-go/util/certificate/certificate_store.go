@@ -21,13 +21,12 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -128,7 +127,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 	if pairFileExists, err := fileExists(pairFile); err != nil {
 		return nil, err
 	} else if pairFileExists {
-		glog.Infof("Loading cert/key pair from %q.", pairFile)
+		klog.Infof("Loading cert/key pair from %q.", pairFile)
 		return loadFile(pairFile)
 	}
 
@@ -141,7 +140,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	}
 	if certFileExists && keyFileExists {
-		glog.Infof("Loading cert/key pair from (%q, %q).", s.certFile, s.keyFile)
+		klog.Infof("Loading cert/key pair from (%q, %q).", s.certFile, s.keyFile)
 		return loadX509KeyPair(s.certFile, s.keyFile)
 	}
 
@@ -156,7 +155,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	}
 	if certFileExists && keyFileExists {
-		glog.Infof("Loading cert/key pair from (%q, %q).", c, k)
+		klog.Infof("Loading cert/key pair from (%q, %q).", c, k)
 		return loadX509KeyPair(c, k)
 	}
 
@@ -171,11 +170,9 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 }
 
 func loadFile(pairFile string) (*tls.Certificate, error) {
-	certBlock, keyBlock, err := loadCertKeyBlocks(pairFile)
-	if err != nil {
-		return nil, err
-	}
-	cert, err := tls.X509KeyPair(pem.EncodeToMemory(certBlock), pem.EncodeToMemory(keyBlock))
+	// LoadX509KeyPair knows how to parse combined cert and private key from
+	// the same file.
+	cert, err := tls.LoadX509KeyPair(pairFile, pairFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert data from %q into cert/key pair: %v", pairFile, err)
 	}
@@ -185,22 +182,6 @@ func loadFile(pairFile string) (*tls.Certificate, error) {
 	}
 	cert.Leaf = certs[0]
 	return &cert, nil
-}
-
-func loadCertKeyBlocks(pairFile string) (cert *pem.Block, key *pem.Block, err error) {
-	data, err := ioutil.ReadFile(pairFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not load cert/key pair from %q: %v", pairFile, err)
-	}
-	certBlock, rest := pem.Decode(data)
-	if certBlock == nil {
-		return nil, nil, fmt.Errorf("could not decode the first block from %q from expected PEM format", pairFile)
-	}
-	keyBlock, _ := pem.Decode(rest)
-	if keyBlock == nil {
-		return nil, nil, fmt.Errorf("could not decode the second block from %q from expected PEM format", pairFile)
-	}
-	return certBlock, keyBlock, nil
 }
 
 func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {

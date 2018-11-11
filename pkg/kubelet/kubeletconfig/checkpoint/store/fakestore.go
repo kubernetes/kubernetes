@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 )
 
@@ -31,6 +31,11 @@ type fakeStore struct {
 }
 
 var _ Store = (*fakeStore)(nil)
+
+// NewFakeStore constructs a fake Store
+func NewFakeStore() Store {
+	return &fakeStore{}
+}
 
 func (s *fakeStore) Initialize() error {
 	return fmt.Errorf("Initialize method not supported")

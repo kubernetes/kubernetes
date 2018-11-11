@@ -29,7 +29,7 @@
   "description": "Creates and runs virtual machines on Google Cloud Platform.",
   "discoveryVersion": "v1",
   "documentationLink": "https://developers.google.com/compute/docs/reference/latest/",
-  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/rcMTQpIOHgWYetp22aQ7_LoqIH4\"",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/BGL7e2LbtubnBH3AZ2eFVpuxx2U\"",
   "icons": {
     "x16": "https://www.google.com/images/icons/product/compute_engine-16.png",
     "x32": "https://www.google.com/images/icons/product/compute_engine-32.png"
@@ -812,6 +812,46 @@
     },
     "backendBuckets": {
       "methods": {
+        "addSignedUrlKey": {
+          "description": "Adds the given Signed URL Key to the backend bucket.",
+          "httpMethod": "POST",
+          "id": "compute.backendBuckets.addSignedUrlKey",
+          "parameterOrder": [
+            "project",
+            "backendBucket"
+          ],
+          "parameters": {
+            "backendBucket": {
+              "description": "Name of the BackendBucket resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/backendBuckets/{backendBucket}/addSignedUrlKey",
+          "request": {
+            "$ref": "SignedUrlKey"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
         "delete": {
           "description": "Deletes the specified BackendBucket resource.",
           "httpMethod": "DELETE",
@@ -842,6 +882,50 @@
             }
           },
           "path": "{project}/global/backendBuckets/{backendBucket}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
+        "deleteSignedUrlKey": {
+          "description": "Deletes the given Signed URL Key from the backend bucket.",
+          "httpMethod": "POST",
+          "id": "compute.backendBuckets.deleteSignedUrlKey",
+          "parameterOrder": [
+            "project",
+            "backendBucket",
+            "keyName"
+          ],
+          "parameters": {
+            "backendBucket": {
+              "description": "Name of the BackendBucket resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "keyName": {
+              "description": "The name of the Signed URL Key to delete.",
+              "location": "query",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/backendBuckets/{backendBucket}/deleteSignedUrlKey",
           "response": {
             "$ref": "Operation"
           },
@@ -1052,6 +1136,46 @@
     },
     "backendServices": {
       "methods": {
+        "addSignedUrlKey": {
+          "description": "Adds the given Signed URL Key to the specified backend service.",
+          "httpMethod": "POST",
+          "id": "compute.backendServices.addSignedUrlKey",
+          "parameterOrder": [
+            "project",
+            "backendService"
+          ],
+          "parameters": {
+            "backendService": {
+              "description": "Name of the BackendService resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/backendServices/{backendService}/addSignedUrlKey",
+          "request": {
+            "$ref": "SignedUrlKey"
+          },
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
         "aggregatedList": {
           "description": "Retrieves the list of all BackendService resources, regional and global, available to the specified project.",
           "httpMethod": "GET",
@@ -1131,6 +1255,50 @@
             }
           },
           "path": "{project}/global/backendServices/{backendService}",
+          "response": {
+            "$ref": "Operation"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute"
+          ]
+        },
+        "deleteSignedUrlKey": {
+          "description": "Deletes the given Signed URL Key from the specified backend service.",
+          "httpMethod": "POST",
+          "id": "compute.backendServices.deleteSignedUrlKey",
+          "parameterOrder": [
+            "project",
+            "backendService",
+            "keyName"
+          ],
+          "parameters": {
+            "backendService": {
+              "description": "Name of the BackendService resource to which the Signed URL Key should be added. The name should conform to RFC1035.",
+              "location": "path",
+              "required": true,
+              "type": "string"
+            },
+            "keyName": {
+              "description": "The name of the Signed URL Key to delete.",
+              "location": "query",
+              "required": true,
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "requestId": {
+              "description": "An optional request ID to identify requests. Specify a unique request ID so that if you must retry your request, the server will know to ignore the request if it has already been completed.\n\nFor example, consider a situation where you make an initial request and the request times out. If you make the request again with the same request ID, the server can check if original operation with the same request ID was received, and if so, will ignore the second request. This prevents clients from accidentally creating duplicate commitments.\n\nThe request ID must be a valid UUID with the exception that zero UUID is not supported (00000000-0000-0000-0000-000000000000).",
+              "location": "query",
+              "type": "string"
+            }
+          },
+          "path": "{project}/global/backendServices/{backendService}/deleteSignedUrlKey",
           "response": {
             "$ref": "Operation"
           },
@@ -14944,7 +15112,6 @@
       }
     }
   },
-  "revision": "20180518",
   "rootUrl": "https://www.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -15443,9 +15610,11 @@
           "description": "[Output Only] The status of the address, which can be one of RESERVING, RESERVED, or IN_USE. An address that is RESERVING is currently in the process of being reserved. A RESERVED address is currently reserved and available to use. An IN_USE address is currently being used by another resource and is not available.",
           "enum": [
             "IN_USE",
-            "RESERVED"
+            "RESERVED",
+            "RESERVING"
           ],
           "enumDescriptions": [
+            "",
             "",
             ""
           ],
@@ -16526,6 +16695,10 @@
           "description": "Cloud Storage bucket name.",
           "type": "string"
         },
+        "cdnPolicy": {
+          "$ref": "BackendBucketCdnPolicy",
+          "description": "Cloud CDN Coniguration for this BackendBucket."
+        },
         "creationTimestamp": {
           "description": "[Output Only] Creation timestamp in RFC3339 text format.",
           "type": "string"
@@ -16556,6 +16729,25 @@
         "selfLink": {
           "description": "[Output Only] Server-defined URL for the resource.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BackendBucketCdnPolicy": {
+      "description": "Message containing Cloud CDN configuration for a backend bucket.",
+      "id": "BackendBucketCdnPolicy",
+      "properties": {
+        "signedUrlCacheMaxAgeSec": {
+          "description": "Number of seconds up to which the response to a signed URL request will be cached in the CDN. After this time period, the Signed URL will be revalidated before being served. Defaults to 1hr (3600s). If this field is set, Cloud CDN will internally act as though all responses from this bucket had a ?Cache-Control: public, max-age=[TTL]? header, regardless of any existing Cache-Control header. The actual headers served in responses will not be altered.",
+          "format": "int64",
+          "type": "string"
+        },
+        "signedUrlKeyNames": {
+          "description": "[Output Only] Names of the keys currently configured for Cloud CDN Signed URL on this backend bucket.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -16932,6 +17124,18 @@
         "cacheKeyPolicy": {
           "$ref": "CacheKeyPolicy",
           "description": "The CacheKeyPolicy for this CdnPolicy."
+        },
+        "signedUrlCacheMaxAgeSec": {
+          "description": "Number of seconds up to which the response to a signed URL request will be cached in the CDN. After this time period, the Signed URL will be revalidated before being served. Defaults to 1hr (3600s). If this field is set, Cloud CDN will internally act as though all responses from this backend had a ?Cache-Control: public, max-age=[TTL]? header, regardless of any existing Cache-Control header. The actual headers served in responses will not be altered.",
+          "format": "int64",
+          "type": "string"
+        },
+        "signedUrlKeyNames": {
+          "description": "[Output Only] Names of the keys currently configured for Cloud CDN Signed URL on this backend service.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -17976,6 +18180,47 @@
             }
           },
           "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DiskInstantiationConfig": {
+      "description": "A specification of the desired way to instantiate a disk in the instance template when its created from a source instance.",
+      "id": "DiskInstantiationConfig",
+      "properties": {
+        "autoDelete": {
+          "description": "Specifies whether the disk will be auto-deleted when the instance is deleted (but not when the disk is detached from the instance).",
+          "type": "boolean"
+        },
+        "customImage": {
+          "description": "The custom source image to be used to restore this disk when instantiating this instance template.",
+          "type": "string"
+        },
+        "deviceName": {
+          "description": "Specifies the device name of the disk to which the configurations apply to.",
+          "type": "string"
+        },
+        "instantiateFrom": {
+          "description": "Specifies whether to include the disk and what image to use. Possible values are:  \n- source-image: to use the same image that was used to create the source instance's corresponding disk. Applicable to the boot disk and additional read-write disks. \n- source-image-family: to use the same image family that was used to create the source instance's corresponding disk. Applicable to the boot disk and additional read-write disks. \n- custom-image: to use a user-provided image url for disk creation. Applicable to the boot disk and additional read-write disks. \n- attach-read-only: to attach a read-only disk. Applicable to read-only disks. \n- do-not-include: to exclude a disk from the template. Applicable to additional read-write disks, local SSDs, and read-only disks.",
+          "enum": [
+            "ATTACH_READ_ONLY",
+            "BLANK",
+            "CUSTOM_IMAGE",
+            "DEFAULT",
+            "DO_NOT_INCLUDE",
+            "SOURCE_IMAGE",
+            "SOURCE_IMAGE_FAMILY"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
         }
       },
       "type": "object"
@@ -22037,6 +22282,14 @@
         "selfLink": {
           "description": "[Output Only] The URL for this instance template. The server defines this URL.",
           "type": "string"
+        },
+        "sourceInstance": {
+          "description": "The source instance used to create the template. You can provide this as a partial or full URL to the resource. For example, the following are valid values:  \n- https://www.googleapis.com/compute/v1/projects/project/zones/zone/instances/instance \n- projects/project/zones/zone/instances/instance",
+          "type": "string"
+        },
+        "sourceInstanceParams": {
+          "$ref": "SourceInstanceParams",
+          "description": "The source instance params to use to create this instance template."
         }
       },
       "type": "object"
@@ -24148,7 +24401,7 @@
       "type": "object"
     },
     "ManagedInstance": {
-      "description": "Next available tag: 12",
+      "description": "A Managed Instance resource.",
       "id": "ManagedInstance",
       "properties": {
         "currentAction": {
@@ -27480,6 +27733,22 @@
       },
       "type": "object"
     },
+    "SignedUrlKey": {
+      "description": "Represents a customer-supplied Signing Key used by Cloud CDN Signed URLs",
+      "id": "SignedUrlKey",
+      "properties": {
+        "keyName": {
+          "description": "Name of the key. The name must be 1-63 characters long, and comply with RFC1035. Specifically, the name must be 1-63 characters long and match the regular expression `[a-z]([-a-z0-9]*[a-z0-9])?` which means the first character must be a lowercase letter, and all following characters must be a dash, lowercase letter, or digit, except the last character, which cannot be a dash.",
+          "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+          "type": "string"
+        },
+        "keyValue": {
+          "description": "128-bit key value used for signing the URL. The key value must be a valid RFC 4648 Section 5 base64url encoded string.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "Snapshot": {
       "description": "A persistent disk snapshot resource. (== resource_for beta.snapshots ==) (== resource_for v1.snapshots ==)",
       "id": "Snapshot",
@@ -27705,6 +27974,20 @@
             }
           },
           "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "SourceInstanceParams": {
+      "description": "A specification of the parameters to use when creating the instance template from a source instance.",
+      "id": "SourceInstanceParams",
+      "properties": {
+        "diskConfigs": {
+          "description": "Attached disks configuration. If not provided, defaults are applied: For boot disk and any other R/W disks, new custom images will be created from each disk. For read-only disks, they will be attached in read-only mode. Local SSD disks will be created as blank volumes.",
+          "items": {
+            "$ref": "DiskInstantiationConfig"
+          },
+          "type": "array"
         }
       },
       "type": "object"

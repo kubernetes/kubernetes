@@ -96,6 +96,9 @@ type Interface interface {
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	// Error is returned on any other error than "file not found".
 	ExistsPath(pathname string) (bool, error)
+	// EvalHostSymlinks returns the path name after evaluating symlinks.
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	EvalHostSymlinks(pathname string) (string, error)
 	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
 	// pod volume directory.
 	CleanSubPaths(podDir string, volumeName string) error
@@ -264,6 +267,13 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	if notMnt == false {
 		return notMnt, nil
 	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
 	// check all mountpoints since IsLikelyNotMountPoint
 	// is not reliable for some mountpoint types
 	mountPoints, mountPointsErr := mounter.List()
@@ -271,7 +281,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		return notMnt, mountPointsErr
 	}
 	for _, mp := range mountPoints {
-		if mounter.IsMountPointMatch(mp, file) {
+		if mounter.IsMountPointMatch(mp, resolvedFile) {
 			notMnt = false
 			break
 		}
@@ -283,7 +293,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
-func isBind(options []string) (bool, []string) {
+func isBind(options []string) (bool, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.
@@ -292,22 +302,36 @@ func isBind(options []string) (bool, []string) {
 	// volume mount to be read only.
 	bindRemountOpts := []string{"bind", "remount"}
 	bind := false
+	bindOpts := []string{"bind"}
 
-	if len(options) != 0 {
-		for _, option := range options {
-			switch option {
-			case "bind":
-				bind = true
-				break
-			case "remount":
-				break
-			default:
-				bindRemountOpts = append(bindRemountOpts, option)
-			}
+	// _netdev is a userspace mount option and does not automatically get added when
+	// bind mount is created and hence we must carry it over.
+	if checkForNetDev(options) {
+		bindOpts = append(bindOpts, "_netdev")
+	}
+
+	for _, option := range options {
+		switch option {
+		case "bind":
+			bind = true
+			break
+		case "remount":
+			break
+		default:
+			bindRemountOpts = append(bindRemountOpts, option)
 		}
 	}
 
-	return bind, bindRemountOpts
+	return bind, bindOpts, bindRemountOpts
+}
+
+func checkForNetDev(options []string) bool {
+	for _, option := range options {
+		if option == "_netdev" {
+			return true
+		}
+	}
+	return false
 }
 
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.
@@ -328,8 +352,8 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return count > 0
 }
 
-// pathWithinBase checks if give path is within given base directory.
-func pathWithinBase(fullPath, basePath string) bool {
+// PathWithinBase checks if give path is within given base directory.
+func PathWithinBase(fullPath, basePath string) bool {
 	rel, err := filepath.Rel(basePath, fullPath)
 	if err != nil {
 		return false

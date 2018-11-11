@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -33,16 +34,16 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const defaultContainerName = "test-c"
@@ -50,11 +51,11 @@ const defaultContainerName = "test-c"
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.
 func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Informer().GetStore()
+	store := informerFactory.Policy().V1beta1().PodSecurityPolicies().Informer().GetStore()
 	for _, psp := range psps {
 		store.Add(psp)
 	}
-	lister := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Lister()
+	lister := informerFactory.Policy().V1beta1().PodSecurityPolicies().Lister()
 	if authz == nil {
 		authz = &TestAuthorizer{}
 	}
@@ -472,7 +473,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 func TestFailClosedOnInvalidPod(t *testing.T) {
 	plugin := NewTestAdmission(nil, nil)
 	pod := &v1.Pod{}
-	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
+	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{})
 
 	err := plugin.Admit(attrs)
 	if err == nil {
@@ -502,19 +503,19 @@ func TestAdmitCaps(t *testing.T) {
 
 	allowsFooInAllowed := restrictivePSP()
 	allowsFooInAllowed.Name = "allowCapInAllowed"
-	allowsFooInAllowed.Spec.AllowedCapabilities = []kapi.Capability{"foo"}
+	allowsFooInAllowed.Spec.AllowedCapabilities = []v1.Capability{"foo"}
 
 	allowsFooInRequired := restrictivePSP()
 	allowsFooInRequired.Name = "allowCapInRequired"
-	allowsFooInRequired.Spec.DefaultAddCapabilities = []kapi.Capability{"foo"}
+	allowsFooInRequired.Spec.DefaultAddCapabilities = []v1.Capability{"foo"}
 
 	requiresFooToBeDropped := restrictivePSP()
 	requiresFooToBeDropped.Name = "requireDrop"
-	requiresFooToBeDropped.Spec.RequiredDropCapabilities = []kapi.Capability{"foo"}
+	requiresFooToBeDropped.Spec.RequiredDropCapabilities = []v1.Capability{"foo"}
 
 	allowAllInAllowed := restrictivePSP()
 	allowAllInAllowed.Name = "allowAllCapsInAllowed"
-	allowAllInAllowed.Spec.AllowedCapabilities = []kapi.Capability{policy.AllowAllCapabilities}
+	allowAllInAllowed.Spec.AllowedCapabilities = []v1.Capability{policy.AllowAllCapabilities}
 
 	tc := map[string]struct {
 		pod                  *kapi.Pod
@@ -959,11 +960,17 @@ func TestAdmitSELinux(t *testing.T) {
 	mustRunAs := permissivePSP()
 	mustRunAs.Name = "mustRunAs"
 	mustRunAs.Spec.SELinux.Rule = policy.SELinuxStrategyMustRunAs
-	mustRunAs.Spec.SELinux.SELinuxOptions = &kapi.SELinuxOptions{}
+	mustRunAs.Spec.SELinux.SELinuxOptions = &v1.SELinuxOptions{}
 	mustRunAs.Spec.SELinux.SELinuxOptions.Level = "level"
 	mustRunAs.Spec.SELinux.SELinuxOptions.Role = "role"
 	mustRunAs.Spec.SELinux.SELinuxOptions.Type = "type"
 	mustRunAs.Spec.SELinux.SELinuxOptions.User = "user"
+
+	getInternalSEOptions := func(policy *policy.PodSecurityPolicy) *kapi.SELinuxOptions {
+		opt := kapi.SELinuxOptions{}
+		k8s_api_v1.Convert_v1_SELinuxOptions_To_core_SELinuxOptions(policy.Spec.SELinux.SELinuxOptions, &opt, nil)
+		return &opt
+	}
 
 	tests := map[string]struct {
 		pod                 *kapi.Pod
@@ -1047,7 +1054,7 @@ func TestAdmitSELinux(t *testing.T) {
 			psps:                []*policy.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
-			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
+			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: getInternalSEOptions(mustRunAs)},
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
 		},
@@ -1059,7 +1066,7 @@ func TestAdmitSELinux(t *testing.T) {
 			psps:                []*policy.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
-			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
+			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: getInternalSEOptions(mustRunAs)},
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
 		},
@@ -1071,7 +1078,7 @@ func TestAdmitSELinux(t *testing.T) {
 			psps:                []*policy.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
-			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
+			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: getInternalSEOptions(mustRunAs)},
 			expectedContainerSC: nil,
 			expectedPSP:         mustRunAs.Name,
 		},
@@ -1769,7 +1776,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
-	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo)
+	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, false, userInfo)
 	annotations := make(map[string]string)
 	attrs = &fakeAttributes{attrs, annotations}
 	err := plugin.Admit(attrs)
@@ -1876,7 +1883,7 @@ func TestAssignSecurityContext(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		errs := assignSecurityContext(provider, v.pod, nil)
+		errs := assignSecurityContext(provider, v.pod)
 		if v.shouldValidate && len(errs) > 0 {
 			t.Errorf("%s expected to validate but received errors %v", k, errs)
 			continue
@@ -1907,6 +1914,9 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 						RunAsUser: policy.RunAsUserStrategyOptions{
 							Rule: policy.RunAsUserStrategyRunAsAny,
 						},
+						RunAsGroup: &policy.RunAsGroupStrategyOptions{
+							Rule: policy.RunAsGroupStrategyRunAsAny,
+						},
 						FSGroup: policy.FSGroupStrategyOptions{
 							Rule: policy.FSGroupStrategyRunAsAny,
 						},
@@ -1929,6 +1939,9 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 						},
 						RunAsUser: policy.RunAsUserStrategyOptions{
 							Rule: policy.RunAsUserStrategyMustRunAs,
+						},
+						RunAsGroup: &policy.RunAsGroupStrategyOptions{
+							Rule: policy.RunAsGroupStrategyRunAsAny,
 						},
 						FSGroup: policy.FSGroupStrategyOptions{
 							Rule: policy.FSGroupStrategyRunAsAny,
@@ -2227,7 +2240,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			pod.Spec.SecurityContext.HostPID = true
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{Name: userName})
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{Name: userName})
 
 			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
@@ -2320,7 +2333,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &allowPrivilegeEscalation
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &user.DefaultInfo{Name: "test"})
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, false, &user.DefaultInfo{Name: "test"})
 
 			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)
@@ -2331,21 +2344,29 @@ func TestPreferValidatedPSP(t *testing.T) {
 }
 
 func restrictivePSP() *policy.PodSecurityPolicy {
+	allowPrivilegeEscalation := false
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "restrictive",
 			Annotations: map[string]string{},
 		},
 		Spec: policy.PodSecurityPolicySpec{
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyMustRunAs,
 				Ranges: []policy.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: int64(999), Max: int64(999)},
+				},
+			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyMustRunAs,
-				SELinuxOptions: &kapi.SELinuxOptions{
+				SELinuxOptions: &v1.SELinuxOptions{
 					Level: "s9:z0,z1",
 				},
 			},
@@ -2366,21 +2387,25 @@ func restrictivePSP() *policy.PodSecurityPolicy {
 }
 
 func permissivePSP() *policy.PodSecurityPolicy {
+	allowPrivilegeEscalation := true
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "privileged",
 			Annotations: map[string]string{},
 		},
 		Spec: policy.PodSecurityPolicySpec{
-			AllowPrivilegeEscalation: true,
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 			HostIPC:                  true,
 			HostNetwork:              true,
 			HostPID:                  true,
 			HostPorts:                []policy.HostPortRange{{Min: 0, Max: 65536}},
 			Volumes:                  []policy.FSType{policy.All},
-			AllowedCapabilities:      []kapi.Capability{policy.AllowAllCapabilities},
+			AllowedCapabilities:      []v1.Capability{policy.AllowAllCapabilities},
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyRunAsAny,
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,

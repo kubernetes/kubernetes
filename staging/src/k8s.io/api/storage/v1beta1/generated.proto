@@ -22,18 +22,16 @@ syntax = 'proto2';
 package k8s.io.api.storage.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
 // StorageClass describes the parameters for a class of storage for
 // which PersistentVolumes can be dynamically provisioned.
-// 
+//
 // StorageClasses are non-namespaced; the name of the storage class
 // according to etcd is in ObjectMeta.Name.
 message StorageClass {
@@ -67,16 +65,14 @@ message StorageClass {
 
   // VolumeBindingMode indicates how PersistentVolumeClaims should be
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
-  // This field is alpha-level and is only honored by servers that enable
-  // the VolumeScheduling feature.
+  // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
   optional string volumeBindingMode = 7;
 
   // Restrict the node topologies where volumes can be dynamically provisioned.
   // Each volume plugin defines its own supported topology specifications.
   // An empty TopologySelectorTerm list means there is no topology restriction.
-  // This field is alpha-level and is only honored by servers that enable
-  // the DynamicProvisioningScheduling feature.
+  // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
   repeated k8s.io.api.core.v1.TopologySelectorTerm allowedTopologies = 8;
 }
@@ -94,7 +90,7 @@ message StorageClassList {
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
-// 
+//
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
   // Standard object metadata.

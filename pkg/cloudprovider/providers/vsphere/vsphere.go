@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -32,16 +33,18 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	"github.com/golang/glog"
+	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/tags"
+	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 // VSphere Cloud Provider constants
@@ -103,6 +106,8 @@ type VirtualCenterConfig struct {
 	Datacenters string `gcfg:"datacenters"`
 	// Soap round tripper count (retries = RoundTripper - 1)
 	RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
+	// Thumbprint of the VCenter's certificate thumbprint
+	Thumbprint string `gcfg:"thumbprint"`
 }
 
 // Structure that represents the content of vsphere.conf file.
@@ -121,6 +126,11 @@ type VSphereConfig struct {
 		VCenterPort string `gcfg:"port"`
 		// True if vCenter uses self-signed cert.
 		InsecureFlag bool `gcfg:"insecure-flag"`
+		// Specifies the path to a CA certificate in PEM format. Optional; if not
+		// configured, the system's CA certificates will be used.
+		CAFile string `gcfg:"ca-file"`
+		// Thumbprint of the VCenter's certificate thumbprint
+		Thumbprint string `gcfg:"thumbprint"`
 		// Datacenter in which VMs are located.
 		// Deprecated. Use "datacenters" instead.
 		Datacenter string `gcfg:"datacenter"`
@@ -169,6 +179,12 @@ type VSphereConfig struct {
 		Folder           string `gcfg:"folder"`
 		DefaultDatastore string `gcfg:"default-datastore"`
 		ResourcePoolPath string `gcfg:"resourcepool-path"`
+	}
+
+	// Tag categories and tags which correspond to "built-in node labels: zones and region"
+	Labels struct {
+		Zone   string `gcfg:"zone"`
+		Region string `gcfg:"region"`
 	}
 }
 
@@ -225,7 +241,7 @@ func init() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (vs *VSphere) Initialize(clientBuilder controller.ControllerClientBuilder) {
+func (vs *VSphere) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 }
 
 // Initialize Node Informers
@@ -248,13 +264,13 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 
 	// Only on controller node it is required to register listeners.
 	// Register callbacks for node updates
-	glog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
+	klog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    vs.NodeAdded,
 		DeleteFunc: vs.NodeDeleted,
 	})
-	glog.V(4).Infof("Node informers in vSphere cloud provider initialized")
+	klog.V(4).Infof("Node informers in vSphere cloud provider initialized")
 
 }
 
@@ -264,12 +280,12 @@ func newWorkerNode() (*VSphere, error) {
 	vs := VSphere{}
 	vs.hostName, err = os.Hostname()
 	if err != nil {
-		glog.Errorf("Failed to get hostname. err: %+v", err)
+		klog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
 	vs.vmUUID, err = GetVMUUID()
 	if err != nil {
-		glog.Errorf("Failed to get uuid. err: %+v", err)
+		klog.Errorf("Failed to get uuid. err: %+v", err)
 		return nil, err
 	}
 	return &vs, nil
@@ -280,18 +296,18 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 	isSecretInfoProvided := true
 
 	if cfg.Global.SecretName == "" || cfg.Global.SecretNamespace == "" {
-		glog.Warningf("SecretName and/or SecretNamespace is not provided. " +
+		klog.Warningf("SecretName and/or SecretNamespace is not provided. " +
 			"VCP will use username and password from config file")
 		isSecretInfoProvided = false
 	}
 
 	if isSecretInfoProvided {
 		if cfg.Global.User != "" {
-			glog.Warning("Global.User and Secret info provided. VCP will use secret to get credentials")
+			klog.Warning("Global.User and Secret info provided. VCP will use secret to get credentials")
 			cfg.Global.User = ""
 		}
 		if cfg.Global.Password != "" {
-			glog.Warning("Global.Password and Secret info provided. VCP will use secret to get credentials")
+			klog.Warning("Global.Password and Secret info provided. VCP will use secret to get credentials")
 			cfg.Global.Password = ""
 		}
 	}
@@ -299,28 +315,28 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 	// Check if the vsphere.conf is in old format. In this
 	// format the cfg.VirtualCenter will be nil or empty.
 	if cfg.VirtualCenter == nil || len(cfg.VirtualCenter) == 0 {
-		glog.V(4).Infof("Config is not per virtual center and is in old format.")
+		klog.V(4).Infof("Config is not per virtual center and is in old format.")
 		if !isSecretInfoProvided {
 			if cfg.Global.User == "" {
-				glog.Error("Global.User is empty!")
+				klog.Error("Global.User is empty!")
 				return nil, ErrUsernameMissing
 			}
 			if cfg.Global.Password == "" {
-				glog.Error("Global.Password is empty!")
+				klog.Error("Global.Password is empty!")
 				return nil, ErrPasswordMissing
 			}
 		}
 
 		if cfg.Global.WorkingDir == "" {
-			glog.Error("Global.WorkingDir is empty!")
+			klog.Error("Global.WorkingDir is empty!")
 			return nil, errors.New("Global.WorkingDir is empty!")
 		}
 		if cfg.Global.VCenterIP == "" {
-			glog.Error("Global.VCenterIP is empty!")
+			klog.Error("Global.VCenterIP is empty!")
 			return nil, errors.New("Global.VCenterIP is empty!")
 		}
 		if cfg.Global.Datacenter == "" {
-			glog.Error("Global.Datacenter is empty!")
+			klog.Error("Global.Datacenter is empty!")
 			return nil, errors.New("Global.Datacenter is empty!")
 		}
 		cfg.Workspace.VCenterIP = cfg.Global.VCenterIP
@@ -334,6 +350,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			VCenterPort:       cfg.Global.VCenterPort,
 			Datacenters:       cfg.Global.Datacenter,
 			RoundTripperCount: cfg.Global.RoundTripperCount,
+			Thumbprint:        cfg.Global.Thumbprint,
 		}
 
 		// Note: If secrets info is provided username and password will be populated
@@ -345,7 +362,10 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			Insecure:          cfg.Global.InsecureFlag,
 			RoundTripperCount: vcConfig.RoundTripperCount,
 			Port:              vcConfig.VCenterPort,
+			CACert:            cfg.Global.CAFile,
+			Thumbprint:        cfg.Global.Thumbprint,
 		}
+
 		vsphereIns := VSphereInstance{
 			conn: &vSphereConn,
 			cfg:  &vcConfig,
@@ -355,14 +375,14 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 		if cfg.Workspace.VCenterIP == "" || cfg.Workspace.Folder == "" || cfg.Workspace.Datacenter == "" {
 			msg := fmt.Sprintf("All fields in workspace are mandatory."+
 				" vsphere.conf does not have the workspace specified correctly. cfg.Workspace: %+v", cfg.Workspace)
-			glog.Error(msg)
+			klog.Error(msg)
 			return nil, errors.New(msg)
 		}
 
 		for vcServer, vcConfig := range cfg.VirtualCenter {
-			glog.V(4).Infof("Initializing vc server %s", vcServer)
+			klog.V(4).Infof("Initializing vc server %s", vcServer)
 			if vcServer == "" {
-				glog.Error("vsphere.conf does not have the VirtualCenter IP address specified")
+				klog.Error("vsphere.conf does not have the VirtualCenter IP address specified")
 				return nil, errors.New("vsphere.conf does not have the VirtualCenter IP address specified")
 			}
 
@@ -370,24 +390,24 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				if vcConfig.User == "" {
 					vcConfig.User = cfg.Global.User
 					if vcConfig.User == "" {
-						glog.Errorf("vcConfig.User is empty for vc %s!", vcServer)
+						klog.Errorf("vcConfig.User is empty for vc %s!", vcServer)
 						return nil, ErrUsernameMissing
 					}
 				}
 				if vcConfig.Password == "" {
 					vcConfig.Password = cfg.Global.Password
 					if vcConfig.Password == "" {
-						glog.Errorf("vcConfig.Password is empty for vc %s!", vcServer)
+						klog.Errorf("vcConfig.Password is empty for vc %s!", vcServer)
 						return nil, ErrPasswordMissing
 					}
 				}
 			} else {
 				if vcConfig.User != "" {
-					glog.Warningf("vcConfig.User for server %s and Secret info provided. VCP will use secret to get credentials", vcServer)
+					klog.Warningf("vcConfig.User for server %s and Secret info provided. VCP will use secret to get credentials", vcServer)
 					vcConfig.User = ""
 				}
 				if vcConfig.Password != "" {
-					glog.Warningf("vcConfig.Password for server %s and Secret info provided. VCP will use secret to get credentials", vcServer)
+					klog.Warningf("vcConfig.Password for server %s and Secret info provided. VCP will use secret to get credentials", vcServer)
 					vcConfig.Password = ""
 				}
 			}
@@ -417,6 +437,8 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				Insecure:          cfg.Global.InsecureFlag,
 				RoundTripperCount: vcConfig.RoundTripperCount,
 				Port:              vcConfig.VCenterPort,
+				CACert:            cfg.Global.CAFile,
+				Thumbprint:        vcConfig.Thumbprint,
 			}
 			vsphereIns := VSphereInstance{
 				conn: &vSphereConn,
@@ -439,7 +461,7 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	}
 	vs.hostName, err = os.Hostname()
 	if err != nil {
-		glog.Errorf("Failed to get hostname. err: %+v", err)
+		klog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
 	if cfg.Global.VMUUID != "" {
@@ -447,7 +469,7 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	} else {
 		vs.vmUUID, err = getVMUUID()
 		if err != nil {
-			glog.Errorf("Failed to get uuid. err: %+v", err)
+			klog.Errorf("Failed to get uuid. err: %+v", err)
 			return nil, err
 		}
 	}
@@ -465,7 +487,7 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 	if cfg.Disk.SCSIControllerType == "" {
 		cfg.Disk.SCSIControllerType = vclib.PVSCSIControllerType
 	} else if !vclib.CheckControllerSupported(cfg.Disk.SCSIControllerType) {
-		glog.Errorf("%v is not a supported SCSI Controller type. Please configure 'lsilogic-sas' OR 'pvscsi'", cfg.Disk.SCSIControllerType)
+		klog.Errorf("%v is not a supported SCSI Controller type. Please configure 'lsilogic-sas' OR 'pvscsi'", cfg.Disk.SCSIControllerType)
 		return nil, errors.New("Controller type not supported. Please configure 'lsilogic-sas' OR 'pvscsi'")
 	}
 	if cfg.Global.WorkingDir != "" {
@@ -497,11 +519,8 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 
 func logout(vs *VSphere) {
 	for _, vsphereIns := range vs.vsphereInstanceMap {
-		if vsphereIns.conn.Client != nil {
-			vsphereIns.conn.Logout(context.TODO())
-		}
+		vsphereIns.conn.Logout(context.TODO())
 	}
-
 }
 
 // Instances returns an implementation of Instances for vSphere.
@@ -513,13 +532,13 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 	addrs := []v1.NodeAddress{}
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		glog.Errorf("net.Interfaces() failed for NodeAddresses - %v", err)
+		klog.Errorf("net.Interfaces() failed for NodeAddresses - %v", err)
 		return nil, err
 	}
 	for _, i := range ifaces {
 		localAddrs, err := i.Addrs()
 		if err != nil {
-			glog.Warningf("Failed to extract addresses for NodeAddresses - %v", err)
+			klog.Warningf("Failed to extract addresses for NodeAddresses - %v", err)
 		} else {
 			for _, addr := range localAddrs {
 				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
@@ -539,7 +558,7 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 								},
 							)
 						}
-						glog.V(4).Infof("Find local IP address %v and set type to %v", ipnet.IP.String(), addressType)
+						klog.V(4).Infof("Find local IP address %v and set type to %v", ipnet.IP.String(), addressType)
 					}
 				}
 			}
@@ -551,7 +570,7 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 func (vs *VSphere) getVSphereInstance(nodeName k8stypes.NodeName) (*VSphereInstance, error) {
 	vsphereIns, err := vs.nodeManager.GetVSphereInstance(nodeName)
 	if err != nil {
-		glog.Errorf("Cannot find node %q in cache. Node not found!!!", nodeName)
+		klog.Errorf("Cannot find node %q in cache. Node not found!!!", nodeName)
 		return nil, err
 	}
 	return &vsphereIns, nil
@@ -560,13 +579,13 @@ func (vs *VSphere) getVSphereInstance(nodeName k8stypes.NodeName) (*VSphereInsta
 func (vs *VSphere) getVSphereInstanceForServer(vcServer string, ctx context.Context) (*VSphereInstance, error) {
 	vsphereIns, ok := vs.vsphereInstanceMap[vcServer]
 	if !ok {
-		glog.Errorf("cannot find vcServer %q in cache. VC not found!!!", vcServer)
+		klog.Errorf("cannot find vcServer %q in cache. VC not found!!!", vcServer)
 		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", vcServer))
 	}
 	// Ensure client is logged in and session is valid
 	err := vs.nodeManager.vcConnect(ctx, vsphereIns)
 	if err != nil {
-		glog.Errorf("failed connecting to vcServer %q with error %+v", vcServer, err)
+		klog.Errorf("failed connecting to vcServer %q with error %+v", vcServer, err)
 		return nil, err
 	}
 
@@ -586,7 +605,13 @@ func (vs *VSphere) getVMFromNodeName(ctx context.Context, nodeName k8stypes.Node
 func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
 	// Get local IP addresses if node is local node
 	if vs.hostName == convertToString(nodeName) {
-		return getLocalIP()
+		addrs, err := getLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		// add the hostname address
+		v1helper.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
+		return addrs, nil
 	}
 
 	if vs.cfg == nil {
@@ -610,12 +635,12 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 
 	vm, err := vs.getVMFromNodeName(ctx, nodeName)
 	if err != nil {
-		glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
+		klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 		return nil, err
 	}
 	vmMoList, err := vm.Datacenter.GetVMMoList(ctx, []*vclib.VirtualMachine{vm}, []string{"guest.net"})
 	if err != nil {
-		glog.Errorf("Failed to get VM Managed object with property guest.net for node: %q. err: +%v", convertToString(nodeName), err)
+		klog.Errorf("Failed to get VM Managed object with property guest.net for node: %q. err: +%v", convertToString(nodeName), err)
 		return nil, err
 	}
 	// retrieve VM's ip(s)
@@ -667,22 +692,10 @@ func convertToK8sType(vmName string) k8stypes.NodeName {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	var nodeName string
-	nodes, err := vs.nodeManager.GetNodeDetails()
+	nodeName, err := vs.GetNodeNameFromProviderID(providerID)
 	if err != nil {
-		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		klog.Errorf("Error while getting nodename for providerID %s", providerID)
 		return false, err
-	}
-	for _, node := range nodes {
-		// ProviderID is UUID for nodes v1.9.3+
-		if node.VMUUID == GetUUIDFromProviderID(providerID) || node.NodeName == providerID {
-			nodeName = node.NodeName
-			break
-		}
-	}
-	if nodeName == "" {
-		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
-		return false, errors.New(msg)
 	}
 	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
 	if err == nil {
@@ -694,7 +707,31 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	nodeName, err := vs.GetNodeNameFromProviderID(providerID)
+	if err != nil {
+		klog.Errorf("Error while getting nodename for providerID %s", providerID)
+		return false, err
+	}
+
+	vsi, err := vs.getVSphereInstance(convertToK8sType(nodeName))
+	if err != nil {
+		return false, err
+	}
+	// Ensure client is logged in and session is valid
+	if err := vs.nodeManager.vcConnect(ctx, vsi); err != nil {
+		return false, err
+	}
+	vm, err := vs.getVMFromNodeName(ctx, convertToK8sType(nodeName))
+	if err != nil {
+		klog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeName, err)
+		return false, err
+	}
+	isActive, err := vm.IsActive(ctx)
+	if err != nil {
+		klog.Errorf("Failed to check whether node %q is active. err: %+v.", nodeName, err)
+		return false, err
+	}
+	return !isActive, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
@@ -724,31 +761,27 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
-				return "", cloudprovider.InstanceNotFound
-			}
-			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
+			klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
 		isActive, err := vm.IsActive(ctx)
 		if err != nil {
-			glog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
+			klog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
 			return "", err
 		}
 		if isActive {
 			return vs.vmUUID, nil
 		}
-		glog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
+		klog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
 		return "", cloudprovider.InstanceNotFound
 	}
 
 	instanceID, err := instanceIDInternal()
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
-				glog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
+				klog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
 				instanceID, err = instanceIDInternal()
 			} else if err == vclib.ErrNoVMFound {
 				return "", cloudprovider.InstanceNotFound
@@ -784,10 +817,13 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 
-// Zones returns an implementation of Zones for Google vSphere.
+// Zones returns an implementation of Zones for vSphere.
 func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
-	glog.V(1).Info("The vSphere cloud provider does not support zones")
-	return nil, false
+	if vs.cfg == nil {
+		klog.V(1).Info("The vSphere cloud provider does not support zones")
+		return nil, false
+	}
+	return vs, true
 }
 
 // Routes returns a false since the interface is not supported for vSphere.
@@ -816,13 +852,13 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
+			klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
 
 		diskUUID, err = vm.AttachDisk(ctx, vmDiskPath, &vclib.VolumeOptions{SCSIControllerType: vclib.PVSCSIControllerType, StoragePolicyName: storagePolicyName})
 		if err != nil {
-			glog.Errorf("Failed to attach disk: %s for node: %s. err: +%v", vmDiskPath, convertToString(nodeName), err)
+			klog.Errorf("Failed to attach disk: %s for node: %s. err: +%v", vmDiskPath, convertToString(nodeName), err)
 			return "", err
 		}
 		return diskUUID, nil
@@ -830,31 +866,18 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 	requestTime := time.Now()
 	diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
-				glog.V(4).Infof("AttachDisk: Found node %q", convertToString(nodeName))
+				klog.V(4).Infof("AttachDisk: Found node %q", convertToString(nodeName))
 				diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
-				glog.V(4).Infof("AttachDisk: Retry: diskUUID %s, err +%v", convertToString(nodeName), diskUUID, err)
+				klog.V(4).Infof("AttachDisk: Retry: diskUUID %s, err +%v", diskUUID, err)
 			}
 		}
 	}
-	glog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
+	klog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
-}
-
-func (vs *VSphere) retry(nodeName k8stypes.NodeName, err error) (bool, error) {
-	isManagedObjectNotFoundError := false
-	if err != nil {
-		if vclib.IsManagedObjectNotFoundError(err) {
-			isManagedObjectNotFoundError = true
-			glog.V(4).Infof("error %q ManagedObjectNotFound for node %q", err, convertToString(nodeName))
-			err = vs.nodeManager.RediscoverNode(nodeName)
-		}
-	}
-	return isManagedObjectNotFoundError, err
 }
 
 // DetachDisk detaches given virtual disk volume from the compute running kubelet.
@@ -870,7 +893,7 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		if err != nil {
 			// If node doesn't exist, disk is already detached from node.
 			if err == vclib.ErrNoVMFound {
-				glog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
+				klog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
 				return nil
 			}
 			return err
@@ -884,16 +907,16 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		if err != nil {
 			// If node doesn't exist, disk is already detached from node.
 			if err == vclib.ErrNoVMFound {
-				glog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
+				klog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
 				return nil
 			}
 
-			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
+			klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return err
 		}
 		err = vm.DetachDisk(ctx, volPath)
 		if err != nil {
-			glog.Errorf("Failed to detach disk: %s for node: %s. err: +%v", volPath, convertToString(nodeName), err)
+			klog.Errorf("Failed to detach disk: %s for node: %s. err: +%v", volPath, convertToString(nodeName), err)
 			return err
 		}
 		return nil
@@ -901,9 +924,8 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 	requestTime := time.Now()
 	err := detachDiskInternal(volPath, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				err = detachDiskInternal(volPath, nodeName)
 			}
@@ -938,30 +960,29 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
 			if err == vclib.ErrNoVMFound {
-				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
+				klog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
 				// make the disk as detached and return false without error.
 				return false, nil
 			}
-			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
+			klog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return false, err
 		}
 
 		volPath = vclib.RemoveStorageClusterORFolderNameFromVDiskPath(volPath)
 		attached, err := vm.IsDiskAttached(ctx, volPath)
 		if err != nil {
-			glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached on node %q",
+			klog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached on node %q",
 				volPath,
 				vSphereInstance)
 		}
-		glog.V(4).Infof("DiskIsAttached result: %q and error: %q, for volume: %q", attached, err, volPath)
+		klog.V(4).Infof("DiskIsAttached result: %v and error: %q, for volume: %q", attached, err, volPath)
 		return attached, err
 	}
 	requestTime := time.Now()
 	isAttached, err := diskIsAttachedInternal(volPath, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == vclib.ErrNoVMFound {
 				isAttached, err = false, nil
 			} else if err == nil {
@@ -1003,7 +1024,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			for nodeName := range nodeVolumes {
 				nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
 				if err != nil {
-					glog.Errorf("Failed to get node info: %+v. err: %+v", nodeInfo.vm, err)
+					klog.Errorf("Failed to get node info: %+v. err: %+v", nodeInfo.vm, err)
 					return nodesToRetry, err
 				}
 				VC_DC := nodeInfo.vcServer + nodeInfo.dataCenter.String()
@@ -1021,7 +1042,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 							globalErrMutex.Lock()
 							globalErr = err
 							globalErrMutex.Unlock()
-							glog.Errorf("Failed to check disk attached for nodes: %+v. err: %+v", nodes, err)
+							klog.Errorf("Failed to check disk attached for nodes: %+v. err: %+v", nodes, err)
 						}
 					}
 					nodesToRetryMutex.Lock()
@@ -1044,7 +1065,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			return nodesToRetry, nil
 		}
 
-		glog.V(4).Info("Starting DisksAreAttached API for vSphere with nodeVolumes: %+v", nodeVolumes)
+		klog.V(4).Infof("Starting DisksAreAttached API for vSphere with nodeVolumes: %+v", nodeVolumes)
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -1057,7 +1078,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		// Convert VolPaths into canonical form so that it can be compared with the VM device path.
 		vmVolumes, err := vs.convertVolPathsToDevicePaths(ctx, nodeVolumes)
 		if err != nil {
-			glog.Errorf("Failed to convert volPaths to devicePaths: %+v. err: %+v", nodeVolumes, err)
+			klog.Errorf("Failed to convert volPaths to devicePaths: %+v. err: %+v", nodeVolumes, err)
 			return nil, err
 		}
 		attached := make(map[string]map[string]bool)
@@ -1073,10 +1094,10 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 				err = vs.nodeManager.RediscoverNode(nodeName)
 				if err != nil {
 					if err == vclib.ErrNoVMFound {
-						glog.V(4).Infof("node %s not found. err: %+v", nodeName, err)
+						klog.V(4).Infof("node %s not found. err: %+v", nodeName, err)
 						continue
 					}
-					glog.Errorf("Failed to rediscover node %s. err: %+v", nodeName, err)
+					klog.Errorf("Failed to rediscover node %s. err: %+v", nodeName, err)
 					return nil, err
 				}
 				remainingNodesVolumes[nodeName] = nodeVolumes[nodeName]
@@ -1086,7 +1107,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			if len(remainingNodesVolumes) != 0 {
 				nodesToRetry, err = disksAreAttach(ctx, remainingNodesVolumes, attached, true)
 				if err != nil || len(nodesToRetry) != 0 {
-					glog.Errorf("Failed to retry disksAreAttach  for nodes %+v. err: %+v", remainingNodesVolumes, err)
+					klog.Errorf("Failed to retry disksAreAttach  for nodes %+v. err: %+v", remainingNodesVolumes, err)
 					return nil, err
 				}
 			}
@@ -1095,7 +1116,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 				disksAttached[convertToK8sType(nodeName)] = volPaths
 			}
 		}
-		glog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
+		klog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
 		return disksAttached, nil
 	}
 	requestTime := time.Now()
@@ -1109,7 +1130,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 // return value will be [DatastoreCluster/sharedVmfs-0] kubevols/<volume-name>.vmdk
 // else return value will be [sharedVmfs-0] kubevols/<volume-name>.vmdk
 func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVolumePath string, err error) {
-	glog.V(1).Infof("Starting to create a vSphere volume with volumeOptions: %+v", volumeOptions)
+	klog.V(1).Infof("Starting to create a vSphere volume with volumeOptions: %+v", volumeOptions)
 	createVolumeInternal := func(volumeOptions *vclib.VolumeOptions) (canonicalVolumePath string, err error) {
 		var datastore string
 		// If datastore not specified, then use default datastore
@@ -1139,21 +1160,21 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 			// This routine will get executed for every 5 minutes and gets initiated only once in its entire lifetime.
 			cleanUpRoutineInitLock.Lock()
 			if !cleanUpRoutineInitialized {
-				glog.V(1).Infof("Starting a clean up routine to remove stale dummy VM's")
+				klog.V(1).Infof("Starting a clean up routine to remove stale dummy VM's")
 				go vs.cleanUpDummyVMs(DummyVMPrefixName)
 				cleanUpRoutineInitialized = true
 			}
 			cleanUpRoutineInitLock.Unlock()
 			vmOptions, err = vs.setVMOptions(ctx, dc, vs.cfg.Workspace.ResourcePoolPath)
 			if err != nil {
-				glog.Errorf("Failed to set VM options requires to create a vsphere volume. err: %+v", err)
+				klog.Errorf("Failed to set VM options requires to create a vsphere volume. err: %+v", err)
 				return "", err
 			}
 		}
 		if volumeOptions.StoragePolicyName != "" && volumeOptions.Datastore == "" {
 			datastore, err = getPbmCompatibleDatastore(ctx, dc, volumeOptions.StoragePolicyName, vs.nodeManager)
 			if err != nil {
-				glog.Errorf("Failed to get pbm compatible datastore with storagePolicy: %s. err: %+v", volumeOptions.StoragePolicyName, err)
+				klog.Errorf("Failed to get pbm compatible datastore with storagePolicy: %s. err: %+v", volumeOptions.StoragePolicyName, err)
 				return "", err
 			}
 		} else {
@@ -1161,7 +1182,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 			// if the given datastore is a shared datastore across all node VMs.
 			sharedDsList, err := getSharedDatastoresInK8SCluster(ctx, dc, vs.nodeManager)
 			if err != nil {
-				glog.Errorf("Failed to get shared datastore: %+v", err)
+				klog.Errorf("Failed to get shared datastore: %+v", err)
 				return "", err
 			}
 			found := false
@@ -1184,7 +1205,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 		kubeVolsPath := filepath.Clean(ds.Path(VolDir)) + "/"
 		err = ds.CreateDirectory(ctx, kubeVolsPath, false)
 		if err != nil && err != vclib.ErrFileAlreadyExist {
-			glog.Errorf("Cannot create dir %#v. err %s", kubeVolsPath, err)
+			klog.Errorf("Cannot create dir %#v. err %s", kubeVolsPath, err)
 			return "", err
 		}
 		volumePath := kubeVolsPath + volumeOptions.Name + ".vmdk"
@@ -1195,13 +1216,13 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 		}
 		volumePath, err = disk.Create(ctx, ds)
 		if err != nil {
-			glog.Errorf("Failed to create a vsphere volume with volumeOptions: %+v on datastore: %s. err: %+v", volumeOptions, datastore, err)
+			klog.Errorf("Failed to create a vsphere volume with volumeOptions: %+v on datastore: %s. err: %+v", volumeOptions, datastore, err)
 			return "", err
 		}
 		// Get the canonical path for the volume path.
 		canonicalVolumePath, err = getcanonicalVolumePath(ctx, dc, volumePath)
 		if err != nil {
-			glog.Errorf("Failed to get canonical vsphere volume path for volume: %s with volumeOptions: %+v on datastore: %s. err: %+v", volumePath, volumeOptions, datastore, err)
+			klog.Errorf("Failed to get canonical vsphere volume path for volume: %s with volumeOptions: %+v on datastore: %s. err: %+v", volumePath, volumeOptions, datastore, err)
 			return "", err
 		}
 		if filepath.Base(datastore) != datastore {
@@ -1213,13 +1234,13 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 	requestTime := time.Now()
 	canonicalVolumePath, err = createVolumeInternal(volumeOptions)
 	vclib.RecordCreateVolumeMetric(volumeOptions, requestTime, err)
-	glog.V(4).Infof("The canonical volume path for the newly created vSphere volume is %q", canonicalVolumePath)
+	klog.V(4).Infof("The canonical volume path for the newly created vSphere volume is %q", canonicalVolumePath)
 	return canonicalVolumePath, err
 }
 
 // DeleteVolume deletes a volume given volume name.
 func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
-	glog.V(1).Infof("Starting to delete vSphere volume with vmDiskPath: %s", vmDiskPath)
+	klog.V(1).Infof("Starting to delete vSphere volume with vmDiskPath: %s", vmDiskPath)
 	deleteVolumeInternal := func(vmDiskPath string) error {
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1239,7 +1260,7 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 		}
 		err = disk.Delete(ctx, dc)
 		if err != nil {
-			glog.Errorf("Failed to delete vsphere volume with vmDiskPath: %s. err: %+v", vmDiskPath, err)
+			klog.Errorf("Failed to delete vsphere volume with vmDiskPath: %s. err: %+v", vmDiskPath, err)
 		}
 		return err
 	}
@@ -1258,11 +1279,11 @@ func (vs *VSphere) HasClusterID() bool {
 func (vs *VSphere) NodeAdded(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if node == nil || !ok {
-		glog.Warningf("NodeAdded: unrecognized object %+v", obj)
+		klog.Warningf("NodeAdded: unrecognized object %+v", obj)
 		return
 	}
 
-	glog.V(4).Infof("Node added: %+v", node)
+	klog.V(4).Infof("Node added: %+v", node)
 	vs.nodeManager.RegisterNode(node)
 }
 
@@ -1270,11 +1291,11 @@ func (vs *VSphere) NodeAdded(obj interface{}) {
 func (vs *VSphere) NodeDeleted(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if node == nil || !ok {
-		glog.Warningf("NodeDeleted: unrecognized object %+v", obj)
+		klog.Warningf("NodeDeleted: unrecognized object %+v", obj)
 		return
 	}
 
-	glog.V(4).Infof("Node deleted: %+v", node)
+	klog.V(4).Infof("Node deleted: %+v", node)
 	vs.nodeManager.UnRegisterNode(node)
 }
 
@@ -1283,4 +1304,113 @@ func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
 		return nil
 	}
 	return vs.nodeManager
+}
+
+func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *rest.Client) error) error {
+	c := rest.NewClient(connection.Client)
+	user := url.UserPassword(connection.Username, connection.Password)
+	if err := c.Login(ctx, user); err != nil {
+		return err
+	}
+	defer c.Logout(ctx)
+	return f(c)
+}
+
+// GetZone implements Zones.GetZone
+func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+	nodeName, err := vs.CurrentNodeName(ctx, vs.hostName)
+	if err != nil {
+		klog.Errorf("Cannot get node name.")
+		return cloudprovider.Zone{}, err
+	}
+	zone := cloudprovider.Zone{}
+	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
+	if err != nil {
+		klog.Errorf("Cannot connent to vsphere. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
+	if err != nil {
+		klog.Errorf("Cannot connent to datacenter. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	vmHost, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
+	if err != nil {
+		klog.Errorf("Cannot find VM runtime host. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+
+	pc := vsi.conn.Client.ServiceContent.PropertyCollector
+	err = withTagsClient(ctx, vsi.conn, func(c *rest.Client) error {
+		client := tags.NewManager(c)
+		// example result: ["Folder", "Datacenter", "Cluster", "Host"]
+		objects, err := mo.Ancestors(ctx, vsi.conn.Client, pc, *vmHost)
+		if err != nil {
+			return err
+		}
+
+		// search the hierarchy, example order: ["Host", "Cluster", "Datacenter", "Folder"]
+		for i := range objects {
+			obj := objects[len(objects)-1-i]
+			tags, err := client.ListAttachedTags(ctx, obj)
+			if err != nil {
+				klog.Errorf("Cannot list attached tags. Get zone for node %s: %s", nodeName, err)
+				return err
+			}
+			for _, value := range tags {
+				tag, err := client.GetTag(ctx, value)
+				if err != nil {
+					klog.Errorf("Get tag %s: %s", value, err)
+					return err
+				}
+				category, err := client.GetCategory(ctx, tag.CategoryID)
+				if err != nil {
+					klog.Errorf("Get category %s error", value)
+					return err
+				}
+
+				found := func() {
+					klog.Errorf("Found %q tag (%s) for %s attached to %s", category.Name, tag.Name, vs.vmUUID, obj.Reference())
+				}
+				switch {
+				case category.Name == vs.cfg.Labels.Zone:
+					zone.FailureDomain = tag.Name
+					found()
+				case category.Name == vs.cfg.Labels.Region:
+					zone.Region = tag.Name
+					found()
+				}
+
+				if zone.FailureDomain != "" && zone.Region != "" {
+					return nil
+				}
+			}
+		}
+
+		if zone.Region == "" {
+			if vs.cfg.Labels.Region != "" {
+				return fmt.Errorf("vSphere region category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Region, nodeName, vs.vmUUID)
+			}
+		}
+		if zone.FailureDomain == "" {
+			if vs.cfg.Labels.Zone != "" {
+				return fmt.Errorf("vSphere zone category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Zone, nodeName, vs.vmUUID)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		klog.Errorf("Get zone for node %s: %s", nodeName, err)
+		return cloudprovider.Zone{}, err
+	}
+	return zone, nil
+}
+
+func (vs *VSphere) GetZoneByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, cloudprovider.NotImplemented
+}
+
+func (vs *VSphere) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, cloudprovider.NotImplemented
 }

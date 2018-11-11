@@ -57,7 +57,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 	It("should create pod that uses dns", func() {
 		mkpath := func(file string) string {
-			return filepath.Join(framework.TestContext.RepoRoot, "examples/cluster-dns", file)
+			return filepath.Join(os.Getenv("GOPATH"), "src/k8s.io/examples/staging/cluster-dns", file)
 		}
 
 		// contrary to the example, this test does not use contexts, for simplicity
@@ -81,8 +81,9 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		namespaces := []*v1.Namespace{nil, nil}
 		for i := range namespaces {
 			var err error
-			namespaces[i], err = f.CreateNamespace(fmt.Sprintf("dnsexample%d", i), nil)
-			Expect(err).NotTo(HaveOccurred())
+			namespaceName := fmt.Sprintf("dnsexample%d", i)
+			namespaces[i], err = f.CreateNamespace(namespaceName, nil)
+			Expect(err).NotTo(HaveOccurred(), "failed to create namespace: %s", namespaceName)
 		}
 
 		for _, ns := range namespaces {
@@ -104,7 +105,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(options)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to list pods in namespace: %s", ns.Name)
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
 			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
@@ -134,7 +135,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDns}, "ok", dnsReadyTimeout)
 		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
 
-		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, "dns-backend.development.svc.cluster.local", fmt.Sprintf("dns-backend.%s.svc.cluster.local", namespaces[0].Name))
+		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
@@ -151,7 +152,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait for pods to print their result
 		for _, ns := range namespaces {
 			_, err := framework.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "pod %s failed to print result in logs", frontendPodName)
 		}
 	})
 })
@@ -163,10 +164,10 @@ func getNsCmdFlag(ns *v1.Namespace) string {
 // pass enough context with the 'old' parameter so that it replaces what your really intended.
 func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	f, err := os.Open(inputFile)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to open file: %s", inputFile)
 	defer f.Close()
 	data, err := ioutil.ReadAll(f)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to read from file: %s", inputFile)
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
 }

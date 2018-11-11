@@ -6,10 +6,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/pod",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 
@@ -18,9 +18,9 @@ go_test(
     srcs = ["pod_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )
 

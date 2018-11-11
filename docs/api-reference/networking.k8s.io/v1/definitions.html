@@ -480,7 +480,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">continue</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -676,7 +676,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">protocol</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_protocol">v1.Protocol</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1083,6 +1083,13 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_deletionpropagation">v1.DeletionPropagation</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">dryRun</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -1248,7 +1255,7 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <div class="sect2">
 <h3 id="_v1_ownerreference">v1.OwnerReference</h3>
 <div class="paragraph">
-<p>OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.</p>
+<p>OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>

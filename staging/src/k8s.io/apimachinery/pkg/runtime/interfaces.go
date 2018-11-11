@@ -39,14 +39,14 @@ type GroupVersioner interface {
 	KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (target schema.GroupVersionKind, ok bool)
 }
 
-// Encoders write objects to a serialized form
+// Encoder writes objects to a serialized form
 type Encoder interface {
 	// Encode writes an object to a stream. Implementations may return errors if the versions are
 	// incompatible, or if no conversion is defined.
 	Encode(obj Object, w io.Writer) error
 }
 
-// Decoders attempt to load an object from data.
+// Decoder attempts to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
 	// default kind, group, and version provided. It returns a decoded object as well as the kind, group, and
@@ -185,7 +185,7 @@ type ObjectConvertor interface {
 	// This method is similar to Convert() but handles specific details of choosing the correct
 	// output version.
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
-	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
+	ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error)
 }
 
 // ObjectTyper contains methods for extracting the APIVersion and Kind
@@ -224,7 +224,7 @@ type SelfLinker interface {
 	Namespace(obj Object) (string, error)
 }
 
-// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// Object interface must be supported by all API types registered with Scheme. Since objects in a scheme are
 // expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
 // serializers to set the kind, version, and group the object is represented as. An Object may choose
 // to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.

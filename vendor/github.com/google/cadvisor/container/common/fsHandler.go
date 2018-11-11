@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/cadvisor/fs"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type FsHandler interface {
@@ -118,7 +118,7 @@ func (fh *realFsHandler) trackUsage() {
 		case <-time.After(fh.period):
 			start := time.Now()
 			if err := fh.update(); err != nil {
-				glog.Errorf("failed to collect filesystem stats - %v", err)
+				klog.Errorf("failed to collect filesystem stats - %v", err)
 				fh.period = fh.period * 2
 				if fh.period > maxBackoffFactor*fh.minPeriod {
 					fh.period = maxBackoffFactor * fh.minPeriod
@@ -132,7 +132,7 @@ func (fh *realFsHandler) trackUsage() {
 				// if the long duration is persistent either because of slow
 				// disk or lots of containers.
 				longOp = longOp + time.Second
-				glog.V(2).Infof("du and find on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
+				klog.V(2).Infof("du and find on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
 			}
 		}
 	}

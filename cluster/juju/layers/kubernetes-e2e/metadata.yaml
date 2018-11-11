@@ -15,6 +15,7 @@ tags:
   - conformance
 series:
   - xenial
+  - bionic
 requires:
   kubernetes-master:
     interface: http

@@ -6,6 +6,7 @@ go_library(
         "trie.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-openapi/pkg/util",
     importpath = "k8s.io/kube-openapi/pkg/util",
     visibility = ["//visibility:public"],
 )
@@ -22,6 +23,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/util/sets:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

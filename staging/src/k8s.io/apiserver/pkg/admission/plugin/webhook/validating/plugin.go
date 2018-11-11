@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	// Name of admission plug-in
+	// PluginName indicates the name of admission plug-in
 	PluginName = "ValidatingAdmissionWebhook"
 )
 

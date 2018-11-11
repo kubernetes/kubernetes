@@ -58,7 +58,7 @@ ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
-API_LOGFILE=/tmp/swagger-api-server.log
+API_LOGFILE=${API_LOGFILE:-/tmp/swagger-api-server.log}
 
 kube::etcd::start
 

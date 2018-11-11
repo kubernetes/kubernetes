@@ -17,15 +17,20 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	certificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -49,16 +54,17 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 		return err
 	}
 	if ok {
-		glog.V(2).Infof("Kubeconfig %s exists and is valid, skipping bootstrap", kubeconfigPath)
+		klog.V(2).Infof("Kubeconfig %s exists and is valid, skipping bootstrap", kubeconfigPath)
 		return nil
 	}
 
-	glog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
+	klog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
 	}
+
 	bootstrapClient, err := certificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
@@ -83,13 +89,17 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	// managed by the store.
 	privKeyPath := filepath.Join(certDir, tmpPrivateKeyFile)
 	if !verifyKeyData(keyData) {
-		glog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
+		klog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
 		// Note: always call LoadOrGenerateKeyFile so that private key is
 		// reused on next startup if CSR request fails.
 		keyData, _, err = certutil.LoadOrGenerateKeyFile(privKeyPath)
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := waitForServer(*bootstrapClientConfig, 1*time.Minute); err != nil {
+		klog.Warningf("Error waiting for apiserver to come up: %v", err)
 	}
 
 	certData, err := csr.RequestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
@@ -100,7 +110,7 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 		return err
 	}
 	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
-		glog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
+		klog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
 	}
 
 	pemPath := store.CurrentPath()
@@ -206,4 +216,31 @@ func verifyKeyData(data []byte) bool {
 	}
 	_, err := certutil.ParsePrivateKeyPEM(data)
 	return err == nil
+}
+
+func waitForServer(cfg restclient.Config, deadline time.Duration) error {
+	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	cfg.Timeout = 1 * time.Second
+	cli, err := restclient.UnversionedRESTClientFor(&cfg)
+	if err != nil {
+		return fmt.Errorf("couldn't create client: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), deadline)
+	defer cancel()
+
+	var connected bool
+	wait.JitterUntil(func() {
+		if _, err := cli.Get().AbsPath("/healthz").Do().Raw(); err != nil {
+			klog.Infof("Failed to connect to apiserver: %v", err)
+			return
+		}
+		cancel()
+		connected = true
+	}, 2*time.Second, 0.2, true, ctx.Done())
+
+	if !connected {
+		return errors.New("timed out waiting to connect to apiserver")
+	}
+	return nil
 }

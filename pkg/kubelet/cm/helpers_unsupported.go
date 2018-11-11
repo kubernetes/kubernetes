@@ -28,13 +28,12 @@ const (
 	SharesPerCPU  = 0
 	MilliCPUToCPU = 0
 
-	QuotaPeriod    = 0
 	MinQuotaPeriod = 0
 )
 
-// MilliCPUToQuota converts milliCPU to CFS quota and period values.
-func MilliCPUToQuota(milliCPU int64) (int64, int64) {
-	return 0, 0
+// MilliCPUToQuota converts milliCPU and period to CFS quota values.
+func MilliCPUToQuota(milliCPU, period int64) int64 {
+	return 0
 }
 
 // MilliCPUToShares converts the milliCPU to CFS shares.
@@ -43,7 +42,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64) *ResourceConfig {
 	return nil
 }
 

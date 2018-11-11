@@ -178,7 +178,8 @@ func (e *Expiry) IsExpired() bool {
 type Credentials struct {
 	creds        Value
 	forceRefresh bool
-	m            sync.Mutex
+
+	m sync.RWMutex
 
 	provider Provider
 }
@@ -201,6 +202,17 @@ func NewCredentials(provider Provider) *Credentials {
 // If Credentials.Expire() was called the credentials Value will be force
 // expired, and the next call to Get() will cause them to be refreshed.
 func (c *Credentials) Get() (Value, error) {
+	// Check the cached credentials first with just the read lock.
+	c.m.RLock()
+	if !c.isExpired() {
+		creds := c.creds
+		c.m.RUnlock()
+		return creds, nil
+	}
+	c.m.RUnlock()
+
+	// Credentials are expired need to retrieve the credentials taking the full
+	// lock.
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -234,8 +246,8 @@ func (c *Credentials) Expire() {
 // If the Credentials were forced to be expired with Expire() this will
 // reflect that override.
 func (c *Credentials) IsExpired() bool {
-	c.m.Lock()
-	defer c.m.Unlock()
+	c.m.RLock()
+	defer c.m.RUnlock()
 
 	return c.isExpired()
 }

@@ -24,8 +24,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 type Feature string
@@ -145,54 +145,24 @@ func NewFeatureGate() *featureGate {
 // Set parses a string of the form "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func (f *featureGate) Set(value string) error {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	// Copy existing state
-	known := map[Feature]FeatureSpec{}
-	for k, v := range f.known.Load().(map[Feature]FeatureSpec) {
-		known[k] = v
-	}
-	enabled := map[Feature]bool{}
-	for k, v := range f.enabled.Load().(map[Feature]bool) {
-		enabled[k] = v
-	}
-
+	m := make(map[string]bool)
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
 			continue
 		}
 		arr := strings.SplitN(s, "=", 2)
-		k := Feature(strings.TrimSpace(arr[0]))
-		featureSpec, ok := known[k]
-		if !ok {
-			return fmt.Errorf("unrecognized key: %s", k)
-		}
+		k := strings.TrimSpace(arr[0])
 		if len(arr) != 2 {
 			return fmt.Errorf("missing bool value for %s", k)
 		}
 		v := strings.TrimSpace(arr[1])
 		boolValue, err := strconv.ParseBool(v)
 		if err != nil {
-			return fmt.Errorf("invalid value of %s: %s, err: %v", k, v, err)
+			return fmt.Errorf("invalid value of %s=%s, err: %v", k, v, err)
 		}
-		enabled[k] = boolValue
-		if boolValue && featureSpec.PreRelease == Deprecated {
-			glog.Warningf("enabling deprecated feature gate %s", k)
-		}
-
-		// Handle "special" features like "all alpha gates"
-		if fn, found := f.special[k]; found {
-			fn(known, enabled, boolValue)
-		}
+		m[k] = boolValue
 	}
-
-	// Persist changes
-	f.known.Store(known)
-	f.enabled.Store(enabled)
-
-	glog.Infof("feature gates: %v", enabled)
-	return nil
+	return f.SetFromMap(m)
 }
 
 // SetFromMap stores flag gates for known features from a map[string]bool or returns an error
@@ -212,14 +182,20 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 
 	for k, v := range m {
 		k := Feature(k)
-		_, ok := known[k]
+		featureSpec, ok := known[k]
 		if !ok {
-			return fmt.Errorf("unrecognized key: %s", k)
+			return fmt.Errorf("unrecognized feature gate: %s", k)
 		}
 		enabled[k] = v
 		// Handle "special" features like "all alpha gates"
 		if fn, found := f.special[k]; found {
 			fn(known, enabled, v)
+		}
+
+		if featureSpec.PreRelease == Deprecated {
+			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
+		} else if featureSpec.PreRelease == GA {
+			klog.Warningf("Setting GA feature gate %s=%t. It will be removed in a future release.", k, v)
 		}
 	}
 
@@ -227,7 +203,7 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 	f.known.Store(known)
 	f.enabled.Store(enabled)
 
-	glog.Infof("feature gates: %v", f.enabled)
+	klog.V(1).Infof("feature gates: %v", f.enabled)
 	return nil
 }
 
@@ -302,14 +278,14 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureGate's known features.
+// Deprecated and GA features are hidden from the list.
 func (f *featureGate) KnownFeatures() []string {
 	var known []string
 	for k, v := range f.known.Load().(map[Feature]FeatureSpec) {
-		pre := ""
-		if v.PreRelease != GA {
-			pre = fmt.Sprintf("%s - ", v.PreRelease)
+		if v.PreRelease == GA || v.PreRelease == Deprecated {
+			continue
 		}
-		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.Default))
+		known = append(known, fmt.Sprintf("%s=true|false (%s - default=%t)", k, v.PreRelease, v.Default))
 	}
 	sort.Strings(known)
 	return known

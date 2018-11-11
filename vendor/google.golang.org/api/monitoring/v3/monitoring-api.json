@@ -69,11 +69,6 @@
       "location": "query",
       "type": "string"
     },
-    "bearer_token": {
-      "description": "OAuth bearer token.",
-      "location": "query",
-      "type": "string"
-    },
     "callback": {
       "description": "JSONP",
       "location": "query",
@@ -93,12 +88,6 @@
       "description": "OAuth 2.0 token for the current user.",
       "location": "query",
       "type": "string"
-    },
-    "pp": {
-      "default": "true",
-      "description": "Pretty-print response.",
-      "location": "query",
-      "type": "boolean"
     },
     "prettyPrint": {
       "default": "true",
@@ -1463,7 +1452,7 @@
       }
     }
   },
-  "revision": "20180529",
+  "revision": "20180603",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -1894,7 +1883,7 @@
           "type": "string"
         },
         "exemplars": {
-          "description": "Must be in increasing order of |value| field. The current requirement enforced by the backend is that at most one Exemplar will fall into any bucket.",
+          "description": "Must be in increasing order of value field.",
           "items": {
             "$ref": "Exemplar"
           },

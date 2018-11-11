@@ -26,7 +26,7 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading
@@ -94,18 +94,14 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 		// Ignore the previous deleted version for spreading purposes
 		// (it can still be considered for resource restrictions etc.)
 		if nodePod.DeletionTimestamp != nil {
-			glog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
+			klog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
 			continue
 		}
-		matches := false
 		for _, selector := range selectors {
 			if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
-				matches = true
+				count++
 				break
 			}
-		}
-		if matches {
-			count++
 		}
 	}
 	return schedulerapi.HostPriority{
@@ -164,8 +160,8 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 			}
 		}
 		result[i].Score = int(fScore)
-		if glog.V(10) {
-			glog.Infof(
+		if klog.V(10) {
+			klog.Infof(
 				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, result[i].Host, int(fScore),
 			)
 		}

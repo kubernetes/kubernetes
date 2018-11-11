@@ -21,12 +21,17 @@ set -o nounset
 set -o pipefail
 
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
-KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
+KUBE_ROOT=$(readlink -e "${TMP_ROOT}" 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' "${TMP_ROOT}")
 
 source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+
+if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ]] ; then
+  source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 # hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
@@ -59,7 +64,7 @@ SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-}"
 EVENT_PD="${EVENT_PD:-}"
 
 # Etcd related variables.
-ETCD_IMAGE="${ETCD_IMAGE:-3.2.18-0}"
+ETCD_IMAGE="${ETCD_IMAGE:-3.2.24-1}"
 ETCD_VERSION="${ETCD_VERSION:-}"
 
 # Controller-manager related variables.
@@ -75,7 +80,6 @@ SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-}"
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
 STORAGE_MEDIA_TYPE="${STORAGE_MEDIA_TYPE:-}"
 STORAGE_BACKEND="${STORAGE_BACKEND:-etcd3}"
-ETCD_QUORUM_READ="${ETCD_QUORUM_READ:-}"
 ETCD_COMPACTION_INTERVAL_SEC="${ETCD_COMPACTION_INTERVAL_SEC:-}"
 RUNTIME_CONFIG="${RUNTIME_CONFIG:-}"
 NUM_NODES="${NUM_NODES:-}"
@@ -93,7 +97,7 @@ function generate-pki-config {
   kube::util::ensure-temp-dir
   gen-kube-bearertoken
   gen-kube-basicauth
-  create-certs ${MASTER_IP}
+  create-certs "${MASTER_IP}"
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
@@ -189,65 +193,41 @@ function start-master-components {
   echo "The master has started and is now live."
 }
 
-# Finds the right kubemark binary for 'linux/amd64' platform and uses it to
-# create a docker image for hollow-node and upload it to the appropriate
-# docker container registry for the cloud provider.
+# Create a docker image for hollow-node and upload it to the appropriate docker registry.
 function create-and-upload-hollow-node-image {
-  MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
-  KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
-  if [[ -z "${KUBEMARK_BIN}" ]]; then
-    echo 'Cannot find cmd/kubemark binary'
-    exit 1
-  fi
-
-  echo "Configuring registry authentication"
-  mkdir -p "${HOME}/.docker"
-  gcloud beta auth configure-docker -q
-
-  echo "Copying kubemark binary to ${MAKE_DIR}"
-  cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
-  CURR_DIR=`pwd`
-  cd "${MAKE_DIR}"
-  RETRIES=3
+  authenticate-docker
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
-  for attempt in $(seq 1 ${RETRIES}); do
-    if ! REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" IMAGE_TAG="${KUBEMARK_IMAGE_TAG}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
-      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
-        echo "${color_red}Make failed. Exiting.${color_norm}"
-        exit 1
-      fi
-      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
-    else
-      break
+  if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
+    # Build+push the image through bazel.
+    touch WORKSPACE # Needed for bazel.
+    build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}")
+    run-cmd-with-retries "${build_cmd[@]}"
+  else
+    # Build+push the image through makefile.
+    build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
+    MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
+    KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+    if [[ -z "${KUBEMARK_BIN}" ]]; then
+      echo 'Cannot find cmd/kubemark binary'
+      exit 1
     fi
-  done
-  rm kubemark
-  cd $CURR_DIR
+    echo "Copying kubemark binary to ${MAKE_DIR}"
+    cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
+    CURR_DIR=$(pwd)
+    cd "${MAKE_DIR}"
+    REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
+    rm kubemark
+    cd "$CURR_DIR"
+  fi
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
+  # Cleanup the kubemark image after the script exits.
+  if [[ "${CLEANUP_KUBEMARK_IMAGE:-}" == "true" ]]; then
+    trap delete-kubemark-image EXIT
+  fi
 }
 
-# Use bazel rule to create a docker image for hollow-node and upload
-# it to the appropriate docker container registry for the cloud provider.
-function create-and-upload-hollow-node-image-bazel {
-  echo "Configuring registry authentication"
-  mkdir -p "${HOME}/.docker"
-  gcloud beta auth configure-docker -q
-
-  RETRIES=3
-  for attempt in $(seq 1 ${RETRIES}); do
-    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then
-      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
-        echo "${color_red}Image push failed. Exiting.${color_norm}"
-        exit 1
-      fi
-      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
-    else
-      break
-    fi
-  done
-  echo "Created and uploaded the kubemark hollow-node image to docker registry."
+function delete-kubemark-image {
+  delete-image "${KUBEMARK_IMAGE_REGISTRY}/kubemark:${KUBEMARK_IMAGE_TAG}"
 }
 
 # Generate secret and configMap for the hollow-node pods to work, prepare
@@ -255,27 +235,27 @@ function create-and-upload-hollow-node-image-bazel {
 # templates, and finally create these resources through kubectl.
 function create-kube-hollow-node-resources {
   # Create kubeconfig for Kubelet.
-  KUBELET_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBELET_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: "${KUBELET_CERT_BASE64}"
-    client-key-data: "${KUBELET_KEY_BASE64}"
+    client-certificate-data: ${KUBELET_CERT_BASE64}
+    client-key-data: ${KUBELET_KEY_BASE64}
 clusters:
 - name: kubemark
   cluster:
-    certificate-authority-data: "${CA_CERT_BASE64}"
+    certificate-authority-data: ${CA_CERT_BASE64}
     server: https://${MASTER_IP}
 contexts:
 - context:
     cluster: kubemark
     user: kubelet
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Kubeproxy.
-  KUBEPROXY_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBEPROXY_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: kube-proxy
@@ -291,10 +271,10 @@ contexts:
     cluster: kubemark
     user: kube-proxy
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Heapster.
-  HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  HEAPSTER_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: heapster
@@ -310,10 +290,10 @@ contexts:
     cluster: kubemark
     user: heapster
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Cluster Autoscaler.
-  CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: cluster-autoscaler
@@ -329,10 +309,10 @@ contexts:
     cluster: kubemark
     user: cluster-autoscaler
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for NodeProblemDetector.
-  NPD_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  NPD_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: node-problem-detector
@@ -348,10 +328,10 @@ contexts:
     cluster: kubemark
     user: node-problem-detector
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Kube DNS.
-  KUBE_DNS_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBE_DNS_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: kube-dns
@@ -367,7 +347,7 @@ contexts:
     cluster: kubemark
     user: kube-dns
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubemark namespace.
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
@@ -439,9 +419,8 @@ current-context: kubemark-context")
   sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubemark_image_tag}}/${KUBEMARK_IMAGE_TAG}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{kubeproxy_verbosity_level}}/${KUBEPROXY_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{use_real_proxier}}/${USE_REAL_PROXIER}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{hollow_kubelet_params}}/${HOLLOW_KUBELET_TEST_ARGS}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{hollow_proxy_params}}/${HOLLOW_PROXY_TEST_ARGS}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s'{{kubemark_mig_config}}'${KUBEMARK_MIG_CONFIG:-}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" --namespace="kubemark"
 
@@ -474,7 +453,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       echo "${running} hollow-nodes are reported as 'Running'"
       not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
       echo "${not_running} hollow-nodes are reported as NOT 'Running'"
-      echo $(echo "${pods}" | grep -v "Running")
+      echo "${pods}" | grep -v Running
       exit 1
     fi
     nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
@@ -485,30 +464,35 @@ function wait-for-hollow-nodes-to-run-or-timeout {
 
 ############################### Main Function ########################################
 detect-project &> /dev/null
+find-release-tars
+
+# We need master IP to generate PKI and kubeconfig for cluster.
+get-or-create-master-ip
+generate-pki-config
+write-local-kubeconfig
 
 # Setup for master.
-echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
-find-release-tars
-create-master-environment-file
-create-master-instance-with-resources
-generate-pki-config
-wait-for-master-reachability
-write-pki-config-to-master
-write-local-kubeconfig
-copy-resource-files-to-master
-start-master-components
+function start-master {
+  echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
+  create-master-environment-file
+  create-master-instance-with-resources
+  wait-for-master-reachability
+  write-pki-config-to-master
+  copy-resource-files-to-master
+  start-master-components
+}
+start-master &
 
 # Setup for hollow-nodes.
-echo ""
-echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
-if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
-  create-and-upload-hollow-node-image-bazel
-else
+function start-hollow-nodes {
+  echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
   create-and-upload-hollow-node-image
-fi
-create-kube-hollow-node-resources
-wait-for-hollow-nodes-to-run-or-timeout
+  create-kube-hollow-node-resources
+  wait-for-hollow-nodes-to-run-or-timeout
+}
+start-hollow-nodes &
 
+wait
 echo ""
 echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${KUBE_PASSWORD}"

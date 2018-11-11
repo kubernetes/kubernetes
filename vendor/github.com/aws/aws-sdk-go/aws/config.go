@@ -151,6 +151,15 @@ type Config struct {
 	// with accelerate.
 	S3UseAccelerate *bool
 
+	// S3DisableContentMD5Validation config option is temporarily disabled,
+	// For S3 GetObject API calls, #1837.
+	//
+	// Set this to `true` to disable the S3 service client from automatically
+	// adding the ContentMD5 to S3 Object Put and Upload API calls. This option
+	// will also disable the SDK from performing object ContentMD5 validation
+	// on GetObject API calls.
+	S3DisableContentMD5Validation *bool
+
 	// Set this to `true` to disable the EC2Metadata client from overriding the
 	// default http.Client's Timeout. This is helpful if you do not want the
 	// EC2Metadata client to create a new http.Client. This options is only
@@ -168,7 +177,7 @@ type Config struct {
 	//
 	EC2MetadataDisableTimeoutOverride *bool
 
-	// Instructs the endpiont to be generated for a service client to
+	// Instructs the endpoint to be generated for a service client to
 	// be the dual stack endpoint. The dual stack endpoint will support
 	// both IPv4 and IPv6 addressing.
 	//
@@ -336,6 +345,15 @@ func (c *Config) WithS3Disable100Continue(disable bool) *Config {
 func (c *Config) WithS3UseAccelerate(enable bool) *Config {
 	c.S3UseAccelerate = &enable
 	return c
+
+}
+
+// WithS3DisableContentMD5Validation sets a config
+// S3DisableContentMD5Validation value returning a Config pointer for chaining.
+func (c *Config) WithS3DisableContentMD5Validation(enable bool) *Config {
+	c.S3DisableContentMD5Validation = &enable
+	return c
+
 }
 
 // WithUseDualStack sets a config UseDualStack value returning a Config
@@ -433,6 +451,10 @@ func mergeInConfig(dst *Config, other *Config) {
 
 	if other.S3UseAccelerate != nil {
 		dst.S3UseAccelerate = other.S3UseAccelerate
+	}
+
+	if other.S3DisableContentMD5Validation != nil {
+		dst.S3DisableContentMD5Validation = other.S3DisableContentMD5Validation
 	}
 
 	if other.UseDualStack != nil {

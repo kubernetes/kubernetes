@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/utils/exec"
 )
 
@@ -78,7 +79,7 @@ var (
 	errCgroupExecer = fakeExecer{
 		ioMap: map[string]fakeCmd{
 			"docker info": {
-				err: fmt.Errorf("no such binary: docker"),
+				err: errors.New("no such binary: docker"),
 			},
 		},
 	}
@@ -119,8 +120,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cni-conf-dir":   "/etc/cni/net.d",
-				"cni-bin-dir":    "/opt/cni/bin",
 			},
 		},
 		{
@@ -136,8 +135,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
-				"cni-conf-dir":      "/etc/cni/net.d",
-				"cni-bin-dir":       "/opt/cni/bin",
 				"hostname-override": "override-name",
 			},
 		},
@@ -154,8 +151,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cni-conf-dir":   "/etc/cni/net.d",
-				"cni-bin-dir":    "/opt/cni/bin",
 				"cgroup-driver":  "systemd",
 			},
 		},
@@ -172,8 +167,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cni-conf-dir":   "/etc/cni/net.d",
-				"cni-bin-dir":    "/opt/cni/bin",
 				"cgroup-driver":  "cgroupfs",
 			},
 		},
@@ -213,9 +206,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					},
 				},
 				registerTaintsUsingFlags: true,
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
-				defaultHostname: "foo",
+				execer:                   cgroupfsCgroupExecer,
+				pidOfFunc:                binaryNotRunningPidOfFunc,
+				defaultHostname:          "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -257,7 +250,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			expected: map[string]string{
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"dynamic-config-dir":         "/var/lib/kubelet/dynamic-config",
+				"dynamic-config-dir":         fmt.Sprintf("%s/dynamic-config", kubeadmconstants.KubeletRunDirectory),
 			},
 		},
 	}

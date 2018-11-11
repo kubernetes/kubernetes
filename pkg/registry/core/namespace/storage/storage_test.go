@@ -69,7 +69,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer storage.store.DestroyFunc()
 	namespace := validNewNamespace()
 	ctx := genericapirequest.NewContext()
-	_, err := storage.Create(ctx, namespace, rest.ValidateAllObjectFunc, false)
+	_, err := storage.Create(ctx, namespace, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
-	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0); err != nil {
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, _, err := storage.Delete(ctx, "foo", nil); err == nil {
@@ -181,7 +181,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
-	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0); err != nil {
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, _, err := storage.Delete(ctx, "foo", nil); err != nil {

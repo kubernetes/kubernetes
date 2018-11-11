@@ -25,21 +25,23 @@ import (
 	"testing"
 	"time"
 
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
@@ -54,8 +56,8 @@ var (
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -95,10 +97,10 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServe
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, storage.Versioner) {
+func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage.Versioner) {
 	prefix := "pods"
 	v := etcdstorage.APIObjectVersioner{}
-	config := storage.CacherConfig{
+	config := cacherstorage.Config{
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      v,
@@ -109,7 +111,7 @@ func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, storage.Versi
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}
-	return storage.NewCacherFromConfig(config), v
+	return cacherstorage.NewCacherFromConfig(config), v
 }
 
 func makeTestPod(name string) *example.Pod {
@@ -313,7 +315,7 @@ func TestInfiniteList(t *testing.T) {
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
 	// Set up List at fooCreated.ResourceVersion + 10
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -549,7 +551,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
 	// Set up Watch starting at fooCreated.ResourceVersion + 10
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -572,7 +574,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	select {
 	case e := <-watcher.ResultChan():
 		pod := e.Object.(*example.Pod)
-		podRV, err := v.ParseWatchResourceVersion(pod.ResourceVersion)
+		podRV, err := v.ParseResourceVersion(pod.ResourceVersion)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -603,7 +605,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 	defer cacher.Stop()
 
 	// get rv of last pod created
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -657,7 +659,7 @@ func TestRandomWatchDeliver(t *testing.T) {
 	defer cacher.Stop()
 
 	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

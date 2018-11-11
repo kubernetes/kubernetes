@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -32,6 +33,8 @@ import (
 
 	"k8s.io/api/authentication/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -165,7 +168,7 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newTokenAuthenticator creates a temporary kubeconfig file from the provided
 // arguments and attempts to load a new WebhookTokenAuthenticator from it.
-func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*WebhookTokenAuthenticator, error) {
+func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (authenticator.Token, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -193,7 +196,12 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 		return nil, err
 	}
 
-	return newWithBackoff(c, cacheTime, 0)
+	authn, err := newWithBackoff(c, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return cache.New(authn, false, cacheTime, cacheTime), nil
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -257,7 +265,7 @@ func TestTLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			_, authenticated, err := wh.AuthenticateToken("t0k3n")
+			_, authenticated, err := wh.AuthenticateToken(context.Background(), "t0k3n")
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error making authorization request: %v", err)
@@ -270,7 +278,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			_, authenticated, err = wh.AuthenticateToken("t0k3n")
+			_, authenticated, err = wh.AuthenticateToken(context.Background(), "t0k3n")
 			if err != nil {
 				t.Errorf("%s: unexpectedly failed AuthenticateToken", tt.test)
 			}
@@ -374,7 +382,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	token := "my-s3cr3t-t0ken"
 	for i, tt := range tests {
 		serv.response = tt.serverResponse
-		user, authenticated, err := wh.AuthenticateToken(token)
+		resp, authenticated, err := wh.AuthenticateToken(context.Background(), token)
 		if err != nil {
 			t.Errorf("case %d: authentication failed: %v", i, err)
 			continue
@@ -391,9 +399,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			t.Errorf("case %d: Plugin returned incorrect authentication response. Got %t, expected %t.",
 				i, authenticated, tt.expectedAuthenticated)
 		}
-		if user != nil && tt.expectedUser != nil && !reflect.DeepEqual(user, tt.expectedUser) {
+		if resp != nil && tt.expectedUser != nil && !reflect.DeepEqual(resp.User, tt.expectedUser) {
 			t.Errorf("case %d: Plugin returned incorrect user. Got %#v, expected %#v",
-				i, user, tt.expectedUser)
+				i, resp.User, tt.expectedUser)
 		}
 	}
 }
@@ -540,25 +548,22 @@ func TestWebhookCacheAndRetry(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		func() {
+		t.Run(testcase.description, func(t *testing.T) {
 			serv.allow = testcase.allow
 			serv.statusCode = testcase.code
 			serv.called = 0
 
-			_, ok, err := wh.AuthenticateToken(testcase.token)
+			_, ok, err := wh.AuthenticateToken(context.Background(), testcase.token)
 			hasError := err != nil
 			if hasError != testcase.expectError {
-				t.Log(testcase.description)
 				t.Errorf("Webhook returned HTTP %d, expected error=%v, but got error %v", testcase.code, testcase.expectError, err)
 			}
 			if serv.called != testcase.expectCalls {
-				t.Log(testcase.description)
 				t.Errorf("Expected %d calls, got %d", testcase.expectCalls, serv.called)
 			}
 			if ok != testcase.expectOk {
-				t.Log(testcase.description)
 				t.Errorf("Expected ok=%v, got %v", testcase.expectOk, ok)
 			}
-		}()
+		})
 	}
 }

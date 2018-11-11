@@ -22,7 +22,7 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/authentication/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,7 +50,7 @@ func (in *Event) DeepCopyInto(out *Event) {
 	}
 	if in.ResponseStatus != nil {
 		in, out := &in.ResponseStatus, &out.ResponseStatus
-		*out = new(meta_v1.Status)
+		*out = new(metav1.Status)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.RequestObject != nil {

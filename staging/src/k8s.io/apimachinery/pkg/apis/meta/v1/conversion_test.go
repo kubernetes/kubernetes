@@ -33,13 +33,13 @@ func TestMapToLabelSelectorRoundTrip(t *testing.T) {
 	}
 	for _, in := range inputs {
 		ls := &v1.LabelSelector{}
-		if err := v1.Convert_map_to_unversioned_LabelSelector(&in, ls, nil); err != nil {
-			t.Errorf("Convert_map_to_unversioned_LabelSelector(%#v): %v", in, err)
+		if err := v1.Convert_Map_string_To_string_To_v1_LabelSelector(&in, ls, nil); err != nil {
+			t.Errorf("Convert_Map_string_To_string_To_v1_LabelSelector(%#v): %v", in, err)
 			continue
 		}
 		out := map[string]string{}
-		if err := v1.Convert_unversioned_LabelSelector_to_map(ls, &out, nil); err != nil {
-			t.Errorf("Convert_unversioned_LabelSelector_to_map(%#v): %v", ls, err)
+		if err := v1.Convert_v1_LabelSelector_To_Map_string_To_string(ls, &out, nil); err != nil {
+			t.Errorf("Convert_v1_LabelSelector_To_Map_string_To_string(%#v): %v", ls, err)
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(in, out) {

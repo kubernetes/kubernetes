@@ -4,33 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "interrupt_handler.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "sigquit_swallower_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "sigquit_swallower_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "sigquit_swallower_unix.go",
+        "sigquit_swallower_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/ginkgo/interrupthandler",
     importpath = "github.com/onsi/ginkgo/ginkgo/interrupthandler",
     visibility = ["//visibility:public"],
 )

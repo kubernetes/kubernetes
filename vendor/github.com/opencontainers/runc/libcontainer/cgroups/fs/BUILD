@@ -2,56 +2,25 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "apply_raw.go",
-            "blkio.go",
-            "cpu.go",
-            "cpuacct.go",
-            "cpuset.go",
-            "devices.go",
-            "freezer.go",
-            "hugetlb.go",
-            "memory.go",
-            "name.go",
-            "net_cls.go",
-            "net_prio.go",
-            "perf_event.go",
-            "pids.go",
-            "utils.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "fs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "fs_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "apply_raw.go",
+        "blkio.go",
+        "cpu.go",
+        "cpuacct.go",
+        "cpuset.go",
+        "devices.go",
+        "freezer.go",
+        "fs_unsupported.go",
+        "hugetlb.go",
+        "memory.go",
+        "name.go",
+        "net_cls.go",
+        "net_prio.go",
+        "perf_event.go",
+        "pids.go",
+        "utils.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups/fs",
     visibility = ["//visibility:public"],
     deps = select({

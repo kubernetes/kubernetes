@@ -1,14 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["api.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["api.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/rkt/api/v1alpha",
     importpath = "github.com/coreos/rkt/api/v1alpha",
     visibility = ["//visibility:public"],
     deps = [

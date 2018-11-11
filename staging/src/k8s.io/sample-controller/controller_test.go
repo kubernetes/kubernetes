@@ -198,7 +198,7 @@ func checkAction(expected, actual core.Action, t *testing.T) {
 		expPatch := e.GetPatch()
 		patch := a.GetPatch()
 
-		if !reflect.DeepEqual(expPatch, expPatch) {
+		if !reflect.DeepEqual(expPatch, patch) {
 			t.Errorf("Action %s %s has wrong patch\nDiff:\n %s",
 				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expPatch, patch))
 		}

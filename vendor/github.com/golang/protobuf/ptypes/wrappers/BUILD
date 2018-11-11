@@ -1,14 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["wrappers.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["wrappers.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/golang/protobuf/ptypes/wrappers",
     importpath = "github.com/golang/protobuf/ptypes/wrappers",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],

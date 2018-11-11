@@ -1,0 +1,11 @@
+approvers:
+- api-approvers
+- sig-scheduling-maintainers
+- sttts
+- luxas
+reviewers:
+- sig-scheduling
+- api-reviewers
+- dixudx
+- luxas
+- sttts

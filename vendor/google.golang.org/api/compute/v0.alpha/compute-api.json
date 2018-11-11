@@ -29,7 +29,7 @@
   "description": "Creates and runs virtual machines on Google Cloud Platform.",
   "discoveryVersion": "v1",
   "documentationLink": "https://developers.google.com/compute/docs/reference/latest/",
-  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/uu5Fb8xKeF9Z7ooFYwXgp7bFFJg\"",
+  "etag": "\"Zkyw9ACJZUvcYmlFaKGChzhmtnE/KNWJ1HZYolCRG_Vy_LaMdDtL5UU\"",
   "icons": {
     "x16": "https://www.google.com/images/icons/product/compute_engine-16.png",
     "x32": "https://www.google.com/images/icons/product/compute_engine-32.png"
@@ -17749,6 +17749,71 @@
             "https://www.googleapis.com/auth/compute.readonly"
           ]
         },
+        "getNatMappingInfo": {
+          "description": "Retrieves runtime Nat mapping information of VM endpoints.",
+          "httpMethod": "GET",
+          "id": "compute.routers.getNatMappingInfo",
+          "parameterOrder": [
+            "project",
+            "region",
+            "router"
+          ],
+          "parameters": {
+            "filter": {
+              "description": "A filter expression that filters resources listed in the response. The expression must specify the field name, a comparison operator, and the value that you want to use for filtering. The value must be a string, a number, or a boolean. The comparison operator must be either =, !=, \u003e, or \u003c.\n\nFor example, if you are filtering Compute Engine instances, you can exclude instances named example-instance by specifying name != example-instance.\n\nYou can also filter nested fields. For example, you could specify scheduling.automaticRestart = false to include instances only if they are not scheduled for automatic restarts. You can use filtering on nested fields to filter based on resource labels.\n\nTo filter on multiple expressions, provide each separate expression within parentheses. For example, (scheduling.automaticRestart = true) (cpuPlatform = \"Intel Skylake\"). By default, each expression is an AND expression. However, you can include AND and OR expressions explicitly. For example, (cpuPlatform = \"Intel Skylake\") OR (cpuPlatform = \"Intel Broadwell\") AND (scheduling.automaticRestart = true).",
+              "location": "query",
+              "type": "string"
+            },
+            "maxResults": {
+              "default": "500",
+              "description": "The maximum number of results per page that should be returned. If the number of available results is larger than maxResults, Compute Engine returns a nextPageToken that can be used to get the next page of results in subsequent list requests. Acceptable values are 0 to 500, inclusive. (Default: 500)",
+              "format": "uint32",
+              "location": "query",
+              "minimum": "0",
+              "type": "integer"
+            },
+            "orderBy": {
+              "description": "Sorts list results by a certain order. By default, results are returned in alphanumerical order based on the resource name.\n\nYou can also sort results in descending order based on the creation timestamp using orderBy=\"creationTimestamp desc\". This sorts results based on the creationTimestamp field in reverse chronological order (newest result first). Use this to sort resources like operations so that the newest operation is returned first.\n\nCurrently, only sorting by name or creationTimestamp desc is supported.",
+              "location": "query",
+              "type": "string"
+            },
+            "pageToken": {
+              "description": "Specifies a page token to use. Set pageToken to the nextPageToken returned by a previous list request to get the next page of results.",
+              "location": "query",
+              "type": "string"
+            },
+            "project": {
+              "description": "Project ID for this request.",
+              "location": "path",
+              "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+              "required": true,
+              "type": "string"
+            },
+            "region": {
+              "description": "Name of the region for this request.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            },
+            "router": {
+              "description": "Name of the Router resource to query for Nat Mapping information of VM endpoints.",
+              "location": "path",
+              "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+              "required": true,
+              "type": "string"
+            }
+          },
+          "path": "{project}/regions/{region}/routers/{router}/getNatMappingInfo",
+          "response": {
+            "$ref": "VmEndpointNatMappingsList"
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/compute",
+            "https://www.googleapis.com/auth/compute.readonly"
+          ]
+        },
         "getRouterStatus": {
           "description": "Retrieves runtime information of the specified router.",
           "httpMethod": "GET",
@@ -23842,7 +23907,6 @@
       }
     }
   },
-  "revision": "20180518",
   "rootUrl": "https://www.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -24416,9 +24480,11 @@
           "description": "[Output Only] The status of the address, which can be one of RESERVING, RESERVED, or IN_USE. An address that is RESERVING is currently in the process of being reserved. A RESERVED address is currently reserved and available to use. An IN_USE address is currently being used by another resource and is not available.",
           "enum": [
             "IN_USE",
-            "RESERVED"
+            "RESERVED",
+            "RESERVING"
           ],
           "enumDescriptions": [
+            "",
             "",
             ""
           ],
@@ -28479,6 +28545,10 @@
             ""
           ],
           "type": "string"
+        },
+        "allPorts": {
+          "description": "This field is used along with the backend_service field for internal load balancing or with the target field for internal TargetInstance. This field cannot be used with port or portRange fields.\n\nWhen the load balancing scheme is INTERNAL and protocol is TCP/UDP, specify this field to allow packets addressed to any ports will be forwarded to the backends configured with this forwarding rule.",
+          "type": "boolean"
         },
         "backendService": {
           "description": "This field is not used for external load balancing.\n\nFor internal load balancing, this field identifies the BackendService resource to receive the matched traffic.",
@@ -35775,7 +35845,7 @@
       "type": "object"
     },
     "ManagedInstance": {
-      "description": "Next available tag: 12",
+      "description": "A Managed Instance resource.",
       "id": "ManagedInstance",
       "properties": {
         "currentAction": {
@@ -37307,6 +37377,21 @@
         },
         "nodeType": {
           "description": "The type of this node.",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "CREATING",
+            "DELETING",
+            "INVALID",
+            "READY"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            "",
+            ""
+          ],
           "type": "string"
         }
       },
@@ -39086,6 +39171,7 @@
             "IN_USE_MAINTENANCE_WINDOWS",
             "LOCAL_SSD_TOTAL_GB",
             "NETWORKS",
+            "NETWORK_ENDPOINT_GROUPS",
             "NVIDIA_K80_GPUS",
             "NVIDIA_P100_GPUS",
             "NVIDIA_P100_VWS_GPUS",
@@ -39119,6 +39205,7 @@
             "VPN_TUNNELS"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             "",
@@ -41702,6 +41789,16 @@
           },
           "type": "array"
         },
+        "icmpIdleTimeoutSec": {
+          "description": "Timeout (in seconds) for ICMP connections. Defaults to 30s if not set.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "minPortsPerVm": {
+          "description": "Minimum number of ports allocated to a VM from this NAT config. If not set, a default number of ports is allocated to a VM. This gets rounded up to the nearest power of 2. Eg. if the value of this field is 50, at least 64 ports will be allocated to a VM.",
+          "format": "int32",
+          "type": "integer"
+        },
         "name": {
           "description": "Unique name of this Nat service. The name must be 1-63 characters long and comply with RFC1035.",
           "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
@@ -41746,6 +41843,21 @@
             "$ref": "RouterNatSubnetworkToNat"
           },
           "type": "array"
+        },
+        "tcpEstablishedIdleTimeoutSec": {
+          "description": "Timeout (in seconds) for TCP established connections. Defaults to 1200s if not set.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "tcpTransitoryIdleTimeoutSec": {
+          "description": "Timeout (in seconds) for TCP transitory connections. Defaults to 30s if not set.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "udpIdleTimeoutSec": {
+          "description": "Timeout (in seconds) for UDP connections. Defaults to 30s if not set.",
+          "format": "int32",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -46688,6 +46800,162 @@
       },
       "type": "object"
     },
+    "VmEndpointNatMappings": {
+      "description": "Contain information of Nat mapping for a VM endpoint (i.e., NIC).",
+      "id": "VmEndpointNatMappings",
+      "properties": {
+        "instanceName": {
+          "description": "Name of the VM instance which the endpoint belongs to",
+          "type": "string"
+        },
+        "interfaceNatMappings": {
+          "items": {
+            "$ref": "VmEndpointNatMappingsInterfaceNatMappings"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "VmEndpointNatMappingsInterfaceNatMappings": {
+      "description": "Contain information of Nat mapping for an interface of this endpoint.",
+      "id": "VmEndpointNatMappingsInterfaceNatMappings",
+      "properties": {
+        "natIpPortRanges": {
+          "description": "A list of all IP:port-range mappings assigned to this interface. These ranges are inclusive, that is, both the first and the last ports can be used for NAT. Example: [\"2.2.2.2:12345-12355\", \"1.1.1.1:2234-2234\"].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "numTotalNatPorts": {
+          "description": "Total number of ports across all NAT IPs allocated to this interface. It equals to the aggregated port number in the field nat_ip_port_ranges.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "sourceAliasIpRange": {
+          "description": "Alias IP range for this interface endpoint. It will be a private (RFC 1918) IP range. Examples: \"10.33.4.55/32\", or \"192.168.5.0/24\".",
+          "type": "string"
+        },
+        "sourceVirtualIp": {
+          "description": "Primary IP of the VM for this NIC.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "VmEndpointNatMappingsList": {
+      "description": "Contains a list of VmEndpointNatMappings.",
+      "id": "VmEndpointNatMappingsList",
+      "properties": {
+        "id": {
+          "description": "[Output Only] The unique identifier for the resource. This identifier is defined by the server.",
+          "type": "string"
+        },
+        "kind": {
+          "default": "compute#vmEndpointNatMappingsList",
+          "description": "[Output Only] Type of resource. Always compute#vmEndpointNatMappingsList for lists of Nat mappings of VM endpoints.",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "description": "[Output Only] This token allows you to get the next page of results for list requests. If the number of results is larger than maxResults, use the nextPageToken as a value for the query parameter pageToken in the next list request. Subsequent list requests will have their own nextPageToken to continue paging through the results.",
+          "type": "string"
+        },
+        "result": {
+          "description": "[Output Only] A list of Nat mapping information of VM endpoints.",
+          "items": {
+            "$ref": "VmEndpointNatMappings"
+          },
+          "type": "array"
+        },
+        "selfLink": {
+          "description": "[Output Only] Server-defined URL for this resource.",
+          "type": "string"
+        },
+        "warning": {
+          "description": "[Output Only] Informational warning message.",
+          "properties": {
+            "code": {
+              "description": "[Output Only] A warning code, if applicable. For example, Compute Engine returns NO_RESULTS_ON_PAGE if there are no results in the response.",
+              "enum": [
+                "CLEANUP_FAILED",
+                "DEPRECATED_RESOURCE_USED",
+                "DEPRECATED_TYPE_USED",
+                "DISK_SIZE_LARGER_THAN_IMAGE_SIZE",
+                "EXPERIMENTAL_TYPE_USED",
+                "EXTERNAL_API_WARNING",
+                "FIELD_VALUE_OVERRIDEN",
+                "INJECTED_KERNELS_DEPRECATED",
+                "MISSING_TYPE_DEPENDENCY",
+                "NEXT_HOP_ADDRESS_NOT_ASSIGNED",
+                "NEXT_HOP_CANNOT_IP_FORWARD",
+                "NEXT_HOP_INSTANCE_NOT_FOUND",
+                "NEXT_HOP_INSTANCE_NOT_ON_NETWORK",
+                "NEXT_HOP_NOT_RUNNING",
+                "NOT_CRITICAL_ERROR",
+                "NO_RESULTS_ON_PAGE",
+                "REQUIRED_TOS_AGREEMENT",
+                "RESOURCE_IN_USE_BY_OTHER_RESOURCE_WARNING",
+                "RESOURCE_NOT_DELETED",
+                "SCHEMA_VALIDATION_IGNORED",
+                "SINGLE_INSTANCE_PROPERTY_TEMPLATE",
+                "UNDECLARED_PROPERTIES",
+                "UNREACHABLE"
+              ],
+              "enumDescriptions": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+              ],
+              "type": "string"
+            },
+            "data": {
+              "description": "[Output Only] Metadata about this warning in key: value format. For example:\n\"data\": [ { \"key\": \"scope\", \"value\": \"zones/us-east1-d\" }",
+              "items": {
+                "properties": {
+                  "key": {
+                    "description": "[Output Only] A key that provides more detail on the warning being returned. For example, for warnings where there are no results in a list request for a particular zone, this key might be scope and the key value might be the zone name. Other examples might be a key indicating a deprecated resource and a suggested replacement, or a warning about invalid network settings (for example, if an instance attempts to perform IP forwarding but is not enabled for IP forwarding).",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "[Output Only] A warning data value corresponding to the key.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "[Output Only] A human-readable description of the warning code.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "VpnGateway": {
       "description": "Represents a VPN gateway resource.",
       "id": "VpnGateway",
@@ -46739,20 +47007,6 @@
             ]
           },
           "description": "URL of the network to which this VPN gateway is attached. Provided by the client when the VPN gateway is created.",
-          "type": "string"
-        },
-        "redundancy": {
-          "description": "The redundancy mode configured for this VPN gateway. Possible values are ACTIVE_ACTIVE and NONE. If set to ACTIVE_ACTIVE, two VPN interfaces are created thereby providing higher availability. If set to NONE, only one interface is created with a lower availability SLA.\n\nIf this field is specified, either 2 or 1 external IP addresses (depending on the value of specified redundancy) are automatically allocated for use with this VPN gateway, and incoming traffic on the external addresses to ports ESP, UDP:500 and UDP:4500 are automatically forwarded to this gateway.",
-          "enum": [
-            "ACTIVE_ACTIVE",
-            "NONE",
-            "REDUNDANCY_UNSPECIFIED"
-          ],
-          "enumDescriptions": [
-            "",
-            "",
-            ""
-          ],
           "type": "string"
         },
         "region": {
@@ -47235,11 +47489,11 @@
           "type": "string"
         },
         "vpnGateway": {
-          "description": "URL of the VPN gateway with which this VPN tunnel is associated. Provided by the client when the VPN tunnel is created. This must be used (instead of target_vpn_gateway) if a VPN gateway resource is created with redundancy.\n\nVPN gateway resource provides a way to create a highly available VPN setup.",
+          "description": "URL of the VPN gateway with which this VPN tunnel is associated. Provided by the client when the VPN tunnel is created. This must be used (instead of target_vpn_gateway) if a High Availability VPN gateway resource is created.",
           "type": "string"
         },
         "vpnGatewayInterface": {
-          "description": "The interface ID of the VPN gateway with which this VPN tunnel is associated. If the VPN gateway has redundancy other than NONE, this field is required to identify which interface of the VPN gateway to use.",
+          "description": "The interface ID of the VPN gateway with which this VPN tunnel is associated.",
           "format": "int32",
           "type": "integer"
         }

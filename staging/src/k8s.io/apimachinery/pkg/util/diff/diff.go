@@ -108,6 +108,14 @@ func limit(aObj, bObj interface{}, max int) (string, string) {
 	elidedASuffix := ""
 	elidedBSuffix := ""
 	a, b := fmt.Sprintf("%#v", aObj), fmt.Sprintf("%#v", bObj)
+
+	if aObj != nil && bObj != nil {
+		if aType, bType := fmt.Sprintf("%T", aObj), fmt.Sprintf("%T", bObj); aType != bType {
+			a = fmt.Sprintf("%s (%s)", a, aType)
+			b = fmt.Sprintf("%s (%s)", b, bType)
+		}
+	}
+
 	for {
 		switch {
 		case len(a) > max && len(a) > 4 && len(b) > 4 && a[:4] == b[:4]:

@@ -26,7 +26,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 	wardle "k8s.io/sample-apiserver/pkg/apis/wardle"
-	clientset_internalversion "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
+	clientsetinternalversion "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/client/informers/internalversion/internalinterfaces"
 	internalversion "k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion"
 )
@@ -47,14 +47,14 @@ type flunderInformer struct {
 // NewFlunderInformer constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFlunderInformer(client clientset_internalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+func NewFlunderInformer(client clientsetinternalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewFilteredFlunderInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredFlunderInformer constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFlunderInformer(client clientset_internalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredFlunderInformer(client clientsetinternalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -76,7 +76,7 @@ func NewFilteredFlunderInformer(client clientset_internalversion.Interface, name
 	)
 }
 
-func (f *flunderInformer) defaultInformer(client clientset_internalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func (f *flunderInformer) defaultInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	return NewFilteredFlunderInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 

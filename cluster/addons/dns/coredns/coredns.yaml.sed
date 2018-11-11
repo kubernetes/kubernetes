@@ -27,6 +27,12 @@ rules:
   verbs:
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -66,7 +72,9 @@ data:
         prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
+        loop
         reload
+        loadbalance
     }
 ---
 apiVersion: extensions/v1beta1
@@ -106,7 +114,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.1.3
+        image: k8s.gcr.io/coredns:1.2.4
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -161,6 +169,7 @@ metadata:
   name: kube-dns
   namespace: kube-system
   annotations:
+    prometheus.io/port: "9153"
     prometheus.io/scrape: "true"
   labels:
     k8s-app: kube-dns

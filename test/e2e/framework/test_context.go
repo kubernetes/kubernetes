@@ -23,28 +23,53 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
-	"github.com/spf13/viper"
+	"github.com/pkg/errors"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubemark"
+	"k8s.io/klog"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 const defaultHost = "http://127.0.0.1:8080"
 
+// TestContextType contains test settings and global state. Due to
+// historic reasons, it is a mixture of items managed by the test
+// framework itself, cloud providers and individual tests.
+// The goal is to move anything not required by the framework
+// into the code which uses the settings.
+//
+// The recommendation for those settings is:
+// - They are stored in their own context structure or local
+//   variables.
+// - The standard `flag` package is used to register them.
+//   The flag name should follow the pattern <part1>.<part2>....<partn>
+//   where the prefix is unlikely to conflict with other tests or
+//   standard packages and each part is in lower camel case. For
+//   example, test/e2e/storage/csi/context.go could define
+//   storage.csi.numIterations.
+// - framework/config can be used to simplify the registration of
+//   multiple options with a single function call:
+//   var storageCSI {
+//       NumIterations `default:"1" usage:"number of iterations"`
+//   }
+//   _ config.AddOptions(&storageCSI, "storage.csi")
+// - The direct use Viper in tests is possible, but discouraged because
+//   it only works in test suites which use Viper (which is not
+//   required) and the supported options cannot be
+//   discovered by a test suite user.
+//
+// Test suite authors can use framework/viper to make all command line
+// parameters also configurable via a configuration file.
 type TestContextType struct {
-	KubeConfig                 string
-	KubemarkExternalKubeConfig string
-	KubeContext                string
-	KubeAPIContentType         string
-	KubeVolumeDir              string
-	CertDir                    string
-	Host                       string
+	KubeConfig         string
+	KubeContext        string
+	KubeAPIContentType string
+	KubeVolumeDir      string
+	CertDir            string
+	Host               string
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot                string
 	DockershimCheckpointDir string
@@ -64,11 +89,9 @@ type TestContextType struct {
 	MinStartupPods int
 	// Timeout for waiting for system pods to be running
 	SystemPodsStartupTimeout    time.Duration
-	UpgradeTarget               string
 	EtcdUpgradeStorage          string
 	EtcdUpgradeVersion          string
 	IngressUpgradeImage         string
-	UpgradeImage                string
 	GCEUpgradeScript            string
 	ContainerRuntime            string
 	ContainerRuntimeEndpoint    string
@@ -99,6 +122,8 @@ type TestContextType struct {
 	OutputPrintType string
 	// NodeSchedulableTimeout is the timeout for waiting for all nodes to be schedulable.
 	NodeSchedulableTimeout time.Duration
+	// SystemDaemonsetStartupTimeout is the timeout for waiting for all system daemonsets to be ready.
+	SystemDaemonsetStartupTimeout time.Duration
 	// CreateTestingNS is responsible for creating namespace used for executing e2e tests.
 	// It accepts namespace base name, which will be prepended with e2e prefix, kube client
 	// and labels to be applied to a namespace.
@@ -113,8 +138,6 @@ type TestContextType struct {
 	FeatureGates map[string]bool
 	// Node e2e specific test context
 	NodeTestContextType
-	// Storage e2e specific test context
-	StorageTestContextType
 	// Monitoring solution that is used in current cluster.
 	ClusterMonitoringMode string
 	// Separate Prometheus monitoring deployed in cluster
@@ -123,23 +146,8 @@ type TestContextType struct {
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
 
-	// Viper-only parameters.  These will in time replace all flags.
-
-	// Example: Create a file 'e2e.json' with the following:
-	// 	"Cadvisor":{
-	// 		"MaxRetries":"6"
-	// 	}
-
-	Viper    string
-	Cadvisor struct {
-		MaxRetries      int
-		SleepDurationMS int
-	}
-
-	LoggingSoak struct {
-		Scale                    int
-		MilliSecondsBetweenWaves int
-	}
+	// The DNS Domain of the cluster.
+	ClusterDNSDomain string
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -162,14 +170,6 @@ type NodeTestContextType struct {
 	SystemSpecName string
 }
 
-// StorageConfig contains the shared settings for storage 2e2 tests.
-type StorageTestContextType struct {
-	// CSIImageVersion overrides the builtin stable version numbers if set.
-	CSIImageVersion string
-	// CSIImageRegistry defines the image registry hosting the CSI container images.
-	CSIImageRegistry string
-}
-
 type CloudConfig struct {
 	ApiEndpoint       string
 	ProjectID         string
@@ -188,8 +188,7 @@ type CloudConfig struct {
 	NodeTag           string
 	MasterTag         string
 
-	Provider           cloudprovider.Interface
-	KubemarkController *kubemark.KubemarkController
+	Provider ProviderInterface
 }
 
 var TestContext TestContextType
@@ -223,7 +222,6 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.Var(utilflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
-	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
@@ -231,14 +229,13 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
-	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
+	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
 }
 
 // Register flags specific to the cluster e2e test suite.
 func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
-	flag.StringVar(&TestContext.KubemarkExternalKubeConfig, fmt.Sprintf("%s-%s", "kubemark-external", clientcmd.RecommendedConfigPathFlag), "", "Path to kubeconfig containing embedded authinfo for external cluster.")
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
 
@@ -250,15 +247,16 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flag.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
-	flag.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, trusty, or coreos).")
-	flag.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, trusty, or coreos).")
+	flag.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")
+	flag.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, ubuntu, gci, coreos, or custom).")
 	flag.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "standalone", "The monitoring solution that is used in the cluster.")
 	flag.BoolVar(&TestContext.EnablePrometheusMonitoring, "prometheus-monitoring", false, "Separate Prometheus monitoring deployed in cluster.")
+	flag.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE ApiEndpoint being used, if applicable")
+	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
@@ -277,10 +275,9 @@ func RegisterClusterFlags() {
 	flag.IntVar(&TestContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
 	flag.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
 	flag.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 30*time.Minute, "Timeout for waiting for all nodes to be schedulable.")
-	flag.StringVar(&TestContext.UpgradeTarget, "upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
+	flag.DurationVar(&TestContext.SystemDaemonsetStartupTimeout, "system-daemonsets-startup-timeout", 5*time.Minute, "Timeout for waiting for all system daemonsets to be ready.")
 	flag.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flag.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
-	flag.StringVar(&TestContext.UpgradeImage, "upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 	flag.StringVar(&TestContext.IngressUpgradeImage, "ingress-upgrade-image", "", "Image to upgrade to if doing an upgrade test for ingress.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
@@ -303,32 +300,11 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
 }
 
-func RegisterStorageFlags() {
-	flag.StringVar(&TestContext.CSIImageVersion, "csiImageVersion", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-	flag.StringVar(&TestContext.CSIImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-}
-
-// ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
-func ViperizeFlags() {
-
-	// Part 1: Set regular flags.
-	// TODO: Future, lets eliminate e2e 'flag' deps entirely in favor of viper only,
-	// since go test 'flag's are sort of incompatible w/ flag, glog, etc.
+// HandleFlags sets up all flags and parses the command line.
+func HandleFlags() {
 	RegisterCommonFlags()
 	RegisterClusterFlags()
-	RegisterStorageFlags()
 	flag.Parse()
-
-	// Part 2: Set Viper provided flags.
-	// This must be done after common flags are registered, since Viper is a flag option.
-	viper.SetConfigName(TestContext.Viper)
-	viper.AddConfigPath(".")
-	viper.ReadInConfig()
-
-	// TODO Consider whether or not we want to use overwriteFlagsWithViperConfig().
-	viper.Unmarshal(&TestContext)
-
-	AfterReadingAllFlags(&TestContext)
 }
 
 func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
@@ -339,7 +315,7 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	config := clientcmdapi.NewConfig()
 
 	credentials := clientcmdapi.NewAuthInfo()
-	credentials.Token = clientCfg.BearerToken
+	credentials.TokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
 	if len(credentials.ClientCertificate) == 0 {
 		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
@@ -379,16 +355,36 @@ func AfterReadingAllFlags(t *TestContextType) {
 				kubeConfig := createKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
-				glog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
+				klog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
 			}
 		}
 		if len(t.KubeConfig) == 0 {
-			glog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
+			klog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
 			t.Host = defaultHost
 		}
 	}
 	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
 	if t.AllowedNotReadyNodes == 0 {
 		t.AllowedNotReadyNodes = t.CloudConfig.NumNodes / 100
+	}
+
+	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
+	var err error
+	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
+	if err == nil {
+		return
+	}
+	if !os.IsNotExist(errors.Cause(err)) {
+		Failf("Failed to setup provider config: %v", err)
+	}
+	// We allow unknown provider parameters for historic reasons. At least log a
+	// warning to catch typos.
+	// TODO (https://github.com/kubernetes/kubernetes/issues/70200):
+	// - remove the fallback for unknown providers
+	// - proper error message instead of Failf (which panics)
+	klog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
+	TestContext.CloudConfig.Provider, err = SetupProviderConfig("skeleton")
+	if err != nil {
+		Failf("Failed to setup fallback skeleton provider config: %v", err)
 	}
 }

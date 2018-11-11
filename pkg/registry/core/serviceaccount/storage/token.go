@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
@@ -39,11 +40,12 @@ func (r *TokenREST) New() runtime.Object {
 }
 
 type TokenREST struct {
-	svcaccts getter
-	pods     getter
-	secrets  getter
-	issuer   token.TokenGenerator
-	auds     []string
+	svcaccts             getter
+	pods                 getter
+	secrets              getter
+	issuer               token.TokenGenerator
+	auds                 authenticator.Audiences
+	maxExpirationSeconds int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -55,7 +57,7 @@ var gvk = schema.GroupVersionKind{
 	Kind:    "TokenRequest",
 }
 
-func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if err := createValidation(obj); err != nil {
 		return nil, err
 	}
@@ -111,6 +113,12 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	if len(out.Spec.Audiences) == 0 {
 		out.Spec.Audiences = r.auds
 	}
+
+	if r.maxExpirationSeconds > 0 && out.Spec.ExpirationSeconds > r.maxExpirationSeconds {
+		//only positive value is valid
+		out.Spec.ExpirationSeconds = r.maxExpirationSeconds
+	}
+
 	sc, pc := token.Claims(*svcacct, pod, secret, out.Spec.ExpirationSeconds, out.Spec.Audiences)
 	tokdata, err := r.issuer.GenerateToken(sc, pc)
 	if err != nil {

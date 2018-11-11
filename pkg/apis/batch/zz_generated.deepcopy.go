@@ -262,6 +262,11 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		**out = **in
 	}
 	in.Template.DeepCopyInto(&out.Template)
+	if in.TTLSecondsAfterFinished != nil {
+		in, out := &in.TTLSecondsAfterFinished, &out.TTLSecondsAfterFinished
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

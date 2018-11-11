@@ -32,7 +32,7 @@ type nopConverter struct {
 
 var _ runtime.ObjectConvertor = &nopConverter{}
 
-func (nopConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+func (nopConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	return "", "", errors.New("unstructured cannot convert field labels")
 }
 
@@ -49,11 +49,11 @@ func (c *nopConverter) Convert(in, out, context interface{}) error {
 
 	outGVK := unstructOut.GroupVersionKind()
 	if !c.validVersions[outGVK.GroupVersion()] {
-		return fmt.Errorf("request to convert CRD from an invalid group/version: %s", outGVK.String())
+		return fmt.Errorf("request to convert CR from an invalid group/version: %s", outGVK.String())
 	}
 	inGVK := unstructIn.GroupVersionKind()
 	if !c.validVersions[inGVK.GroupVersion()] {
-		return fmt.Errorf("request to convert CRD to an invalid group/version: %s", inGVK.String())
+		return fmt.Errorf("request to convert CR to an invalid group/version: %s", inGVK.String())
 	}
 
 	unstructOut.SetUnstructuredContent(unstructIn.UnstructuredContent())
@@ -72,7 +72,7 @@ func (c *nopConverter) ConvertToVersion(in runtime.Object, target runtime.GroupV
 		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
 	}
 	if !c.validVersions[gvk.GroupVersion()] {
-		return nil, fmt.Errorf("request to convert CRD to an invalid group/version: %s", gvk.String())
+		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", gvk.String())
 	}
 	in.GetObjectKind().SetGroupVersionKind(gvk)
 	return in, nil

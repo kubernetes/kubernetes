@@ -1,6 +1,7 @@
 #!/bin/bash
 # fail out of the script if anything here fails
 set -e
+set -o pipefail
 
 # set the path to the present working directory
 export GOPATH=`pwd`
@@ -21,9 +22,6 @@ function git_clone() {
 
 # Remove potential previous runs
 rm -rf src test_program_bin toml-test
-
-# Run go vet
-go vet ./...
 
 go get github.com/pelletier/go-buffruneio
 go get github.com/davecgh/go-spew/spew

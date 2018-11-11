@@ -26,8 +26,6 @@ kube::etcd::install
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
-apiserver=$(kube::util::find-binary "kube-apiserver")
-
 SPECROOT="${KUBE_ROOT}/api/openapi-spec"
 TMP_SPECROOT="${KUBE_ROOT}/_tmp/openapi-spec"
 _tmp="${KUBE_ROOT}/_tmp"

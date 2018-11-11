@@ -22,6 +22,4 @@ type ControllerRevisionExpansion interface{}
 
 type DeploymentExpansion interface{}
 
-type ScaleExpansion interface{}
-
 type StatefulSetExpansion interface{}

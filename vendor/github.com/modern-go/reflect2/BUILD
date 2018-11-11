@@ -8,10 +8,16 @@ go_library(
         "go_below_17.go",
         "go_below_19.go",
         "reflect2.go",
+        "reflect2_amd64.s",
         "reflect2_kind.go",
+        "relfect2_386.s",
+        "relfect2_amd64p32.s",
+        "relfect2_arm.s",
+        "relfect2_arm64.s",
         "relfect2_mips64x.s",
         "relfect2_mipsx.s",
         "relfect2_ppc64x.s",
+        "relfect2_s390x.s",
         "safe_field.go",
         "safe_map.go",
         "safe_slice.go",
@@ -28,27 +34,8 @@ go_library(
         "unsafe_slice.go",
         "unsafe_struct.go",
         "unsafe_type.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:386": [
-            "relfect2_386.s",
-        ],
-        "@io_bazel_rules_go//go/platform:amd64": [
-            "reflect2_amd64.s",
-        ],
-        "@io_bazel_rules_go//go/platform:amd64p32": [
-            "relfect2_amd64p32.s",
-        ],
-        "@io_bazel_rules_go//go/platform:arm": [
-            "relfect2_arm.s",
-        ],
-        "@io_bazel_rules_go//go/platform:arm64": [
-            "relfect2_arm64.s",
-        ],
-        "@io_bazel_rules_go//go/platform:s390x": [
-            "relfect2_s390x.s",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/modern-go/reflect2",
     importpath = "github.com/modern-go/reflect2",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/modern-go/concurrent:go_default_library"],

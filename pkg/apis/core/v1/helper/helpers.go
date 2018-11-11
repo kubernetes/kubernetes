@@ -79,7 +79,7 @@ func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
 // an error is returned.
 func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
 	if !IsHugePageResourceName(name) {
-		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is an invalid hugepage name", name)
 	}
 	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
 	return resource.ParseQuantity(pageSize)
@@ -281,6 +281,20 @@ func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (
 	}
 
 	return fields.AndSelectors(selectors...), nil
+}
+
+// NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
+func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorRequirement, terms []v1.NodeSelectorTerm) bool {
+	for _, req := range reqs {
+		for _, term := range terms {
+			for _, r := range term.MatchExpressions {
+				if r.Key == req.Key {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
@@ -485,4 +499,29 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 	}
 
 	return ""
+}
+
+// ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements
+// labels.Selector.
+func ScopedResourceSelectorRequirementsAsSelector(ssr v1.ScopedResourceSelectorRequirement) (labels.Selector, error) {
+	selector := labels.NewSelector()
+	var op selection.Operator
+	switch ssr.Operator {
+	case v1.ScopeSelectorOpIn:
+		op = selection.In
+	case v1.ScopeSelectorOpNotIn:
+		op = selection.NotIn
+	case v1.ScopeSelectorOpExists:
+		op = selection.Exists
+	case v1.ScopeSelectorOpDoesNotExist:
+		op = selection.DoesNotExist
+	default:
+		return nil, fmt.Errorf("%q is not a valid scope selector operator", ssr.Operator)
+	}
+	r, err := labels.NewRequirement(string(ssr.ScopeName), op, ssr.Values)
+	if err != nil {
+		return nil, err
+	}
+	selector = selector.Add(*r)
+	return selector, nil
 }

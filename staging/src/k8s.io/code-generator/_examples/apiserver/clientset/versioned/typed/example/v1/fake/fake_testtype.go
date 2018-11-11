@@ -25,7 +25,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	example_v1 "k8s.io/code-generator/_examples/apiserver/apis/example/v1"
+	examplev1 "k8s.io/code-generator/_examples/apiserver/apis/example/v1"
 )
 
 // FakeTestTypes implements TestTypeInterface
@@ -39,20 +39,20 @@ var testtypesResource = schema.GroupVersionResource{Group: "example.apiserver.co
 var testtypesKind = schema.GroupVersionKind{Group: "example.apiserver.code-generator.k8s.io", Version: "v1", Kind: "TestType"}
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *example_v1.TestType, err error) {
+func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *examplev1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &example_v1.TestType{})
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &examplev1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example_v1.TestType), err
+	return obj.(*examplev1.TestType), err
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example_v1.TestTypeList, err error) {
+func (c *FakeTestTypes) List(opts v1.ListOptions) (result *examplev1.TestTypeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &example_v1.TestTypeList{})
+		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &examplev1.TestTypeList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example_v1.TestTypeLi
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &example_v1.TestTypeList{ListMeta: obj.(*example_v1.TestTypeList).ListMeta}
-	for _, item := range obj.(*example_v1.TestTypeList).Items {
+	list := &examplev1.TestTypeList{ListMeta: obj.(*examplev1.TestTypeList).ListMeta}
+	for _, item := range obj.(*examplev1.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Create(testType *example_v1.TestType) (result *example_v1.TestType, err error) {
+func (c *FakeTestTypes) Create(testType *examplev1.TestType) (result *examplev1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &example_v1.TestType{})
+		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &examplev1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example_v1.TestType), err
+	return obj.(*examplev1.TestType), err
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *FakeTestTypes) Update(testType *example_v1.TestType) (result *example_v1.TestType, err error) {
+func (c *FakeTestTypes) Update(testType *examplev1.TestType) (result *examplev1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &example_v1.TestType{})
+		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &examplev1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example_v1.TestType), err
+	return obj.(*examplev1.TestType), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeTestTypes) UpdateStatus(testType *example_v1.TestType) (*example_v1.TestType, error) {
+func (c *FakeTestTypes) UpdateStatus(testType *examplev1.TestType) (*examplev1.TestType, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &example_v1.TestType{})
+		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &examplev1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example_v1.TestType), err
+	return obj.(*examplev1.TestType), err
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(testtypesResource, c.ns, name), &example_v1.TestType{})
+		Invokes(testing.NewDeleteAction(testtypesResource, c.ns, name), &examplev1.TestType{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &example_v1.TestTypeList{})
+	_, err := c.Fake.Invokes(action, &examplev1.TestTypeList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example_v1.TestType, err error) {
+func (c *FakeTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *examplev1.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &example_v1.TestType{})
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &examplev1.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*example_v1.TestType), err
+	return obj.(*examplev1.TestType), err
 }

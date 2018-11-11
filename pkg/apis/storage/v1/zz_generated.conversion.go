@@ -23,7 +23,7 @@ package v1
 import (
 	unsafe "unsafe"
 
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/storage/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -37,13 +37,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_StorageClass_To_storage_StorageClass,
-		Convert_storage_StorageClass_To_v1_StorageClass,
-		Convert_v1_StorageClassList_To_storage_StorageClassList,
-		Convert_storage_StorageClassList_To_v1_StorageClassList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1.StorageClass)(nil), (*storage.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StorageClass_To_storage_StorageClass(a.(*v1.StorageClass), b.(*storage.StorageClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.StorageClass)(nil), (*v1.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_StorageClass_To_v1_StorageClass(a.(*storage.StorageClass), b.(*v1.StorageClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StorageClassList)(nil), (*storage.StorageClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StorageClassList_To_storage_StorageClassList(a.(*v1.StorageClassList), b.(*storage.StorageClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.StorageClassList)(nil), (*v1.StorageClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_StorageClassList_To_v1_StorageClassList(a.(*storage.StorageClassList), b.(*v1.StorageClassList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_StorageClass_To_storage_StorageClass(in *v1.StorageClass, out *storage.StorageClass, s conversion.Scope) error {
@@ -67,11 +82,11 @@ func autoConvert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClas
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
-	out.ReclaimPolicy = (*core_v1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
+	out.ReclaimPolicy = (*corev1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*v1.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
-	out.AllowedTopologies = *(*[]core_v1.TopologySelectorTerm)(unsafe.Pointer(&in.AllowedTopologies))
+	out.AllowedTopologies = *(*[]corev1.TopologySelectorTerm)(unsafe.Pointer(&in.AllowedTopologies))
 	return nil
 }
 

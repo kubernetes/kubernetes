@@ -99,13 +99,13 @@ function get-cluster-ip-range {
 }
 
 # Calculate ip alias range based on max number of pods.
-# Let pow be the smallest integer which is bigger than log2($1 * 2).
+# Let pow be the smallest integer which is bigger or equal to log2($1 * 2).
 # (32 - pow) will be returned.
 #
 # $1: The number of max pods limitation.
 function get-alias-range-size() {
   for pow in {0..31}; do
-    if (( 1 << $pow > $1 * 2 )); then
+    if (( 1 << $pow >= $1 * 2 )); then
       echo $((32 - pow))
       return 0
     fi

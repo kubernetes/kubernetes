@@ -67,7 +67,10 @@ func validNewHorizontalPodAutoscaler(name string) *autoscaling.HorizontalPodAuto
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
 						Name: api.ResourceCPU,
-						TargetAverageUtilization: &cpu,
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: &cpu,
+						},
 					},
 				},
 			},
@@ -177,7 +180,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	autoscalerStart := validNewHorizontalPodAutoscaler("foo")
-	err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -194,7 +197,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = statusStorage.Update(ctx, autoscalerIn.Name, rest.DefaultUpdatedObjectInfo(autoscalerIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = statusStorage.Update(ctx, autoscalerIn.Name, rest.DefaultUpdatedObjectInfo(autoscalerIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

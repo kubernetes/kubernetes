@@ -6,3 +6,5 @@ approvers:
   - ixdy
   - luxas
   - mikedanese
+labels:
+- sig/release

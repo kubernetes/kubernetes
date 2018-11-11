@@ -153,6 +153,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
+	/*
+	   Release: v1.9
+	   Testname: Service Account Tokens Must AutoMount
+	   Description: Ensure that Service Account keys are mounted into the Container. Pod
+	                contains three containers each will read Service Account token,
+	                root CA and default namespace respectively from the default API
+	                Token Mount path. All these three files MUST exist and the Service
+	                Account mount path MUST be auto mounted to the Container.
+	*/
 	framework.ConformanceIt("should mount an API token into pods ", func() {
 		var tokenContent string
 		var rootCAContent string
@@ -235,7 +244,33 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		})
 	})
 
+	/*
+	   Release: v1.9
+	   Testname: Service account tokens auto mount optionally
+	   Description: Ensure that Service Account keys are mounted into the Pod only
+	                when AutoMountServiceToken is not set to false. We test the
+	                following scenarios here.
+	   1. Create Pod, Pod Spec has AutomountServiceAccountToken set to nil
+	      a) Service Account with default value,
+	      b) Service Account is an configured AutomountServiceAccountToken set to true,
+	      c) Service Account is an configured AutomountServiceAccountToken set to false
+	   2. Create Pod, Pod Spec has AutomountServiceAccountToken set to true
+	      a) Service Account with default value,
+	      b) Service Account is configured with AutomountServiceAccountToken set to true,
+	      c) Service Account is configured with AutomountServiceAccountToken set to false
+	   3. Create Pod, Pod Spec has AutomountServiceAccountToken set to false
+	      a) Service Account with default value,
+	      b) Service Account is configured with AutomountServiceAccountToken set to true,
+	      c) Service Account is configured with AutomountServiceAccountToken set to false
+
+	   The Containers running in these pods MUST verify that the ServiceTokenVolume path is
+	   auto mounted only when Pod Spec has AutomountServiceAccountToken not set to false
+	   and ServiceAccount object has AutomountServiceAccountToken not set to false, this
+	   include test cases 1a,1b,2a,2b and 2c.
+	   In the test cases 1c,3a,3b and 3c the ServiceTokenVolume MUST not be auto mounted.
+	*/
 	framework.ConformanceIt("should allow opting out of API token automount ", func() {
+
 		var err error
 		trueValue := true
 		falseValue := false

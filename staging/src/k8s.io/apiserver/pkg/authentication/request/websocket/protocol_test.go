@@ -17,6 +17,7 @@ limitations under the License.
 package websocket
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"reflect"
@@ -27,36 +28,36 @@ import (
 )
 
 func TestAuthenticateRequest(t *testing.T) {
-	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		if token != "token" {
 			t.Errorf("unexpected token: %s", token)
 		}
-		return &user.DefaultInfo{Name: "user"}, true, nil
+		return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	resp, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{
 			"Connection":             []string{"upgrade"},
 			"Upgrade":                []string{"websocket"},
 			"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
 		},
 	})
-	if !ok || user == nil || err != nil {
+	if !ok || resp == nil || err != nil {
 		t.Errorf("expected valid user")
 	}
 }
 
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
-	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, nil
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	resp, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{
 			"Connection":             []string{"upgrade"},
 			"Upgrade":                []string{"websocket"},
 			"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
 		},
 	})
-	if ok || user != nil {
+	if ok || resp != nil {
 		t.Errorf("expected not authenticated user")
 	}
 	if err != errInvalidToken {
@@ -66,17 +67,17 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 
 func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
 	customError := errors.New("custom")
-	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, customError
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	resp, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{
 			"Connection":             []string{"upgrade"},
 			"Upgrade":                []string{"websocket"},
 			"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
 		},
 	})
-	if ok || user != nil {
+	if ok || resp != nil {
 		t.Errorf("expected not authenticated user")
 	}
 	if err != customError {
@@ -85,17 +86,17 @@ func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenError(t *testing.T) {
-	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, errors.New("error")
 	}))
-	user, ok, err := auth.AuthenticateRequest(&http.Request{
+	resp, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{
 			"Connection":             []string{"upgrade"},
 			"Upgrade":                []string{"websocket"},
 			"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
 		},
 	})
-	if ok || user != nil || err == nil {
+	if ok || resp != nil || err == nil {
 		t.Errorf("expected error")
 	}
 }
@@ -117,12 +118,12 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+		auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 			t.Errorf("authentication should not have been called")
 			return nil, false, nil
 		}))
-		user, ok, err := auth.AuthenticateRequest(testCase.Req)
-		if ok || user != nil || err != nil {
+		resp, ok, err := auth.AuthenticateRequest(testCase.Req)
+		if ok || resp != nil || err != nil {
 			t.Errorf("%d: expected not authenticated (no token)", i)
 		}
 	}
@@ -167,8 +168,10 @@ func TestBearerToken(t *testing.T) {
 			ExpectedProtocolHeaders: []string{"base64url.bearer.authorization.k8s.io."},
 		},
 		"valid bearer token removing header": {
-			ProtocolHeaders:         []string{"base64url.bearer.authorization.k8s.io.dG9rZW4", "dummy, dummy2"},
-			TokenAuth:               authenticator.TokenFunc(func(t string) (user.Info, bool, error) { return &user.DefaultInfo{Name: "myuser"}, true, nil }),
+			ProtocolHeaders: []string{"base64url.bearer.authorization.k8s.io.dG9rZW4", "dummy, dummy2"},
+			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "myuser"}}, true, nil
+			}),
 			ExpectedUserName:        "myuser",
 			ExpectedOK:              true,
 			ExpectedErr:             false,
@@ -176,15 +179,17 @@ func TestBearerToken(t *testing.T) {
 		},
 		"invalid bearer token": {
 			ProtocolHeaders:         []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
-			TokenAuth:               authenticator.TokenFunc(func(t string) (user.Info, bool, error) { return nil, false, nil }),
+			TokenAuth:               authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) { return nil, false, nil }),
 			ExpectedUserName:        "",
 			ExpectedOK:              false,
 			ExpectedErr:             true,
 			ExpectedProtocolHeaders: []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
 		},
 		"error bearer token": {
-			ProtocolHeaders:         []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
-			TokenAuth:               authenticator.TokenFunc(func(t string) (user.Info, bool, error) { return nil, false, errors.New("error") }),
+			ProtocolHeaders: []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
+			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
+				return nil, false, errors.New("error")
+			}),
 			ExpectedUserName:        "",
 			ExpectedOK:              false,
 			ExpectedErr:             true,
@@ -201,7 +206,7 @@ func TestBearerToken(t *testing.T) {
 		}
 
 		bearerAuth := NewProtocolAuthenticator(tc.TokenAuth)
-		u, ok, err := bearerAuth.AuthenticateRequest(req)
+		resp, ok, err := bearerAuth.AuthenticateRequest(req)
 		if tc.ExpectedErr != (err != nil) {
 			t.Errorf("%s: Expected err=%v, got %v", k, tc.ExpectedErr, err)
 			continue
@@ -210,8 +215,8 @@ func TestBearerToken(t *testing.T) {
 			t.Errorf("%s: Expected ok=%v, got %v", k, tc.ExpectedOK, ok)
 			continue
 		}
-		if ok && u.GetName() != tc.ExpectedUserName {
-			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, u.GetName())
+		if ok && resp.User.GetName() != tc.ExpectedUserName {
+			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, resp.User.GetName())
 			continue
 		}
 		if !reflect.DeepEqual(req.Header["Sec-Websocket-Protocol"], tc.ExpectedProtocolHeaders) {

@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	rbac_v1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredRoleInformer(client kubernetes.Interface, namespace string, resy
 				return client.RbacV1beta1().Roles(namespace).Watch(options)
 			},
 		},
-		&rbac_v1beta1.Role{},
+		&rbacv1beta1.Role{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *roleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod
 }
 
 func (f *roleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1beta1.Role{}, f.defaultInformer)
+	return f.factory.InformerFor(&rbacv1beta1.Role{}, f.defaultInformer)
 }
 
 func (f *roleInformer) Lister() v1beta1.RoleLister {

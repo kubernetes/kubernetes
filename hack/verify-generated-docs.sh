@@ -36,7 +36,7 @@ kube::util::ensure-temp-dir
 kube::util::gen-docs "${KUBE_TEMP}"
 
 # Verify the list matches the expected list (diff should be empty)
-if [[ "$(diff ${KUBE_ROOT}/docs/.generated_docs ${KUBE_TEMP}/docs/.generated_docs)" != "" ]]; then
+if ! diff "${KUBE_ROOT}/docs/.generated_docs" "${KUBE_TEMP}/docs/.generated_docs"; then
   echo "List of generated docs doesn't match a freshly built list. Please run hack/update-generated-docs.sh"
   exit 1
 fi

@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	scheduling_v1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -69,7 +69,7 @@ func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod 
 				return client.SchedulingV1beta1().PriorityClasses().Watch(options)
 			},
 		},
-		&scheduling_v1beta1.PriorityClass{},
+		&schedulingv1beta1.PriorityClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *priorityClassInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&scheduling_v1beta1.PriorityClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&schedulingv1beta1.PriorityClass{}, f.defaultInformer)
 }
 
 func (f *priorityClassInformer) Lister() v1beta1.PriorityClassLister {

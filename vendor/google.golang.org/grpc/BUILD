@@ -22,6 +22,7 @@ go_library(
         "stream.go",
         "trace.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc",
     importpath = "google.golang.org/grpc",
     visibility = ["//visibility:public"],
     deps = [
@@ -65,7 +66,7 @@ filegroup(
         "//vendor/google.golang.org/grpc/credentials:all-srcs",
         "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1/messages:all-srcs",
         "//vendor/google.golang.org/grpc/grpclog:all-srcs",
-        "//vendor/google.golang.org/grpc/health/grpc_health_v1:all-srcs",
+        "//vendor/google.golang.org/grpc/health:all-srcs",
         "//vendor/google.golang.org/grpc/internal:all-srcs",
         "//vendor/google.golang.org/grpc/keepalive:all-srcs",
         "//vendor/google.golang.org/grpc/metadata:all-srcs",

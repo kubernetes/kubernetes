@@ -17,3 +17,5 @@ reviewers:
 - david-mcmahon
 - kevin-wangzefeng
 - jianhuiz
+labels:
+- sig/apps

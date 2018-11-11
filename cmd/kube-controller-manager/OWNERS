@@ -2,6 +2,7 @@ approvers:
 - deads2k
 - lavalamp
 - mikedanese
+- sttts
 reviewers:
 - '249043822'
 - a-robinson
@@ -63,3 +64,5 @@ reviewers:
 - thockin
 - timothysc
 - wojtek-t
+labels:
+- sig/api-machinery

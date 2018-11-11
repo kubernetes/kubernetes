@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	cr_v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var examplesResource = schema.GroupVersionResource{Group: "cr.example.apiextensi
 var examplesKind = schema.GroupVersionKind{Group: "cr.example.apiextensions.k8s.io", Version: "v1", Kind: "Example"}
 
 // Get takes name of the example, and returns the corresponding example object, and an error if there is any.
-func (c *FakeExamples) Get(name string, options v1.GetOptions) (result *cr_v1.Example, err error) {
+func (c *FakeExamples) Get(name string, options v1.GetOptions) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(examplesResource, c.ns, name), &cr_v1.Example{})
+		Invokes(testing.NewGetAction(examplesResource, c.ns, name), &crv1.Example{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*cr_v1.Example), err
+	return obj.(*crv1.Example), err
 }
 
 // List takes label and field selectors, and returns the list of Examples that match those selectors.
-func (c *FakeExamples) List(opts v1.ListOptions) (result *cr_v1.ExampleList, err error) {
+func (c *FakeExamples) List(opts v1.ListOptions) (result *crv1.ExampleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(examplesResource, examplesKind, c.ns, opts), &cr_v1.ExampleList{})
+		Invokes(testing.NewListAction(examplesResource, examplesKind, c.ns, opts), &crv1.ExampleList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeExamples) List(opts v1.ListOptions) (result *cr_v1.ExampleList, err
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &cr_v1.ExampleList{ListMeta: obj.(*cr_v1.ExampleList).ListMeta}
-	for _, item := range obj.(*cr_v1.ExampleList).Items {
+	list := &crv1.ExampleList{ListMeta: obj.(*crv1.ExampleList).ListMeta}
+	for _, item := range obj.(*crv1.ExampleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,31 +79,31 @@ func (c *FakeExamples) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a example and creates it.  Returns the server's representation of the example, and an error, if there is any.
-func (c *FakeExamples) Create(example *cr_v1.Example) (result *cr_v1.Example, err error) {
+func (c *FakeExamples) Create(example *crv1.Example) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(examplesResource, c.ns, example), &cr_v1.Example{})
+		Invokes(testing.NewCreateAction(examplesResource, c.ns, example), &crv1.Example{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*cr_v1.Example), err
+	return obj.(*crv1.Example), err
 }
 
 // Update takes the representation of a example and updates it. Returns the server's representation of the example, and an error, if there is any.
-func (c *FakeExamples) Update(example *cr_v1.Example) (result *cr_v1.Example, err error) {
+func (c *FakeExamples) Update(example *crv1.Example) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(examplesResource, c.ns, example), &cr_v1.Example{})
+		Invokes(testing.NewUpdateAction(examplesResource, c.ns, example), &crv1.Example{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*cr_v1.Example), err
+	return obj.(*crv1.Example), err
 }
 
 // Delete takes name of the example and deletes it. Returns an error if one occurs.
 func (c *FakeExamples) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(examplesResource, c.ns, name), &cr_v1.Example{})
+		Invokes(testing.NewDeleteAction(examplesResource, c.ns, name), &crv1.Example{})
 
 	return err
 }
@@ -112,17 +112,17 @@ func (c *FakeExamples) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeExamples) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(examplesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &cr_v1.ExampleList{})
+	_, err := c.Fake.Invokes(action, &crv1.ExampleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched example.
-func (c *FakeExamples) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *cr_v1.Example, err error) {
+func (c *FakeExamples) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *crv1.Example, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, data, subresources...), &cr_v1.Example{})
+		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, pt, data, subresources...), &crv1.Example{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*cr_v1.Example), err
+	return obj.(*crv1.Example), err
 }

@@ -10,6 +10,7 @@ go_library(
         "message.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/chai2010/gettext-go/gettext/mo",
     importpath = "github.com/chai2010/gettext-go/gettext/mo",
     visibility = ["//visibility:public"],
 )

@@ -29,15 +29,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func noDefault(*api.Pod) error { return nil }
+func noDefault(*core.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "",
@@ -59,8 +59,9 @@ func TestDecodeSinglePod(t *testing.T) {
 				TerminationMessagePolicy: v1.TerminationMessageReadFile,
 				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
-			SecurityContext: &v1.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      core.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 	json, err := runtime.Encode(testapi.Default.Codec(), pod)
@@ -100,6 +101,7 @@ func TestDecodeSinglePod(t *testing.T) {
 
 func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "",
@@ -122,8 +124,9 @@ func TestDecodePodList(t *testing.T) {
 
 				SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
-			SecurityContext: &v1.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      core.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 	podList := &v1.PodList{

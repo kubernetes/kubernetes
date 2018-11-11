@@ -36,11 +36,18 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration,
-		Convert_podtolerationrestriction_Configuration_To_v1alpha1_Configuration,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Configuration)(nil), (*podtolerationrestriction.Configuration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration(a.(*Configuration), b.(*podtolerationrestriction.Configuration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*podtolerationrestriction.Configuration)(nil), (*Configuration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_podtolerationrestriction_Configuration_To_v1alpha1_Configuration(a.(*podtolerationrestriction.Configuration), b.(*Configuration), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration(in *Configuration, out *podtolerationrestriction.Configuration, s conversion.Scope) error {

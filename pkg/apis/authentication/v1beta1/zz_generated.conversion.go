@@ -35,17 +35,48 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_TokenReview_To_authentication_TokenReview,
-		Convert_authentication_TokenReview_To_v1beta1_TokenReview,
-		Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec,
-		Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec,
-		Convert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus,
-		Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus,
-		Convert_v1beta1_UserInfo_To_authentication_UserInfo,
-		Convert_authentication_UserInfo_To_v1beta1_UserInfo,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.TokenReview)(nil), (*authentication.TokenReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_TokenReview_To_authentication_TokenReview(a.(*v1beta1.TokenReview), b.(*authentication.TokenReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenReview)(nil), (*v1beta1.TokenReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenReview_To_v1beta1_TokenReview(a.(*authentication.TokenReview), b.(*v1beta1.TokenReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.TokenReviewSpec)(nil), (*authentication.TokenReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(a.(*v1beta1.TokenReviewSpec), b.(*authentication.TokenReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenReviewSpec)(nil), (*v1beta1.TokenReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(a.(*authentication.TokenReviewSpec), b.(*v1beta1.TokenReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.TokenReviewStatus)(nil), (*authentication.TokenReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus(a.(*v1beta1.TokenReviewStatus), b.(*authentication.TokenReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenReviewStatus)(nil), (*v1beta1.TokenReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(a.(*authentication.TokenReviewStatus), b.(*v1beta1.TokenReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.UserInfo)(nil), (*authentication.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_UserInfo_To_authentication_UserInfo(a.(*v1beta1.UserInfo), b.(*authentication.UserInfo), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.UserInfo)(nil), (*v1beta1.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_UserInfo_To_v1beta1_UserInfo(a.(*authentication.UserInfo), b.(*v1beta1.UserInfo), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_TokenReview_To_authentication_TokenReview(in *v1beta1.TokenReview, out *authentication.TokenReview, s conversion.Scope) error {

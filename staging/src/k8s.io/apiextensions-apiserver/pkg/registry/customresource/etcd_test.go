@@ -38,10 +38,10 @@ import (
 	registrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/client-go/discovery"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 )
@@ -61,7 +61,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 
 	typer := apiserver.UnstructuredObjectTyper{
 		Delegate:          parameterScheme,
-		UnstructuredTyper: discovery.NewUnstructuredObjectTyper(),
+		UnstructuredTyper: crdserverscheme.NewUnstructuredObjectTyper(),
 	}
 
 	kind := schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "Noxu"}
@@ -91,6 +91,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 
 	storage := customresource.NewStorage(
 		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
+		kind,
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(
 			typer,
@@ -112,7 +113,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 // createCustomResource is a helper function that returns a CustomResource with the updated resource version.
 func createCustomResource(storage *customresource.REST, cr unstructured.Unstructured, t *testing.T) (unstructured.Unstructured, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), cr.GetNamespace())
-	obj, err := storage.Create(ctx, &cr, rest.ValidateAllObjectFunc, false)
+	obj, err := storage.Create(ctx, &cr, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create CustomResource, %v", err)
 	}
@@ -205,7 +206,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	setSpecReplicas(storedCR, getSpecReplicas(storedCR)+1)
-	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	etcdCR, err = storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
@@ -219,7 +220,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment the generation number
 	setStatusReplicas(storedCR, getStatusReplicas(storedCR)+1)
-	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	etcdCR, err = storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
@@ -254,7 +255,7 @@ func TestColumns(t *testing.T) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/foo"
 	validCustomResource := validNewCustomResource()
-	if err := storage.CustomResource.Storage.Create(ctx, key, validCustomResource, nil, 0); err != nil {
+	if err := storage.CustomResource.Storage.Create(ctx, key, validCustomResource, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -324,7 +325,7 @@ func TestStatusUpdate(t *testing.T) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/foo"
 	validCustomResource := validNewCustomResource()
-	if err := storage.CustomResource.Storage.Create(ctx, key, validCustomResource, nil, 0); err != nil {
+	if err := storage.CustomResource.Storage.Create(ctx, key, validCustomResource, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -339,7 +340,7 @@ func TestStatusUpdate(t *testing.T) {
 		"replicas": int64(7),
 	}
 
-	if _, _, err := storage.Status.Update(ctx, update.GetName(), rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Status.Update(ctx, update.GetName(), rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -375,7 +376,7 @@ func TestScaleGet(t *testing.T) {
 	var cr unstructured.Unstructured
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.CustomResource.Storage.Create(ctx, key, &validCustomResource, &cr, 0); err != nil {
+	if err := storage.CustomResource.Storage.Create(ctx, key, &validCustomResource, &cr, 0, false); err != nil {
 		t.Fatalf("error setting new custom resource (key: %s) %v: %v", key, validCustomResource, err)
 	}
 
@@ -415,7 +416,7 @@ func TestScaleGetWithoutSpecReplicas(t *testing.T) {
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
 	withoutSpecReplicas := validCustomResource.DeepCopy()
 	unstructured.RemoveNestedField(withoutSpecReplicas.Object, "spec", "replicas")
-	if err := storage.CustomResource.Storage.Create(ctx, key, withoutSpecReplicas, &cr, 0); err != nil {
+	if err := storage.CustomResource.Storage.Create(ctx, key, withoutSpecReplicas, &cr, 0, false); err != nil {
 		t.Fatalf("error setting new custom resource (key: %s) %v: %v", key, withoutSpecReplicas, err)
 	}
 
@@ -438,7 +439,7 @@ func TestScaleUpdate(t *testing.T) {
 	var cr unstructured.Unstructured
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.CustomResource.Storage.Create(ctx, key, &validCustomResource, &cr, 0); err != nil {
+	if err := storage.CustomResource.Storage.Create(ctx, key, &validCustomResource, &cr, 0, false); err != nil {
 		t.Fatalf("error setting new custom resource (key: %s) %v: %v", key, validCustomResource, err)
 	}
 
@@ -459,7 +460,7 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
@@ -475,7 +476,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = scale.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -492,7 +493,7 @@ func TestScaleUpdateWithoutSpecReplicas(t *testing.T) {
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
 	withoutSpecReplicas := validCustomResource.DeepCopy()
 	unstructured.RemoveNestedField(withoutSpecReplicas.Object, "spec", "replicas")
-	if err := storage.CustomResource.Storage.Create(ctx, key, withoutSpecReplicas, &cr, 0); err != nil {
+	if err := storage.CustomResource.Storage.Create(ctx, key, withoutSpecReplicas, &cr, 0, false); err != nil {
 		t.Fatalf("error setting new custom resource (key: %s) %v: %v", key, withoutSpecReplicas, err)
 	}
 
@@ -507,7 +508,7 @@ func TestScaleUpdateWithoutSpecReplicas(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 

@@ -372,9 +372,7 @@ func (in *MetaVictims) DeepCopyInto(out *MetaVictims) {
 		in, out := &in.Pods, &out.Pods
 		*out = make([]*MetaPod, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
 				*out = new(MetaPod)
 				**out = **in
@@ -620,9 +618,7 @@ func (in *Victims) DeepCopyInto(out *Victims) {
 		in, out := &in.Pods, &out.Pods
 		*out = make([]*v1.Pod, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
 				*out = new(v1.Pod)
 				(*in).DeepCopyInto(*out)

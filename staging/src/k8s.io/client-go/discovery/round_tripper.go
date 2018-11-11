@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package transport provides a round tripper capable of caching HTTP responses.
 package discovery
 
 import (
@@ -24,6 +23,7 @@ import (
 	"github.com/gregjones/httpcache"
 	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
+	"k8s.io/klog"
 )
 
 type cacheRoundTripper struct {
@@ -46,6 +46,17 @@ func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 
 func (rt *cacheRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return rt.rt.RoundTrip(req)
+}
+
+func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
+	type canceler interface {
+		CancelRequest(*http.Request)
+	}
+	if cr, ok := rt.rt.Transport.(canceler); ok {
+		cr.CancelRequest(req)
+	} else {
+		klog.Errorf("CancelRequest not implemented by %T", rt.rt.Transport)
+	}
 }
 
 func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt.Transport }

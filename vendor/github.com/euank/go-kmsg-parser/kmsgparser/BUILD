@@ -6,6 +6,7 @@ go_library(
         "kmsgparser.go",
         "log.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/euank/go-kmsg-parser/kmsgparser",
     importpath = "github.com/euank/go-kmsg-parser/kmsgparser",
     visibility = ["//visibility:public"],
 )

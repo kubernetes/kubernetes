@@ -19,14 +19,13 @@ package cache
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func TestNewResource(t *testing.T) {
@@ -241,43 +240,40 @@ func TestSetMaxResource(t *testing.T) {
 	}
 }
 
-func TestImageSizes(t *testing.T) {
-	ni := fakeNodeInfo()
-	ni.node = &v1.Node{
+type testingMode interface {
+	Fatalf(format string, args ...interface{})
+}
+
+func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort) *v1.Pod {
+	req := v1.ResourceList{}
+	if cpu != "" {
+		req = v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse(cpu),
+			v1.ResourceMemory: resource.MustParse(mem),
+		}
+		if extended != "" {
+			parts := strings.Split(extended, ":")
+			if len(parts) != 2 {
+				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
+			}
+			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
+		}
+	}
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-node",
+			UID:       types.UID(objName),
+			Namespace: "node_info_cache_test",
+			Name:      objName,
 		},
-		Status: v1.NodeStatus{
-			Images: []v1.ContainerImage{
-				{
-					Names: []string{
-						"gcr.io/10:" + parsers.DefaultImageTag,
-						"gcr.io/10:v1",
-					},
-					SizeBytes: int64(10 * 1024 * 1024),
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: req,
 				},
-				{
-					Names: []string{
-						"gcr.io/50:" + parsers.DefaultImageTag,
-						"gcr.io/50:v1",
-					},
-					SizeBytes: int64(50 * 1024 * 1024),
-				},
-			},
+				Ports: ports,
+			}},
+			NodeName: nodeName,
 		},
-	}
-
-	ni.updateImageSizes()
-	expected := map[string]int64{
-		"gcr.io/10:" + parsers.DefaultImageTag: 10 * 1024 * 1024,
-		"gcr.io/10:v1":                         10 * 1024 * 1024,
-		"gcr.io/50:" + parsers.DefaultImageTag: 50 * 1024 * 1024,
-		"gcr.io/50:v1":                         50 * 1024 * 1024,
-	}
-
-	imageSizes := ni.ImageSizes()
-	if !reflect.DeepEqual(expected, imageSizes) {
-		t.Errorf("expected: %#v, got: %#v", expected, imageSizes)
 	}
 }
 
@@ -303,16 +299,16 @@ func TestNewNodeInfo(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		TransientInfo:       newTransientSchedulerInfo(),
+		TransientInfo:       NewTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
-		usedPorts: util.HostPortInfo{
-			"127.0.0.1": map[util.ProtocolPort]struct{}{
+		usedPorts: HostPortInfo{
+			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		imageSizes: map[string]int64{},
+		imageStates: map[string]*ImageStateSummary{},
 		pods: []*v1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -392,18 +388,16 @@ func TestNodeInfoClone(t *testing.T) {
 			nodeInfo: &NodeInfo{
 				requestedResource:   &Resource{},
 				nonzeroRequest:      &Resource{},
-				TransientInfo:       newTransientSchedulerInfo(),
+				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				imageSizes: map[string]int64{
-					"gcr.io/10": 10 * 1024 * 1024,
-				},
+				imageStates: map[string]*ImageStateSummary{},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -464,18 +458,16 @@ func TestNodeInfoClone(t *testing.T) {
 			expected: &NodeInfo{
 				requestedResource:   &Resource{},
 				nonzeroRequest:      &Resource{},
-				TransientInfo:       newTransientSchedulerInfo(),
+				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				imageSizes: map[string]int64{
-					"gcr.io/10": 10 * 1024 * 1024,
-				},
+				imageStates: map[string]*ImageStateSummary{},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -540,6 +532,7 @@ func TestNodeInfoClone(t *testing.T) {
 		ni := test.nodeInfo.Clone()
 		// Modify the field to check if the result is a clone of the origin one.
 		test.nodeInfo.generation += 10
+		test.nodeInfo.usedPorts.Remove("127.0.0.1", "TCP", 80)
 		if !reflect.DeepEqual(test.expected, ni) {
 			t.Errorf("expected: %#v, got: %#v", test.expected, ni)
 		}
@@ -624,16 +617,16 @@ func TestNodeInfoAddPod(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
-		TransientInfo:       newTransientSchedulerInfo(),
+		TransientInfo:       NewTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
-		usedPorts: util.HostPortInfo{
-			"127.0.0.1": map[util.ProtocolPort]struct{}{
+		usedPorts: HostPortInfo{
+			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		imageSizes: map[string]int64{},
+		imageStates: map[string]*ImageStateSummary{},
 		pods: []*v1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -743,16 +736,16 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				TransientInfo:       newTransientSchedulerInfo(),
+				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				imageSizes: map[string]int64{},
+				imageStates: map[string]*ImageStateSummary{},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -860,15 +853,15 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
-				TransientInfo:       newTransientSchedulerInfo(),
+				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          3,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				imageSizes: map[string]int64{},
+				imageStates: map[string]*ImageStateSummary{},
 				pods: []*v1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -909,7 +902,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		err := ni.RemovePod(test.pod)
 		if err != nil {
 			if test.errExpected {
-				expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.node.Name)
+				expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
 				if expectedErrorMsg == err {
 					t.Errorf("expected error: %v, got: %v", expectedErrorMsg, err)
 				}
@@ -931,10 +924,10 @@ func TestNodeInfoRemovePod(t *testing.T) {
 
 func fakeNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := NewNodeInfo(pods...)
-	ni.node = &v1.Node{
+	ni.SetNode(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 		},
-	}
+	})
 	return ni
 }

@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,7 +44,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 			Containers: []v1.Container{
 				{
 					Name:    containerName,
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", cmd},
 					VolumeMounts: []v1.VolumeMount{
 						{

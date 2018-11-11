@@ -24,7 +24,7 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/authentication/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -37,25 +37,88 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_BoundObjectReference_To_authentication_BoundObjectReference,
-		Convert_authentication_BoundObjectReference_To_v1_BoundObjectReference,
-		Convert_v1_TokenRequest_To_authentication_TokenRequest,
-		Convert_authentication_TokenRequest_To_v1_TokenRequest,
-		Convert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec,
-		Convert_authentication_TokenRequestSpec_To_v1_TokenRequestSpec,
-		Convert_v1_TokenRequestStatus_To_authentication_TokenRequestStatus,
-		Convert_authentication_TokenRequestStatus_To_v1_TokenRequestStatus,
-		Convert_v1_TokenReview_To_authentication_TokenReview,
-		Convert_authentication_TokenReview_To_v1_TokenReview,
-		Convert_v1_TokenReviewSpec_To_authentication_TokenReviewSpec,
-		Convert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec,
-		Convert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus,
-		Convert_authentication_TokenReviewStatus_To_v1_TokenReviewStatus,
-		Convert_v1_UserInfo_To_authentication_UserInfo,
-		Convert_authentication_UserInfo_To_v1_UserInfo,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1.BoundObjectReference)(nil), (*authentication.BoundObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_BoundObjectReference_To_authentication_BoundObjectReference(a.(*v1.BoundObjectReference), b.(*authentication.BoundObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.BoundObjectReference)(nil), (*v1.BoundObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_BoundObjectReference_To_v1_BoundObjectReference(a.(*authentication.BoundObjectReference), b.(*v1.BoundObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TokenRequest)(nil), (*authentication.TokenRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TokenRequest_To_authentication_TokenRequest(a.(*v1.TokenRequest), b.(*authentication.TokenRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenRequest)(nil), (*v1.TokenRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenRequest_To_v1_TokenRequest(a.(*authentication.TokenRequest), b.(*v1.TokenRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TokenRequestSpec)(nil), (*authentication.TokenRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(a.(*v1.TokenRequestSpec), b.(*authentication.TokenRequestSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenRequestSpec)(nil), (*v1.TokenRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenRequestSpec_To_v1_TokenRequestSpec(a.(*authentication.TokenRequestSpec), b.(*v1.TokenRequestSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TokenRequestStatus)(nil), (*authentication.TokenRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TokenRequestStatus_To_authentication_TokenRequestStatus(a.(*v1.TokenRequestStatus), b.(*authentication.TokenRequestStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenRequestStatus)(nil), (*v1.TokenRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenRequestStatus_To_v1_TokenRequestStatus(a.(*authentication.TokenRequestStatus), b.(*v1.TokenRequestStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TokenReview)(nil), (*authentication.TokenReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TokenReview_To_authentication_TokenReview(a.(*v1.TokenReview), b.(*authentication.TokenReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenReview)(nil), (*v1.TokenReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenReview_To_v1_TokenReview(a.(*authentication.TokenReview), b.(*v1.TokenReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TokenReviewSpec)(nil), (*authentication.TokenReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TokenReviewSpec_To_authentication_TokenReviewSpec(a.(*v1.TokenReviewSpec), b.(*authentication.TokenReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenReviewSpec)(nil), (*v1.TokenReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec(a.(*authentication.TokenReviewSpec), b.(*v1.TokenReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TokenReviewStatus)(nil), (*authentication.TokenReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus(a.(*v1.TokenReviewStatus), b.(*authentication.TokenReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.TokenReviewStatus)(nil), (*v1.TokenReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_TokenReviewStatus_To_v1_TokenReviewStatus(a.(*authentication.TokenReviewStatus), b.(*v1.TokenReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.UserInfo)(nil), (*authentication.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_UserInfo_To_authentication_UserInfo(a.(*v1.UserInfo), b.(*authentication.UserInfo), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authentication.UserInfo)(nil), (*v1.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authentication_UserInfo_To_v1_UserInfo(a.(*authentication.UserInfo), b.(*v1.UserInfo), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_BoundObjectReference_To_authentication_BoundObjectReference(in *v1.BoundObjectReference, out *authentication.BoundObjectReference, s conversion.Scope) error {
@@ -118,7 +181,7 @@ func Convert_authentication_TokenRequest_To_v1_TokenRequest(in *authentication.T
 
 func autoConvert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(in *v1.TokenRequestSpec, out *authentication.TokenRequestSpec, s conversion.Scope) error {
 	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	if err := meta_v1.Convert_Pointer_int64_To_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
+	if err := metav1.Convert_Pointer_int64_To_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
 		return err
 	}
 	out.BoundObjectRef = (*authentication.BoundObjectReference)(unsafe.Pointer(in.BoundObjectRef))
@@ -132,7 +195,7 @@ func Convert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(in *v1.Token
 
 func autoConvert_authentication_TokenRequestSpec_To_v1_TokenRequestSpec(in *authentication.TokenRequestSpec, out *v1.TokenRequestSpec, s conversion.Scope) error {
 	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	if err := meta_v1.Convert_int64_To_Pointer_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
+	if err := metav1.Convert_int64_To_Pointer_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
 		return err
 	}
 	out.BoundObjectRef = (*v1.BoundObjectReference)(unsafe.Pointer(in.BoundObjectRef))

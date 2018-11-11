@@ -21,8 +21,8 @@ package v1
 import (
 	time "time"
 
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -56,20 +56,20 @@ func NewNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, in
 func NewFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.CoreV1().Nodes().List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.CoreV1().Nodes().Watch(options)
 			},
 		},
-		&core_v1.Node{},
+		&corev1.Node{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *nodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod
 }
 
 func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.Node{}, f.defaultInformer)
+	return f.factory.InformerFor(&corev1.Node{}, f.defaultInformer)
 }
 
 func (f *nodeInformer) Lister() v1.NodeLister {

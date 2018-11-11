@@ -40,9 +40,10 @@ func NewExpressRouteCircuitsClientWithBaseURI(baseURI string, subscriptionID str
 }
 
 // CreateOrUpdate creates or updates an express route circuit.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the circuit. parameters is
-// parameters supplied to the create or update express route circuit operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the circuit.
+// parameters - parameters supplied to the create or update express route circuit operation.
 func (client ExpressRouteCircuitsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, circuitName string, parameters ExpressRouteCircuit) (result ExpressRouteCircuitsCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, circuitName, parameters)
 	if err != nil {
@@ -73,7 +74,7 @@ func (client ExpressRouteCircuitsClient) CreateOrUpdatePreparer(ctx context.Cont
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/expressRouteCircuits/{circuitName}", pathParameters),
@@ -85,15 +86,13 @@ func (client ExpressRouteCircuitsClient) CreateOrUpdatePreparer(ctx context.Cont
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitsClient) CreateOrUpdateSender(req *http.Request) (future ExpressRouteCircuitsCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -111,8 +110,9 @@ func (client ExpressRouteCircuitsClient) CreateOrUpdateResponder(resp *http.Resp
 }
 
 // Delete deletes the specified express route circuit.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the express route circuit.
 func (client ExpressRouteCircuitsClient) Delete(ctx context.Context, resourceGroupName string, circuitName string) (result ExpressRouteCircuitsDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, circuitName)
 	if err != nil {
@@ -153,15 +153,13 @@ func (client ExpressRouteCircuitsClient) DeletePreparer(ctx context.Context, res
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitsClient) DeleteSender(req *http.Request) (future ExpressRouteCircuitsDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -178,8 +176,9 @@ func (client ExpressRouteCircuitsClient) DeleteResponder(resp *http.Response) (r
 }
 
 // Get gets information about the specified express route circuit.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of express route circuit.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of express route circuit.
 func (client ExpressRouteCircuitsClient) Get(ctx context.Context, resourceGroupName string, circuitName string) (result ExpressRouteCircuit, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, circuitName)
 	if err != nil {
@@ -244,9 +243,10 @@ func (client ExpressRouteCircuitsClient) GetResponder(resp *http.Response) (resu
 }
 
 // GetPeeringStats gets all stats from an express route circuit in a resource group.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
-// peeringName is the name of the peering.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the express route circuit.
+// peeringName - the name of the peering.
 func (client ExpressRouteCircuitsClient) GetPeeringStats(ctx context.Context, resourceGroupName string, circuitName string, peeringName string) (result ExpressRouteCircuitStats, err error) {
 	req, err := client.GetPeeringStatsPreparer(ctx, resourceGroupName, circuitName, peeringName)
 	if err != nil {
@@ -312,8 +312,9 @@ func (client ExpressRouteCircuitsClient) GetPeeringStatsResponder(resp *http.Res
 }
 
 // GetStats gets all the stats from an express route circuit in a resource group.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the express route circuit.
 func (client ExpressRouteCircuitsClient) GetStats(ctx context.Context, resourceGroupName string, circuitName string) (result ExpressRouteCircuitStats, err error) {
 	req, err := client.GetStatsPreparer(ctx, resourceGroupName, circuitName)
 	if err != nil {
@@ -378,8 +379,8 @@ func (client ExpressRouteCircuitsClient) GetStatsResponder(resp *http.Response) 
 }
 
 // List gets all the express route circuits in a resource group.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client ExpressRouteCircuitsClient) List(ctx context.Context, resourceGroupName string) (result ExpressRouteCircuitListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
@@ -561,9 +562,11 @@ func (client ExpressRouteCircuitsClient) ListAllComplete(ctx context.Context) (r
 }
 
 // ListArpTable gets the currently advertised ARP table associated with the express route circuit in a resource group.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
-// peeringName is the name of the peering. devicePath is the path of the device.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the express route circuit.
+// peeringName - the name of the peering.
+// devicePath - the path of the device.
 func (client ExpressRouteCircuitsClient) ListArpTable(ctx context.Context, resourceGroupName string, circuitName string, peeringName string, devicePath string) (result ExpressRouteCircuitsListArpTableFuture, err error) {
 	req, err := client.ListArpTablePreparer(ctx, resourceGroupName, circuitName, peeringName, devicePath)
 	if err != nil {
@@ -606,15 +609,13 @@ func (client ExpressRouteCircuitsClient) ListArpTablePreparer(ctx context.Contex
 // ListArpTableSender sends the ListArpTable request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitsClient) ListArpTableSender(req *http.Request) (future ExpressRouteCircuitsListArpTableFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -633,9 +634,11 @@ func (client ExpressRouteCircuitsClient) ListArpTableResponder(resp *http.Respon
 
 // ListRoutesTable gets the currently advertised routes table associated with the express route circuit in a resource
 // group.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
-// peeringName is the name of the peering. devicePath is the path of the device.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the express route circuit.
+// peeringName - the name of the peering.
+// devicePath - the path of the device.
 func (client ExpressRouteCircuitsClient) ListRoutesTable(ctx context.Context, resourceGroupName string, circuitName string, peeringName string, devicePath string) (result ExpressRouteCircuitsListRoutesTableFuture, err error) {
 	req, err := client.ListRoutesTablePreparer(ctx, resourceGroupName, circuitName, peeringName, devicePath)
 	if err != nil {
@@ -678,15 +681,13 @@ func (client ExpressRouteCircuitsClient) ListRoutesTablePreparer(ctx context.Con
 // ListRoutesTableSender sends the ListRoutesTable request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitsClient) ListRoutesTableSender(req *http.Request) (future ExpressRouteCircuitsListRoutesTableFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -705,9 +706,11 @@ func (client ExpressRouteCircuitsClient) ListRoutesTableResponder(resp *http.Res
 
 // ListRoutesTableSummary gets the currently advertised routes table summary associated with the express route circuit
 // in a resource group.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
-// peeringName is the name of the peering. devicePath is the path of the device.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the express route circuit.
+// peeringName - the name of the peering.
+// devicePath - the path of the device.
 func (client ExpressRouteCircuitsClient) ListRoutesTableSummary(ctx context.Context, resourceGroupName string, circuitName string, peeringName string, devicePath string) (result ExpressRouteCircuitsListRoutesTableSummaryFuture, err error) {
 	req, err := client.ListRoutesTableSummaryPreparer(ctx, resourceGroupName, circuitName, peeringName, devicePath)
 	if err != nil {
@@ -750,15 +753,13 @@ func (client ExpressRouteCircuitsClient) ListRoutesTableSummaryPreparer(ctx cont
 // ListRoutesTableSummarySender sends the ListRoutesTableSummary request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitsClient) ListRoutesTableSummarySender(req *http.Request) (future ExpressRouteCircuitsListRoutesTableSummaryFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -776,9 +777,10 @@ func (client ExpressRouteCircuitsClient) ListRoutesTableSummaryResponder(resp *h
 }
 
 // UpdateTags updates an express route circuit tags.
-//
-// resourceGroupName is the name of the resource group. circuitName is the name of the circuit. parameters is
-// parameters supplied to update express route circuit tags.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// circuitName - the name of the circuit.
+// parameters - parameters supplied to update express route circuit tags.
 func (client ExpressRouteCircuitsClient) UpdateTags(ctx context.Context, resourceGroupName string, circuitName string, parameters TagsObject) (result ExpressRouteCircuitsUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, circuitName, parameters)
 	if err != nil {
@@ -809,7 +811,7 @@ func (client ExpressRouteCircuitsClient) UpdateTagsPreparer(ctx context.Context,
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/expressRouteCircuits/{circuitName}", pathParameters),
@@ -821,15 +823,13 @@ func (client ExpressRouteCircuitsClient) UpdateTagsPreparer(ctx context.Context,
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitsClient) UpdateTagsSender(req *http.Request) (future ExpressRouteCircuitsUpdateTagsFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

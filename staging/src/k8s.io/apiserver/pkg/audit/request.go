@@ -22,8 +22,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/klog"
 
 	"reflect"
 
@@ -37,14 +37,19 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+const (
+	maxUserAgentLength      = 1024
+	userAgentTruncateSuffix = "...TRUNCATED"
+)
+
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
-		Verb:       attribs.GetVerb(),
-		RequestURI: req.URL.RequestURI(),
+		Verb:                     attribs.GetVerb(),
+		RequestURI:               req.URL.RequestURI(),
+		UserAgent:                maybeTruncateUserAgent(req),
+		Level:                    level,
 	}
-
-	ev.Level = level
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?
@@ -147,7 +152,7 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
-		glog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
 		return
 	}
 }
@@ -186,7 +191,7 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
-		glog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
+		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
 	}
 }
 
@@ -218,7 +223,7 @@ func LogAnnotation(ae *auditinternal.Event, key, value string) {
 		ae.Annotations = make(map[string]string)
 	}
 	if v, ok := ae.Annotations[key]; ok && v != value {
-		glog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
+		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
 		return
 	}
 	ae.Annotations[key] = value
@@ -232,4 +237,14 @@ func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
 	for key, value := range annotations {
 		LogAnnotation(ae, key, value)
 	}
+}
+
+// truncate User-Agent if too long, otherwise return it directly.
+func maybeTruncateUserAgent(req *http.Request) string {
+	ua := req.UserAgent()
+	if len(ua) > maxUserAgentLength {
+		ua = ua[:maxUserAgentLength] + userAgentTruncateSuffix
+	}
+
+	return ua
 }

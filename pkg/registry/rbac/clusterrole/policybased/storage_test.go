@@ -118,7 +118,7 @@ func TestEscalation(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			authzCalled, fakeStorage.created, fakeStorage.updated = 0, 0, 0
-			_, err := s.Create(request.WithUser(createContext, tc.user), role, nil, false)
+			_, err := s.Create(request.WithUser(createContext, tc.user), role, nil, nil)
 
 			if tc.expectAllowed {
 				if err != nil {
@@ -145,7 +145,7 @@ func TestEscalation(t *testing.T) {
 			}
 
 			authzCalled, fakeStorage.created, fakeStorage.updated = 0, 0, 0
-			_, _, err = s.Update(request.WithUser(updateContext, tc.user), role.Name, rest.DefaultUpdatedObjectInfo(role), nil, nil)
+			_, _, err = s.Update(request.WithUser(updateContext, tc.user), role.Name, rest.DefaultUpdatedObjectInfo(role), nil, nil, false, nil)
 
 			if tc.expectAllowed {
 				if err != nil {
@@ -180,12 +180,12 @@ type fakeStorage struct {
 	rest.StandardStorage
 }
 
-func (f *fakeStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (f *fakeStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	f.created++
 	return nil, nil
 }
 
-func (f *fakeStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (f *fakeStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, err := objInfo.UpdatedObject(ctx, &rbac.ClusterRole{})
 	if err != nil {
 		return obj, false, err

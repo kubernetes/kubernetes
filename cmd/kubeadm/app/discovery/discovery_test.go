@@ -24,31 +24,37 @@ import (
 
 func TestFor(t *testing.T) {
 	tests := []struct {
-		d      kubeadm.NodeConfiguration
+		d      kubeadm.JoinConfiguration
 		expect bool
 	}{
-		{d: kubeadm.NodeConfiguration{}, expect: false},
+		{d: kubeadm.JoinConfiguration{}, expect: false},
 		{
-			d: kubeadm.NodeConfiguration{
-				DiscoveryFile: "notnil",
+			d: kubeadm.JoinConfiguration{
+				Discovery: kubeadm.Discovery{
+					File: &kubeadm.FileDiscovery{
+						KubeConfigPath: "notnil",
+					},
+				},
 			},
 			expect: false,
 		},
 		{
-			d: kubeadm.NodeConfiguration{
-				DiscoveryFile: "https://localhost",
+			d: kubeadm.JoinConfiguration{
+				Discovery: kubeadm.Discovery{
+					File: &kubeadm.FileDiscovery{
+						KubeConfigPath: "https://localhost",
+					},
+				},
 			},
 			expect: false,
 		},
 		{
-			d: kubeadm.NodeConfiguration{
-				DiscoveryFile: "notnil",
-			},
-			expect: false,
-		},
-		{
-			d: kubeadm.NodeConfiguration{
-				DiscoveryToken: "foo.bar@foobar",
+			d: kubeadm.JoinConfiguration{
+				Discovery: kubeadm.Discovery{
+					BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+						Token: "foo.bar@foobar",
+					},
+				},
 			},
 			expect: false,
 		},

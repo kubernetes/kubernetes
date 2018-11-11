@@ -19,6 +19,8 @@ package vsphere
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -26,13 +28,20 @@ import (
 	"testing"
 
 	lookup "github.com/vmware/govmomi/lookup/simulator"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/simulator/vpx"
 	sts "github.com/vmware/govmomi/sts/simulator"
+	"github.com/vmware/govmomi/vapi/rest"
+	vapi "github.com/vmware/govmomi/vapi/simulator"
+	"github.com/vmware/govmomi/vapi/tags"
+	"github.com/vmware/govmomi/vim25/mo"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
 )
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
@@ -90,7 +99,15 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 }
 
 // configFromSim starts a vcsim instance and returns config for use against the vcsim instance.
+// The vcsim instance is configured with an empty tls.Config.
 func configFromSim() (VSphereConfig, func()) {
+	return configFromSimWithTLS(new(tls.Config), true)
+}
+
+// configFromSimWithTLS starts a vcsim instance and returns config for use against the vcsim instance.
+// The vcsim instance is configured with a tls.Config. The returned client
+// config can be configured to allow/decline insecure connections.
+func configFromSimWithTLS(tlsConfig *tls.Config, insecureAllowed bool) (VSphereConfig, func()) {
 	var cfg VSphereConfig
 	model := simulator.VPX()
 
@@ -99,17 +116,22 @@ func configFromSim() (VSphereConfig, func()) {
 		log.Fatal(err)
 	}
 
-	model.Service.TLS = new(tls.Config)
+	model.Service.TLS = tlsConfig
 	s := model.Service.NewServer()
 
 	// STS simulator
 	path, handler := sts.New(s.URL, vpx.Setting)
 	model.Service.ServeMux.Handle(path, handler)
 
+	// vAPI simulator
+	path, handler = vapi.New(s.URL, vpx.Setting)
+	model.Service.ServeMux.Handle(path, handler)
+
 	// Lookup Service simulator
 	model.Service.RegisterSDK(lookup.New())
 
-	cfg.Global.InsecureFlag = true
+	cfg.Global.InsecureFlag = insecureAllowed
+
 	cfg.Global.VCenterIP = s.URL.Hostname()
 	cfg.Global.VCenterPort = s.URL.Port()
 	cfg.Global.User = s.URL.User.Username()
@@ -160,6 +182,7 @@ insecure-flag = true
 datacenter = us-west
 vm-uuid = 1234
 vm-name = vmname
+ca-file = /some/path/to/a/ca.pem
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -179,6 +202,10 @@ vm-name = vmname
 
 	if cfg.Global.VMName != "vmname" {
 		t.Errorf("incorrect vm-name: %s", cfg.Global.VMName)
+	}
+
+	if cfg.Global.CAFile != "/some/path/to/a/ca.pem" {
+		t.Errorf("incorrect ca-file: %s", cfg.Global.CAFile)
 	}
 }
 
@@ -250,18 +277,213 @@ func TestVSphereLoginByToken(t *testing.T) {
 	vcInstance.conn.Logout(ctx)
 }
 
-func TestZones(t *testing.T) {
-	cfg := VSphereConfig{}
-	cfg.Global.Datacenter = "myDatacenter"
-
-	// Create vSphere configuration object
-	vs := VSphere{
-		cfg: &cfg,
+func TestVSphereLoginWithCaCert(t *testing.T) {
+	caCertPEM, err := ioutil.ReadFile(fixtures.CaCertPath)
+	if err != nil {
+		t.Fatalf("Could not read ca cert from file")
 	}
 
-	_, ok := vs.Zones()
+	serverCert, err := tls.LoadX509KeyPair(fixtures.ServerCertPath, fixtures.ServerKeyPath)
+	if err != nil {
+		t.Fatalf("Could not load server cert and server key from files: %#v", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(caCertPEM); !ok {
+		t.Fatalf("Cannot add CA to CAPool")
+	}
+
+	tlsConfig := tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		RootCAs:      certPool,
+	}
+
+	cfg, cleanup := configFromSimWithTLS(&tlsConfig, false)
+	defer cleanup()
+
+	cfg.Global.CAFile = fixtures.CaCertPath
+
+	// Create vSphere configuration object
+	vs, err := newControllerNode(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	ctx := context.Background()
+
+	// Create vSphere client
+	vcInstance, ok := vs.vsphereInstanceMap[cfg.Global.VCenterIP]
+	if !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vcInstance.conn.Connect(ctx)
+	if err != nil {
+		t.Errorf("Failed to connect to vSphere: %s", err)
+	}
+	vcInstance.conn.Logout(ctx)
+}
+
+func TestZonesNoConfig(t *testing.T) {
+	_, ok := new(VSphere).Zones()
 	if ok {
-		t.Fatalf("Zones() returned true")
+		t.Fatalf("Zones() should return false without VCP configured")
+	}
+}
+
+func TestZones(t *testing.T) {
+	// Any context will do
+	ctx := context.Background()
+
+	// Create a vcsim instance
+	cfg, cleanup := configFromSim()
+	defer cleanup()
+
+	// Create vSphere configuration object
+	vs, err := newControllerNode(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	// Configure region and zone categories
+	vs.cfg.Labels.Region = "k8s-region"
+	vs.cfg.Labels.Zone = "k8s-zone"
+
+	// Create vSphere client
+	vsi, ok := vs.vsphereInstanceMap[cfg.Global.VCenterIP]
+	if !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vsi.conn.Connect(ctx)
+	if err != nil {
+		t.Errorf("Failed to connect to vSphere: %s", err)
+	}
+
+	// Lookup Datacenter for this test's Workspace
+	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Lookup VM's host where we'll attach tags
+	host, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Property Collector instance
+	pc := property.DefaultCollector(vsi.conn.Client)
+
+	// Tag manager instance
+	m := tags.NewManager(rest.NewClient(vsi.conn.Client))
+
+	// Create a region category
+	regionID, err := m.CreateCategory(ctx, &tags.Category{Name: vs.cfg.Labels.Region})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a region tag
+	regionID, err = m.CreateTag(ctx, &tags.Tag{CategoryID: regionID, Name: "k8s-region-US"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a zone category
+	zoneID, err := m.CreateCategory(ctx, &tags.Category{Name: vs.cfg.Labels.Zone})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a zone tag
+	zoneID, err = m.CreateTag(ctx, &tags.Tag{CategoryID: zoneID, Name: "k8s-zone-US-CA1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a random category
+	randomID, err := m.CreateCategory(ctx, &tags.Category{Name: "random-cat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a random tag
+	randomID, err = m.CreateTag(ctx, &tags.Tag{CategoryID: randomID, Name: "random-tag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Attach a random tag to VM's host
+	if err = m.AttachTag(ctx, randomID, host); err != nil {
+		t.Fatal(err)
+	}
+
+	// Expecting Zones() to return true, indicating VCP supports the Zones interface
+	zones, ok := vs.Zones()
+	if !ok {
+		t.Fatalf("zones=%t", ok)
+	}
+
+	// GetZone() tests, covering error and success paths
+	tests := []struct {
+		name string // name of the test for logging
+		fail bool   // expect GetZone() to return error if true
+		prep func() // prepare vCenter state for the test
+	}{
+		{"no tags", true, func() {
+			// no prep
+		}},
+		{"no zone tag", true, func() {
+			if err = m.AttachTag(ctx, regionID, host); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"host tags set", false, func() {
+			if err = m.AttachTag(ctx, zoneID, host); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"host tags removed", true, func() {
+			if err = m.DetachTag(ctx, zoneID, host); err != nil {
+				t.Fatal(err)
+			}
+			if err = m.DetachTag(ctx, regionID, host); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"dc region, cluster zone", false, func() {
+			var h mo.HostSystem
+			if err = pc.RetrieveOne(ctx, host.Reference(), []string{"parent"}, &h); err != nil {
+				t.Fatal(err)
+			}
+			// Attach region tag to Datacenter
+			if err = m.AttachTag(ctx, regionID, dc); err != nil {
+				t.Fatal(err)
+			}
+			// Attach zone tag to Cluster
+			if err = m.AttachTag(ctx, zoneID, h.Parent); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+
+	for _, test := range tests {
+		test.prep()
+
+		zone, err := zones.GetZone(ctx)
+		if test.fail {
+			if err == nil {
+				t.Errorf("%s: expected error", test.name)
+			} else {
+				t.Logf("%s: expected error=%s", test.name, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s: %s", test.name, err)
+			}
+			t.Logf("zone=%#v", zone)
+		}
 	}
 }
 
@@ -293,7 +515,7 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", nodeName, instanceID)
 
-	instanceID, err = i.InstanceID(context.TODO(), nonExistingVM)
+	_, err = i.InstanceID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)
 	} else if err == nil {
@@ -305,6 +527,15 @@ func TestInstances(t *testing.T) {
 	addrs, err := i.NodeAddresses(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", nodeName, err)
+	}
+	found := false
+	for _, addr := range addrs {
+		if addr.Type == v1.NodeHostName {
+			found = true
+		}
+	}
+	if found == false {
+		t.Fatalf("NodeAddresses does not report hostname, %s %s", nodeName, addrs)
 	}
 	t.Logf("Found NodeAddresses(%s) = %s\n", nodeName, addrs)
 }
@@ -366,6 +597,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 		expectedUsername         string
 		expectedPassword         string
 		expectedError            error
+		expectedThumbprints      map[string]string
 	}{
 		{
 			testName: "Username and password with old configuration",
@@ -535,6 +767,69 @@ func TestSecretVSphereConfig(t *testing.T) {
 			expectedIsSecretProvided: true,
 			expectedError:            nil,
 		},
+		{
+			testName: "virtual centers with a thumbprint",
+			conf: `[Global]
+			server = global
+			user = user
+			password = password
+			datacenter = us-west
+			thumbprint = "thumbprint:global"
+			working-dir = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+			expectedThumbprints: map[string]string{
+				"global": "thumbprint:global",
+			},
+		},
+		{
+			testName: "Multiple virtual centers with different thumbprints",
+			conf: `[Global]
+			user = user
+			password = password
+			datacenter = us-west
+			[VirtualCenter "0.0.0.0"]
+			thumbprint = thumbprint:0
+			[VirtualCenter "no_thumbprint"]
+			[VirtualCenter "1.1.1.1"]
+			thumbprint = thumbprint:1
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+			expectedThumbprints: map[string]string{
+				"0.0.0.0": "thumbprint:0",
+				"1.1.1.1": "thumbprint:1",
+			},
+		},
+		{
+			testName: "Multiple virtual centers use the global CA cert",
+			conf: `[Global]
+			user = user
+			password = password
+			datacenter = us-west
+			ca-file = /some/path/to/my/trusted/ca.pem
+			[VirtualCenter "0.0.0.0"]
+			user = user
+			password = password
+			[VirtualCenter "1.1.1.1"]
+			user = user
+			password = password
+			[Workspace]
+			server = 0.0.0.0
+			datacenter = us-west
+			folder = kubernetes
+			`,
+			expectedUsername: username,
+			expectedPassword: password,
+			expectedError:    nil,
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -564,9 +859,31 @@ func TestSecretVSphereConfig(t *testing.T) {
 					t.Fatalf("Expected password %s doesn't match actual password %s in config %s. error: %s",
 						testcase.expectedPassword, vsInstance.conn.Password, testcase.conf, err)
 				}
-
 			}
 		}
-
+		// Check, if all the expected thumbprints are configured
+		for instanceName, expectedThumbprint := range testcase.expectedThumbprints {
+			instanceConfig, ok := vs.vsphereInstanceMap[instanceName]
+			if !ok {
+				t.Fatalf("Could not find configuration for instance %s", instanceName)
+			}
+			if actualThumbprint := instanceConfig.conn.Thumbprint; actualThumbprint != expectedThumbprint {
+				t.Fatalf(
+					"Expected thumbprint for instance '%s' to be '%s', got '%s'",
+					instanceName, expectedThumbprint, actualThumbprint,
+				)
+			}
+		}
+		// Check, if all all connections are configured with the global CA certificate
+		if expectedCaPath := cfg.Global.CAFile; expectedCaPath != "" {
+			for name, instance := range vs.vsphereInstanceMap {
+				if actualCaPath := instance.conn.CACert; actualCaPath != expectedCaPath {
+					t.Fatalf(
+						"Expected CA certificate path for instance '%s' to be the globally configured one ('%s'), got '%s'",
+						name, expectedCaPath, actualCaPath,
+					)
+				}
+			}
+		}
 	}
 }

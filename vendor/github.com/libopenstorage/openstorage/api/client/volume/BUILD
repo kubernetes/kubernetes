@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "volume.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/libopenstorage/openstorage/api/client/volume",
     importpath = "github.com/libopenstorage/openstorage/api/client/volume",
     visibility = ["//visibility:public"],
     deps = [

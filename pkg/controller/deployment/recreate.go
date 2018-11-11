@@ -27,7 +27,7 @@ import (
 // rolloutRecreate implements the logic for recreating a replica set.
 func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID]*v1.PodList) error {
 	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down.
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, false)
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 
 	// If we need to create a new RS, create it now.
 	if newRS == nil {
-		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, true)
+		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)
 		if err != nil {
 			return err
 		}

@@ -31,15 +31,16 @@ func (in *AdmissionRequest) DeepCopyInto(out *AdmissionRequest) {
 	out.Kind = in.Kind
 	out.Resource = in.Resource
 	in.UserInfo.DeepCopyInto(&out.UserInfo)
-	if in.Object == nil {
-		out.Object = nil
-	} else {
+	if in.Object != nil {
 		out.Object = in.Object.DeepCopyObject()
 	}
-	if in.OldObject == nil {
-		out.OldObject = nil
-	} else {
+	if in.OldObject != nil {
 		out.OldObject = in.OldObject.DeepCopyObject()
+	}
+	if in.DryRun != nil {
+		in, out := &in.DryRun, &out.DryRun
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -71,6 +72,13 @@ func (in *AdmissionResponse) DeepCopyInto(out *AdmissionResponse) {
 		in, out := &in.PatchType, &out.PatchType
 		*out = new(PatchType)
 		**out = **in
+	}
+	if in.AuditAnnotations != nil {
+		in, out := &in.AuditAnnotations, &out.AuditAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	return
 }

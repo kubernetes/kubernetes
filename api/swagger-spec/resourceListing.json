@@ -22,6 +22,14 @@
     "description": "get available API versions"
    },
    {
+    "path": "/apis/auditregistration.k8s.io/v1alpha1",
+    "description": "API at /apis/auditregistration.k8s.io/v1alpha1"
+   },
+   {
+    "path": "/apis/auditregistration.k8s.io",
+    "description": "get information of a group"
+   },
+   {
     "path": "/apis/authentication.k8s.io/v1",
     "description": "API at /apis/authentication.k8s.io/v1"
    },
@@ -54,6 +62,10 @@
     "description": "API at /apis/autoscaling/v2beta1"
    },
    {
+    "path": "/apis/autoscaling/v2beta2",
+    "description": "API at /apis/autoscaling/v2beta2"
+   },
+   {
     "path": "/apis/autoscaling",
     "description": "get information of a group"
    },
@@ -79,6 +91,14 @@
    },
    {
     "path": "/apis/certificates.k8s.io",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/coordination.k8s.io/v1beta1",
+    "description": "API at /apis/coordination.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/coordination.k8s.io",
     "description": "get information of a group"
    },
    {

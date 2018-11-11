@@ -21,8 +21,8 @@ package v1
 import (
 	time "time"
 
-	apps_v1 "k8s.io/api/apps/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -57,20 +57,20 @@ func NewControllerRevisionInformer(client kubernetes.Interface, namespace string
 func NewFilteredControllerRevisionInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.AppsV1().ControllerRevisions(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.AppsV1().ControllerRevisions(namespace).Watch(options)
 			},
 		},
-		&apps_v1.ControllerRevision{},
+		&appsv1.ControllerRevision{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *controllerRevisionInformer) defaultInformer(client kubernetes.Interface
 }
 
 func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1.ControllerRevision{}, f.defaultInformer)
+	return f.factory.InformerFor(&appsv1.ControllerRevision{}, f.defaultInformer)
 }
 
 func (f *controllerRevisionInformer) Lister() v1.ControllerRevisionLister {

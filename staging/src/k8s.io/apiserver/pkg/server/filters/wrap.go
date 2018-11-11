@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/httplog"
@@ -31,7 +31,7 @@ func WithPanicRecovery(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
-			glog.Errorf("apiserver panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
+			klog.Errorf("apiserver panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
 		})
 
 		logger := httplog.NewLogged(req, &w)

@@ -14,15 +14,16 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/create-update-delete-deployment",
     importpath = "k8s.io/client-go/examples/create-update-delete-deployment",
     deps = [
-        "//vendor/k8s.io/api/apps/v1:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/util/homedir:go_default_library",
-        "//vendor/k8s.io/client-go/util/retry:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/client-go/util/homedir:go_default_library",
+        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 

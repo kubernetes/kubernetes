@@ -6,10 +6,10 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/raw",
     importpath = "github.com/google/cadvisor/container/raw",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/container/common:go_default_library",
         "//vendor/github.com/google/cadvisor/container/libcontainer:go_default_library",
@@ -19,6 +19,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/manager/watcher:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

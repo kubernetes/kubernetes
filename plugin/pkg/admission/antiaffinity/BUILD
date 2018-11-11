@@ -16,8 +16,8 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
@@ -28,9 +28,9 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 

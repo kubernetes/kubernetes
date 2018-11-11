@@ -55,8 +55,9 @@ function run {
 }
 
 # Creates a kubeconfig file for the kubelet.
-# Args: destination file path
+# Args: the IP address of the API server (e.g. "http://localhost:8080"), destination file path
 function create-kubelet-kubeconfig() {
+  #local api_addr="${1}"
   local destination="${2}"
   if [[ -z "${destination}" ]]; then
     echo "Must provide destination path to create Kubelet kubeconfig file!"
@@ -85,12 +86,13 @@ EOF
 function create_cluster {
   echo "Creating a local cluster:"
   echo -e -n "\tStarting kubelet..."
-  create-kubelet-kubeconfig "${KUBELET_KUBECONFIG}"
+  create-kubelet-kubeconfig "http://localhost:8080" "${KUBELET_KUBECONFIG}"
   run "docker run \
   --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \
   --volume=/var/lib/docker/:/var/lib/docker:rw \
   --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+  --volume=/usr/libexec/kubernetes/kubelet-plugins/volume/exec:/usr/libexec/kubernetes/kubelet-plugins/volume/exec:rw \
   --volume=/var/run:/var/run:rw \
   --volume=/run/xtables.lock:/run/xtables.lock:rw \
   --net=host \
@@ -102,7 +104,7 @@ function create_cluster {
       --containerized \
       --hostname-override="127.0.0.1" \
       --address="0.0.0.0" \
-      --kubeconfig=${KUBELET_KUBECONFIG}/kubelet.kubeconfig \
+      --kubeconfig=${KUBELET_KUBECONFIG} \
       --pod-manifest-path=/etc/kubernetes/manifests \
       --allow-privileged=true \
       --cluster-dns=10.0.0.10 \

@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -44,13 +44,10 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("client", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	info, err := client.Discovery().ServerVersion()
 	if err != nil {
@@ -60,7 +57,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.Core().Pods(ns.Name).List(metav1.ListOptions{})
+	pods, err := client.CoreV1().Pods("default").List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +69,7 @@ func TestClient(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test",
-			Namespace:    ns.Name,
+			Namespace:    "default",
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -83,14 +80,14 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	got, err := client.Core().Pods(ns.Name).Create(pod)
+	got, err := client.CoreV1().Pods("default").Create(pod)
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", got)
 	}
 
 	// get a created pod
 	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.Core().Pods(ns.Name).Create(pod)
+	got, err = client.CoreV1().Pods("default").Create(pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,7 +96,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.Core().Pods(ns.Name).List(metav1.ListOptions{})
+	pods, err = client.CoreV1().Pods("default").List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -116,21 +113,18 @@ func TestClient(t *testing.T) {
 }
 
 func TestAtomicPut(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("atomic-put", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	rcBody := v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: c.Core().RESTClient().APIVersion().String(),
+			APIVersion: c.CoreV1().RESTClient().APIVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "atomicrc",
-			Namespace: ns.Name,
+			Namespace: "default",
 			Labels: map[string]string{
 				"name": "atomicrc",
 			},
@@ -154,7 +148,7 @@ func TestAtomicPut(t *testing.T) {
 			},
 		},
 	}
-	rcs := c.Core().ReplicationControllers(ns.Name)
+	rcs := c.CoreV1().ReplicationControllers("default")
 	rc, err := rcs.Create(&rcBody)
 	if err != nil {
 		t.Fatalf("Failed creating atomicRC: %v", err)
@@ -208,23 +202,20 @@ func TestAtomicPut(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("patch", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	name := "patchpod"
 	resource := "pods"
 	podBody := v1.Pod{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: c.Core().RESTClient().APIVersion().String(),
+			APIVersion: c.CoreV1().RESTClient().APIVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: ns.Name,
+			Namespace: "default",
 			Labels:    map[string]string{},
 		},
 		Spec: v1.PodSpec{
@@ -233,7 +224,7 @@ func TestPatch(t *testing.T) {
 			},
 		},
 	}
-	pods := c.Core().Pods(ns.Name)
+	pods := c.CoreV1().Pods("default")
 	pod, err := pods.Create(&podBody)
 	if err != nil {
 		t.Fatalf("Failed creating patchpods: %v", err)
@@ -263,12 +254,12 @@ func TestPatch(t *testing.T) {
 		},
 	}
 
-	pb := patchBodies[c.Core().RESTClient().APIVersion()]
+	pb := patchBodies[c.CoreV1().RESTClient().APIVersion()]
 
 	execPatch := func(pt types.PatchType, body []byte) error {
-		result := c.Core().RESTClient().Patch(pt).
+		result := c.CoreV1().RESTClient().Patch(pt).
 			Resource(resource).
-			Namespace(ns.Name).
+			Namespace("default").
 			Name(name).
 			Body(body).
 			Do()
@@ -330,18 +321,15 @@ func TestPatch(t *testing.T) {
 }
 
 func TestPatchWithCreateOnUpdate(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("patch-with-create", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	endpointTemplate := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "patchendpoint",
-			Namespace: ns.Name,
+			Namespace: "default",
 		},
 		Subsets: []v1.EndpointSubset{
 			{
@@ -352,7 +340,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	patchEndpoint := func(json []byte) (runtime.Object, error) {
-		return c.Core().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace(ns.Name).Name("patchendpoint").Body(json).Do().Get()
+		return c.CoreV1().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace("default").Name("patchendpoint").Body(json).Do().Get()
 	}
 
 	// Make sure patch doesn't get to CreateOnUpdate
@@ -367,7 +355,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
-	createdEndpoint, err := c.Core().Endpoints(ns.Name).Update(endpointTemplate)
+	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(endpointTemplate)
 	if err != nil {
 		t.Fatalf("Failed creating endpoint: %v", err)
 	}
@@ -441,12 +429,12 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 }
 
 func TestAPIVersions(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
-	clientVersion := c.Core().RESTClient().APIVersion().String()
+	clientVersion := c.CoreV1().RESTClient().APIVersion().String()
 	g, err := c.Discovery().ServerGroups()
 	if err != nil {
 		t.Fatalf("Failed to get api versions: %v", err)
@@ -463,23 +451,20 @@ func TestAPIVersions(t *testing.T) {
 }
 
 func TestSingleWatch(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	ns := framework.CreateTestingNamespace("single-watch", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	mkEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("event-%v", i)
 		return &v1.Event{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
+				Namespace: "default",
 				Name:      name,
 			},
 			InvolvedObject: v1.ObjectReference{
-				Namespace: ns.Name,
+				Namespace: "default",
 				Name:      name,
 			},
 			Reason: fmt.Sprintf("event %v", i),
@@ -489,7 +474,7 @@ func TestSingleWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.Core().Events(ns.Name).Create(event)
+		got, err := client.CoreV1().Events("default").Create(event)
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}
@@ -502,8 +487,8 @@ func TestSingleWatch(t *testing.T) {
 		t.Logf("Created event %#v", got.ObjectMeta)
 	}
 
-	w, err := client.Core().RESTClient().Get().
-		Namespace(ns.Name).
+	w, err := client.CoreV1().RESTClient().Get().
+		Namespace("default").
 		Resource("events").
 		VersionedParams(&metav1.ListOptions{
 			ResourceVersion: rv1,
@@ -550,24 +535,21 @@ func TestMultiWatch(t *testing.T) {
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)
 
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	ns := framework.CreateTestingNamespace("multi-watch", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	dummyEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("unrelated-%v", i)
 		return &v1.Event{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%v.%x", name, time.Now().UnixNano()),
-				Namespace: ns.Name,
+				Namespace: "default",
 			},
 			InvolvedObject: v1.ObjectReference{
 				Name:      name,
-				Namespace: ns.Name,
+				Namespace: "default",
 			},
 			Reason: fmt.Sprintf("unrelated change %v", i),
 		}
@@ -585,7 +567,7 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		watchesStarted.Add(1)
 		name := fmt.Sprintf("multi-watch-%v", i)
-		got, err := client.Core().Pods(ns.Name).Create(&v1.Pod{
+		got, err := client.CoreV1().Pods("default").Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: labels.Set{"watchlabel": name},
@@ -606,7 +588,7 @@ func TestMultiWatch(t *testing.T) {
 				LabelSelector:   labels.Set{"watchlabel": name}.AsSelector().String(),
 				ResourceVersion: rv,
 			}
-			w, err := client.Core().Pods(ns.Name).Watch(options)
+			w, err := client.CoreV1().Pods("default").Watch(options)
 			if err != nil {
 				panic(fmt.Sprintf("watch error for %v: %v", name, err))
 			}
@@ -655,7 +637,7 @@ func TestMultiWatch(t *testing.T) {
 					if !ok {
 						return
 					}
-					if _, err := client.Core().Events(ns.Name).Create(dummyEvent(i)); err != nil {
+					if _, err := client.CoreV1().Events("default").Create(dummyEvent(i)); err != nil {
 						panic(fmt.Sprintf("couldn't make an event: %v", err))
 					}
 					changeMade <- i
@@ -692,7 +674,7 @@ func TestMultiWatch(t *testing.T) {
 						return
 					}
 					name := fmt.Sprintf("unrelated-%v", i)
-					_, err := client.Core().Pods(ns.Name).Create(&v1.Pod{
+					_, err := client.CoreV1().Pods("default").Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: name,
 						},
@@ -726,13 +708,13 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		go func(i int) {
 			name := fmt.Sprintf("multi-watch-%v", i)
-			pod, err := client.Core().Pods(ns.Name).Get(name, metav1.GetOptions{})
+			pod, err := client.CoreV1().Pods("default").Get(name, metav1.GetOptions{})
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
 			pod.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 			sentTimes <- timePair{time.Now(), name}
-			if _, err := client.Core().Pods(ns.Name).Update(pod); err != nil {
+			if _, err := client.CoreV1().Pods("default").Update(pod); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))
 			}
 		}(i)
@@ -806,13 +788,10 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 }
 
 func TestSelfLinkOnNamespace(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer result.TearDownFn()
 
-	ns := framework.CreateTestingNamespace("selflink", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	runSelfLinkTestOnNamespace(t, c, ns.Name)
+	runSelfLinkTestOnNamespace(t, c, "default")
 }

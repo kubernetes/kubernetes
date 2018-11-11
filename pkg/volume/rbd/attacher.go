@@ -21,9 +21,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -32,6 +32,11 @@ import (
 // NewAttacher implements AttachableVolumePlugin.NewAttacher.
 func (plugin *rbdPlugin) NewAttacher() (volume.Attacher, error) {
 	return plugin.newAttacherInternal(&RBDUtil{})
+}
+
+// NewDeviceMounter implements DeviceMountableVolumePlugin.NewDeviceMounter
+func (plugin *rbdPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
 }
 
 func (plugin *rbdPlugin) newAttacherInternal(manager diskManager) (volume.Attacher, error) {
@@ -45,6 +50,11 @@ func (plugin *rbdPlugin) newAttacherInternal(manager diskManager) (volume.Attach
 // NewDetacher implements AttachableVolumePlugin.NewDetacher.
 func (plugin *rbdPlugin) NewDetacher() (volume.Detacher, error) {
 	return plugin.newDetacherInternal(&RBDUtil{})
+}
+
+// NewDeviceUnmounter implements DeviceMountableVolumePlugin.NewDeviceUnmounter
+func (plugin *rbdPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (plugin *rbdPlugin) newDetacherInternal(manager diskManager) (volume.Detacher, error) {
@@ -69,6 +79,8 @@ type rbdAttacher struct {
 }
 
 var _ volume.Attacher = &rbdAttacher{}
+
+var _ volume.DeviceMounter = &rbdAttacher{}
 
 // Attach implements Attacher.Attach.
 // We do not lock image here, because it requires kube-controller-manager to
@@ -95,17 +107,17 @@ func (attacher *rbdAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 // attach volume onto the node.
 // This method is idempotent, callers are responsible for retrying on failure.
 func (attacher *rbdAttacher) WaitForAttach(spec *volume.Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error) {
-	glog.V(4).Infof("rbd: waiting for attach volume (name: %s) for pod (name: %s, uid: %s)", spec.Name(), pod.Name, pod.UID)
+	klog.V(4).Infof("rbd: waiting for attach volume (name: %s) for pod (name: %s, uid: %s)", spec.Name(), pod.Name, pod.UID)
 	mounter, err := attacher.plugin.createMounterFromVolumeSpecAndPod(spec, pod)
 	if err != nil {
-		glog.Warningf("failed to create mounter: %v", spec)
+		klog.Warningf("failed to create mounter: %v", spec)
 		return "", err
 	}
 	realDevicePath, err := attacher.manager.AttachDisk(*mounter)
 	if err != nil {
 		return "", err
 	}
-	glog.V(3).Infof("rbd: successfully wait for attach volume (spec: %s, pool: %s, image: %s) at %s", spec.Name(), mounter.Pool, mounter.Image, realDevicePath)
+	klog.V(3).Infof("rbd: successfully wait for attach volume (spec: %s, pool: %s, image: %s) at %s", spec.Name(), mounter.Pool, mounter.Image, realDevicePath)
 	return realDevicePath, nil
 }
 
@@ -126,7 +138,7 @@ func (attacher *rbdAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 // mount device at the given mount path.
 // This method is idempotent, callers are responsible for retrying on failure.
 func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	glog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
+	klog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -159,7 +171,7 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		os.Remove(deviceMountPath)
 		return fmt.Errorf("rbd: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
 	}
-	glog.V(3).Infof("rbd: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
+	klog.V(3).Infof("rbd: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
 	return nil
 }
 
@@ -171,6 +183,8 @@ type rbdDetacher struct {
 }
 
 var _ volume.Detacher = &rbdDetacher{}
+
+var _ volume.DeviceUnmounter = &rbdDetacher{}
 
 // UnmountDevice implements Detacher.UnmountDevice. It unmounts the global
 // mount of the RBD image. This is called once all bind mounts have been
@@ -186,7 +200,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 	if pathExists, pathErr := volutil.PathExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
 	}
 	devicePath, _, err := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)
@@ -194,23 +208,23 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	// Unmount the device from the device mount point.
-	glog.V(4).Infof("rbd: unmouting device mountpoint %s", deviceMountPath)
+	klog.V(4).Infof("rbd: unmouting device mountpoint %s", deviceMountPath)
 	if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
 		return err
 	}
-	glog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
+	klog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
 
-	glog.V(4).Infof("rbd: detaching device %s", devicePath)
+	klog.V(4).Infof("rbd: detaching device %s", devicePath)
 	err = detacher.manager.DetachDisk(detacher.plugin, deviceMountPath, devicePath)
 	if err != nil {
 		return err
 	}
-	glog.V(3).Infof("rbd: successfully detach device %s", devicePath)
+	klog.V(3).Infof("rbd: successfully detach device %s", devicePath)
 	err = os.Remove(deviceMountPath)
 	if err != nil {
 		return err
 	}
-	glog.V(3).Infof("rbd: successfully remove device mount point %s", deviceMountPath)
+	klog.V(3).Infof("rbd: successfully remove device mount point %s", deviceMountPath)
 	return nil
 }
 

@@ -24,7 +24,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
-source "${KUBE_ROOT}/hack/make-rules/test-cmd-util.sh"
+source "${KUBE_ROOT}/test/cmd/legacy-script.sh"
 
 function run_kube_apiserver() {
   kube::log::status "Building kube-apiserver"
@@ -34,11 +34,14 @@ function run_kube_apiserver() {
   kube::log::status "Starting kube-apiserver"
 
   # Admission Controllers to invoke prior to persisting objects in cluster
-  ENABLE_ADMISSION_PLUGINS="Initializers,LimitRanger,ResourceQuota"
+  ENABLE_ADMISSION_PLUGINS="LimitRanger,ResourceQuota"
   DISABLE_ADMISSION_PLUGINS="ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
 
   # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions
   AUTHORIZATION_MODE="RBAC,AlwaysAllow"
+
+  # Enable features
+  ENABLE_FEATURE_GATES="DryRun=true"
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --insecure-bind-address="127.0.0.1" \
@@ -46,6 +49,7 @@ function run_kube_apiserver() {
     --insecure-port="${API_PORT}" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
+    --feature-gates="${ENABLE_FEATURE_GATES}" \
     --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
     --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \

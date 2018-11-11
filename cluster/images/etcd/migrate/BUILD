@@ -42,8 +42,8 @@ go_library(
         "//vendor/github.com/coreos/etcd/wal:go_default_library",
         "//vendor/github.com/coreos/etcd/wal/walpb:go_default_library",
         "//vendor/github.com/coreos/go-semver/semver:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

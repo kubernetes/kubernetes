@@ -31,8 +31,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/http2"
+	"k8s.io/klog"
 )
 
 // JoinPreservingTrailingSlash does a path.Join of the specified elements,
@@ -91,7 +91,8 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
 		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
-	if t.DialContext == nil {
+	// If no custom dialer is set, use the default context dialer
+	if t.DialContext == nil && t.Dial == nil {
 		t.DialContext = defaultTransport.DialContext
 	}
 	if t.TLSHandshakeTimeout == 0 {
@@ -106,10 +107,10 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		glog.Infof("HTTP2 has been explicitly disabled")
+		klog.Infof("HTTP2 has been explicitly disabled")
 	} else {
 		if err := http2.ConfigureTransport(t); err != nil {
-			glog.Warningf("Transport failed http2 configuration: %v", err)
+			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
 	return t
@@ -129,7 +130,18 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 
 	switch transport := transport.(type) {
 	case *http.Transport:
-		return transport.DialContext, nil
+		// transport.DialContext takes precedence over transport.Dial
+		if transport.DialContext != nil {
+			return transport.DialContext, nil
+		}
+		// adapt transport.Dial to the DialWithContext signature
+		if transport.Dial != nil {
+			return func(ctx context.Context, net, addr string) (net.Conn, error) {
+				return transport.Dial(net, addr)
+			}, nil
+		}
+		// otherwise return nil
+		return nil, nil
 	case RoundTripperWrapper:
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
@@ -167,10 +179,8 @@ func FormatURL(scheme string, host string, port int, path string) *url.URL {
 }
 
 func GetHTTPClient(req *http.Request) string {
-	if userAgent, ok := req.Header["User-Agent"]; ok {
-		if len(userAgent) > 0 {
-			return userAgent[0]
-		}
+	if ua := req.UserAgent(); len(ua) != 0 {
+		return ua
 	}
 	return "unknown"
 }
@@ -311,9 +321,10 @@ type Dialer interface {
 
 // ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
 // originalLocation). It returns the opened net.Conn and the raw response bytes.
-func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer) (net.Conn, []byte, error) {
+// If requireSameHostRedirects is true, only redirects to the same host are permitted.
+func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer, requireSameHostRedirects bool) (net.Conn, []byte, error) {
 	const (
-		maxRedirects    = 10
+		maxRedirects    = 9     // Fail on the 10th redirect
 		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
 	)
 
@@ -357,7 +368,7 @@ redirectLoop:
 		resp, err := http.ReadResponse(respReader, nil)
 		if err != nil {
 			// Unable to read the backend response; let the client handle it.
-			glog.Warningf("Error reading backend response: %v", err)
+			klog.Warningf("Error reading backend response: %v", err)
 			break redirectLoop
 		}
 
@@ -377,10 +388,6 @@ redirectLoop:
 
 		resp.Body.Close() // not used
 
-		// Reset the connection.
-		intermediateConn.Close()
-		intermediateConn = nil
-
 		// Prepare to follow the redirect.
 		redirectStr := resp.Header.Get("Location")
 		if redirectStr == "" {
@@ -394,6 +401,15 @@ redirectLoop:
 		if err != nil {
 			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
 		}
+
+		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
+		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
+			break redirectLoop
+		}
+
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
 	}
 
 	connToReturn := intermediateConn

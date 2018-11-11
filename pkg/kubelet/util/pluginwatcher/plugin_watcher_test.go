@@ -17,204 +17,224 @@ limitations under the License.
 package pluginwatcher
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
-	"strconv"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
-	v1beta1 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1"
-	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
 )
 
-func TestExamplePlugin(t *testing.T) {
-	socketDir, err := ioutil.TempDir("", "plugin_test")
-	require.NoError(t, err)
-	socketPath := socketDir + "/plugin.sock"
-	w := NewWatcher(socketDir)
+var (
+	socketDir string
 
-	testCases := []struct {
-		description      string
-		expectedEndpoint string
-		returnErr        error
-	}{
-		{
-			description:      "Successfully register plugin through inotify",
-			expectedEndpoint: "",
-			returnErr:        nil,
-		},
-		{
-			description:      "Successfully register plugin through inotify and got expected optional endpoint",
-			expectedEndpoint: "dummyEndpoint",
-			returnErr:        nil,
-		},
-		{
-			description:      "Fails registration because endpoint is expected to be non-empty",
-			expectedEndpoint: "dummyEndpoint",
-			returnErr:        fmt.Errorf("empty endpoint received"),
-		},
-		{
-			description:      "Successfully register plugin through inotify after plugin restarts",
-			expectedEndpoint: "",
-			returnErr:        nil,
-		},
-		{
-			description:      "Fails registration with conflicting plugin name",
-			expectedEndpoint: "",
-			returnErr:        fmt.Errorf("conflicting plugin name"),
-		},
-		{
-			description:      "Successfully register plugin during initial traverse after plugin watcher restarts",
-			expectedEndpoint: "",
-			returnErr:        nil,
-		},
-		{
-			description:      "Fails registration with conflicting plugin name during initial traverse after plugin watcher restarts",
-			expectedEndpoint: "",
-			returnErr:        fmt.Errorf("conflicting plugin name"),
-		},
+	supportedVersions = []string{"v1beta1", "v1beta2"}
+)
+
+func init() {
+	var logLevel string
+
+	klog.InitFlags(flag.CommandLine)
+	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
+	flag.StringVar(&logLevel, "logLevel", "6", "test")
+	flag.Lookup("v").Value.Set(logLevel)
+
+	d, err := ioutil.TempDir("", "plugin_test")
+	if err != nil {
+		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}
 
-	callbackCount := struct {
-		mutex sync.Mutex
-		count int32
-	}{}
-	w.AddHandler(PluginType, func(name string, endpoint string, versions []string, sockPath string) (error, chan bool) {
-		callbackCount.mutex.Lock()
-		localCount := callbackCount.count
-		callbackCount.count = callbackCount.count + 1
-		callbackCount.mutex.Unlock()
-
-		require.True(t, localCount <= int32((len(testCases)-1)))
-		require.Equal(t, PluginName, name, "Plugin name mismatched!!")
-		retError := testCases[localCount].returnErr
-		if retError == nil || retError.Error() != "empty endpoint received" {
-			require.Equal(t, testCases[localCount].expectedEndpoint, endpoint, "Unexpected endpoint")
-		} else {
-			require.NotEqual(t, testCases[localCount].expectedEndpoint, endpoint, "Unexpected endpoint")
-		}
-
-		require.Equal(t, []string{"v1beta1", "v1beta2"}, versions, "Plugin version mismatched!!")
-		// Verifies the grpcServer is ready to serve services.
-		_, conn, err := dial(sockPath)
-		require.Nil(t, err)
-		defer conn.Close()
-
-		// The plugin handler should be able to use any listed service API version.
-		v1beta1Client := v1beta1.NewExampleClient(conn)
-		v1beta2Client := v1beta2.NewExampleClient(conn)
-
-		// Tests v1beta1 GetExampleInfo
-		_, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{})
-		require.Nil(t, err)
-
-		// Tests v1beta1 GetExampleInfo
-		_, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{})
-		//atomic.AddInt32(&callbackCount, 1)
-		chanForAckOfNotification := make(chan bool)
-
-		go func() {
-			select {
-			case <-chanForAckOfNotification:
-				close(chanForAckOfNotification)
-			case <-time.After(time.Second):
-				t.Fatalf("Timed out while waiting for notification ack")
-			}
-		}()
-		return retError, chanForAckOfNotification
-	})
-	require.NoError(t, w.Start())
-
-	p := NewTestExamplePlugin("")
-	require.NoError(t, p.Serve(socketPath))
-	require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-
-	require.NoError(t, p.Stop())
-
-	p = NewTestExamplePlugin("dummyEndpoint")
-	require.NoError(t, p.Serve(socketPath))
-	require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-
-	require.NoError(t, p.Stop())
-
-	p = NewTestExamplePlugin("")
-	require.NoError(t, p.Serve(socketPath))
-	require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-
-	// Trying to start a plugin service at the same socket path should fail
-	// with "bind: address already in use"
-	require.NotNil(t, p.Serve(socketPath))
-
-	// grpcServer.Stop() will remove the socket and starting plugin service
-	// at the same path again should succeeds and trigger another callback.
-	require.NoError(t, p.Stop())
-	p = NewTestExamplePlugin("")
-	go func() {
-		require.Nil(t, p.Serve(socketPath))
-	}()
-	require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-
-	// Starting another plugin with the same name got verification error.
-	p2 := NewTestExamplePlugin("")
-	socketPath2 := socketDir + "/plugin2.sock"
-	go func() {
-		require.NoError(t, p2.Serve(socketPath2))
-	}()
-	require.False(t, waitForPluginRegistrationStatus(t, p2.registrationStatus))
-
-	// Restarts plugin watcher should traverse the socket directory and issues a
-	// callback for every existing socket.
-	require.NoError(t, w.Stop())
-	errCh := make(chan error)
-	go func() {
-		errCh <- w.Start()
-	}()
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	var pStatus string
-	var p2Status string
-	go func() {
-		pStatus = strconv.FormatBool(waitForPluginRegistrationStatus(t, p.registrationStatus))
-		wg.Done()
-	}()
-	go func() {
-		p2Status = strconv.FormatBool(waitForPluginRegistrationStatus(t, p2.registrationStatus))
-		wg.Done()
-	}()
-	wg.Wait()
-	expectedSet := sets.NewString()
-	expectedSet.Insert("true", "false")
-	actualSet := sets.NewString()
-	actualSet.Insert(pStatus, p2Status)
-
-	require.Equal(t, expectedSet, actualSet)
-
-	select {
-	case err = <-errCh:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		t.Fatalf("Timed out while waiting for watcher start")
-
-	}
-
-	require.NoError(t, w.Stop())
-	err = w.Cleanup()
-	require.NoError(t, err)
+	socketDir = d
 }
 
-func waitForPluginRegistrationStatus(t *testing.T, statusCh chan registerapi.RegistrationStatus) bool {
+func cleanup(t *testing.T) {
+	require.NoError(t, os.RemoveAll(socketDir))
+	os.MkdirAll(socketDir, 0755)
+}
+
+func TestPluginRegistration(t *testing.T) {
+	defer cleanup(t)
+
+	hdlr := NewExampleHandler(supportedVersions)
+	w := newWatcherWithHandler(t, hdlr)
+	defer func() { require.NoError(t, w.Stop()) }()
+
+	for i := 0; i < 10; i++ {
+		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
+		pluginName := fmt.Sprintf("example-plugin-%d", i)
+
+		hdlr.AddPluginName(pluginName)
+
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+
+		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+		require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
+
+		require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+
+		require.NoError(t, p.Stop())
+		require.True(t, waitForEvent(t, exampleEventDeRegister, hdlr.EventChan(p.pluginName)))
+	}
+}
+
+func TestPluginReRegistration(t *testing.T) {
+	defer cleanup(t)
+
+	pluginName := fmt.Sprintf("example-plugin")
+	hdlr := NewExampleHandler(supportedVersions)
+
+	w := newWatcherWithHandler(t, hdlr)
+	defer func() { require.NoError(t, w.Stop()) }()
+
+	plugins := make([]*examplePlugin, 10)
+
+	for i := 0; i < 10; i++ {
+		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
+		hdlr.AddPluginName(pluginName)
+
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+
+		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+		require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
+
+		require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+
+		plugins[i] = p
+	}
+
+	plugins[len(plugins)-1].Stop()
+	require.True(t, waitForEvent(t, exampleEventDeRegister, hdlr.EventChan(pluginName)))
+
+	close(hdlr.EventChan(pluginName))
+	for i := 0; i < len(plugins)-1; i++ {
+		plugins[i].Stop()
+	}
+}
+
+func TestPluginRegistrationAtKubeletStart(t *testing.T) {
+	defer cleanup(t)
+
+	hdlr := NewExampleHandler(supportedVersions)
+	plugins := make([]*examplePlugin, 10)
+
+	for i := 0; i < len(plugins); i++ {
+		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
+		pluginName := fmt.Sprintf("example-plugin-%d", i)
+		hdlr.AddPluginName(pluginName)
+
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+		defer func(p *examplePlugin) { require.NoError(t, p.Stop()) }(p)
+
+		plugins[i] = p
+	}
+
+	w := newWatcherWithHandler(t, hdlr)
+	defer func() { require.NoError(t, w.Stop()) }()
+
+	var wg sync.WaitGroup
+	for i := 0; i < len(plugins); i++ {
+		wg.Add(1)
+		go func(p *examplePlugin) {
+			defer wg.Done()
+
+			require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+			require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
+
+			require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+		}(plugins[i])
+	}
+
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+
 	select {
-	case status := <-statusCh:
+	case <-c:
+		return
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Timeout while waiting for the plugin registration status")
+	}
+}
+
+func TestPluginRegistrationFailureWithUnsupportedVersion(t *testing.T) {
+	defer cleanup(t)
+
+	pluginName := fmt.Sprintf("example-plugin")
+	socketPath := socketDir + "/plugin.sock"
+
+	hdlr := NewExampleHandler(supportedVersions)
+	hdlr.AddPluginName(pluginName)
+
+	w := newWatcherWithHandler(t, hdlr)
+	defer func() { require.NoError(t, w.Stop()) }()
+
+	// Advertise v1beta3 but don't serve anything else than the plugin service
+	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "v1beta3")
+	require.NoError(t, p.Serve())
+	defer func() { require.NoError(t, p.Stop()) }()
+
+	require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+	require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+}
+
+func TestPlugiRegistrationFailureWithUnsupportedVersionAtKubeletStart(t *testing.T) {
+	defer cleanup(t)
+
+	pluginName := fmt.Sprintf("example-plugin")
+	socketPath := socketDir + "/plugin.sock"
+
+	// Advertise v1beta3 but don't serve anything else than the plugin service
+	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "v1beta3")
+	require.NoError(t, p.Serve())
+	defer func() { require.NoError(t, p.Stop()) }()
+
+	hdlr := NewExampleHandler(supportedVersions)
+	hdlr.AddPluginName(pluginName)
+
+	w := newWatcherWithHandler(t, hdlr)
+	defer func() { require.NoError(t, w.Stop()) }()
+
+	require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+	require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+}
+
+func waitForPluginRegistrationStatus(t *testing.T, statusChan chan registerapi.RegistrationStatus) bool {
+	select {
+	case status := <-statusChan:
 		return status.PluginRegistered
 	case <-time.After(10 * time.Second):
 		t.Fatalf("Timed out while waiting for registration status")
 	}
 	return false
+}
+
+func waitForEvent(t *testing.T, expected examplePluginEvent, eventChan chan examplePluginEvent) bool {
+	select {
+	case event := <-eventChan:
+		return event == expected
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Timed out while waiting for registration status %v", expected)
+	}
+
+	return false
+}
+
+func newWatcherWithHandler(t *testing.T, hdlr PluginHandler) *Watcher {
+	w := NewWatcher(socketDir)
+
+	w.AddHandler(registerapi.DevicePlugin, hdlr)
+	require.NoError(t, w.Start())
+
+	return w
 }

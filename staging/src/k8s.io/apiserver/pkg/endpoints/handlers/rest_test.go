@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -51,8 +52,8 @@ var (
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 type testPatchType struct {
@@ -78,7 +79,6 @@ func (obj *testPatchType) DeepCopyObject() runtime.Object {
 func TestPatchAnonymousField(t *testing.T) {
 	testGV := schema.GroupVersion{Group: "", Version: "v"}
 	scheme.AddKnownTypes(testGV, &testPatchType{})
-	codec := codecs.LegacyCodec(testGV)
 	defaulter := runtime.ObjectDefaulter(scheme)
 
 	original := &testPatchType{
@@ -92,7 +92,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 
 	actual := &testPatchType{}
-	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,10 +101,9 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 }
 
-func TestPatchInvalid(t *testing.T) {
+func TestStrategicMergePatchInvalid(t *testing.T) {
 	testGV := schema.GroupVersion{Group: "", Version: "v"}
 	scheme.AddKnownTypes(testGV, &testPatchType{})
-	codec := codecs.LegacyCodec(testGV)
 	defaulter := runtime.ObjectDefaulter(scheme)
 
 	original := &testPatchType{
@@ -115,7 +114,7 @@ func TestPatchInvalid(t *testing.T) {
 	expectedError := "invalid character 'b' looking for beginning of value"
 
 	actual := &testPatchType{}
-	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
@@ -124,10 +123,64 @@ func TestPatchInvalid(t *testing.T) {
 	}
 }
 
+func TestJSONPatch(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		patch             string
+		expectedError     string
+		expectedErrorType metav1.StatusReason
+	}{
+		{
+			name:  "valid",
+			patch: `[{"op": "test", "value": "podA", "path": "/metadata/name"}]`,
+		},
+		{
+			name:              "invalid-syntax",
+			patch:             `invalid json patch`,
+			expectedError:     "invalid character 'i' looking for beginning of value",
+			expectedErrorType: metav1.StatusReasonBadRequest,
+		},
+		{
+			name:              "invalid-semantics",
+			patch:             `[{"op": "test", "value": "podA", "path": "/invalid/path"}]`,
+			expectedError:     "the server rejected our request due to an error in our request",
+			expectedErrorType: metav1.StatusReasonInvalid,
+		},
+	} {
+		p := &patcher{
+			patchType: types.JSONPatchType,
+			patchJS:   []byte(test.patch),
+		}
+		jp := jsonPatcher{p}
+		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
+		pod := &examplev1.Pod{}
+		pod.Name = "podA"
+		versionedJS, err := runtime.Encode(codec, pod)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+		_, err = jp.applyJSPatch(versionedJS)
+		if err != nil {
+			if len(test.expectedError) == 0 {
+				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
+				continue
+			}
+			if err.Error() != test.expectedError {
+				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
+			}
+			if test.expectedErrorType != apierrors.ReasonForError(err) {
+				t.Errorf("%s: expected error type %v, but got %v", test.name, test.expectedErrorType, apierrors.ReasonForError(err))
+			}
+		} else if len(test.expectedError) > 0 {
+			t.Errorf("%s: expected err %s", test.name, test.expectedError)
+		}
+	}
+}
+
 func TestPatchCustomResource(t *testing.T) {
 	testGV := schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"}
 	scheme.AddKnownTypes(testGV, &unstructured.Unstructured{})
-	codec := codecs.LegacyCodec(testGV)
 	defaulter := runtime.ObjectDefaulter(scheme)
 
 	original := &unstructured.Unstructured{
@@ -147,7 +200,7 @@ func TestPatchCustomResource(t *testing.T) {
 	expectedError := "strategic merge patch format is not supported"
 
 	actual := &unstructured.Unstructured{}
-	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &unstructured.Unstructured{})
+	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &unstructured.Unstructured{})
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
@@ -172,7 +225,7 @@ func (p *testPatcher) New() runtime.Object {
 	return &example.Pod{}
 }
 
-func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// Simulate GuaranteedUpdate behavior (retries internally on etcd changes if the incoming resource doesn't pin resourceVersion)
 	for {
 		currentPod := p.startingPod
@@ -314,6 +367,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
 	schemaReferenceObj := &examplev1.Pod{}
+	hubVersion := example.SchemeGroupVersion
 
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
@@ -386,6 +440,8 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			kind:            kind,
 			resource:        resource,
 
+			hubGroupVersion: hubVersion,
+
 			createValidation: rest.ValidateAllObjectFunc,
 			updateValidation: admissionValidation,
 			admissionCheck:   admissionMutation,
@@ -452,7 +508,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 }
 
 func TestNumberConversion(t *testing.T) {
-	codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
 	defaulter := runtime.ObjectDefaulter(scheme)
 
 	terminationGracePeriodSeconds := int64(42)
@@ -470,7 +525,7 @@ func TestNumberConversion(t *testing.T) {
 
 	patchJS := []byte(`{"spec":{"terminationGracePeriodSeconds":42,"activeDeadlineSeconds":120}}`)
 
-	err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj)
+	err := strategicPatchObject(defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj)
 	if err != nil {
 		t.Fatal(err)
 	}

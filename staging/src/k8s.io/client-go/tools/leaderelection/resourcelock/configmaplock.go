@@ -80,7 +80,7 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 // Update will update an existing annotation on a given resource.
 func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 	if cml.cm == nil {
-		return errors.New("endpoint not initialized, call get or create first")
+		return errors.New("configmap not initialized, call get or create first")
 	}
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {

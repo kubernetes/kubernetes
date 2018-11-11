@@ -11,15 +11,16 @@ go_library(
         "client.go",
         "interfaces.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/external_metrics",
     importpath = "k8s.io/metrics/pkg/client/external_metrics",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
     ],
 )
 

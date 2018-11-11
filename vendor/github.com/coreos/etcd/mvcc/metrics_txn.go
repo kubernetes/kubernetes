@@ -50,18 +50,10 @@ func (tw *metricsTxnWrite) Put(key, value []byte, lease lease.LeaseID) (rev int6
 
 func (tw *metricsTxnWrite) End() {
 	defer tw.TxnWrite.End()
-	if sum := tw.ranges + tw.puts + tw.deletes; sum != 1 {
-		if sum > 1 {
-			txnCounter.Inc()
-		}
-		return
+	if sum := tw.ranges + tw.puts + tw.deletes; sum > 1 {
+		txnCounter.Inc()
 	}
-	switch {
-	case tw.ranges == 1:
-		rangeCounter.Inc()
-	case tw.puts == 1:
-		putCounter.Inc()
-	case tw.deletes == 1:
-		deleteCounter.Inc()
-	}
+	rangeCounter.Add(float64(tw.ranges))
+	putCounter.Add(float64(tw.puts))
+	deleteCounter.Add(float64(tw.deletes))
 }

@@ -25,7 +25,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	samplecontroller_v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
+	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	versioned "k8s.io/sample-controller/pkg/client/clientset/versioned"
 	internalinterfaces "k8s.io/sample-controller/pkg/client/informers/externalversions/internalinterfaces"
 	v1alpha1 "k8s.io/sample-controller/pkg/client/listers/samplecontroller/v1alpha1"
@@ -70,7 +70,7 @@ func NewFilteredFooInformer(client versioned.Interface, namespace string, resync
 				return client.SamplecontrollerV1alpha1().Foos(namespace).Watch(options)
 			},
 		},
-		&samplecontroller_v1alpha1.Foo{},
+		&samplecontrollerv1alpha1.Foo{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *fooInformer) defaultInformer(client versioned.Interface, resyncPeriod t
 }
 
 func (f *fooInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&samplecontroller_v1alpha1.Foo{}, f.defaultInformer)
+	return f.factory.InformerFor(&samplecontrollerv1alpha1.Foo{}, f.defaultInformer)
 }
 
 func (f *fooInformer) Lister() v1alpha1.FooLister {

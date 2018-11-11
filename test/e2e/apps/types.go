@@ -31,7 +31,7 @@ var (
 	CronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 	NautilusImage                    = imageutils.GetE2EImage(imageutils.Nautilus)
 	KittenImage                      = imageutils.GetE2EImage(imageutils.Kitten)
-	NginxImage                       = imageutils.GetE2EImage(imageutils.NginxSlim)
-	NewNginxImage                    = imageutils.GetE2EImage(imageutils.NginxSlimNew)
+	NginxImage                       = imageutils.GetE2EImage(imageutils.Nginx)
+	NewNginxImage                    = imageutils.GetE2EImage(imageutils.NginxNew)
 	RedisImage                       = imageutils.GetE2EImage(imageutils.Redis)
 )

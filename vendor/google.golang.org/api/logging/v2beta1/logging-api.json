@@ -72,11 +72,6 @@
       "location": "query",
       "type": "string"
     },
-    "bearer_token": {
-      "description": "OAuth bearer token.",
-      "location": "query",
-      "type": "string"
-    },
     "callback": {
       "description": "JSONP",
       "location": "query",
@@ -96,12 +91,6 @@
       "description": "OAuth 2.0 token for the current user.",
       "location": "query",
       "type": "string"
-    },
-    "pp": {
-      "default": "true",
-      "description": "Pretty-print response.",
-      "location": "query",
-      "type": "boolean"
     },
     "prettyPrint": {
       "default": "true",
@@ -755,7 +744,7 @@
       }
     }
   },
-  "revision": "20180424",
+  "revision": "20180604",
   "rootUrl": "https://logging.googleapis.com/",
   "schemas": {
     "BucketOptions": {

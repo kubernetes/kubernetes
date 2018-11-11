@@ -17,7 +17,6 @@ limitations under the License.
 package auth
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -27,14 +26,16 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/evanphx/json-patch"
@@ -45,7 +46,7 @@ var (
 	watchTestTimeout int64 = 1
 	auditTestUser          = "kubecfg"
 
-	crd          = testserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	crd          = fixtures.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
 	crdNamespace = strings.SplitN(crd.Name, ".", 2)[1]
 
@@ -80,7 +81,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 		testCases := []struct {
 			action func()
-			events []auditEvent
+			events []utils.AuditEvent
 		}{
 			// Create, get, update, patch, delete, list, watch pods.
 			{
@@ -118,103 +119,103 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 					f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 				},
-				[]auditEvent{
+				[]utils.AuditEvent{
 					{
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace),
-						"create",
-						201,
-						auditTestUser,
-						"pods",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace),
+						Verb:              "create",
+						Code:              201,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
-						"get",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
+						Verb:              "get",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace),
-						"list",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace),
+						Verb:              "list",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseStarted,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseStarted,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
-						"update",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
+						Verb:              "update",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
-						"patch",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
+						Verb:              "patch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
-						"delete",
-						200,
-						auditTestUser,
-						"pods",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/audit-pod", namespace),
+						Verb:              "delete",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					},
 				},
 			},
@@ -247,103 +248,103 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					err = f.ClientSet.AppsV1().Deployments(namespace).Delete("audit-deployment", &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete deployments")
 				},
-				[]auditEvent{
+				[]utils.AuditEvent{
 					{
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
-						"create",
-						201,
-						auditTestUser,
-						"deployments",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
+						Verb:              "create",
+						Code:              201,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
-						"get",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
+						Verb:              "get",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
-						"list",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", namespace),
+						Verb:              "list",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseStarted,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseStarted,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequest,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
-						"update",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
+						Verb:              "update",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
-						"patch",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
+						Verb:              "patch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelRequestResponse,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
-						"delete",
-						200,
-						auditTestUser,
-						"deployments",
-						namespace,
-						true,
-						true,
-						"allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments/audit-deployment", namespace),
+						Verb:              "delete",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "deployments",
+						Namespace:         namespace,
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					},
 				},
 			},
@@ -382,103 +383,103 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete audit-configmap")
 				},
-				[]auditEvent{
+				[]utils.AuditEvent{
 					{
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps", namespace),
-						"create",
-						201,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps", namespace),
+						Verb:              "create",
+						Code:              201,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
-						"get",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+						Verb:              "get",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps", namespace),
-						"list",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps", namespace),
+						Verb:              "list",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseStarted,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseStarted,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
-						"update",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+						Verb:              "update",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
-						"patch",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+						Verb:              "patch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
-						"delete",
-						200,
-						auditTestUser,
-						"configmaps",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+						Verb:              "delete",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "configmaps",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					},
 				},
 			},
@@ -516,158 +517,158 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					err = f.ClientSet.CoreV1().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete audit-secret")
 				},
-				[]auditEvent{
+				[]utils.AuditEvent{
 					{
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets", namespace),
-						"create",
-						201,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets", namespace),
+						Verb:              "create",
+						Code:              201,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
-						"get",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
+						Verb:              "get",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets", namespace),
-						"list",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets", namespace),
+						Verb:              "list",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseStarted,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseStarted,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
-						"watch",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						Verb:              "watch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
-						"update",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
+						Verb:              "update",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
-						"patch",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
+						Verb:              "patch",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						v1beta1.LevelMetadata,
-						v1beta1.StageResponseComplete,
-						fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
-						"delete",
-						200,
-						auditTestUser,
-						"secrets",
-						namespace,
-						false,
-						false,
-						"allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets/audit-secret", namespace),
+						Verb:              "delete",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "secrets",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					},
 				},
 			},
 			// Create and delete custom resource definition.
 			{
 				func() {
-					crd, err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+					crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
 					framework.ExpectNoError(err, "failed to create custom resource definition")
-					testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+					fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 				},
-				[]auditEvent{
+				[]utils.AuditEvent{
 					{
-						level:             v1beta1.LevelRequestResponse,
-						stage:             v1beta1.StageResponseComplete,
-						requestURI:        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions",
-						verb:              "create",
-						code:              201,
-						user:              auditTestUser,
-						resource:          "customresourcedefinitions",
-						requestObject:     true,
-						responseObject:    true,
-						authorizeDecision: "allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions",
+						Verb:              "create",
+						Code:              201,
+						User:              auditTestUser,
+						Resource:          "customresourcedefinitions",
+						RequestObject:     true,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						level:             v1beta1.LevelMetadata,
-						stage:             v1beta1.StageResponseComplete,
-						requestURI:        fmt.Sprintf("/apis/%s/v1beta1/%s", crdNamespace, crdName),
-						verb:              "create",
-						code:              201,
-						user:              auditTestUser,
-						resource:          crdName,
-						requestObject:     false,
-						responseObject:    false,
-						authorizeDecision: "allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/%s/v1beta1/%s", crdNamespace, crdName),
+						Verb:              "create",
+						Code:              201,
+						User:              auditTestUser,
+						Resource:          crdName,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					}, {
-						level:             v1beta1.LevelRequestResponse,
-						stage:             v1beta1.StageResponseComplete,
-						requestURI:        fmt.Sprintf("/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/%s", crd.Name),
-						verb:              "delete",
-						code:              200,
-						user:              auditTestUser,
-						resource:          "customresourcedefinitions",
-						requestObject:     false,
-						responseObject:    true,
-						authorizeDecision: "allow",
+						Level:             auditinternal.LevelRequestResponse,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/%s", crd.Name),
+						Verb:              "delete",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          "customresourcedefinitions",
+						RequestObject:     false,
+						ResponseObject:    true,
+						AuthorizeDecision: "allow",
 					}, {
-						level:             v1beta1.LevelMetadata,
-						stage:             v1beta1.StageResponseComplete,
-						requestURI:        fmt.Sprintf("/apis/%s/v1beta1/%s/setup-instance", crdNamespace, crdName),
-						verb:              "delete",
-						code:              200,
-						user:              auditTestUser,
-						resource:          crdName,
-						requestObject:     false,
-						responseObject:    false,
-						authorizeDecision: "allow",
+						Level:             auditinternal.LevelMetadata,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/apis/%s/v1beta1/%s/setup-instance", crdNamespace, crdName),
+						Verb:              "delete",
+						Code:              200,
+						User:              auditTestUser,
+						Resource:          crdName,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "allow",
 					},
 				},
 			},
@@ -676,7 +677,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 		// test authorizer annotations, RBAC is required.
 		annotationTestCases := []struct {
 			action func()
-			events []auditEvent
+			events []utils.AuditEvent
 		}{
 
 			// get a pod with unauthorized user
@@ -685,19 +686,19 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					_, err := anonymousClient.CoreV1().Pods(namespace).Get("another-audit-pod", metav1.GetOptions{})
 					expectForbidden(err)
 				},
-				[]auditEvent{
+				[]utils.AuditEvent{
 					{
-						level:             v1beta1.LevelRequest,
-						stage:             v1beta1.StageResponseComplete,
-						requestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/another-audit-pod", namespace),
-						verb:              "get",
-						code:              403,
-						user:              auditTestUser,
-						resource:          "pods",
-						namespace:         namespace,
-						requestObject:     false,
-						responseObject:    false,
-						authorizeDecision: "forbid",
+						Level:             auditinternal.LevelRequest,
+						Stage:             auditinternal.StageResponseComplete,
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/another-audit-pod", namespace),
+						Verb:              "get",
+						Code:              403,
+						User:              auditTestUser,
+						Resource:          "pods",
+						Namespace:         namespace,
+						RequestObject:     false,
+						ResponseObject:    false,
+						AuthorizeDecision: "forbid",
 					},
 				},
 			},
@@ -706,7 +707,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 		if framework.IsRBACEnabled(f) {
 			testCases = append(testCases, annotationTestCases...)
 		}
-		expectedEvents := []auditEvent{}
+		expectedEvents := []utils.AuditEvent{}
 		for _, t := range testCases {
 			t.action()
 			expectedEvents = append(expectedEvents, t.events...)
@@ -717,96 +718,20 @@ var _ = SIGDescribe("Advanced Audit", func() {
 		pollingInterval := 30 * time.Second
 		pollingTimeout := 5 * time.Minute
 		err = wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
-			ok, err := checkAuditLines(f, expectedEvents)
+			// Fetch the log stream.
+			stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+			if err != nil {
+				return false, err
+			}
+			defer stream.Close()
+			missing, err := utils.CheckAuditLines(stream, expectedEvents, v1beta1.SchemeGroupVersion)
 			if err != nil {
 				framework.Logf("Failed to observe audit events: %v", err)
+			} else if len(missing) > 0 {
+				framework.Logf("Events %#v not found!", missing)
 			}
-			return ok, nil
+			return len(missing) == 0, nil
 		})
 		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
 	})
 })
-
-type auditEvent struct {
-	level             v1beta1.Level
-	stage             v1beta1.Stage
-	requestURI        string
-	verb              string
-	code              int32
-	user              string
-	resource          string
-	namespace         string
-	requestObject     bool
-	responseObject    bool
-	authorizeDecision string
-}
-
-// Search the audit log for the expected audit lines.
-func checkAuditLines(f *framework.Framework, expected []auditEvent) (bool, error) {
-	expectations := map[auditEvent]bool{}
-	for _, event := range expected {
-		expectations[event] = false
-	}
-
-	// Fetch the log stream.
-	stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
-	if err != nil {
-		return false, err
-	}
-	defer stream.Close()
-
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		line := scanner.Text()
-		event, err := parseAuditLine(line)
-		if err != nil {
-			return false, err
-		}
-
-		// If the event was expected, mark it as found.
-		if _, found := expectations[event]; found {
-			expectations[event] = true
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
-
-	noneMissing := true
-	for event, found := range expectations {
-		if !found {
-			framework.Logf("Event %#v not found!", event)
-		}
-		noneMissing = noneMissing && found
-	}
-	return noneMissing, nil
-}
-
-func parseAuditLine(line string) (auditEvent, error) {
-	var e v1beta1.Event
-	if err := json.Unmarshal([]byte(line), &e); err != nil {
-		return auditEvent{}, err
-	}
-	event := auditEvent{
-		level:      e.Level,
-		stage:      e.Stage,
-		requestURI: e.RequestURI,
-		verb:       e.Verb,
-		user:       e.User.Username,
-	}
-	if e.ObjectRef != nil {
-		event.namespace = e.ObjectRef.Namespace
-		event.resource = e.ObjectRef.Resource
-	}
-	if e.ResponseStatus != nil {
-		event.code = e.ResponseStatus.Code
-	}
-	if e.ResponseObject != nil {
-		event.responseObject = true
-	}
-	if e.RequestObject != nil {
-		event.requestObject = true
-	}
-	event.authorizeDecision = e.Annotations["authorization.k8s.io/decision"]
-	return event, nil
-}

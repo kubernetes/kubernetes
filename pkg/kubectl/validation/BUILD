@@ -26,8 +26,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/validation",
     visibility = ["//build/visible_to:pkg_kubectl_validation_CONSUMERS"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/github.com/exponent-io/jsonpath:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
 

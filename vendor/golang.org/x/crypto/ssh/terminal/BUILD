@@ -4,42 +4,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "terminal.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "util.go",
-            "util_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "util.go",
-            "util_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "util.go",
-            "util_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "util.go",
-            "util_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "util.go",
-            "util_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "util.go",
-            "util_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "util_plan9.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "util_solaris.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "util_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "util.go",
+        "util_bsd.go",
+        "util_linux.go",
+        "util_plan9.go",
+        "util_solaris.go",
+        "util_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/ssh/terminal",
     importpath = "golang.org/x/crypto/ssh/terminal",
     visibility = ["//visibility:public"],
     deps = select({

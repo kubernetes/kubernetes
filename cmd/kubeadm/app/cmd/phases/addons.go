@@ -19,15 +19,17 @@ package phases
 import (
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
@@ -47,7 +49,7 @@ var (
 		# Installs the CoreDNS and the kube-proxy addons components via the API server,
 		# functionally equivalent to what installed by kubeadm init. 
 
-		kubeadm alpha phase selfhosting from-staticpods
+		kubeadm alpha phase self-hosting from-staticpods
 		`)
 
 	corednsAddonsLongDesc = normalizer.LongDesc(`
@@ -74,14 +76,14 @@ func NewCmdAddon() *cobra.Command {
 }
 
 // EnsureAllAddons installs all addons to a Kubernetes cluster
-func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func EnsureAllAddons(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 
-	addonActions := []func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error{
+	addonActions := []func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error{
 		dnsaddon.EnsureDNSAddon,
 		proxyaddon.EnsureProxyAddon,
 	}
 
-	glog.V(1).Infoln("[addon] installing all addons")
+	klog.V(1).Infoln("[addon] installing all addons")
 	for _, action := range addonActions {
 		err := action(cfg, client)
 		if err != nil {
@@ -94,19 +96,20 @@ func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 
 // getAddonsSubCommands returns sub commands for addons phase
 func getAddonsSubCommands() []*cobra.Command {
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, kubeConfigFile, featureGatesString string
+	var cfgPath, featureGatesString string
 	var subCmds []*cobra.Command
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
 
 	subCmdProperties := []struct {
 		use      string
 		short    string
 		long     string
 		examples string
-		cmdFunc  func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error
+		cmdFunc  func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error
 	}{
 		{
 			use:      "all",
@@ -136,25 +139,25 @@ func getAddonsSubCommands() []*cobra.Command {
 			Short:   properties.short,
 			Long:    properties.long,
 			Example: properties.examples,
-			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath, &featureGatesString),
+			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, kubeConfigFile, &cfgPath, &featureGatesString),
 		}
 
 		// Add flags to the command
-		cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+		options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
 		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
 		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from`)
 
 		if properties.use == "all" || properties.use == "kube-proxy" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, `The IP address the API server is accessible on`)
-			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, `The port the API server is accessible on`)
+			cmd.Flags().StringVar(&cfg.LocalAPIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.LocalAPIEndpoint.AdvertiseAddress, `The IP address the API server is accessible on`)
+			cmd.Flags().Int32Var(&cfg.LocalAPIEndpoint.BindPort, "apiserver-bind-port", cfg.LocalAPIEndpoint.BindPort, `The port the API server is accessible on`)
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `The range of IP addresses used for the Pod network`)
 		}
 
 		if properties.use == "all" || properties.use == "coredns" {
 			cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, `Alternative domain for services`)
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, `The range of IP address used for service VIPs`)
-			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
+			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 				"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 		}
 		subCmds = append(subCmds, cmd)
@@ -164,7 +167,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha2.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1beta1.InitConfiguration, kubeConfigFile string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -181,9 +184,10 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 			kubeadmutil.CheckErr(err)
 		}
 
-		internalcfg := &kubeadmapi.MasterConfiguration{}
+		internalcfg := &kubeadmapi.InitConfiguration{}
 		kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
-		client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
+		kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 		kubeadmutil.CheckErr(err)
 		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)

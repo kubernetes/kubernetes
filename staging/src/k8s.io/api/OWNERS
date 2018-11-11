@@ -1,50 +1,10 @@
+# Disable inheritance as this is an api owners file
+options:
+  no_parent_owners: true
 approvers:
-- erictune
-- lavalamp
-- smarterclayton
-- thockin
-- liggitt
-# - bgrant0607 # manual escalations only
+- api-approvers
 reviewers:
-- brendandburns
-- caesarxuchao
-- davidopp
-- dchen1107
-- deads2k
-- derekwaynecarr
-- dims
-- eparis
-- erictune
-- errordeveloper
-- feiskyer
-- gmarek
-- janetkuo
-- jbeda
-- jsafrane
-- jszczepkowski
-- justinsb
-- krousey
-- lavalamp
-- liggitt
-- luxas
-- madhusudancs
-- mikedanese
-- mwielgus
-- ncdc
-- nikhiljindal
-- piosz
-- pmorie
-- pwittrock
-- roberthbailey
-- rootfs
-- saad-ali
-- smarterclayton
-- soltysh
-- sttts
-- tallclair
-- thockin
-- vishh
-- wojtek-t
-- yifan-gu
-- yujuhong
-- zmerlynn
+- api-reviewers
+labels:
+- sig/architecture
+- kind/api-change

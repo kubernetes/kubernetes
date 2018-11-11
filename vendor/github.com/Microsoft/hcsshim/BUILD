@@ -43,6 +43,7 @@ go_library(
         "zhcsshim.go",
     ],
     cgo = True,
+    importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim",
     importpath = "github.com/Microsoft/hcsshim",
     visibility = ["//visibility:public"],
     deps = [

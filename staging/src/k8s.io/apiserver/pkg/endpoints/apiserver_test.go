@@ -38,11 +38,10 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful"
-
+	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	fuzzer "k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
@@ -67,8 +67,11 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/filters"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 )
 
 type alwaysMutatingDeny struct{}
@@ -126,8 +129,8 @@ func init() {
 	scheme.AddUnversionedTypes(grouplessGroupVersion, &metav1.Status{})
 	metav1.AddToGroupVersion(scheme, grouplessGroupVersion)
 
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 func addGrouplessTypes() {
@@ -175,17 +178,17 @@ func init() {
 	addTestTypes()
 	addNewTestTypes()
 
-	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	scheme.AddFieldLabelConversionFunc(testGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(testGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	scheme.AddFieldLabelConversionFunc(newGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(newGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -411,7 +414,7 @@ func (obj *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
-func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
+func (s *SimpleStream) InputStream(_ context.Context, version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
 	s.accept = accept
 	return s, false, s.contentType, s.err
@@ -460,7 +463,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -476,7 +479,7 @@ func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {
@@ -566,15 +569,6 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
-type LegacyRESTStorage struct {
-	*SimpleRESTStorage
-}
-
-func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
-	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
-	return obj, err
-}
-
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string
@@ -645,7 +639,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -3615,6 +3609,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 }
 
 func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
+	t.Helper()
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	if err != nil {
@@ -3627,12 +3622,13 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *m
 		return nil
 	}
 	var status metav1.Status
-	if body, err := extractBody(response, &status); err != nil {
+	body, err := extractBody(response, &status)
+	if err != nil {
 		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
 		return nil
 	}
 	if code != response.StatusCode {
-		t.Fatalf("Expected %s %s to return %d, Got %d", method, url, code, response.StatusCode)
+		t.Fatalf("Expected %s %s to return %d, Got %d: %v", method, url, code, response.StatusCode, body)
 	}
 	return &status
 }
@@ -3673,10 +3669,12 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
-	// We send a 200 status code before we encode the object, so we expect OK, but there will
-	// still be an error object.  This seems ok, the alternative is to validate the object before
-	// encoding, but this really should never happen, so it's wasted compute for every API request.
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusOK)
+	// Decode error response behavior is dictated by
+	// apiserver/pkg/endpoints/handlers/responsewriters/status.go::ErrorToAPIStatus().
+	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
+	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
+	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
+	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
@@ -3869,7 +3867,9 @@ func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx conte
 	return nil, nil
 }
 
-func TestDryRun(t *testing.T) {
+func TestDryRunDisabled(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
+
 	tests := []struct {
 		path        string
 		verb        string

@@ -37,6 +37,14 @@ func (p *PackageLogger) internalLog(depth int, inLevel LogLevel, entries ...inte
 	}
 }
 
+// SetLevel allows users to change the current logging level.
+func (p *PackageLogger) SetLevel(l LogLevel) {
+	logger.Lock()
+	defer logger.Unlock()
+	p.level = l
+}
+
+// LevelAt checks if the given log level will be outputted under current setting.
 func (p *PackageLogger) LevelAt(l LogLevel) bool {
 	logger.Lock()
 	defer logger.Unlock()
@@ -77,6 +85,12 @@ func (p *PackageLogger) Panicf(format string, args ...interface{}) {
 
 func (p *PackageLogger) Panic(args ...interface{}) {
 	s := fmt.Sprint(args...)
+	p.internalLog(calldepth, CRITICAL, s)
+	panic(s)
+}
+
+func (p *PackageLogger) Panicln(args ...interface{}) {
+	s := fmt.Sprintln(args...)
 	p.internalLog(calldepth, CRITICAL, s)
 	panic(s)
 }

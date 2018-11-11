@@ -21,11 +21,11 @@ package v1
 import (
 	time "time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	example_v1 "k8s.io/code-generator/_examples/apiserver/apis/example/v1"
+	examplev1 "k8s.io/code-generator/_examples/apiserver/apis/example/v1"
 	versioned "k8s.io/code-generator/_examples/apiserver/clientset/versioned"
 	internalinterfaces "k8s.io/code-generator/_examples/apiserver/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/code-generator/_examples/apiserver/listers/example/v1"
@@ -57,20 +57,20 @@ func NewTestTypeInformer(client versioned.Interface, namespace string, resyncPer
 func NewFilteredTestTypeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.ExampleV1().TestTypes(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.ExampleV1().TestTypes(namespace).Watch(options)
 			},
 		},
-		&example_v1.TestType{},
+		&examplev1.TestType{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *testTypeInformer) defaultInformer(client versioned.Interface, resyncPer
 }
 
 func (f *testTypeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&example_v1.TestType{}, f.defaultInformer)
+	return f.factory.InformerFor(&examplev1.TestType{}, f.defaultInformer)
 }
 
 func (f *testTypeInformer) Lister() v1.TestTypeLister {

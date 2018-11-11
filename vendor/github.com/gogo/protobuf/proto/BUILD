@@ -27,6 +27,7 @@ go_library(
         "timestamp.go",
         "timestamp_gogo.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/proto",
     importpath = "github.com/gogo/protobuf/proto",
     visibility = ["//visibility:public"],
 )

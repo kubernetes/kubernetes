@@ -119,7 +119,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOp
 // Patch applies the patch and returns the patched serviceAccount.
 func (c *FakeServiceAccounts) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &core.ServiceAccount{})
+		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, pt, data, subresources...), &core.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err

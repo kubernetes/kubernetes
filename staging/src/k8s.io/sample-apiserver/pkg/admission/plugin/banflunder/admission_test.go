@@ -136,6 +136,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 				scenario.admissionInputResource,
 				"",
 				admission.Create,
+				false,
 				nil),
 			)
 

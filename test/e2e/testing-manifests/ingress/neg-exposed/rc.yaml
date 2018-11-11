@@ -1,0 +1,31 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: hostname
+  name: hostname
+spec:
+  template:
+    metadata:
+      labels:
+        run: hostname
+    spec:
+      containers:
+      - image: gcr.io/kubernetes-e2e-test-images/serve-hostname:1.1
+        name: host1
+        command:
+        - /bin/sh
+        - -c
+        - /serve_hostname -http=true -udp=false -port=8000
+        ports:
+        - protocol: TCP
+          containerPort: 8000
+      - image: gcr.io/kubernetes-e2e-test-images/serve-hostname:1.1
+        name: host2
+        command:
+        - /bin/sh
+        - -c
+        - /serve_hostname -http=true -udp=false -port=8080
+        ports:
+        - protocol: TCP
+          containerPort: 8080

@@ -17,8 +17,8 @@ limitations under the License.
 package cm
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
@@ -27,6 +27,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -35,7 +36,7 @@ type containerManagerStub struct{}
 var _ ContainerManager = &containerManagerStub{}
 
 func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
-	glog.V(2).Infof("Starting stub container manager")
+	klog.V(2).Infof("Starting stub container manager")
 	return nil
 }
 
@@ -74,6 +75,10 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 			resource.BinarySI),
 	}
 	return c
+}
+
+func (cm *containerManagerStub) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return nil
 }
 
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

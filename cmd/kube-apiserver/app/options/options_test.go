@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
@@ -40,9 +39,11 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s := NewServerRunOptions()
-	s.AddFlags(f)
+	for _, f := range s.Flags().FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	args := []string{
 		"--enable-admission-plugins=AlwaysDeny",
@@ -97,7 +98,6 @@ func TestAddFlags(t *testing.T) {
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
-		"--etcd-quorum-read=false",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
@@ -111,9 +111,9 @@ func TestAddFlags(t *testing.T) {
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
-		"--storage-backend=etcd2",
+		"--storage-backend=etcd3",
 	}
-	f.Parse(args)
+	fs.Parse(args)
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
@@ -141,11 +141,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
-				Type:       "etcd2",
-				ServerList: nil,
-				Prefix:     "/registry",
-				DeserializationCacheSize: 0,
-				Quorum:                false,
+				Type:                  "etcd3",
+				ServerList:            nil,
+				Prefix:                "/registry",
 				KeyFile:               "/var/run/kubernetes/etcd.key",
 				CAFile:                "/var/run/kubernetes/etcdca.crt",
 				CertFile:              "/var/run/kubernetes/etcdce.crt",
@@ -158,7 +156,7 @@ func TestAddFlags(t *testing.T) {
 			EnableWatchCache:        true,
 			DefaultWatchCacheSize:   100,
 		},
-		SecureServing: genericoptions.WithLoopback(&apiserveroptions.SecureServingOptions{
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindAddress: net.ParseIP("192.168.10.20"),
 			BindPort:    6443,
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -166,11 +164,12 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "apiserver",
 			},
 			HTTP2MaxStreamsPerConnection: 42,
-		}),
-		InsecureServing: &kubeoptions.InsecureServingOptions{
+			Required:                     true,
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),
 			BindPort:    8080,
-		},
+		}).WithLoopback(),
 		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         10250,
@@ -228,6 +227,7 @@ func TestAddFlags(t *testing.T) {
 						ThrottleEnable: false,
 						ThrottleQPS:    43.5,
 						ThrottleBurst:  44,
+						AsyncDelegate:  true,
 					},
 				},
 				TruncateOptions: apiserveroptions.AuditTruncateOptions{

@@ -6,13 +6,14 @@ go_library(
         "expansion_generated.go",
         "flunder.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/client/listers/wardle/v1beta1",
     importpath = "k8s.io/sample-apiserver/pkg/client/listers/wardle/v1beta1",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1:go_default_library",
     ],
 )
 

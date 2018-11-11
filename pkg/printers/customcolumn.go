@@ -28,14 +28,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
 
 // RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
-//   * metadata.name (no leading '.' or curly brances '{...}'
+//   * metadata.name (no leading '.' or curly braces '{...}'
 //   * {metadata.name} (no leading '.')
 //   * .metadata.name (no curly braces '{...}')
 //   * {.metadata.name} (complete expression)

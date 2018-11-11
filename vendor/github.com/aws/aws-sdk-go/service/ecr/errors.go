@@ -13,8 +13,8 @@ const (
 	// ErrCodeImageAlreadyExistsException for service response error code
 	// "ImageAlreadyExistsException".
 	//
-	// The specified image has already been pushed, and there are no changes to
-	// the manifest or image tag since the last push.
+	// The specified image has already been pushed, and there were no changes to
+	// the manifest or image tag after the last push.
 	ErrCodeImageAlreadyExistsException = "ImageAlreadyExistsException"
 
 	// ErrCodeImageNotFoundException for service response error code
@@ -70,13 +70,32 @@ const (
 	// for this repository.
 	ErrCodeLayersNotFoundException = "LayersNotFoundException"
 
+	// ErrCodeLifecyclePolicyNotFoundException for service response error code
+	// "LifecyclePolicyNotFoundException".
+	//
+	// The lifecycle policy could not be found, and no policy is set to the repository.
+	ErrCodeLifecyclePolicyNotFoundException = "LifecyclePolicyNotFoundException"
+
+	// ErrCodeLifecyclePolicyPreviewInProgressException for service response error code
+	// "LifecyclePolicyPreviewInProgressException".
+	//
+	// The previous lifecycle policy preview request has not completed. Please try
+	// again later.
+	ErrCodeLifecyclePolicyPreviewInProgressException = "LifecyclePolicyPreviewInProgressException"
+
+	// ErrCodeLifecyclePolicyPreviewNotFoundException for service response error code
+	// "LifecyclePolicyPreviewNotFoundException".
+	//
+	// There is no dry run for this repository.
+	ErrCodeLifecyclePolicyPreviewNotFoundException = "LifecyclePolicyPreviewNotFoundException"
+
 	// ErrCodeLimitExceededException for service response error code
 	// "LimitExceededException".
 	//
 	// The operation did not succeed because it would have exceeded a service limit
 	// for your account. For more information, see Amazon ECR Default Service Limits
 	// (http://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
-	// in the Amazon EC2 Container Registry User Guide.
+	// in the Amazon Elastic Container Registry User Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 
 	// ErrCodeRepositoryAlreadyExistsException for service response error code

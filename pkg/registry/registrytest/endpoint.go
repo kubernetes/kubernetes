@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -38,7 +39,7 @@ type EndpointRegistry struct {
 	lock sync.Mutex
 }
 
-func (e *EndpointRegistry) ListEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error) {
+func (e *EndpointRegistry) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -46,7 +47,14 @@ func (e *EndpointRegistry) ListEndpoints(ctx context.Context, options *metainter
 	return e.Endpoints, e.Err
 }
 
-func (e *EndpointRegistry) GetEndpoints(ctx context.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
+func (e *EndpointRegistry) New() runtime.Object {
+	return &api.Endpoints{}
+}
+func (e *EndpointRegistry) NewList() runtime.Object {
+	return &api.EndpointsList{}
+}
+
+func (e *EndpointRegistry) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -63,11 +71,20 @@ func (e *EndpointRegistry) GetEndpoints(ctx context.Context, name string, option
 	return nil, errors.NewNotFound(api.Resource("endpoints"), name)
 }
 
-func (e *EndpointRegistry) WatchEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (e *EndpointRegistry) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }
 
-func (e *EndpointRegistry) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (e *EndpointRegistry) Create(ctx context.Context, endpoints runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	return nil, fmt.Errorf("unimplemented!")
+}
+
+func (e *EndpointRegistry) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreateOnUpdate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	obj, err := objInfo.UpdatedObject(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	endpoints := obj.(*api.Endpoints)
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -75,7 +92,7 @@ func (e *EndpointRegistry) UpdateEndpoints(ctx context.Context, endpoints *api.E
 	e.Updates = append(e.Updates, *endpoints)
 
 	if e.Err != nil {
-		return e.Err
+		return nil, false, e.Err
 	}
 	if e.Endpoints == nil {
 		e.Endpoints = &api.EndpointsList{
@@ -83,7 +100,7 @@ func (e *EndpointRegistry) UpdateEndpoints(ctx context.Context, endpoints *api.E
 				*endpoints,
 			},
 		}
-		return nil
+		return endpoints, false, nil
 	}
 	for ix := range e.Endpoints.Items {
 		if e.Endpoints.Items[ix].Name == endpoints.Name {
@@ -91,15 +108,15 @@ func (e *EndpointRegistry) UpdateEndpoints(ctx context.Context, endpoints *api.E
 		}
 	}
 	e.Endpoints.Items = append(e.Endpoints.Items, *endpoints)
-	return nil
+	return endpoints, false, nil
 }
 
-func (e *EndpointRegistry) DeleteEndpoints(ctx context.Context, name string) error {
+func (e *EndpointRegistry) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.Err != nil {
-		return e.Err
+		return nil, false, e.Err
 	}
 	if e.Endpoints != nil {
 		var newList []api.Endpoints
@@ -110,5 +127,9 @@ func (e *EndpointRegistry) DeleteEndpoints(ctx context.Context, name string) err
 		}
 		e.Endpoints.Items = newList
 	}
-	return nil
+	return nil, true, nil
+}
+
+func (e *EndpointRegistry) DeleteCollection(ctx context.Context, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
+	return nil, fmt.Errorf("unimplemented!")
 }

@@ -21,8 +21,8 @@ package v1
 import (
 	time "time"
 
-	batch_v1 "k8s.io/api/batch/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -57,20 +57,20 @@ func NewJobInformer(client kubernetes.Interface, namespace string, resyncPeriod 
 func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.BatchV1().Jobs(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.BatchV1().Jobs(namespace).Watch(options)
 			},
 		},
-		&batch_v1.Job{},
+		&batchv1.Job{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *jobInformer) defaultInformer(client kubernetes.Interface, resyncPeriod 
 }
 
 func (f *jobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&batch_v1.Job{}, f.defaultInformer)
+	return f.factory.InformerFor(&batchv1.Job{}, f.defaultInformer)
 }
 
 func (f *jobInformer) Lister() v1.JobLister {

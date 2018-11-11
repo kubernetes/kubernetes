@@ -93,13 +93,11 @@ def file_passes(filename, refs, regexs):
     else:
         ref = refs[basename]
 
-    # remove build tags from the top of Go files
-    if extension == "go" or extension =="generatego":
+    # remove extra content from the top of files
+    if extension == "go" or extension == "generatego":
         p = regexs["go_build_constraints"]
         (data, found) = p.subn("", data, 1)
-
-    # remove shebang from the top of shell files
-    if extension == "sh":
+    elif extension == "sh":
         p = regexs["shebang"]
         (data, found) = p.subn("", data, 1)
 
@@ -149,7 +147,7 @@ def file_extension(filename):
 
 skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
-                "pkg/generated/bindata.go"]
+                "pkg/kubectl/generated/bindata.go"]
 
 # list all the files contain 'DO NOT EDIT', but are not generated
 skipped_ungenerated_files = ['hack/build-ui.sh', 'hack/lib/swagger.sh',

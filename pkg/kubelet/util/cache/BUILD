@@ -10,7 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = ["object_cache.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/util/cache",
-    deps = ["//vendor/k8s.io/client-go/tools/cache:go_default_library"],
+    deps = ["//staging/src/k8s.io/client-go/tools/cache:go_default_library"],
 )
 
 go_test(
@@ -18,8 +18,8 @@ go_test(
     srcs = ["object_cache_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

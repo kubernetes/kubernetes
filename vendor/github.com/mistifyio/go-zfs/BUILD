@@ -8,6 +8,7 @@ go_library(
         "zfs.go",
         "zpool.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/mistifyio/go-zfs",
     importpath = "github.com/mistifyio/go-zfs",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/pborman/uuid:go_default_library"],

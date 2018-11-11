@@ -4,8 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "base.go",
+        "doc.go",
+        "metrics.go",
         "peer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/etcdhttp",
     importpath = "github.com/coreos/etcd/etcdserver/api/etcdhttp",
     visibility = ["//visibility:public"],
     deps = [
@@ -21,7 +24,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/version:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
     ],
 )
 

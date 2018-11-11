@@ -37,10 +37,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admission"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/auditregistration"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -52,15 +54,17 @@ import (
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
+	// Initialize install packages
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	_ "k8s.io/kubernetes/pkg/apis/auditregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
+	_ "k8s.io/kubernetes/pkg/apis/coordination/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/events/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
@@ -73,6 +77,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
+// Variables to store GroupName
 var (
 	Groups      = make(map[string]TestGroup)
 	Default     TestGroup
@@ -89,6 +94,7 @@ var (
 	storageSerializer runtime.SerializerInfo
 )
 
+// TestGroup contains GroupVersion to uniquely identify the API
 type TestGroup struct {
 	externalGroupVersion schema.GroupVersion
 }
@@ -257,6 +263,18 @@ func init() {
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
+	if _, ok := Groups[coordination.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: coordination.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(coordination.GroupName)[0].Version}
+		Groups[coordination.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
+	if _, ok := Groups[auditregistration.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: auditregistration.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(auditregistration.GroupName)[0].Version}
+		Groups[auditregistration.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
 
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
@@ -269,6 +287,7 @@ func init() {
 	Admission = Groups[admission.GroupName]
 }
 
+// GroupVersion makes copy of schema.GroupVersion
 func (g TestGroup) GroupVersion() *schema.GroupVersion {
 	copyOfGroupVersion := g.externalGroupVersion
 	return &copyOfGroupVersion
@@ -283,6 +302,7 @@ func (g TestGroup) Codec() runtime.Codec {
 	return legacyscheme.Codecs.CodecForVersions(serializer.Serializer, legacyscheme.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
+// StorageMediaType finds media type set by KUBE_TEST_API_STORAGE_TYPE env var used to store objects in storage
 func StorageMediaType() string {
 	return os.Getenv("KUBE_TEST_API_STORAGE_TYPE")
 }
@@ -315,14 +335,13 @@ func (g TestGroup) SelfLink(resource, name string) string {
 			return fmt.Sprintf("/api/%s/%s", g.externalGroupVersion.Version, resource)
 		}
 		return fmt.Sprintf("/api/%s/%s/%s", g.externalGroupVersion.Version, resource, name)
-	} else {
-		// TODO: will need a /apis prefix once we have proper multi-group
-		// support
-		if name == "" {
-			return fmt.Sprintf("/apis/%s/%s/%s", g.externalGroupVersion.Group, g.externalGroupVersion.Version, resource)
-		}
-		return fmt.Sprintf("/apis/%s/%s/%s/%s", g.externalGroupVersion.Group, g.externalGroupVersion.Version, resource, name)
 	}
+	// TODO: will need a /apis prefix once we have proper multi-group
+	// support
+	if name == "" {
+		return fmt.Sprintf("/apis/%s/%s/%s", g.externalGroupVersion.Group, g.externalGroupVersion.Version, resource)
+	}
+	return fmt.Sprintf("/apis/%s/%s/%s/%s", g.externalGroupVersion.Group, g.externalGroupVersion.Version, resource, name)
 }
 
 // ResourcePathWithPrefix returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.

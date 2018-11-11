@@ -23,16 +23,18 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"io/ioutil"
+	"os"
+
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"os"
 )
 
 type mockState struct {
@@ -139,40 +141,56 @@ func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 }
 
 func TestCPUManagerAdd(t *testing.T) {
+	testPolicy := NewStaticPolicy(
+		&topology.CPUTopology{
+			NumCPUs:    4,
+			NumSockets: 1,
+			NumCores:   4,
+			CPUDetails: map[int]topology.CPUInfo{
+				0: {CoreID: 0, SocketID: 0},
+				1: {CoreID: 1, SocketID: 0},
+				2: {CoreID: 2, SocketID: 0},
+				3: {CoreID: 3, SocketID: 0},
+			},
+		}, 0)
 	testCases := []struct {
 		description string
-		regErr      error
 		updateErr   error
+		policy      Policy
+		expCPUSet   cpuset.CPUSet
 		expErr      error
 	}{
 		{
 			description: "cpu manager add - no error",
-			regErr:      nil,
 			updateErr:   nil,
+			policy:      testPolicy,
+			expCPUSet:   cpuset.NewCPUSet(3, 4),
 			expErr:      nil,
 		},
 		{
 			description: "cpu manager add - policy add container error",
-			regErr:      fmt.Errorf("fake reg error"),
 			updateErr:   nil,
-			expErr:      fmt.Errorf("fake reg error"),
+			policy: &mockPolicy{
+				err: fmt.Errorf("fake reg error"),
+			},
+			expCPUSet: cpuset.NewCPUSet(1, 2, 3, 4),
+			expErr:    fmt.Errorf("fake reg error"),
 		},
 		{
 			description: "cpu manager add - container update error",
-			regErr:      nil,
 			updateErr:   fmt.Errorf("fake update error"),
-			expErr:      nil,
+			policy:      testPolicy,
+			expCPUSet:   cpuset.NewCPUSet(1, 2, 3, 4),
+			expErr:      fmt.Errorf("fake update error"),
 		},
 	}
 
 	for _, testCase := range testCases {
 		mgr := &manager{
-			policy: &mockPolicy{
-				err: testCase.regErr,
-			},
+			policy: testCase.policy,
 			state: &mockState{
 				assignments:   state.ContainerCPUAssignments{},
-				defaultCPUSet: cpuset.NewCPUSet(),
+				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4),
 			},
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
@@ -181,12 +199,16 @@ func TestCPUManagerAdd(t *testing.T) {
 			podStatusProvider: mockPodStatusProvider{},
 		}
 
-		pod := makePod("1000", "1000")
+		pod := makePod("2", "2")
 		container := &pod.Spec.Containers[0]
 		err := mgr.AddContainer(pod, container, "fakeID")
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
+		}
+		if !testCase.expCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
+			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
+				testCase.description, testCase.expCPUSet, mgr.state.GetDefaultCPUSet())
 		}
 	}
 }
@@ -199,7 +221,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 		isTopologyBroken           bool
 		expectedPolicy             string
 		expectedError              error
-		skipIfPermissionsError     bool
 	}{
 		{
 			description:                "set none policy",
@@ -218,7 +239,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(3, resource.DecimalSI)},
 			expectedPolicy:             "static",
-			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - broken topology",
@@ -226,21 +246,18 @@ func TestCPUManagerGenerate(t *testing.T) {
 			nodeAllocatableReservation: v1.ResourceList{},
 			isTopologyBroken:           true,
 			expectedError:              fmt.Errorf("could not detect number of cpus"),
-			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - broken reservation",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{},
 			expectedError:              fmt.Errorf("unable to determine reserved CPU resources for static policy"),
-			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - no CPU resources",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(0, resource.DecimalSI)},
 			expectedError:              fmt.Errorf("the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero"),
-			skipIfPermissionsError:     true,
 		},
 	}
 

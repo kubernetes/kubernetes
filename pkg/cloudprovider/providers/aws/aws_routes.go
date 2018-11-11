@@ -22,8 +22,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/klog"
+
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func (c *Cloud) findRouteTable(clusterName string) (*ec2.RouteTable, error) {
@@ -116,7 +117,7 @@ func (c *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpro
 				route.TargetNode = mapInstanceToNodeName(instance)
 				routes = append(routes, route)
 			} else {
-				glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
+				klog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
 			}
 		}
 	}
@@ -171,7 +172,7 @@ func (c *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 	}
 
 	if deleteRoute != nil {
-		glog.Infof("deleting blackholed route: %s", aws.StringValue(deleteRoute.DestinationCidrBlock))
+		klog.Infof("deleting blackholed route: %s", aws.StringValue(deleteRoute.DestinationCidrBlock))
 
 		request := &ec2.DeleteRouteInput{}
 		request.DestinationCidrBlock = deleteRoute.DestinationCidrBlock

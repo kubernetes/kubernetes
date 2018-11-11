@@ -24,6 +24,8 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
@@ -32,14 +34,15 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
-var (
-	// The short keepalive timeout and interval have been chosen to aggressively
-	// detect a failed etcd server without introducing much overhead.
-	keepaliveTime    = 30 * time.Second
-	keepaliveTimeout = 10 * time.Second
-	// dialTimeout is the timeout for failing to establish a connection.
-	dialTimeout = 10 * time.Second
-)
+// The short keepalive timeout and interval have been chosen to aggressively
+// detect a failed etcd server without introducing much overhead.
+const keepaliveTime = 30 * time.Second
+const keepaliveTimeout = 10 * time.Second
+
+// dialTimeout is the timeout for failing to establish a connection.
+// It is set to 20 seconds as times shorter than that will cause TLS connections to fail
+// on heavily loaded arm64 CPUs (issue #64649)
+const dialTimeout = 20 * time.Second
 
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
@@ -94,11 +97,15 @@ func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
-		Endpoints:            c.ServerList,
-		TLS:                  tlsConfig,
+		DialOptions: []grpc.DialOption{
+			grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
+			grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
+		},
+		Endpoints: c.ServerList,
+		TLS:       tlsConfig,
 	}
-	client, err := clientv3.New(cfg)
-	return client, err
+
+	return clientv3.New(cfg)
 }
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
@@ -116,8 +123,5 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	if c.Quorum {
-		return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
-	}
-	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }

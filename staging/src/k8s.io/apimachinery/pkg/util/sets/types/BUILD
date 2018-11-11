@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["types.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/sets/types",
     importpath = "k8s.io/apimachinery/pkg/util/sets/types",
 )
 

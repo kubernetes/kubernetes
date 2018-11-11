@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -47,6 +47,7 @@ var masterNodes sets.String
 
 type pausePodConfig struct {
 	Name                              string
+	Namespace                         string
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
@@ -55,6 +56,7 @@ type pausePodConfig struct {
 	Ports                             []v1.ContainerPort
 	OwnerReferences                   []metav1.OwnerReference
 	PriorityClassName                 string
+	DeletionGracePeriodSeconds        *int64
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -218,9 +220,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// 4. Create another pod with no affinity to any node that need 50% of the largest node CPU.
 	// 5. Make sure this additional pod is not scheduled.
 	/*
-		    Testname: scheduler-resource-limits
-		    Description: Ensure that scheduler accounts node resources correctly
-			and respects pods' resource requirements during scheduling.
+		Release : v1.9
+		Testname: Scheduler, resource limits
+		Description: Scheduling Pods MUST fail if the resource limits exceed Machine capacity.
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
 		framework.WaitForStableCluster(cs, masterNodes)
@@ -324,9 +326,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// nonempty Selector set.
 	/*
-		    Testname: scheduler-node-selector-not-matching
-		    Description: Ensure that scheduler respects the NodeSelector field of
-			PodSpec during scheduling (when it does not match any node).
+		Release : v1.9
+		Testname: Scheduler, node selector not matching
+		Description: Create a Pod with a NodeSelector set to a value that does not match a node in the cluster. Since there are no nodes matching the criteria the Pod MUST not be scheduled.
 	*/
 	framework.ConformanceIt("validates that NodeSelector is respected if not matching ", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
@@ -347,9 +349,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	/*
-		    Testname: scheduler-node-selector-matching
-		    Description: Ensure that scheduler respects the NodeSelector field
-			of PodSpec during scheduling (when it matches).
+		Release : v1.9
+		Testname: Scheduler, node selector matching
+		Description: Create a label on the node {k: v}. Then create a Pod with a NodeSelector set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches then Pod MUST be scheduled on that node.
 	*/
 	framework.ConformanceIt("validates that NodeSelector is respected if matching ", func() {
 		nodeName := GetNodeThatCanRunPod(f)
@@ -602,9 +604,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 })
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
+	var gracePeriod = int64(1)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            conf.Name,
+			Namespace:       conf.Namespace,
 			Labels:          conf.Labels,
 			Annotations:     conf.Annotations,
 			OwnerReferences: conf.OwnerReferences,
@@ -619,19 +623,27 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 					Ports: conf.Ports,
 				},
 			},
-			Tolerations:       conf.Tolerations,
-			NodeName:          conf.NodeName,
-			PriorityClassName: conf.PriorityClassName,
+			Tolerations:                   conf.Tolerations,
+			NodeName:                      conf.NodeName,
+			PriorityClassName:             conf.PriorityClassName,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
 	}
+	if conf.DeletionGracePeriodSeconds != nil {
+		pod.ObjectMeta.DeletionGracePeriodSeconds = conf.DeletionGracePeriodSeconds
+	}
 	return pod
 }
 
 func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
+	namespace := conf.Namespace
+	if len(namespace) == 0 {
+		namespace = f.Namespace.Name
+	}
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(initPausePod(f, conf))
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -639,7 +651,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(conf.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }

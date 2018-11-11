@@ -94,7 +94,7 @@ func (p *Parser) consumeText() string {
 
 // next returns the next rune in the input.
 func (p *Parser) next() rune {
-	if int(p.pos) >= len(p.input) {
+	if p.pos >= len(p.input) {
 		p.width = 0
 		return eof
 	}
@@ -266,7 +266,7 @@ Loop:
 		}
 	}
 	text := p.consumeText()
-	text = string(text[1 : len(text)-1])
+	text = text[1 : len(text)-1]
 	if text == "*" {
 		text = ":"
 	}
@@ -373,7 +373,7 @@ Loop:
 	}
 	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
 	text := p.consumeText()
-	text = string(text[:len(text)-2])
+	text = text[:len(text)-2]
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
 		parser, err := parseAction("text", text)

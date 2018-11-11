@@ -18,8 +18,12 @@ package etcd
 
 import (
 	"context"
+	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metatable "k8s.io/apimachinery/pkg/api/meta/table"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -53,6 +57,60 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 	return &REST{store}
 }
 
+var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
+
+func (c *REST) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	table := &metav1beta1.Table{
+		ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
+			{Name: "Service", Type: "string", Description: "The reference to the service that hosts this API endpoint."},
+			{Name: "Available", Type: "string", Description: "Whether this service is available."},
+			{Name: "Age", Type: "string", Description: swaggerMetadataDescriptions["creationTimestamp"]},
+		},
+	}
+	if m, err := meta.ListAccessor(obj); err == nil {
+		table.ResourceVersion = m.GetResourceVersion()
+		table.SelfLink = m.GetSelfLink()
+		table.Continue = m.GetContinue()
+	} else {
+		if m, err := meta.CommonAccessor(obj); err == nil {
+			table.ResourceVersion = m.GetResourceVersion()
+			table.SelfLink = m.GetSelfLink()
+		}
+	}
+
+	var err error
+	table.Rows, err = metatable.MetaToTableRow(obj, func(obj runtime.Object, m metav1.Object, name, age string) ([]interface{}, error) {
+		svc := obj.(*apiregistration.APIService)
+		service := "Local"
+		if svc.Spec.Service != nil {
+			service = fmt.Sprintf("%s/%s", svc.Spec.Service.Namespace, svc.Spec.Service.Name)
+		}
+		status := string(apiregistration.ConditionUnknown)
+		if condition := getCondition(svc.Status.Conditions, "Available"); condition != nil {
+			switch {
+			case condition.Status == apiregistration.ConditionTrue:
+				status = string(condition.Status)
+			case len(condition.Reason) > 0:
+				status = fmt.Sprintf("%s (%s)", condition.Status, condition.Reason)
+			default:
+				status = string(condition.Status)
+			}
+		}
+		return []interface{}{name, service, status, age}, nil
+	})
+	return table, err
+}
+
+func getCondition(conditions []apiregistration.APIServiceCondition, conditionType apiregistration.APIServiceConditionType) *apiregistration.APIServiceCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
 // NewStatusREST makes a RESTStorage for status that has more limited options.
 // It is based on the original REST so that we can share the same underlying store
 func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
@@ -79,6 +137,8 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }

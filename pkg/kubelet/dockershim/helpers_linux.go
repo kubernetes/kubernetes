@@ -120,7 +120,7 @@ func (ds *dockerService) updateCreateConfig(
 		if err := applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, createConfig.HostConfig, securityOptSep); err != nil {
 			return fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
 		}
-		modifyContainerPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, createConfig.HostConfig, podSandboxID)
+		modifyContainerPIDNamespaceOverrides(apiVersion, createConfig.HostConfig, podSandboxID)
 	}
 
 	// Apply cgroupsParent derived from the sandbox config.

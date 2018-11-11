@@ -18,6 +18,7 @@ tags:
   - misc
 series:
   - xenial
+  - bionic
 subordinate: false
 requires:
   kube-api-endpoint:
@@ -35,6 +36,10 @@ requires:
     interface: gcp-integration
   openstack:
     interface: openstack-integration
+  vsphere:
+    interface: vsphere-integration
+  azure:
+    interface: azure-integration
   nfs:
     interface: mount
 provides:

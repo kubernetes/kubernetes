@@ -18,63 +18,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
-SCRIPT_BASE=${SCRIPT_ROOT}/../..
-CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo k8s.io/code-generator)}
+SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
-if LANG=C sed --help 2>&1 | grep -q GNU; then
-  SED="sed"
-elif which gsed &>/dev/null; then
-  SED="gsed"
-else
-  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
-  exit 1
-fi
-
-# Register function to be called on EXIT to remove generated binary.
-function cleanup {
-  rm -f "${CLIENTGEN:-}"
-  rm -f "${listergen:-}"
-  rm -f "${informergen:-}"
-}
-trap cleanup EXIT
-
-echo "Building client-gen"
-CLIENTGEN="${PWD}/client-gen"
-go build -o "${CLIENTGEN}" ${CODEGEN_PKG}/cmd/client-gen
-
-PREFIX=k8s.io/apiextensions-apiserver/pkg/apis
-INPUT_BASE="--input-base ${PREFIX}"
-INPUT_APIS=(
-apiextensions/
-apiextensions/v1beta1
-)
-INPUT="--input ${INPUT_APIS[@]}"
-CLIENTSET_PATH="--output-package k8s.io/apiextensions-apiserver/pkg/client/clientset"
-
-${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} --output-base ${SCRIPT_BASE}
-${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiextensions/v1beta1 ${CLIENTSET_PATH}  --output-base ${SCRIPT_BASE} --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
-
-
-echo "Building lister-gen"
-listergen="${PWD}/lister-gen"
-go build -o "${listergen}" ${CODEGEN_PKG}/cmd/lister-gen
-
-LISTER_INPUT="--input-dirs k8s.io/apiextensions-apiserver/pkg/apis/apiextensions --input-dirs k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-LISTER_PATH="--output-package k8s.io/apiextensions-apiserver/pkg/client/listers"
-${listergen} ${LISTER_INPUT} ${LISTER_PATH} --output-base ${SCRIPT_BASE} --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
-
-
-echo "Building informer-gen"
-informergen="${PWD}/informer-gen"
-go build -o "${informergen}" ${CODEGEN_PKG}/cmd/informer-gen
-
-${informergen} \
-  --output-base ${SCRIPT_BASE} \
-  --input-dirs k8s.io/apiextensions-apiserver/pkg/apis/apiextensions --input-dirs k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1 \
-  --versioned-clientset-package k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset \
-  --internal-clientset-package k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset \
-  --listers-package k8s.io/apiextensions-apiserver/pkg/client/listers \
-  --output-package k8s.io/apiextensions-apiserver/pkg/client/informers \
+# generate the code with:
+# --output-base    because this script should also be able to run inside the vendor dir of
+#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
+#                  instead of the $GOPATH directly. For normal projects this can be dropped.
+CLIENTSET_NAME_VERSIONED=clientset \
+CLIENTSET_NAME_INTERNAL=internalclientset \
+${CODEGEN_PKG}/generate-internal-groups.sh all \
+  k8s.io/apiextensions-apiserver/pkg/client k8s.io/apiextensions-apiserver/pkg/apis k8s.io/apiextensions-apiserver/pkg/apis \
+  "apiextensions:v1beta1" \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.." \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
-  "$@"

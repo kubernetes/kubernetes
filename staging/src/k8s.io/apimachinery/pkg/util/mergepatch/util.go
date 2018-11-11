@@ -21,7 +21,7 @@ import (
 	"reflect"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 // PreconditionFunc asserts that an incompatible change is not present within a patch.
@@ -125,7 +125,7 @@ func HasConflicts(left, right interface{}) (bool, error) {
 		default:
 			return true, nil
 		}
-	case string, float64, bool, int, int64, nil:
+	case string, float64, bool, int64, nil:
 		return !reflect.DeepEqual(left, right), nil
 	default:
 		return true, fmt.Errorf("unknown type: %v", reflect.TypeOf(left))

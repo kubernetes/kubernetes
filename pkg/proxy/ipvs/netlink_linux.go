@@ -105,8 +105,25 @@ func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
 	return h.LinkDel(dummy)
 }
 
+// ListBindAddress will list all IP addresses which are bound in a given interface
+func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
+	dev, err := h.LinkByName(devName)
+	if err != nil {
+		return nil, fmt.Errorf("error get interface: %s, err: %v", devName, err)
+	}
+	addrs, err := h.AddrList(dev, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error list bound address of interface: %s, err: %v", devName, err)
+	}
+	var ips []string
+	for _, addr := range addrs {
+		ips = append(ips, addr.IP.String())
+	}
+	return ips, nil
+}
+
 // GetLocalAddresses lists all LOCAL type IP addresses from host based on filter device.
-// If filter device is not specified, it's equivalent to exec:
+// If dev is not specified, it's equivalent to exec:
 // $ ip route show table local type local proto kernel
 // 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
 // 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
@@ -119,20 +136,28 @@ func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
 // Then cut the unique src IP fields,
 // --> result set: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 192.168.122.1]
 
-// If filter device is specified, it's equivalent to exec:
+// If dev is specified, it's equivalent to exec:
 // $ ip route show table local type local proto kernel dev kube-ipvs0
 // 10.0.0.1  scope host  src 10.0.0.1
 // 10.0.0.10  scope host  src 10.0.0.10
 // Then cut the unique src IP fields,
 // --> result set: [10.0.0.1, 10.0.0.10]
-func (h *netlinkHandle) GetLocalAddresses(filterDev string) (sets.String, error) {
-	linkIndex := -1
-	if len(filterDev) != 0 {
+
+// If filterDev is specified, the result will discard route of specified device and cut src from other routes.
+func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
+	chosenLinkIndex, filterLinkIndex := -1, -1
+	if dev != "" {
+		link, err := h.LinkByName(dev)
+		if err != nil {
+			return nil, fmt.Errorf("error get device %s, err: %v", filterDev, err)
+		}
+		chosenLinkIndex = link.Attrs().Index
+	} else if filterDev != "" {
 		link, err := h.LinkByName(filterDev)
 		if err != nil {
 			return nil, fmt.Errorf("error get filter device %s, err: %v", filterDev, err)
 		}
-		linkIndex = link.Attrs().Index
+		filterLinkIndex = link.Attrs().Index
 	}
 
 	routeFilter := &netlink.Route{
@@ -142,18 +167,20 @@ func (h *netlinkHandle) GetLocalAddresses(filterDev string) (sets.String, error)
 	}
 	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
 
-	// find filter device
-	if linkIndex != -1 {
-		routeFilter.LinkIndex = linkIndex
+	// find chosen device
+	if chosenLinkIndex != -1 {
+		routeFilter.LinkIndex = chosenLinkIndex
 		filterMask |= netlink.RT_FILTER_OIF
 	}
-
 	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
 	if err != nil {
 		return nil, fmt.Errorf("error list route table, err: %v", err)
 	}
 	res := sets.NewString()
 	for _, route := range routes {
+		if route.LinkIndex == filterLinkIndex {
+			continue
+		}
 		if route.Src != nil {
 			res.Insert(route.Src.String())
 		}

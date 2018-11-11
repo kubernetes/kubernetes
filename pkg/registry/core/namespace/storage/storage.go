@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
@@ -100,12 +101,12 @@ func (r *REST) List(ctx context.Context, options *metainternalversion.ListOption
 	return r.store.List(ctx, options)
 }
 
-func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
-	return r.store.Create(ctx, obj, createValidation, includeUninitialized)
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	return r.store.Create(ctx, obj, createValidation, options)
 }
 
-func (r *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
 }
 
 func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -190,6 +191,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 				}
 				return existingNamespace, nil
 			}),
+			dryrun.IsDryRun(options.DryRun),
 		)
 
 		if err != nil {
@@ -234,8 +236,10 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
 func (r *FinalizeREST) New() runtime.Object {
@@ -243,6 +247,8 @@ func (r *FinalizeREST) New() runtime.Object {
 }
 
 // Update alters the status finalizers subset of an object.
-func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }

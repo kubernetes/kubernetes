@@ -23,7 +23,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -86,14 +86,14 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	if !filepath.IsAbs(mapPath) {
 		return fmt.Errorf("The map path should be absolute: map path: %s", mapPath)
 	}
-	glog.V(5).Infof("MapDevice: devicePath %s", devicePath)
-	glog.V(5).Infof("MapDevice: mapPath %s", mapPath)
-	glog.V(5).Infof("MapDevice: linkName %s", linkName)
+	klog.V(5).Infof("MapDevice: devicePath %s", devicePath)
+	klog.V(5).Infof("MapDevice: mapPath %s", mapPath)
+	klog.V(5).Infof("MapDevice: linkName %s", linkName)
 
 	// Check and create mapPath
 	_, err := os.Stat(mapPath)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate map path: %s", mapPath)
+		klog.Errorf("cannot validate map path: %s", mapPath)
 		return err
 	}
 	if err = os.MkdirAll(mapPath, 0750); err != nil {
@@ -115,15 +115,15 @@ func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
 	if len(mapPath) == 0 {
 		return fmt.Errorf("Failed to unmap device from map path. mapPath is empty")
 	}
-	glog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
-	glog.V(5).Infof("UnmapDevice: linkName %s", linkName)
+	klog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
+	klog.V(5).Infof("UnmapDevice: linkName %s", linkName)
 
 	// Check symbolic link exists
 	linkPath := path.Join(mapPath, string(linkName))
 	if islinkExist, checkErr := v.IsSymlinkExist(linkPath); checkErr != nil {
 		return checkErr
 	} else if !islinkExist {
-		glog.Warningf("Warning: Unmap skipped because symlink does not exist on the path: %v", linkPath)
+		klog.Warningf("Warning: Unmap skipped because symlink does not exist on the path: %v", linkPath)
 		return nil
 	}
 	err := os.Remove(linkPath)
@@ -135,7 +135,7 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 	if len(mapPath) == 0 {
 		return fmt.Errorf("Failed to remove map path. mapPath is empty")
 	}
-	glog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
+	klog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
 	err := os.RemoveAll(mapPath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -180,12 +180,12 @@ func (v VolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) 
 		if err != nil {
 			return nil, fmt.Errorf("Symbolic link cannot be retrieved %v", err)
 		}
-		glog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", filepath, devPath)
+		klog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", filepath, devPath)
 		if filepath == devPath {
 			refs = append(refs, path.Join(mapPath, filename))
 		}
 	}
-	glog.V(5).Infof("GetDeviceSymlinkRefs: refs %v", refs)
+	klog.V(5).Infof("GetDeviceSymlinkRefs: refs %v", refs)
 	return refs, nil
 }
 
@@ -201,7 +201,7 @@ func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath strin
 			return err
 		}
 		if (fi.Mode()&os.ModeSymlink == os.ModeSymlink) && (fi.Name() == string(podUID)) {
-			glog.V(5).Infof("FindGlobalMapPathFromPod: path %s, mapPath %s", path, mapPath)
+			klog.V(5).Infof("FindGlobalMapPathFromPod: path %s, mapPath %s", path, mapPath)
 			if res, err := compareSymlinks(path, mapPath); err == nil && res {
 				globalMapPathUUID = path
 			}
@@ -211,7 +211,7 @@ func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath strin
 	if err != nil {
 		return "", err
 	}
-	glog.V(5).Infof("FindGlobalMapPathFromPod: globalMapPathUUID %s", globalMapPathUUID)
+	klog.V(5).Infof("FindGlobalMapPathFromPod: globalMapPathUUID %s", globalMapPathUUID)
 	// Return path contains global map path + {pod uuid}
 	return globalMapPathUUID, nil
 }
@@ -225,7 +225,7 @@ func compareSymlinks(global, pod string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	glog.V(5).Infof("CompareSymlinks: devGloBal %s, devPod %s", devGlobal, devPod)
+	klog.V(5).Infof("CompareSymlinks: devGloBal %s, devPod %s", devGlobal, devPod)
 	if devGlobal == devPod {
 		return true, nil
 	}

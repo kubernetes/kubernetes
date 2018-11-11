@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,7 +30,7 @@ func (in *AggregationRule) DeepCopyInto(out *AggregationRule) {
 	*out = *in
 	if in.ClusterRoleSelectors != nil {
 		in, out := &in.ClusterRoleSelectors, &out.ClusterRoleSelectors
-		*out = make([]meta_v1.LabelSelector, len(*in))
+		*out = make([]metav1.LabelSelector, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

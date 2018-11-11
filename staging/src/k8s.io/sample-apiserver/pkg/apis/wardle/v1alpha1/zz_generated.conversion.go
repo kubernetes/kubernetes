@@ -34,21 +34,78 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_Fischer_To_wardle_Fischer,
-		Convert_wardle_Fischer_To_v1alpha1_Fischer,
-		Convert_v1alpha1_FischerList_To_wardle_FischerList,
-		Convert_wardle_FischerList_To_v1alpha1_FischerList,
-		Convert_v1alpha1_Flunder_To_wardle_Flunder,
-		Convert_wardle_Flunder_To_v1alpha1_Flunder,
-		Convert_v1alpha1_FlunderList_To_wardle_FlunderList,
-		Convert_wardle_FlunderList_To_v1alpha1_FlunderList,
-		Convert_v1alpha1_FlunderSpec_To_wardle_FlunderSpec,
-		Convert_wardle_FlunderSpec_To_v1alpha1_FlunderSpec,
-		Convert_v1alpha1_FlunderStatus_To_wardle_FlunderStatus,
-		Convert_wardle_FlunderStatus_To_v1alpha1_FlunderStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Fischer)(nil), (*wardle.Fischer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Fischer_To_wardle_Fischer(a.(*Fischer), b.(*wardle.Fischer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*wardle.Fischer)(nil), (*Fischer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_Fischer_To_v1alpha1_Fischer(a.(*wardle.Fischer), b.(*Fischer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*FischerList)(nil), (*wardle.FischerList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_FischerList_To_wardle_FischerList(a.(*FischerList), b.(*wardle.FischerList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*wardle.FischerList)(nil), (*FischerList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_FischerList_To_v1alpha1_FischerList(a.(*wardle.FischerList), b.(*FischerList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*Flunder)(nil), (*wardle.Flunder)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Flunder_To_wardle_Flunder(a.(*Flunder), b.(*wardle.Flunder), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*wardle.Flunder)(nil), (*Flunder)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_Flunder_To_v1alpha1_Flunder(a.(*wardle.Flunder), b.(*Flunder), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*FlunderList)(nil), (*wardle.FlunderList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_FlunderList_To_wardle_FlunderList(a.(*FlunderList), b.(*wardle.FlunderList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*wardle.FlunderList)(nil), (*FlunderList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_FlunderList_To_v1alpha1_FlunderList(a.(*wardle.FlunderList), b.(*FlunderList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*FlunderSpec)(nil), (*wardle.FlunderSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_FlunderSpec_To_wardle_FlunderSpec(a.(*FlunderSpec), b.(*wardle.FlunderSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*wardle.FlunderSpec)(nil), (*FlunderSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_FlunderSpec_To_v1alpha1_FlunderSpec(a.(*wardle.FlunderSpec), b.(*FlunderSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*FlunderStatus)(nil), (*wardle.FlunderStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_FlunderStatus_To_wardle_FlunderStatus(a.(*FlunderStatus), b.(*wardle.FlunderStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*wardle.FlunderStatus)(nil), (*FlunderStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_FlunderStatus_To_v1alpha1_FlunderStatus(a.(*wardle.FlunderStatus), b.(*FlunderStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*FlunderSpec)(nil), (*wardle.FlunderSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_FlunderSpec_To_wardle_FlunderSpec(a.(*FlunderSpec), b.(*wardle.FlunderSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*wardle.FlunderSpec)(nil), (*FlunderSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_wardle_FlunderSpec_To_v1alpha1_FlunderSpec(a.(*wardle.FlunderSpec), b.(*FlunderSpec), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_Fischer_To_wardle_Fischer(in *Fischer, out *wardle.Fischer, s conversion.Scope) error {

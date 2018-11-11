@@ -46,5 +46,5 @@ func (ts throttledImageService) PullImage(image kubecontainer.ImageSpec, secrets
 	if ts.limiter.TryAccept() {
 		return ts.ImageService.PullImage(image, secrets)
 	}
-	return "", fmt.Errorf("pull QPS exceeded.")
+	return "", fmt.Errorf("pull QPS exceeded")
 }

@@ -2,42 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "resizefs_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "resizefs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "resizefs_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "resizefs_linux.go",
+        "resizefs_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/resizefs",
     visibility = ["//visibility:public"],
     deps = select({
@@ -55,7 +23,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/mount:go_default_library",
-            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/util/mount:go_default_library",

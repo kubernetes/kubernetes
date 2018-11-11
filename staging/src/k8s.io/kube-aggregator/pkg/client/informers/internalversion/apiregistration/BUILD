@@ -8,10 +8,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration",
     importpath = "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration",
     deps = [
-        "//vendor/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
-        "//vendor/k8s.io/kube-aggregator/pkg/client/informers/internalversion/internalinterfaces:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
+        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/internalinterfaces:go_default_library",
     ],
 )
 

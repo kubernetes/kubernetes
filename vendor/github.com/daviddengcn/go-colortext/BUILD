@@ -4,42 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "ct.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "ct_ansi.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "ct_win.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "ct_ansi.go",
+        "ct_win.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/daviddengcn/go-colortext",
     importpath = "github.com/daviddengcn/go-colortext",
     visibility = ["//visibility:public"],
 )

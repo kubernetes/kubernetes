@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -24,11 +25,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -113,7 +114,7 @@ type Runtime interface {
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
-	GetContainerLogs(pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
+	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
 	DeleteContainer(containerID ContainerID) error
 	// ImageService provides methods to image-related methods.
@@ -202,7 +203,7 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 	}
 	return id
 }

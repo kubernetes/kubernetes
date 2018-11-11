@@ -209,7 +209,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			s.Fixup(obj)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
 				return
 			}
 
@@ -223,14 +223,14 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// and we get the benefit of using conversion functions which already have to stay in sync
 			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			err := metav1.Convert_v1_InternalEvent_To_v1_WatchEvent(internalEvent, outEvent, nil)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
 				// client disconnect.
 				return
 			}
 			if err := e.Encode(outEvent); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e))
 				// client disconnect.
 				return
 			}
@@ -276,7 +276,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			s.Fixup(obj)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
 				return
 			}
 
@@ -291,7 +291,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			// and we get the benefit of using conversion functions which already have to stay in sync
 			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			err := metav1.Convert_v1_InternalEvent_To_v1_WatchEvent(internalEvent, outEvent, nil)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
 				// client disconnect.

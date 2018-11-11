@@ -23,10 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -36,11 +37,12 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&iscsiPlugin{nil}}
+	return []volume.VolumePlugin{&iscsiPlugin{}}
 }
 
 type iscsiPlugin struct {
-	host volume.VolumeHost
+	host        volume.VolumeHost
+	targetLocks keymutex.KeyMutex
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
@@ -53,6 +55,7 @@ const (
 
 func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.targetLocks = keymutex.NewHashed(0)
 	return nil
 }
 
@@ -176,8 +179,9 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedNameForDisk(iscsiPluginName), volName)),
 		},
-		mounter: mounter,
-		exec:    exec,
+		mounter:    mounter,
+		exec:       exec,
+		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
 	}, nil
 }
 
@@ -248,7 +252,7 @@ func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	klog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 	// Retrieve volume information from globalMapPathUUID
 	// globalMapPathUUID example:
 	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
@@ -281,9 +285,9 @@ func (iscsi *iscsiDisk) GetPath() string {
 }
 
 func (iscsi *iscsiDisk) iscsiGlobalMapPath(spec *volume.Spec) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, nil /* pod */)
+	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, iscsi.plugin.targetLocks, nil /* pod */)
 	if err != nil {
-		glog.Warningf("failed to get iscsi mounter: %v", err)
+		klog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
 	}
 	return iscsi.manager.MakeGlobalVDPDName(*mounter.iscsiDisk), nil
@@ -330,15 +334,16 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
-		glog.Errorf("iscsi: failed to setup")
+		klog.Errorf("iscsi: failed to setup")
 	}
 	return err
 }
 
 type iscsiDiskUnmounter struct {
 	*iscsiDisk
-	mounter mount.Interface
-	exec    mount.Exec
+	mounter    mount.Interface
+	exec       mount.Exec
+	deviceUtil ioutil.DeviceUtil
 }
 
 var _ volume.Unmounter = &iscsiDiskUnmounter{}
@@ -387,12 +392,12 @@ func (c *iscsiDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to detach disk: %s\nError: %v", mapPath, err)
 	}
-	glog.V(4).Infof("iscsi: %q is unmounted, deleting the directory", mapPath)
+	klog.V(4).Infof("iscsi: %q is unmounted, deleting the directory", mapPath)
 	err = os.RemoveAll(mapPath)
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
-	glog.V(4).Infof("iscsi: successfully detached disk: %s", mapPath)
+	klog.V(4).Infof("iscsi: successfully detached disk: %s", mapPath)
 	return nil
 }
 
@@ -577,7 +582,7 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 			}
 			secret = make(map[string]string)
 			for name, data := range secretObj.Data {
-				glog.V(4).Infof("retrieving CHAP secret name: %s", name)
+				klog.V(4).Infof("retrieving CHAP secret name: %s", name)
 				secret[name] = string(data)
 			}
 		}
@@ -644,7 +649,7 @@ func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.S
 			ISCSIInterface: iface,
 		},
 	)
-	glog.V(5).Infof("ConstructBlockVolumeSpec: TargetPortal: %v, IQN: %v, Lun: %v, ISCSIInterface: %v",
+	klog.V(5).Infof("ConstructBlockVolumeSpec: TargetPortal: %v, IQN: %v, Lun: %v, ISCSIInterface: %v",
 		iscsiPV.Spec.PersistentVolumeSource.ISCSI.TargetPortal,
 		iscsiPV.Spec.PersistentVolumeSource.ISCSI.IQN,
 		iscsiPV.Spec.PersistentVolumeSource.ISCSI.Lun,

@@ -7,42 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "rlimit_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "rlimit_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "rlimit_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "rlimit_linux.go",
+        "rlimit_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/rlimit",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

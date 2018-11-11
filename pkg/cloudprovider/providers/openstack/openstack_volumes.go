@@ -29,7 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -42,7 +42,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type volumeService interface {
@@ -235,6 +235,7 @@ func (volumes *VolumesV3) getVolume(volumeID string) (Volume, error) {
 		ID:               volumeV3.ID,
 		Name:             volumeV3.Name,
 		Status:           volumeV3.Status,
+		Size:             volumeV3.Size,
 	}
 
 	if len(volumeV3.Attachments) > 0 {
@@ -333,19 +334,19 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 
 	if volume.AttachedServerID != "" {
 		if instanceID == volume.AttachedServerID {
-			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
+			klog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
 		}
 		nodeName, err := os.GetNodeNameByID(volume.AttachedServerID)
 		attachErr := fmt.Sprintf("disk %s path %s is attached to a different instance (%s)", volumeID, volume.AttachedDevice, volume.AttachedServerID)
 		if err != nil {
-			glog.Error(attachErr)
+			klog.Error(attachErr)
 			return "", errors.New(attachErr)
 		}
 		// using volume.AttachedDevice may cause problems because cinder does not report device path correctly see issue #33128
 		devicePath := volume.AttachedDevice
 		danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
-		glog.V(2).Infof("Found dangling volume %s attached to node %s", volumeID, nodeName)
+		klog.V(2).Infof("Found dangling volume %s attached to node %s", volumeID, nodeName)
 		return "", danglingErr
 	}
 
@@ -359,7 +360,7 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to attach %s volume to %s compute: %v", volumeID, instanceID, err)
 	}
-	glog.V(2).Infof("Successfully attached %s volume to %s compute", volumeID, instanceID)
+	klog.V(2).Infof("Successfully attached %s volume to %s compute", volumeID, instanceID)
 	return volume.ID, nil
 }
 
@@ -371,7 +372,7 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	}
 	if volume.Status == volumeAvailableStatus {
 		// "available" is fine since that means the volume is detached from instance already.
-		glog.V(2).Infof("volume: %s has been detached from compute: %s ", volume.ID, instanceID)
+		klog.V(2).Infof("volume: %s has been detached from compute: %s ", volume.ID, instanceID)
 		return nil
 	}
 
@@ -395,7 +396,7 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete volume %s from compute %s attached %v", volume.ID, instanceID, err)
 	}
-	glog.V(2).Infof("Successfully detached volume: %s from compute: %s", volume.ID, instanceID)
+	klog.V(2).Infof("Successfully detached volume: %s from compute: %s", volume.ID, instanceID)
 
 	return nil
 }
@@ -411,13 +412,15 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 		return oldSize, fmt.Errorf("volume status is not available")
 	}
 
-	volSizeBytes := newSize.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(volumeutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGB))
+	volSizeGiB, err := volumeutil.RoundUpToGiBInt(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGiB))
 
 	// if volume size equals to or greater than the newSize, return nil
-	if volume.Size >= volSizeGB {
+	if volume.Size >= volSizeGiB {
 		return newSizeQuant, nil
 	}
 
@@ -426,7 +429,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 		return oldSize, err
 	}
 
-	err = volumes.expandVolume(volumeID, volSizeGB)
+	err = volumes.expandVolume(volumeID, volSizeGiB)
 	if err != nil {
 		return oldSize, err
 	}
@@ -443,10 +446,10 @@ func (os *OpenStack) getVolume(volumeID string) (Volume, error) {
 }
 
 // CreateVolume creates a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
+func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
 	volumes, err := os.volumeService("")
 	if err != nil {
-		return "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
+		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
 	}
 
 	opts := volumeCreateOpts{
@@ -462,11 +465,11 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	volumeID, volumeAZ, err := volumes.createVolume(opts)
 
 	if err != nil {
-		return "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
+		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
 	}
 
-	glog.Infof("Created volume %v in Availability Zone: %v Ignore volume AZ: %v", volumeID, volumeAZ, os.bsOpts.IgnoreVolumeAZ)
-	return volumeID, volumeAZ, os.bsOpts.IgnoreVolumeAZ, nil
+	klog.Infof("Created volume %v in Availability Zone: %v Region: %v Ignore volume AZ: %v", volumeID, volumeAZ, os.region, os.bsOpts.IgnoreVolumeAZ)
+	return volumeID, volumeAZ, os.region, os.bsOpts.IgnoreVolumeAZ, nil
 }
 
 // GetDevicePathBySerialID returns the path of an attached block storage volume, specified by its id.
@@ -487,13 +490,13 @@ func (os *OpenStack) GetDevicePathBySerialID(volumeID string) string {
 	for _, f := range files {
 		for _, c := range candidateDeviceNodes {
 			if c == f.Name() {
-				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
+				klog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
 				return path.Join("/dev/disk/by-id/", f.Name())
 			}
 		}
 	}
 
-	glog.V(4).Infof("Failed to find device for the volumeID: %q by serial ID", volumeID)
+	klog.V(4).Infof("Failed to find device for the volumeID: %q by serial ID", volumeID)
 	return ""
 }
 
@@ -508,14 +511,14 @@ func (os *OpenStack) getDevicePathFromInstanceMetadata(volumeID string) string {
 		newtonMetadataVersion)
 
 	if err != nil {
-		glog.V(4).Infof(
+		klog.V(4).Infof(
 			"Could not retrieve instance metadata. Error: %v", err)
 		return ""
 	}
 
 	for _, device := range instanceMetadata.Devices {
 		if device.Type == "disk" && device.Serial == volumeID {
-			glog.V(4).Infof(
+			klog.V(4).Infof(
 				"Found disk metadata for volumeID %q. Bus: %q, Address: %q",
 				volumeID, device.Bus, device.Address)
 
@@ -524,7 +527,7 @@ func (os *OpenStack) getDevicePathFromInstanceMetadata(volumeID string) string {
 				device.Bus, device.Address)
 			diskPaths, err := filepath.Glob(diskPattern)
 			if err != nil {
-				glog.Errorf(
+				klog.Errorf(
 					"could not retrieve disk path for volumeID: %q. Error filepath.Glob(%q): %v",
 					volumeID, diskPattern, err)
 				return ""
@@ -534,14 +537,14 @@ func (os *OpenStack) getDevicePathFromInstanceMetadata(volumeID string) string {
 				return diskPaths[0]
 			}
 
-			glog.Errorf(
+			klog.Errorf(
 				"expecting to find one disk path for volumeID %q, found %d: %v",
 				volumeID, len(diskPaths), diskPaths)
 			return ""
 		}
 	}
 
-	glog.V(4).Infof(
+	klog.V(4).Infof(
 		"Could not retrieve device metadata for volumeID: %q", volumeID)
 	return ""
 }
@@ -555,7 +558,7 @@ func (os *OpenStack) GetDevicePath(volumeID string) string {
 	}
 
 	if devicePath == "" {
-		glog.Warningf("Failed to find device for the volumeID: %q", volumeID)
+		klog.Warningf("Failed to find device for the volumeID: %q", volumeID)
 	}
 
 	return devicePath
@@ -607,7 +610,7 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 // DiskIsAttached queries if a volume is attached to a compute instance
 func (os *OpenStack) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 	if instanceID == "" {
-		glog.Warningf("calling DiskIsAttached with empty instanceid: %s %s", instanceID, volumeID)
+		klog.Warningf("calling DiskIsAttached with empty instanceid: %s %s", instanceID, volumeID)
 	}
 	volume, err := os.getVolume(volumeID)
 	if err != nil {
@@ -694,6 +697,11 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
 func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore if not Cinder.
+	if pv.Spec.Cinder == nil {
+		return nil, nil
+	}
+
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
 		return nil, nil
@@ -709,7 +717,7 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 	labels := make(map[string]string)
 	labels[kubeletapis.LabelZoneFailureDomain] = volume.AvailabilityZone
 	labels[kubeletapis.LabelZoneRegion] = os.region
-	glog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
+	klog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
 
 	return labels, nil
 }

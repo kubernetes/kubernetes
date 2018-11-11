@@ -9,7 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = ["equal.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/equal",
-    deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
+    deps = ["//staging/src/k8s.io/api/core/v1:go_default_library"],
 )
 
 filegroup(

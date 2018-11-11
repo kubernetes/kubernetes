@@ -22,7 +22,7 @@ const (
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: kube-proxy
+  name: {{ .ProxyConfigMap }}
   namespace: kube-system
   labels:
     app: kube-proxy
@@ -46,7 +46,7 @@ data:
     - name: default
       user:
         tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-  config.conf: |-
+  {{ .ProxyConfigMapKey }}: |-
 {{ .ProxyConfig}}
 `
 
@@ -69,14 +69,17 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
     spec:
+      priorityClassName: system-node-critical
       containers:
       - name: kube-proxy
-        image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy
-        - --config=/var/lib/kube-proxy/config.conf
+        - --config=/var/lib/kube-proxy/{{ .ProxyConfigMapKey }}
         securityContext:
           privileged: true
         volumeMounts:
@@ -93,7 +96,7 @@ spec:
       volumes:
       - name: kube-proxy
         configMap:
-          name: kube-proxy
+          name: {{ .ProxyConfigMap }}
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
@@ -104,9 +107,6 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
-      nodeSelector:
-        beta.kubernetes.io/arch: {{ .Arch }}
+      - operator: Exists
 `
 )

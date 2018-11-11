@@ -6,6 +6,7 @@ go_library(
         "lease.go",
         "lease_updater.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/nfc",
     importpath = "github.com/vmware/govmomi/nfc",
     visibility = ["//visibility:public"],
     deps = [

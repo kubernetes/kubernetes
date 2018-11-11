@@ -45,8 +45,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -172,8 +173,10 @@ type Store struct {
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
 
-	// Storage is the interface for the underlying storage for the resource.
-	Storage storage.Interface
+	// Storage is the interface for the underlying storage for the
+	// resource. It is wrapped into a "DryRunnableStorage" that will
+	// either pass-through or simply dry-run.
+	Storage DryRunnableStorage
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
 }
@@ -322,7 +325,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 }
 
 // Create inserts a new item according to the unique key from the object.
-func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -348,7 +351,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 	out := e.NewFunc()
-	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
+	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		if !kubeerr.IsAlreadyExists(err) {
@@ -377,7 +380,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, err
 		}
 	}
-	if !includeUninitialized {
+	if !options.IncludeUninitialized {
 		return e.WaitForInitialized(ctx, out)
 	}
 	return out, nil
@@ -496,10 +499,10 @@ func (e *Store) shouldDeleteForFailedInitialization(ctx context.Context, obj run
 
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
-func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, dryRun bool) (runtime.Object, bool, error) {
 	out := e.NewFunc()
-	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
-	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
+	klog.V(6).Infof("going to delete %s from registry, triggered by update", name)
+	if err := e.Storage.Delete(ctx, key, out, preconditions, dryRun); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
@@ -522,7 +525,7 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -564,7 +567,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return nil, nil, err
 		}
 		if version == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() {
+			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
 				return nil, nil, kubeerr.NewNotFound(qualifiedResource, name)
 			}
 			creating = true
@@ -633,12 +636,12 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return obj, &ttl, nil
 		}
 		return obj, nil, nil
-	})
+	}, dryrun.IsDryRun(options.DryRun))
 
 	if err != nil {
 		// delete the object
 		if err == errEmptiedFinalizers {
-			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions)
+			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions, dryrun.IsDryRun(options.DryRun))
 		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
@@ -650,7 +653,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	}
 
 	if e.shouldDeleteForFailedInitialization(ctx, out) {
-		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions)
+		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions, dryrun.IsDryRun(options.DryRun))
 	}
 
 	if creating {
@@ -906,7 +909,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
 				if pendingFinalizers {
-					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
+					klog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
 					err = markAsDeleting(existing)
 					if err != nil {
 						return nil, err
@@ -919,6 +922,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			lastExisting = existing
 			return existing, nil
 		}),
+		dryrun.IsDryRun(options.DryRun),
 	)
 	switch err {
 	case nil:
@@ -1000,10 +1004,22 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 		return out, false, err
 	}
 
+	// Going further in this function is not useful when we are
+	// performing a dry-run request. Worse, it will actually
+	// override "out" with the version of the object in database
+	// that doesn't have the finalizer and deletiontimestamp set
+	// (because the update above was dry-run too). If we already
+	// have that version available, let's just return it now,
+	// otherwise, we can call dry-run delete that will get us the
+	// latest version of the object.
+	if dryrun.IsDryRun(options.DryRun) && out != nil {
+		return out, true, nil
+	}
+
 	// delete immediately, or no graceful deletion supported
-	glog.V(6).Infof("going to delete %s from registry: ", name)
+	klog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
-	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, &preconditions, dryrun.IsDryRun(options.DryRun)); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
@@ -1087,7 +1103,7 @@ func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 					return
 				}
 				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
-					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
 				}
@@ -1230,7 +1246,7 @@ func (e *Store) Export(ctx context.Context, name string, opts metav1.ExportOptio
 	if accessor, err := meta.Accessor(obj); err == nil {
 		exportObjectMeta(accessor, opts.Exact)
 	} else {
-		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
+		klog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}
 
 	if e.ExportStrategy != nil {
@@ -1364,8 +1380,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		}
 	}
 
-	if e.Storage == nil {
-		e.Storage, e.DestroyFunc = opts.Decorator(
+	if e.Storage.Storage == nil {
+		e.Storage.Codec = opts.StorageConfig.Codec
+		e.Storage.Storage, e.DestroyFunc = opts.Decorator(
 			opts.StorageConfig,
 			e.NewFunc(),
 			prefix,
@@ -1394,12 +1411,12 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 func (e *Store) startObservingCount(period time.Duration) func() {
 	prefix := e.KeyRootFunc(genericapirequest.NewContext())
 	resourceName := e.DefaultQualifiedResource.String()
-	glog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
+	klog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
 	stopCh := make(chan struct{})
 	go wait.JitterUntil(func() {
 		count, err := e.Storage.Count(prefix)
 		if err != nil {
-			glog.V(5).Infof("Failed to update storage count metric: %v", err)
+			klog.V(5).Infof("Failed to update storage count metric: %v", err)
 			metrics.UpdateObjectCount(resourceName, -1)
 		} else {
 			metrics.UpdateObjectCount(resourceName, count)

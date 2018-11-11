@@ -27,7 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/testserver"
+	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -812,7 +812,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 
 	// Create a custom owner resource.
 	owner := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner"))
-	owner, err := resourceClient.Create(owner)
+	owner, err := resourceClient.Create(owner, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner resource %q: %v", owner.GetName(), err)
 	}
@@ -822,7 +822,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	dependent := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
 	link(t, owner, dependent)
 
-	dependent, err = resourceClient.Create(dependent)
+	dependent, err = resourceClient.Create(dependent, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create dependent resource %q: %v", dependent.GetName(), err)
 	}
@@ -873,7 +873,7 @@ func TestMixedRelationships(t *testing.T) {
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
-	customOwner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")))
+	customOwner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}
@@ -900,7 +900,7 @@ func TestMixedRelationships(t *testing.T) {
 	coreOwner.TypeMeta.Kind = "ConfigMap"
 	coreOwner.TypeMeta.APIVersion = "v1"
 	link(t, coreOwner, customDependent)
-	customDependent, err = resourceClient.Create(customDependent)
+	customDependent, err = resourceClient.Create(customDependent, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create dependent: %v", err)
 	}
@@ -971,7 +971,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
-	owner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")))
+	owner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}

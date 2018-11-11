@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["csi.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/container-storage-interface/spec/lib/go/csi/v0",
     importpath = "github.com/container-storage-interface/spec/lib/go/csi/v0",
     visibility = ["//visibility:public"],
     deps = [

@@ -180,7 +180,7 @@ func TestDecode(t *testing.T) {
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",
@@ -257,7 +257,7 @@ func TestDecode(t *testing.T) {
 			// "VaLue" should have been "value"
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","VaLue":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",
@@ -268,7 +268,7 @@ func TestDecode(t *testing.T) {
 			// "b" should have been "B", "I" should have been "i"
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","spec": {"A": 1, "b": 2, "h": 3, "I": 4}}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Spec: DecodableSpec{A: 1, H: 3},

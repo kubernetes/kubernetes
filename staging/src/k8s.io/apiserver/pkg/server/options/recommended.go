@@ -54,7 +54,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 
 	return &RecommendedOptions{
 		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:              WithLoopback(sso),
+		SecureServing:              sso.WithLoopback(),
 		Authentication:             NewDelegatingAuthenticationOptions(),
 		Authorization:              NewDelegatingAuthorizationOptions(),
 		Audit:                      NewAuditOptions(),
@@ -83,7 +83,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.SecureServing.ApplyTo(&config.Config); err != nil {
+	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {

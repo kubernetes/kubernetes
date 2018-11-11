@@ -27,10 +27,11 @@ import (
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/transport"
 
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
@@ -42,8 +43,8 @@ var codecs = serializer.NewCodecFactory(scheme)
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 func TestTLSConnection(t *testing.T) {

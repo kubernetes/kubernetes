@@ -204,7 +204,7 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 }
 
 func (o operation) kind() string {
-	if obj, ok := o["op"]; ok {
+	if obj, ok := o["op"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -220,7 +220,7 @@ func (o operation) kind() string {
 }
 
 func (o operation) path() string {
-	if obj, ok := o["path"]; ok {
+	if obj, ok := o["path"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -236,7 +236,7 @@ func (o operation) path() string {
 }
 
 func (o operation) from() string {
-	if obj, ok := o["from"]; ok {
+	if obj, ok := o["from"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -389,16 +389,12 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 
 	cur := *d
 
-	if idx < 0 {
-		idx *= -1
-
-		if idx > len(ary) {
-			return fmt.Errorf("Unable to access invalid index: %d", idx)
-		}
-		idx = len(ary) - idx
-	}
-	if idx < 0 || idx >= len(ary) || idx > len(cur) {
+	if idx < -len(ary) || idx >= len(ary) {
 		return fmt.Errorf("Unable to access invalid index: %d", idx)
+	}
+
+	if idx < 0 {
+		idx += len(ary)
 	}
 	copy(ary[0:idx], cur[0:idx])
 	ary[idx] = val
@@ -430,8 +426,11 @@ func (d *partialArray) remove(key string) error {
 
 	cur := *d
 
-	if idx >= len(cur) {
+	if idx < -len(cur) || idx >= len(cur) {
 		return fmt.Errorf("Unable to remove invalid index: %d", idx)
+	}
+	if idx < 0 {
+		idx += len(cur)
 	}
 
 	ary := make([]*lazyNode, len(cur)-1)
@@ -450,7 +449,7 @@ func (p Patch) add(doc *container, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: %s", path)
+		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: \"%s\"", path)
 	}
 
 	return con.add(key, op.value())
@@ -462,7 +461,7 @@ func (p Patch) remove(doc *container, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: %s", path)
+		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: \"%s\"", path)
 	}
 
 	return con.remove(key)
@@ -477,8 +476,8 @@ func (p Patch) replace(doc *container, op operation) error {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing path: %s", path)
 	}
 
-	val, ok := con.get(key)
-	if val == nil || ok != nil {
+	_, ok := con.get(key)
+	if ok != nil {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing key: %s", path)
 	}
 
@@ -534,6 +533,8 @@ func (p Patch) test(doc *container, op operation) error {
 		if op.value().raw == nil {
 			return nil
 		}
+		return fmt.Errorf("Testing value %s failed", path)
+	} else if op.value() == nil {
 		return fmt.Errorf("Testing value %s failed", path)
 	}
 

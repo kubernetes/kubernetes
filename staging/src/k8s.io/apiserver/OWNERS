@@ -17,3 +17,6 @@ reviewers:
 - enj
 - hzxuzhonghu
 - CaoShuFeng
+labels:
+- sig/api-machinery
+- area/apiserver

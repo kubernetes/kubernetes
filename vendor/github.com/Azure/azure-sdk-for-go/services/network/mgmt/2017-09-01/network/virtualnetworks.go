@@ -40,9 +40,10 @@ func NewVirtualNetworksClientWithBaseURI(baseURI string, subscriptionID string) 
 }
 
 // CheckIPAddressAvailability checks whether a private IP address is available for use.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// IPAddress is the private IP address to be verified.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// IPAddress - the private IP address to be verified.
 func (client VirtualNetworksClient) CheckIPAddressAvailability(ctx context.Context, resourceGroupName string, virtualNetworkName string, IPAddress string) (result IPAddressAvailabilityResult, err error) {
 	req, err := client.CheckIPAddressAvailabilityPreparer(ctx, resourceGroupName, virtualNetworkName, IPAddress)
 	if err != nil {
@@ -110,9 +111,10 @@ func (client VirtualNetworksClient) CheckIPAddressAvailabilityResponder(resp *ht
 }
 
 // CreateOrUpdate creates or updates a virtual network in the specified resource group.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// parameters is parameters supplied to the create or update virtual network operation
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// parameters - parameters supplied to the create or update virtual network operation
 func (client VirtualNetworksClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, parameters VirtualNetwork) (result VirtualNetworksCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, virtualNetworkName, parameters)
 	if err != nil {
@@ -143,7 +145,7 @@ func (client VirtualNetworksClient) CreateOrUpdatePreparer(ctx context.Context, 
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/virtualNetworks/{virtualNetworkName}", pathParameters),
@@ -155,15 +157,13 @@ func (client VirtualNetworksClient) CreateOrUpdatePreparer(ctx context.Context, 
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) CreateOrUpdateSender(req *http.Request) (future VirtualNetworksCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -181,8 +181,9 @@ func (client VirtualNetworksClient) CreateOrUpdateResponder(resp *http.Response)
 }
 
 // Delete deletes the specified virtual network.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
 func (client VirtualNetworksClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result VirtualNetworksDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, virtualNetworkName)
 	if err != nil {
@@ -223,15 +224,13 @@ func (client VirtualNetworksClient) DeletePreparer(ctx context.Context, resource
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) DeleteSender(req *http.Request) (future VirtualNetworksDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -248,9 +247,10 @@ func (client VirtualNetworksClient) DeleteResponder(resp *http.Response) (result
 }
 
 // Get gets the specified virtual network by resource group.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// expand is expands referenced resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// expand - expands referenced resources.
 func (client VirtualNetworksClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, expand string) (result VirtualNetwork, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualNetworkName, expand)
 	if err != nil {
@@ -318,8 +318,8 @@ func (client VirtualNetworksClient) GetResponder(resp *http.Response) (result Vi
 }
 
 // List gets all virtual networks in a resource group.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client VirtualNetworksClient) List(ctx context.Context, resourceGroupName string) (result VirtualNetworkListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
@@ -501,8 +501,9 @@ func (client VirtualNetworksClient) ListAllComplete(ctx context.Context) (result
 }
 
 // ListUsage lists usage stats.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
 func (client VirtualNetworksClient) ListUsage(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result VirtualNetworkListUsageResultPage, err error) {
 	result.fn = client.listUsageNextResults
 	req, err := client.ListUsagePreparer(ctx, resourceGroupName, virtualNetworkName)
@@ -595,9 +596,10 @@ func (client VirtualNetworksClient) ListUsageComplete(ctx context.Context, resou
 }
 
 // UpdateTags updates a virtual network tags.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// parameters is parameters supplied to update virtual network tags.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// parameters - parameters supplied to update virtual network tags.
 func (client VirtualNetworksClient) UpdateTags(ctx context.Context, resourceGroupName string, virtualNetworkName string, parameters TagsObject) (result VirtualNetworksUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, virtualNetworkName, parameters)
 	if err != nil {
@@ -628,7 +630,7 @@ func (client VirtualNetworksClient) UpdateTagsPreparer(ctx context.Context, reso
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/virtualNetworks/{virtualNetworkName}", pathParameters),
@@ -640,15 +642,13 @@ func (client VirtualNetworksClient) UpdateTagsPreparer(ctx context.Context, reso
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworksClient) UpdateTagsSender(req *http.Request) (future VirtualNetworksUpdateTagsFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

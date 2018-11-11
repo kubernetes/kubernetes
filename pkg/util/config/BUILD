@@ -13,7 +13,7 @@ go_library(
         "doc.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/util/config",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 
 go_test(

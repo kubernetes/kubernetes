@@ -28,8 +28,8 @@ import (
 	"testing"
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/ghodss/yaml"
 	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -228,7 +228,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 }
 
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
-	etcdClient, err := integration.GetEtcdKVClient(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig)
+	_, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}

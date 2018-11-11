@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	batch_v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var jobsResource = schema.GroupVersionResource{Group: "batch", Version: "v1", Re
 var jobsKind = schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
 
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *FakeJobs) Get(name string, options v1.GetOptions) (result *batch_v1.Job, err error) {
+func (c *FakeJobs) Get(name string, options v1.GetOptions) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(jobsResource, c.ns, name), &batch_v1.Job{})
+		Invokes(testing.NewGetAction(jobsResource, c.ns, name), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*batch_v1.Job), err
+	return obj.(*batchv1.Job), err
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *FakeJobs) List(opts v1.ListOptions) (result *batch_v1.JobList, err error) {
+func (c *FakeJobs) List(opts v1.ListOptions) (result *batchv1.JobList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(jobsResource, jobsKind, c.ns, opts), &batch_v1.JobList{})
+		Invokes(testing.NewListAction(jobsResource, jobsKind, c.ns, opts), &batchv1.JobList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeJobs) List(opts v1.ListOptions) (result *batch_v1.JobList, err erro
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &batch_v1.JobList{ListMeta: obj.(*batch_v1.JobList).ListMeta}
-	for _, item := range obj.(*batch_v1.JobList).Items {
+	list := &batchv1.JobList{ListMeta: obj.(*batchv1.JobList).ListMeta}
+	for _, item := range obj.(*batchv1.JobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
-func (c *FakeJobs) Create(job *batch_v1.Job) (result *batch_v1.Job, err error) {
+func (c *FakeJobs) Create(job *batchv1.Job) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(jobsResource, c.ns, job), &batch_v1.Job{})
+		Invokes(testing.NewCreateAction(jobsResource, c.ns, job), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*batch_v1.Job), err
+	return obj.(*batchv1.Job), err
 }
 
 // Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
-func (c *FakeJobs) Update(job *batch_v1.Job) (result *batch_v1.Job, err error) {
+func (c *FakeJobs) Update(job *batchv1.Job) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(jobsResource, c.ns, job), &batch_v1.Job{})
+		Invokes(testing.NewUpdateAction(jobsResource, c.ns, job), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*batch_v1.Job), err
+	return obj.(*batchv1.Job), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeJobs) UpdateStatus(job *batch_v1.Job) (*batch_v1.Job, error) {
+func (c *FakeJobs) UpdateStatus(job *batchv1.Job) (*batchv1.Job, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &batch_v1.Job{})
+		Invokes(testing.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*batch_v1.Job), err
+	return obj.(*batchv1.Job), err
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
 func (c *FakeJobs) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(jobsResource, c.ns, name), &batch_v1.Job{})
+		Invokes(testing.NewDeleteAction(jobsResource, c.ns, name), &batchv1.Job{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeJobs) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &batch_v1.JobList{})
+	_, err := c.Fake.Invokes(action, &batchv1.JobList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *FakeJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch_v1.Job, err error) {
+func (c *FakeJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, data, subresources...), &batch_v1.Job{})
+		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, pt, data, subresources...), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*batch_v1.Job), err
+	return obj.(*batchv1.Job), err
 }

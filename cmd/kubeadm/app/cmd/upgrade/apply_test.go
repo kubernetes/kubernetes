@@ -153,19 +153,21 @@ func TestSetImplicitFlags(t *testing.T) {
 
 func TestGetPathManagerForUpgrade(t *testing.T) {
 
-	haEtcd := &kubeadmapi.MasterConfiguration{
-		Etcd: kubeadmapi.Etcd{
-			External: &kubeadmapi.ExternalEtcd{
-				Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379", "10.100.0.3:2379"},
+	haEtcd := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			Etcd: kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379", "10.100.0.3:2379"},
+				},
 			},
 		},
 	}
 
-	noHAEtcd := &kubeadmapi.MasterConfiguration{}
+	noHAEtcd := &kubeadmapi.InitConfiguration{}
 
 	tests := []struct {
 		name             string
-		cfg              *kubeadmapi.MasterConfiguration
+		cfg              *kubeadmapi.InitConfiguration
 		etcdUpgrade      bool
 		shouldDeleteEtcd bool
 	}{

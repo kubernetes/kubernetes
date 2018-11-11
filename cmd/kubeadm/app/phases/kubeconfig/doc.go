@@ -21,9 +21,9 @@ package kubeconfig
 	PHASE: KUBECONFIG
 
 	INPUTS:
-		From MasterConfiguration
-			The Master API Server endpoint (AdvertiseAddress + BindPort) is required so the KubeConfig file knows where to find the master
-			The KubernetesDir path is required for knowing where to put the KubeConfig files
+		From InitConfiguration
+			The Master API Server endpoint (AdvertiseAddress + BindPort) is required so the kubeconfig file knows where to find the master
+			The KubernetesDir path is required for knowing where to put the kubeconfig files
 			The PKIPath is required for knowing where all certificates should be stored
 
 	OUTPUTS:

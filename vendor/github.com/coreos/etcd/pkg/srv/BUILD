@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["srv.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/srv",
     importpath = "github.com/coreos/etcd/pkg/srv",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/etcd/pkg/types:go_default_library"],

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // APIGroupResources is an API group with a mapping of versions to
@@ -99,18 +99,20 @@ func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper
 					scope = meta.RESTScopeRoot
 				}
 
-				// this is for legacy resources and servers which don't list singular forms.  For those we must still guess.
-				if len(resource.SingularName) == 0 {
-					versionMapper.Add(gv.WithKind(resource.Kind), scope)
-					// TODO this is producing unsafe guesses that don't actually work, but it matches previous behavior
-					versionMapper.Add(gv.WithKind(resource.Kind+"List"), scope)
+				// if we have a slash, then this is a subresource and we shouldn't create mappings for those.
+				if strings.Contains(resource.Name, "/") {
 					continue
 				}
 
 				plural := gv.WithResource(resource.Name)
 				singular := gv.WithResource(resource.SingularName)
-				versionMapper.AddSpecific(gv.WithKind(resource.Kind), plural, singular, scope)
+				// this is for legacy resources and servers which don't list singular forms.  For those we must still guess.
+				if len(resource.SingularName) == 0 {
+					_, singular = meta.UnsafeGuessKindToResource(gv.WithKind(resource.Kind))
+				}
+
 				versionMapper.AddSpecific(gv.WithKind(strings.ToLower(resource.Kind)), plural, singular, scope)
+				versionMapper.AddSpecific(gv.WithKind(resource.Kind), plural, singular, scope)
 				// TODO this is producing unsafe guesses that don't actually work, but it matches previous behavior
 				versionMapper.Add(gv.WithKind(resource.Kind+"List"), scope)
 			}
@@ -210,7 +212,7 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 // Reset resets the internally cached Discovery information and will
 // cause the next mapping request to re-discover.
 func (d *DeferredDiscoveryRESTMapper) Reset() {
-	glog.V(5).Info("Invalidating discovery information")
+	klog.V(5).Info("Invalidating discovery information")
 
 	d.initMu.Lock()
 	defer d.initMu.Unlock()

@@ -36,6 +36,16 @@ type dynamicClient struct {
 
 var _ Interface = &dynamicClient{}
 
+// NewForConfigOrDie creates a new Interface for the given config and
+// panics if there is an error in the config.
+func NewForConfigOrDie(c *rest.Config) Interface {
+	ret, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
 func NewForConfig(inConfig *rest.Config) (Interface, error) {
 	config := rest.CopyConfig(inConfig)
 	// for serializing the options
@@ -72,7 +82,7 @@ func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
 	return &ret
 }
 
-func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
@@ -86,7 +96,12 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, subresour
 		name = accessor.GetName()
 	}
 
-	result := c.client.client.Post().AbsPath(append(c.makeURLSegments(name), subresources...)...).Body(outBytes).Do()
+	result := c.client.client.
+		Post().
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(outBytes).
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -102,7 +117,7 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, subresour
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -112,7 +127,12 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, subresour
 		return nil, err
 	}
 
-	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), subresources...)...).Body(outBytes).Do()
+	result := c.client.client.
+		Put().
+		AbsPath(append(c.makeURLSegments(accessor.GetName()), subresources...)...).
+		Body(outBytes).
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -128,7 +148,7 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, subresour
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -139,7 +159,12 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*u
 		return nil, err
 	}
 
-	result := c.client.client.Put().AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).Body(outBytes).Do()
+	result := c.client.client.
+		Put().
+		AbsPath(append(c.makeURLSegments(accessor.GetName()), "status")...).
+		Body(outBytes).
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
@@ -164,7 +189,11 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, 
 		return err
 	}
 
-	result := c.client.client.Delete().AbsPath(append(c.makeURLSegments(name), subresources...)...).Body(deleteOptionsByte).Do()
+	result := c.client.client.
+		Delete().
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(deleteOptionsByte).
+		Do()
 	return result.Error()
 }
 
@@ -177,7 +206,12 @@ func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, lis
 		return err
 	}
 
-	result := c.client.client.Delete().AbsPath(c.makeURLSegments("")...).Body(deleteOptionsByte).SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).Do()
+	result := c.client.client.
+		Delete().
+		AbsPath(c.makeURLSegments("")...).
+		Body(deleteOptionsByte).
+		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
+		Do()
 	return result.Error()
 }
 
@@ -249,8 +283,13 @@ func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 		WatchWithSpecificDecoders(wrappedDecoderFn, unstructured.UnstructuredJSONScheme)
 }
 
-func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*unstructured.Unstructured, error) {
-	result := c.client.client.Patch(pt).AbsPath(append(c.makeURLSegments(name), subresources...)...).Body(data).Do()
+func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	result := c.client.client.
+		Patch(pt).
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(data).
+		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
+		Do()
 	if err := result.Error(); err != nil {
 		return nil, err
 	}

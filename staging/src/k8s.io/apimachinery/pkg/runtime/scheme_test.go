@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 func TestScheme(t *testing.T) {
@@ -480,9 +481,10 @@ func GetTestScheme() *runtime.Scheme {
 	s.AddKnownTypeWithName(differentExternalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
 	s.AddUnversionedTypes(externalGV, &runtimetesting.UnversionedType{})
 
-	s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) {
+	utilruntime.Must(s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) error {
 		out.A = in.A
-	})
+		return nil
+	}))
 	return s
 }
 
@@ -668,7 +670,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     schema.GroupVersions{{Version: runtime.APIVersionInternal}, {Version: "v1"}},
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// unversioned type returned as-is
@@ -679,7 +681,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.UnversionedType{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "UnversionedType"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// unversioned type returned when not included in the target types
@@ -690,7 +692,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.UnversionedType{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "UnversionedType"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// detected as already being in the target version
@@ -701,7 +703,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// detected as already being in the first target version
@@ -712,7 +714,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// detected as already being in the first target version
@@ -723,7 +725,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// the external type is registered in multiple groups, versions, and kinds, and can be targeted to all of them (1/3): different kind
@@ -734,7 +736,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType3"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// the external type is registered in multiple groups, versions, and kinds, and can be targeted to all of them (2/3): different gv
@@ -745,7 +747,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType3"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// the external type is registered in multiple groups, versions, and kinds, and can be targeted to all of them (3/3): different gvk
@@ -756,7 +758,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType5"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner recognizes multiple groups and forces the output to a particular version, copies because version differs
@@ -766,7 +768,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     runtime.NewMultiGroupVersioner(schema.GroupVersion{Group: "other", Version: "v2"}, schema.GroupKind{Group: "custom", Kind: "TestType3"}, schema.GroupKind{Kind: "TestType1"}),
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "other/v2", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner recognizes multiple groups and forces the output to a particular version, copies because version differs
@@ -776,7 +778,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     runtime.NewMultiGroupVersioner(schema.GroupVersion{Group: "other", Version: "v2"}, schema.GroupKind{Kind: "TestType1"}, schema.GroupKind{Group: "custom", Kind: "TestType3"}),
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "other/v2", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner is unable to find a match when kind AND group don't match (there is no TestType1 kind in group "other", and no kind "TestType5" in the default group)
@@ -796,7 +798,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner recognizes multiple groups and forces the output to a particular version, performs no copy
@@ -807,7 +809,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// group versioner can choose a particular target kind for a given input when kind is the same across group versions
@@ -817,7 +819,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     testGroupVersioner{ok: true, target: schema.GroupVersionKind{Version: "v1", Kind: "TestType3"}},
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType3"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// group versioner can choose a different kind
@@ -827,7 +829,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     testGroupVersioner{ok: true, target: schema.GroupVersionKind{Kind: "TestType5", Group: "custom", Version: "v1"}},
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType5"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 	}

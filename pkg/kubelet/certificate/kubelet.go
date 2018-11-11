@@ -21,21 +21,23 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"net"
+	"sort"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	certificates "k8s.io/api/certificates/v1beta1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	clientcertificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/certificate"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, ips []net.IP, hostnames []string, certDirectory string) (certificate.Manager, error) {
+func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
 	var certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
 	if kubeClient != nil && kubeClient.CertificatesV1beta1() != nil {
 		certSigningRequestClient = kubeClient.CertificatesV1beta1().CertificateSigningRequests()
@@ -59,16 +61,25 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	)
 	prometheus.MustRegister(certificateExpiration)
 
-	m, err := certificate.NewManager(&certificate.Config{
-		CertificateSigningRequestClient: certSigningRequestClient,
-		Template: &x509.CertificateRequest{
+	getTemplate := func() *x509.CertificateRequest {
+		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
+		// don't return a template if we have no addresses to request for
+		if len(hostnames) == 0 && len(ips) == 0 {
+			return nil
+		}
+		return &x509.CertificateRequest{
 			Subject: pkix.Name{
 				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
 				Organization: []string{"system:nodes"},
 			},
 			DNSNames:    hostnames,
 			IPAddresses: ips,
-		},
+		}
+	}
+
+	m, err := certificate.NewManager(&certificate.Config{
+		CertificateSigningRequestClient: certSigningRequestClient,
+		GetTemplate:                     getTemplate,
 		Usages: []certificates.KeyUsage{
 			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 			//
@@ -90,6 +101,44 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
 	return m, nil
+}
+
+func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, ips []net.IP) {
+	seenDNSNames := map[string]bool{}
+	seenIPs := map[string]bool{}
+	for _, address := range addresses {
+		if len(address.Address) == 0 {
+			continue
+		}
+
+		switch address.Type {
+		case v1.NodeHostName:
+			if ip := net.ParseIP(address.Address); ip != nil {
+				seenIPs[address.Address] = true
+			} else {
+				seenDNSNames[address.Address] = true
+			}
+		case v1.NodeExternalIP, v1.NodeInternalIP:
+			if ip := net.ParseIP(address.Address); ip != nil {
+				seenIPs[address.Address] = true
+			}
+		case v1.NodeExternalDNS, v1.NodeInternalDNS:
+			seenDNSNames[address.Address] = true
+		}
+	}
+
+	for dnsName := range seenDNSNames {
+		dnsNames = append(dnsNames, dnsName)
+	}
+	for ip := range seenIPs {
+		ips = append(ips, net.ParseIP(ip))
+	}
+
+	// return in stable order
+	sort.Strings(dnsNames)
+	sort.Slice(ips, func(i, j int) bool { return ips[i].String() < ips[j].String() })
+
+	return dnsNames, ips
 }
 
 // NewKubeletClientCertificateManager sets up a certificate manager without a

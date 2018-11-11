@@ -18,134 +18,222 @@ package scheduler
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-// Binder knows how to write a binding.
-type Binder interface {
-	Bind(binding *v1.Binding) error
-}
-
-// PodConditionUpdater updates the condition of a pod based on the passed
-// PodCondition
-type PodConditionUpdater interface {
-	Update(pod *v1.Pod, podCondition *v1.PodCondition) error
-}
-
-// PodPreemptor has methods needed to delete a pod and to update
-// annotations of the preemptor pod.
-type PodPreemptor interface {
-	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
-	DeletePod(pod *v1.Pod) error
-	SetNominatedNodeName(pod *v1.Pod, nominatedNode string) error
-	RemoveNominatedNodeName(pod *v1.Pod) error
-}
+const (
+	// BindTimeoutSeconds defines the default bind timeout
+	BindTimeoutSeconds = 100
+)
 
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
-	config *Config
+	config *factory.Config
 }
 
-// StopEverything closes the scheduler config's StopEverything channel, to shut
-// down the Scheduler.
-func (sched *Scheduler) StopEverything() {
-	close(sched.config.StopEverything)
+// Cache returns the cache in scheduler for test to check the data in scheduler.
+func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
+	return sched.config.SchedulerCache
 }
 
-// Configurator defines I/O, caching, and other functionality needed to
-// construct a new scheduler. An implementation of this can be seen in
-// factory.go.
-type Configurator interface {
-	GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error)
-	GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error)
-	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
-	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
-	GetHardPodAffinitySymmetricWeight() int32
-	GetSchedulerName() string
-	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error)
-
-	// Needs to be exposed for things like integration tests where we want to make fake nodes.
-	GetNodeLister() corelisters.NodeLister
-	GetClient() clientset.Interface
-	GetScheduledPodLister() corelisters.PodLister
-
-	Create() (*Config, error)
-	CreateFromProvider(providerName string) (*Config, error)
-	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
-	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
+type schedulerOptions struct {
+	schedulerName                  string
+	hardPodAffinitySymmetricWeight int32
+	enableEquivalenceClassCache    bool
+	disablePreemption              bool
+	percentageOfNodesToScore       int32
+	bindTimeoutSeconds             int64
 }
 
-// Config is an implementation of the Scheduler's configured input data.
-// TODO over time we should make this struct a hidden implementation detail of the scheduler.
-type Config struct {
-	// It is expected that changes made via SchedulerCache will be observed
-	// by NodeLister and Algorithm.
-	SchedulerCache schedulercache.Cache
-	// Ecache is used for optimistically invalid affected cache items after
-	// successfully binding a pod
-	Ecache     *equivalence.Cache
-	NodeLister algorithm.NodeLister
-	Algorithm  algorithm.ScheduleAlgorithm
-	GetBinder  func(pod *v1.Pod) Binder
-	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
-	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
-	// handler so that binding and setting PodCondition it is atomic.
-	PodConditionUpdater PodConditionUpdater
-	// PodPreemptor is used to evict pods and update pod annotations.
-	PodPreemptor PodPreemptor
+// Option configures a Scheduler
+type Option func(*schedulerOptions)
 
-	// NextPod should be a function that blocks until the next pod
-	// is available. We don't use a channel for this, because scheduling
-	// a pod may take some amount of time and we don't want pods to get
-	// stale while they sit in a channel.
-	NextPod func() *v1.Pod
+// WithName sets schedulerName for Scheduler, the default schedulerName is default-scheduler
+func WithName(schedulerName string) Option {
+	return func(o *schedulerOptions) {
+		o.schedulerName = schedulerName
+	}
+}
 
-	// WaitForCacheSync waits for scheduler cache to populate.
-	// It returns true if it was successful, false if the controller should shutdown.
-	WaitForCacheSync func() bool
+// WithHardPodAffinitySymmetricWeight sets hardPodAffinitySymmetricWeight for Scheduler, the default value is 1
+func WithHardPodAffinitySymmetricWeight(hardPodAffinitySymmetricWeight int32) Option {
+	return func(o *schedulerOptions) {
+		o.hardPodAffinitySymmetricWeight = hardPodAffinitySymmetricWeight
+	}
+}
 
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
-	Error func(*v1.Pod, error)
+// WithEquivalenceClassCacheEnabled sets enableEquivalenceClassCache for Scheduler, the default value is false
+func WithEquivalenceClassCacheEnabled(enableEquivalenceClassCache bool) Option {
+	return func(o *schedulerOptions) {
+		o.enableEquivalenceClassCache = enableEquivalenceClassCache
+	}
+}
 
-	// Recorder is the EventRecorder to use
-	Recorder record.EventRecorder
+// WithPreemptionDisabled sets disablePreemption for Scheduler, the default value is false
+func WithPreemptionDisabled(disablePreemption bool) Option {
+	return func(o *schedulerOptions) {
+		o.disablePreemption = disablePreemption
+	}
+}
 
-	// Close this to shut down the scheduler.
-	StopEverything chan struct{}
+// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler, the default value is 50
+func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
+	return func(o *schedulerOptions) {
+		o.percentageOfNodesToScore = percentageOfNodesToScore
+	}
+}
 
-	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder *volumebinder.VolumeBinder
+// WithBindTimeoutSeconds sets bindTimeoutSeconds for Scheduler, the default value is 100
+func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.bindTimeoutSeconds = bindTimeoutSeconds
+	}
+}
 
-	// Disable pod preemption or not.
-	DisablePreemption bool
+var defaultSchedulerOptions = schedulerOptions{
+	schedulerName:                  v1.DefaultSchedulerName,
+	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+	enableEquivalenceClassCache:    false,
+	disablePreemption:              false,
+	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+	bindTimeoutSeconds:             BindTimeoutSeconds,
+}
+
+// New returns a Scheduler
+func New(client clientset.Interface,
+	nodeInformer coreinformers.NodeInformer,
+	podInformer coreinformers.PodInformer,
+	pvInformer coreinformers.PersistentVolumeInformer,
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	replicationControllerInformer coreinformers.ReplicationControllerInformer,
+	replicaSetInformer appsinformers.ReplicaSetInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
+	serviceInformer coreinformers.ServiceInformer,
+	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	storageClassInformer storageinformers.StorageClassInformer,
+	recorder record.EventRecorder,
+	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
+	stopCh <-chan struct{},
+	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
+
+	options := defaultSchedulerOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	// Set up the configurator which can create schedulers from configs.
+	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+		SchedulerName:                  options.schedulerName,
+		Client:                         client,
+		NodeInformer:                   nodeInformer,
+		PodInformer:                    podInformer,
+		PvInformer:                     pvInformer,
+		PvcInformer:                    pvcInformer,
+		ReplicationControllerInformer:  replicationControllerInformer,
+		ReplicaSetInformer:             replicaSetInformer,
+		StatefulSetInformer:            statefulSetInformer,
+		ServiceInformer:                serviceInformer,
+		PdbInformer:                    pdbInformer,
+		StorageClassInformer:           storageClassInformer,
+		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
+		EnableEquivalenceClassCache:    options.enableEquivalenceClassCache,
+		DisablePreemption:              options.disablePreemption,
+		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
+		BindTimeoutSeconds:             options.bindTimeoutSeconds,
+	})
+	var config *factory.Config
+	source := schedulerAlgorithmSource
+	switch {
+	case source.Provider != nil:
+		// Create the config from a named algorithm provider.
+		sc, err := configurator.CreateFromProvider(*source.Provider)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
+		}
+		config = sc
+	case source.Policy != nil:
+		// Create the config from a user specified policy source.
+		policy := &schedulerapi.Policy{}
+		switch {
+		case source.Policy.File != nil:
+			// Use a policy serialized in a file.
+			policyFile := source.Policy.File.Path
+			_, err := os.Stat(policyFile)
+			if err != nil {
+				return nil, fmt.Errorf("missing policy config file %s", policyFile)
+			}
+			data, err := ioutil.ReadFile(policyFile)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't read policy config: %v", err)
+			}
+			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+			if err != nil {
+				return nil, fmt.Errorf("invalid policy: %v", err)
+			}
+		case source.Policy.ConfigMap != nil:
+			// Use a policy serialized in a config map value.
+			policyRef := source.Policy.ConfigMap
+			policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
+			}
+			data, found := policyConfigMap.Data[kubeschedulerconfig.SchedulerPolicyConfigMapKey]
+			if !found {
+				return nil, fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
+			}
+			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+			if err != nil {
+				return nil, fmt.Errorf("invalid policy: %v", err)
+			}
+		}
+		sc, err := configurator.CreateFromConfig(*policy)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
+		}
+		config = sc
+	default:
+		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
+	}
+	// Additional tweaks to the config produced by the configurator.
+	config.Recorder = recorder
+	config.DisablePreemption = options.disablePreemption
+	config.StopEverything = stopCh
+	// Create the scheduler.
+	sched := NewFromConfig(config)
+	return sched, nil
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
 // Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
-func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Scheduler, error) {
+func NewFromConfigurator(c factory.Configurator, modifiers ...func(c *factory.Config)) (*Scheduler, error) {
 	cfg, err := c.Create()
 	if err != nil {
 		return nil, err
@@ -163,7 +251,7 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 }
 
 // NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *Config) *Scheduler {
+func NewFromConfig(config *factory.Config) *Scheduler {
 	metrics.Register()
 	return &Scheduler{
 		config: config,
@@ -176,15 +264,11 @@ func (sched *Scheduler) Run() {
 		return
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		go sched.config.VolumeBinder.Run(sched.bindVolumesWorker, sched.config.StopEverything)
-	}
-
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
-// Config return scheduler's config pointer. It is exposed for testing purposes.
-func (sched *Scheduler) Config() *Config {
+// Config returns scheduler's config pointer. It is exposed for testing purposes.
+func (sched *Scheduler) Config() *factory.Config {
 	return sched.config
 }
 
@@ -192,7 +276,6 @@ func (sched *Scheduler) Config() *Config {
 func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		pod = pod.DeepCopy()
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
@@ -212,20 +295,20 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
 	if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
-		glog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
+		klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
 			" No preemption is performed.")
 		return "", nil
 	}
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
 	if err != nil {
-		glog.Errorf("Error getting the updated preemptor pod object: %v", err)
+		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
 		return "", err
 	}
 
 	node, victims, nominatedPodsToClear, err := sched.config.Algorithm.Preempt(preemptor, sched.config.NodeLister, scheduleErr)
 	metrics.PreemptionVictims.Set(float64(len(victims)))
 	if err != nil {
-		glog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
+		klog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
 		return "", err
 	}
 	var nodeName = ""
@@ -233,12 +316,12 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 		nodeName = node.Name
 		err = sched.config.PodPreemptor.SetNominatedNodeName(preemptor, nodeName)
 		if err != nil {
-			glog.Errorf("Error in preemption process. Cannot update pod %v annotations: %v", preemptor.Name, err)
+			klog.Errorf("Error in preemption process. Cannot update pod %v/%v annotations: %v", preemptor.Namespace, preemptor.Name, err)
 			return "", err
 		}
 		for _, victim := range victims {
 			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
-				glog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
 				return "", err
 			}
 			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
@@ -251,24 +334,19 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	for _, p := range nominatedPodsToClear {
 		rErr := sched.config.PodPreemptor.RemoveNominatedNodeName(p)
 		if rErr != nil {
-			glog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
+			klog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
 			// We do not return as this error is not critical.
 		}
 	}
 	return nodeName, err
 }
 
-// assumeAndBindVolumes will update the volume cache and then asynchronously bind volumes if required.
-//
-// If volume binding is required, then the bind volumes routine will update the pod to send it back through
-// the scheduler.
-//
-// Otherwise, return nil error and continue to assume the pod.
+// assumeVolumes will update the volume cache with the chosen bindings
 //
 // This function modifies assumed if volume binding is required.
-func (sched *Scheduler) assumeAndBindVolumes(assumed *v1.Pod, host string) error {
+func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bool, err error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		allBound, bindingRequired, err := sched.config.VolumeBinder.Binder.AssumePodVolumes(assumed, host)
+		allBound, err = sched.config.VolumeBinder.Binder.AssumePodVolumes(assumed, host)
 		if err != nil {
 			sched.config.Error(assumed, err)
 			sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "AssumePodVolumes failed: %v", err)
@@ -278,76 +356,38 @@ func (sched *Scheduler) assumeAndBindVolumes(assumed *v1.Pod, host string) error
 				Reason:  "SchedulerError",
 				Message: err.Error(),
 			})
-			return err
 		}
-		if !allBound {
-			err = fmt.Errorf("Volume binding started, waiting for completion")
-			if bindingRequired {
-				if sched.config.Ecache != nil {
-					invalidPredicates := sets.NewString(predicates.CheckVolumeBindingPred)
-					sched.config.Ecache.InvalidatePredicates(invalidPredicates)
-				}
-
-				// bindVolumesWorker() will update the Pod object to put it back in the scheduler queue
-				sched.config.VolumeBinder.BindQueue.Add(assumed)
-			} else {
-				// We are just waiting for PV controller to finish binding, put it back in the
-				// scheduler queue
-				sched.config.Error(assumed, err)
-				sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "FailedScheduling", "%v", err)
-				sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
-					Type:   v1.PodScheduled,
-					Status: v1.ConditionFalse,
-					Reason: "VolumeBindingWaiting",
-				})
-			}
-			return err
+		// Invalidate ecache because assumed volumes could have affected the cached
+		// pvs for other pods
+		if sched.config.Ecache != nil {
+			invalidPredicates := sets.NewString(predicates.CheckVolumeBindingPred)
+			sched.config.Ecache.InvalidatePredicates(invalidPredicates)
 		}
 	}
-	return nil
+	return
 }
 
-// bindVolumesWorker() processes pods queued in assumeAndBindVolumes() and tries to
-// make the API update for volume binding.
-// This function runs forever until the volume BindQueue is closed.
-func (sched *Scheduler) bindVolumesWorker() {
-	workFunc := func() bool {
-		keyObj, quit := sched.config.VolumeBinder.BindQueue.Get()
-		if quit {
-			return true
-		}
-		defer sched.config.VolumeBinder.BindQueue.Done(keyObj)
+// bindVolumes will make the API update with the assumed bindings and wait until
+// the PV controller has completely finished the binding operation.
+//
+// If binding errors, times out or gets undone, then an error will be returned to
+// retry scheduling.
+func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
+	var reason string
+	var eventType string
 
-		assumed, ok := keyObj.(*v1.Pod)
-		if !ok {
-			glog.V(4).Infof("Object is not a *v1.Pod")
-			return false
-		}
+	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
+	err := sched.config.VolumeBinder.Binder.BindPodVolumes(assumed)
+	if err != nil {
+		klog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
 
-		// TODO: add metrics
-		var reason string
-		var eventType string
-
-		glog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
-
-		// The Pod is always sent back to the scheduler afterwards.
-		err := sched.config.VolumeBinder.Binder.BindPodVolumes(assumed)
-		if err != nil {
-			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
-			reason = "VolumeBindingFailed"
-			eventType = v1.EventTypeWarning
-		} else {
-			glog.V(4).Infof("Successfully bound volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
-			reason = "VolumeBindingWaiting"
-			eventType = v1.EventTypeNormal
-			err = fmt.Errorf("Volume binding started, waiting for completion")
+		// Unassume the Pod and retry scheduling
+		if forgetErr := sched.config.SchedulerCache.ForgetPod(assumed); forgetErr != nil {
+			klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
 		}
 
-		// Always fail scheduling regardless of binding success.
-		// The Pod needs to be sent back through the scheduler to:
-		// * Retry volume binding if it fails.
-		// * Retry volume binding if dynamic provisioning fails.
-		// * Bind the Pod to the Node once all volumes are bound.
+		reason = "VolumeBindingFailed"
+		eventType = v1.EventTypeWarning
 		sched.config.Error(assumed, err)
 		sched.config.Recorder.Eventf(assumed, eventType, "FailedScheduling", "%v", err)
 		sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
@@ -355,15 +395,11 @@ func (sched *Scheduler) bindVolumesWorker() {
 			Status: v1.ConditionFalse,
 			Reason: reason,
 		})
-		return false
+		return err
 	}
 
-	for {
-		if quit := workFunc(); quit {
-			glog.V(4).Infof("bindVolumesWorker shutting down")
-			break
-		}
-	}
+	klog.V(5).Infof("Success binding volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
+	return nil
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
@@ -374,11 +410,13 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
-	// NOTE: Because the scheduler uses snapshots of SchedulerCache and the live
-	// version of Ecache, updates must be written to SchedulerCache before
-	// invalidating Ecache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
-		glog.Errorf("scheduler cache AssumePod failed: %v", err)
+		klog.Errorf("scheduler cache AssumePod failed: %v", err)
 
 		// This is most probably result of a BUG in retrying logic.
 		// We report an error here so that pod scheduling can be retried.
@@ -412,13 +450,13 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 	// it's atomic with setting host.
 	err := sched.config.GetBinder(assumed).Bind(b)
-	if err := sched.config.SchedulerCache.FinishBinding(assumed); err != nil {
-		glog.Errorf("scheduler cache FinishBinding failed: %v", err)
+	if finErr := sched.config.SchedulerCache.FinishBinding(assumed); finErr != nil {
+		klog.Errorf("scheduler cache FinishBinding failed: %v", finErr)
 	}
 	if err != nil {
-		glog.V(1).Infof("Failed to bind pod: %v/%v", assumed.Namespace, assumed.Name)
+		klog.V(1).Infof("Failed to bind pod: %v/%v", assumed.Namespace, assumed.Name)
 		if err := sched.config.SchedulerCache.ForgetPod(assumed); err != nil {
-			glog.Errorf("scheduler cache ForgetPod failed: %v", err)
+			klog.Errorf("scheduler cache ForgetPod failed: %v", err)
 		}
 		sched.config.Error(assumed, err)
 		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
@@ -439,13 +477,17 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 // scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne() {
 	pod := sched.config.NextPod()
+	// pod could be nil when schedulerQueue is closed
+	if pod == nil {
+		return
+	}
 	if pod.DeletionTimestamp != nil {
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		klog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		return
 	}
 
-	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
+	klog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
@@ -461,6 +503,13 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PreemptionAttempts.Inc()
 			metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
 			metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+			// Pod did not fit anywhere, so it is counted as a failure. If preemption
+			// succeeds, the pod should get counted as a success the next time we try to
+			// schedule it. (hopefully)
+			metrics.PodScheduleFailures.Inc()
+		} else {
+			klog.Errorf("error selecting node for pod: %v", err)
+			metrics.PodScheduleErrors.Inc()
 		}
 		return
 	}
@@ -471,27 +520,37 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Assume volumes first before assuming the pod.
 	//
-	// If no volumes need binding, then nil is returned, and continue to assume the pod.
+	// If all volumes are completely bound, then allBound is true and binding will be skipped.
 	//
-	// Otherwise, error is returned and volume binding is started asynchronously for all of the pod's volumes.
-	// scheduleOne() returns immediately on error, so that it doesn't continue to assume the pod.
-	//
-	// After the asynchronous volume binding updates are made, it will send the pod back through the scheduler for
-	// subsequent passes until all volumes are fully bound.
+	// Otherwise, binding of volumes is started after the pod is assumed, but before pod binding.
 	//
 	// This function modifies 'assumedPod' if volume binding is required.
-	err = sched.assumeAndBindVolumes(assumedPod, suggestedHost)
+	allBound, err := sched.assumeVolumes(assumedPod, suggestedHost)
 	if err != nil {
+		klog.Errorf("error assuming volumes: %v", err)
+		metrics.PodScheduleErrors.Inc()
 		return
 	}
 
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
 	err = sched.assume(assumedPod, suggestedHost)
 	if err != nil {
+		klog.Errorf("error assuming pod: %v", err)
+		metrics.PodScheduleErrors.Inc()
 		return
 	}
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
+		// Bind volumes first before Pod
+		if !allBound {
+			err := sched.bindVolumes(assumedPod)
+			if err != nil {
+				klog.Errorf("error binding volumes: %v", err)
+				metrics.PodScheduleErrors.Inc()
+				return
+			}
+		}
+
 		err := sched.bind(assumedPod, &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
 			Target: v1.ObjectReference{
@@ -501,7 +560,10 @@ func (sched *Scheduler) scheduleOne() {
 		})
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
-			glog.Errorf("Internal error binding pod: (%v)", err)
+			klog.Errorf("error binding pod: %v", err)
+			metrics.PodScheduleErrors.Inc()
+		} else {
+			metrics.PodScheduleSuccesses.Inc()
 		}
 	}()
 }

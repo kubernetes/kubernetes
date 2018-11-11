@@ -17,7 +17,7 @@ type FilterAttrs struct {
 	Handle    uint32
 	Parent    uint32
 	Priority  uint16 // lower is higher priority
-	Protocol  uint16 // unix.ETH_P_*
+	Protocol  uint16 // syscall.ETH_P_*
 }
 
 func (q FilterAttrs) String() string {

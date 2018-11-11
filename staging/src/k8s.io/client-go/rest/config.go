@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -28,8 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,12 +36,15 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
 )
 
 const (
 	DefaultQPS   float32 = 5.0
 	DefaultBurst int     = 10
 )
+
+var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
@@ -220,7 +222,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 // the config.Version to be empty.
 func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	if config.NegotiatedSerializer == nil {
-		return nil, fmt.Errorf("NeogitatedSerializer is required when initializing a RESTClient")
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
@@ -308,22 +310,28 @@ func DefaultKubernetesUserAgent() string {
 
 // InClusterConfig returns a config object which uses the service account
 // kubernetes gives to pods. It's intended for clients that expect to be
-// running inside a pod running on kubernetes. It will return an error if
-// called from a process not running in a kubernetes environment.
+// running inside a pod running on kubernetes. It will return ErrNotInCluster
+// if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
+	const (
+		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	)
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
-		return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
+		return nil, ErrNotInCluster
 	}
 
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-	if err != nil {
+	ts := NewCachedFileTokenSource(tokenFile)
+
+	if _, err := ts.Token(); err != nil {
 		return nil, err
 	}
+
 	tlsClientConfig := TLSClientConfig{}
-	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
 	if _, err := certutil.NewPool(rootCAFile); err != nil {
-		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		klog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
 	}
@@ -331,8 +339,8 @@ func InClusterConfig() (*Config, error) {
 	return &Config{
 		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(host, port),
-		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
+		WrapTransport:   TokenSourceWrapTransport(ts),
 	}, nil
 }
 

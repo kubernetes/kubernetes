@@ -22,10 +22,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -40,8 +39,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := legacyscheme.Codecs
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	ns := scheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -49,7 +48,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/secrets" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, secretObject)}, nil
+				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, secretObject)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -72,8 +71,8 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 	secretObject := &v1.Secret{}
 	secretObject.Name = "my-secret"
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := legacyscheme.Codecs
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	ns := scheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -81,7 +80,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/secrets" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, secretObject)}, nil
+				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, secretObject)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

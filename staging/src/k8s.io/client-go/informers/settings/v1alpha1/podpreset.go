@@ -21,7 +21,7 @@ package v1alpha1
 import (
 	time "time"
 
-	settings_v1alpha1 "k8s.io/api/settings/v1alpha1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredPodPresetInformer(client kubernetes.Interface, namespace string,
 				return client.SettingsV1alpha1().PodPresets(namespace).Watch(options)
 			},
 		},
-		&settings_v1alpha1.PodPreset{},
+		&settingsv1alpha1.PodPreset{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *podPresetInformer) defaultInformer(client kubernetes.Interface, resyncP
 }
 
 func (f *podPresetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&settings_v1alpha1.PodPreset{}, f.defaultInformer)
+	return f.factory.InformerFor(&settingsv1alpha1.PodPreset{}, f.defaultInformer)
 }
 
 func (f *podPresetInformer) Lister() v1alpha1.PodPresetLister {

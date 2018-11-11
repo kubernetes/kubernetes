@@ -3,6 +3,7 @@ includes:
   - 'layer:basic'
   - 'layer:debug'
   - 'layer:snap'
+  - 'layer:leadership'
   - 'layer:docker'
   - 'layer:metrics'
   - 'layer:nagios'
@@ -15,6 +16,8 @@ includes:
   - 'interface:aws-integration'
   - 'interface:gcp-integration'
   - 'interface:openstack-integration'
+  - 'interface:vsphere-integration'
+  - 'interface:azure-integration'
   - 'interface:mount'
 config:
   deletes:

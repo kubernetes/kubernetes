@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -45,7 +46,7 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	subjectAccessReview, ok := obj.(*authorizationapi.SubjectAccessReview)
 	if !ok {
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a SubjectAccessReview: %#v", obj))

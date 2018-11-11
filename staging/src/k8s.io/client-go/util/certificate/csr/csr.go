@@ -24,9 +24,10 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/golang/glog"
 	"reflect"
 	"time"
+
+	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -102,7 +104,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
-		glog.Infof("csr for this node already exists, reusing")
+		klog.Infof("csr for this node already exists, reusing")
 		req, err = client.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return nil, formatError("cannot retrieve certificate signing request: %v", err)
@@ -110,7 +112,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		if err := ensureCompatible(req, csr, privateKey); err != nil {
 			return nil, fmt.Errorf("retrieved csr is not compatible: %v", err)
 		}
-		glog.Infof("csr for this node is still valid")
+		klog.Infof("csr for this node is still valid")
 	default:
 		return nil, formatError("cannot create certificate signing request: %v", err)
 	}
@@ -121,7 +123,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 func WaitForCertificate(client certificatesclient.CertificateSigningRequestInterface, req *certificates.CertificateSigningRequest, timeout time.Duration) (certData []byte, err error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", req.Name).String()
 
-	event, err := cache.ListWatchUntil(
+	event, err := watchtools.ListWatchUntil(
 		timeout,
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {

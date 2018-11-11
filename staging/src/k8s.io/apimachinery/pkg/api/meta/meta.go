@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -132,12 +132,12 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				CreationTimestamp:          m.GetCreationTimestamp(),
 				DeletionTimestamp:          m.GetDeletionTimestamp(),
 				DeletionGracePeriodSeconds: m.GetDeletionGracePeriodSeconds(),
-				Labels:          m.GetLabels(),
-				Annotations:     m.GetAnnotations(),
-				OwnerReferences: m.GetOwnerReferences(),
-				Finalizers:      m.GetFinalizers(),
-				ClusterName:     m.GetClusterName(),
-				Initializers:    m.GetInitializers(),
+				Labels:                     m.GetLabels(),
+				Annotations:                m.GetAnnotations(),
+				OwnerReferences:            m.GetOwnerReferences(),
+				Finalizers:                 m.GetFinalizers(),
+				ClusterName:                m.GetClusterName(),
+				Initializers:               m.GetInitializers(),
 			},
 		}
 	}
@@ -607,7 +607,7 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 	var ret []metav1.OwnerReference
 	s := a.ownerReferences
 	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
-		glog.Errorf("expect %v to be a pointer to slice", s)
+		klog.Errorf("expect %v to be a pointer to slice", s)
 		return ret
 	}
 	s = s.Elem()
@@ -615,7 +615,7 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 	ret = make([]metav1.OwnerReference, s.Len(), s.Len()+1)
 	for i := 0; i < s.Len(); i++ {
 		if err := extractFromOwnerReference(s.Index(i), &ret[i]); err != nil {
-			glog.Errorf("extractFromOwnerReference failed: %v", err)
+			klog.Errorf("extractFromOwnerReference failed: %v", err)
 			return ret
 		}
 	}
@@ -625,13 +625,13 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 func (a genericAccessor) SetOwnerReferences(references []metav1.OwnerReference) {
 	s := a.ownerReferences
 	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
-		glog.Errorf("expect %v to be a pointer to slice", s)
+		klog.Errorf("expect %v to be a pointer to slice", s)
 	}
 	s = s.Elem()
 	newReferences := reflect.MakeSlice(s.Type(), len(references), len(references))
 	for i := 0; i < len(references); i++ {
 		if err := setOwnerReference(newReferences.Index(i), &references[i]); err != nil {
-			glog.Errorf("setOwnerReference failed: %v", err)
+			klog.Errorf("setOwnerReference failed: %v", err)
 			return
 		}
 	}

@@ -20,9 +20,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
 )
 
 // Set of resp. Codes that we backoff for.
@@ -64,7 +64,7 @@ func (n *NoBackoff) Sleep(d time.Duration) {
 // Disable makes the backoff trivial, i.e., sets it to zero.  This might be used
 // by tests which want to run 1000s of mock requests without slowing down.
 func (b *URLBackoff) Disable() {
-	glog.V(4).Infof("Disabling backoff strategy")
+	klog.V(4).Infof("Disabling backoff strategy")
 	b.Backoff = flowcontrol.NewBackOff(0*time.Second, 0*time.Second)
 }
 
@@ -76,7 +76,7 @@ func (b *URLBackoff) baseUrlKey(rawurl *url.URL) string {
 	// in the future.
 	host, err := url.Parse(rawurl.String())
 	if err != nil {
-		glog.V(4).Infof("Error extracting url: %v", rawurl)
+		klog.V(4).Infof("Error extracting url: %v", rawurl)
 		panic("bad url!")
 	}
 	return host.Host
@@ -89,7 +89,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 		b.Backoff.Next(b.baseUrlKey(actualUrl), b.Backoff.Clock.Now())
 		return
 	} else if responseCode >= 300 || err != nil {
-		glog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
+		klog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
 	}
 
 	//If we got this far, there is no backoff required for this URL anymore.

@@ -35,4 +35,9 @@ func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
 		selector := metav1.LabelSelector{}
 		obj.NamespaceSelector = &selector
 	}
+	if obj.SideEffects == nil {
+		// TODO: revisit/remove this default and possibly make the field required when promoting to v1
+		unknown := admissionregistrationv1beta1.SideEffectClassUnknown
+		obj.SideEffects = &unknown
+	}
 }

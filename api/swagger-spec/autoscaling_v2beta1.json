@@ -86,7 +86,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -137,6 +137,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If IncludeUninitialized is specified, the object may be returned without completing initialization.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -248,7 +264,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -286,7 +302,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
+      "summary": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedHorizontalPodAutoscalerList",
       "parameters": [
        {
@@ -357,7 +373,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -481,6 +497,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -541,6 +565,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -593,7 +625,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -622,6 +654,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -641,6 +681,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -662,7 +707,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind HorizontalPodAutoscaler",
+      "summary": "watch changes to an object of kind HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedHorizontalPodAutoscaler",
       "parameters": [
        {
@@ -733,7 +778,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -852,7 +897,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -884,7 +929,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
+      "summary": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchHorizontalPodAutoscalerListForAllNamespaces",
       "parameters": [
        {
@@ -955,7 +1000,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -1055,6 +1100,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1111,6 +1164,14 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -1217,7 +1278,7 @@
      },
      "continue": {
       "type": "string",
-      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response."
+      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message."
      }
     }
    },
@@ -1327,7 +1388,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
     "required": [
      "apiVersion",
      "kind",
@@ -1587,6 +1648,56 @@
      "targetValue": {
       "type": "string",
       "description": "targetValue is the target value of the metric (as a quantity)."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics."
+     },
+     "averageValue": {
+      "type": "string",
+      "description": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)"
+     }
+    }
+   },
+   "v1.LabelSelector": {
+    "id": "v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.LabelSelectorRequirement": {
+    "id": "v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
      }
     }
    },
@@ -1605,6 +1716,10 @@
      "targetAverageValue": {
       "type": "string",
       "description": "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)"
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics."
      }
     }
    },
@@ -1652,48 +1767,6 @@
      "targetAverageValue": {
       "type": "string",
       "description": "targetAverageValue is the target per-pod value of global metric (as a quantity). Mutually exclusive with TargetValue."
-     }
-    }
-   },
-   "v1.LabelSelector": {
-    "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-    "properties": {
-     "matchLabels": {
-      "type": "object",
-      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
-     },
-     "matchExpressions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.LabelSelectorRequirement"
-      },
-      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
-     }
-    }
-   },
-   "v1.LabelSelectorRequirement": {
-    "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-    "required": [
-     "key",
-     "operator"
-    ],
-    "properties": {
-     "key": {
-      "type": "string",
-      "description": "key is the label key that the selector applies to."
-     },
-     "operator": {
-      "type": "string",
-      "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
-     },
-     "values": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
      }
     }
    },
@@ -1791,6 +1864,14 @@
      "currentValue": {
       "type": "string",
       "description": "currentValue is the current value of the metric (as a quantity)."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the ObjectMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics."
+     },
+     "averageValue": {
+      "type": "string",
+      "description": "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)"
      }
     }
    },
@@ -1809,6 +1890,10 @@
      "currentAverageValue": {
       "type": "string",
       "description": "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)"
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the PodsMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics."
      }
     }
    },
@@ -1939,6 +2024,13 @@
      "propagationPolicy": {
       "$ref": "v1.DeletionPropagation",
       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground."
+     },
+     "dryRun": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed"
      }
     }
    },

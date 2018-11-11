@@ -24,12 +24,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -78,16 +79,26 @@ func TestConvertFieldLabel(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			crd := apiextensions.CustomResourceDefinition{}
+			crd := apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: "None",
+					},
+				},
+			}
 
 			if test.clusterScoped {
 				crd.Spec.Scope = apiextensions.ClusterScoped
 			} else {
 				crd.Spec.Scope = apiextensions.NamespaceScoped
 			}
-			_, c := conversion.NewCRDConverter(&crd)
+			f, err := conversion.NewCRConverterFactory(nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, c, err := f.NewConverter(&crd)
 
-			label, value, err := c.ConvertFieldLabel("", "", test.label, "value")
+			label, value, err := c.ConvertFieldLabel(schema.GroupVersionKind{}, test.label, "value")
 			if e, a := test.expectError, err != nil; e != a {
 				t.Fatalf("err: expected %t, got %t", e, a)
 			}

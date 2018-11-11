@@ -20,15 +20,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 type AuthorizationRuleResolver interface {
@@ -59,13 +61,28 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 	ownerRules, err := ruleResolver.RulesFor(user, namespace)
 	if err != nil {
 		// As per AuthorizationRuleResolver contract, this may return a non fatal error with an incomplete list of policies. Log the error and continue.
-		glog.V(1).Infof("non-fatal error getting local rules for %v: %v", user, err)
+		klog.V(1).Infof("non-fatal error getting local rules for %v: %v", user, err)
 		ruleResolutionErrors = append(ruleResolutionErrors, err)
 	}
 
 	ownerRightsCover, missingRights := Covers(ownerRules, rules)
 	if !ownerRightsCover {
-		return apierrors.NewUnauthorized(fmt.Sprintf("attempt to grant extra privileges: %v user=%v ownerrules=%v ruleResolutionErrors=%v", missingRights, user, ownerRules, ruleResolutionErrors))
+		compactMissingRights := missingRights
+		if compact, err := CompactRules(missingRights); err == nil {
+			compactMissingRights = compact
+		}
+
+		missingDescriptions := sets.NewString()
+		for _, missing := range compactMissingRights {
+			missingDescriptions.Insert(rbacv1helpers.CompactString(missing))
+		}
+
+		msg := fmt.Sprintf("user %q (groups=%q) is attempting to grant RBAC permissions not currently held:\n%s", user.GetName(), user.GetGroups(), strings.Join(missingDescriptions.List(), "\n"))
+		if len(ruleResolutionErrors) > 0 {
+			msg = msg + fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors)
+		}
+
+		return errors.New(msg)
 	}
 	return nil
 }
