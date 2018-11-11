@@ -102,6 +102,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flushwriter:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/util/globalflag:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/logs:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/openapi:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/proxy:all-srcs",
