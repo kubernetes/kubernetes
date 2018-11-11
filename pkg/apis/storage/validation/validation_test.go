@@ -174,6 +174,12 @@ func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
+	// Enable alpha feature ExpandPersistentVolumes
+	err := utilfeature.DefaultFeatureGate.Set("CSIInlineVolume=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for CSIInlineVolumes: %v", err)
+		return
+	}
 	volumeName := "pv-name"
 	empty := ""
 	successCases := []storage.VolumeAttachment{
