@@ -364,10 +364,10 @@ func TestAttacherPostVolumeAttachment(t *testing.T) {
 		}
 
 		// go and watch/mark attachment as attached
-		go func() {
-			status := storage.VolumeAttachmentStatus{Attached: tc.isAttached}
-			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
-		}()
+		go func(attachID string, isAttached bool) {
+			status := storage.VolumeAttachmentStatus{Attached: isAttached}
+			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, attachID, status)
+		}(tc.attachID, tc.isAttached)
 
 		_, err = csiAttacher.postVolumeAttachment(testDriver, tc.volID, attachment, time.Millisecond*100)
 		if tc.shouldFail && err == nil {
