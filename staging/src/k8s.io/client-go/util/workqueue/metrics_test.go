@@ -124,7 +124,7 @@ func (m *testMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 func TestSinceInMicroseconds(t *testing.T) {
 	mp := testMetricsProvider{}
 	c := clock.NewFakeClock(time.Now())
-	mf := metricsFactory{metricsProvider: &mp}
+	mf := queueMetricsFactory{metricsProvider: &mp}
 	m := mf.newQueueMetrics("test", c)
 	dqm := m.(*defaultQueueMetrics)
 
@@ -141,7 +141,7 @@ func TestMetrics(t *testing.T) {
 	mp := testMetricsProvider{}
 	t0 := time.Unix(0, 0)
 	c := clock.NewFakeClock(t0)
-	mf := metricsFactory{metricsProvider: &mp}
+	mf := queueMetricsFactory{metricsProvider: &mp}
 	m := mf.newQueueMetrics("test", c)
 	q := newQueue(c, m, time.Millisecond)
 	defer q.ShutDown()

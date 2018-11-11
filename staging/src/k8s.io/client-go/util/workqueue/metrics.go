@@ -64,6 +64,7 @@ func (noopMetric) Dec()            {}
 func (noopMetric) Set(float64)     {}
 func (noopMetric) Observe(float64) {}
 
+// defaultQueueMetrics expects the caller to lock before setting any metrics.
 type defaultQueueMetrics struct {
 	clock clock.Clock
 
@@ -190,22 +191,23 @@ func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-var globalMetricsFactory = metricsFactory{
+var globalMetricsFactory = queueMetricsFactory{
 	metricsProvider: noopMetricsProvider{},
 }
 
-type metricsFactory struct {
+type queueMetricsFactory struct {
 	metricsProvider MetricsProvider
-	setProviders    sync.Once
+
+	onlyOnce sync.Once
 }
 
-func (f *metricsFactory) set(mp MetricsProvider) {
-	f.setProviders.Do(func() {
+func (f *queueMetricsFactory) setProvider(mp MetricsProvider) {
+	f.onlyOnce.Do(func() {
 		f.metricsProvider = mp
 	})
 }
 
-func (f *metricsFactory) newQueueMetrics(name string, clock clock.Clock) queueMetrics {
+func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) queueMetrics {
 	mp := f.metricsProvider
 	if len(name) == 0 || mp == (noopMetricsProvider{}) {
 		return noMetrics{}
@@ -235,5 +237,5 @@ func newRetryMetrics(name string) retryMetrics {
 // SetProvider sets the metrics provider for all subsequently created work
 // queues. Only the first call has an effect.
 func SetProvider(metricsProvider MetricsProvider) {
-	globalMetricsFactory.set(metricsProvider)
+	globalMetricsFactory.setProvider(metricsProvider)
 }
