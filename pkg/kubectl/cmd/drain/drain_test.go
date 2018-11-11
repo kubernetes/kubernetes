@@ -142,6 +142,22 @@ func TestCordon(t *testing.T) {
 			arg:         "bar",
 			expectFatal: true,
 		},
+		{
+			description: "cordon for multiple nodes",
+			node:        node,
+			expected:    cordoned_node,
+			cmd:         NewCmdCordon,
+			arg:         "node node1 node2",
+			expectFatal: false,
+		},
+		{
+			description: "uncordon for multiple nodes",
+			node:        cordoned_node,
+			expected:    node,
+			cmd:         NewCmdUncordon,
+			arg:         "node node1 node2",
+			expectFatal: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -160,10 +176,18 @@ func TestCordon(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
 					switch {
+					case m.isFor("GET", "/nodes/node1"):
+						fallthrough
+					case m.isFor("GET", "/nodes/node2"):
+						fallthrough
 					case m.isFor("GET", "/nodes/node"):
 						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 					case m.isFor("GET", "/nodes/bar"):
 						return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
+					case m.isFor("PATCH", "/nodes/node1"):
+						fallthrough
+					case m.isFor("PATCH", "/nodes/node2"):
+						fallthrough
 					case m.isFor("PATCH", "/nodes/node"):
 						data, err := ioutil.ReadAll(req.Body)
 						if err != nil {
@@ -209,7 +233,7 @@ func TestCordon(t *testing.T) {
 					saw_fatal = true
 					panic(e)
 				})
-				cmd.SetArgs([]string{test.arg})
+				cmd.SetArgs(strings.Split(test.arg, " "))
 				cmd.Execute()
 			}()
 
