@@ -50,7 +50,6 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	// disable InlineVolumeSource
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		va.Spec.Source.InlineVolumeSource = nil
-		va.Spec.Source.InlineVolumeSource = nil
 	}
 }
 

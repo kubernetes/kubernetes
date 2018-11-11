@@ -154,7 +154,7 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
-	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Beta feature).
+	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Alpha feature).
 	// +optional
 	CSI *CSIVolumeSource
 }
