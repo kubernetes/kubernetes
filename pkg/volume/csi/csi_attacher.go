@@ -81,8 +81,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		if volSource.VolumeHandle != nil {
 			volumeHandle = *volSource.VolumeHandle
 		} else {
-			// TODO, add volumeHandle generation
-			return "", errors.New("CSI volume source missing required volumeHandle")
+			volumeHandle = getTmpVolumeHandleForPodVolume(spec.PodUID, spec.Volume.Name)
 		}
 	} else if pvSource != nil {
 		driverName = pvSource.Driver
@@ -376,6 +375,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if c.plugin.inlineFeatureEnabled && volSrc != nil {
 		if volSrc.VolumeHandle != nil {
 			handle = *volSrc.VolumeHandle
+		} else {
+			handle = getTmpVolumeHandleForPodVolume(spec.PodUID, spec.Volume.Name)
 		}
 		driver = volSrc.Driver
 		volAttribs = volSrc.VolumeAttributes

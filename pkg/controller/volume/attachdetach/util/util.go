@@ -30,7 +30,7 @@ import (
 
 // CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
-func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) (*volume.Spec, error) {
+func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, podUID types.UID, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) (*volume.Spec, error) {
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 		klog.V(10).Infof(
 			"Found PVC, ClaimName: %q/%q",
@@ -86,6 +86,7 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 	if podNamespace != "" {
 		volumeSpec.PodNamespace = podNamespace
 	}
+	volumeSpec.PodUID = podUID
 
 	return volumeSpec, nil
 }
@@ -199,7 +200,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := CreateVolumeSpec(podVolume, pod.Namespace, pvcLister, pvLister)
+		volumeSpec, err := CreateVolumeSpec(podVolume, pod.Namespace, pod.UID, pvcLister, pvLister)
 		if err != nil {
 			klog.V(10).Infof(
 				"Error processing volume %q for pod %q/%q: %v",

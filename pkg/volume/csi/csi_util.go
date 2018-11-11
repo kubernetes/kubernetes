@@ -25,6 +25,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -49,6 +50,10 @@ func defaultBackoff() wait.Backoff {
 		Factor:   1.2,
 		Steps:    10,
 	}
+}
+
+func getTmpVolumeHandleForPodVolume(podUID types.UID, specVolumeName string) (string) {
+	return fmt.Sprintf("%q-%s", podUID, specVolumeName)
 }
 
 func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {

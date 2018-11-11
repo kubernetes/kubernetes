@@ -216,6 +216,8 @@ func (p *csiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		driver = volSource.Driver
 		if volSource.VolumeHandle != nil {
 			handle = *volSource.VolumeHandle
+		} else {
+			handle = getTmpVolumeHandleForPodVolume(spec.PodUID, spec.Volume.Name)
 		}
 	} else if pvSource != nil {
 		driver = pvSource.Driver
@@ -263,6 +265,8 @@ func (p *csiPlugin) NewMounter(
 		driver = volSource.Driver
 		if volSource.VolumeHandle != nil {
 			volHandle = *volSource.VolumeHandle
+		} else {
+			volHandle = getTmpVolumeHandleForPodVolume(pod.UID, spec.Volume.Name)
 		}
 		sourceKind = volumeKind
 	} else if pvSource != nil {

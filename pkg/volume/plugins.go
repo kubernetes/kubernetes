@@ -383,6 +383,7 @@ type Spec struct {
 	Volume           *v1.Volume
 	PersistentVolume *v1.PersistentVolume
 	PodNamespace     string
+	PodUID           types.UID
 	ReadOnly         bool
 }
 
