@@ -26,7 +26,7 @@ const (
 
 	// The Content-Type values for the different wire protocols.
 	FmtUnknown      Format = `<unknown>`
-	FmtText         Format = `text/plain; version=` + TextVersion
+	FmtText         Format = `text/plain; version=` + TextVersion + `; charset=utf-8`
 	FmtProtoDelim   Format = ProtoFmt + ` encoding=delimited`
 	FmtProtoText    Format = ProtoFmt + ` encoding=text`
 	FmtProtoCompact Format = ProtoFmt + ` encoding=compact-text`
