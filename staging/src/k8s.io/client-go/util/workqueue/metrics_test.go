@@ -113,7 +113,7 @@ func (m *testMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
 	return &m.duration
 }
 
-func (m *testMetricsProvider) NewUnfinishedWorkMicrosecondsMetric(name string) SettableGaugeMetric {
+func (m *testMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
 	return &m.unfinished
 }
 
@@ -229,7 +229,7 @@ func TestMetrics(t *testing.T) {
 	c.Step(time.Millisecond)
 	<-ch
 	mp.unfinished.notifyCh = nil
-	if e, a := 1000.0, mp.unfinished.gaugeValue(); e != a {
+	if e, a := .001, mp.unfinished.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 

@@ -80,7 +80,7 @@ type defaultQueueMetrics struct {
 	processingStartTimes map[t]time.Time
 
 	// how long have current threads been working?
-	unfinishedWorkMicroseconds SettableGaugeMetric
+	unfinishedWorkSeconds SettableGaugeMetric
 }
 
 func (m *defaultQueueMetrics) add(item t) {
@@ -124,7 +124,9 @@ func (m *defaultQueueMetrics) updateUnfinishedWork() {
 	for _, t := range m.processingStartTimes {
 		total += m.sinceInMicroseconds(t)
 	}
-	m.unfinishedWorkMicroseconds.Set(total)
+	// Convert to seconds; microseconds is unhelpfully granular for this.
+	total /= 1000000
+	m.unfinishedWorkSeconds.Set(total)
 }
 
 type noMetrics struct{}
@@ -161,7 +163,7 @@ type MetricsProvider interface {
 	NewAddsMetric(name string) CounterMetric
 	NewLatencyMetric(name string) SummaryMetric
 	NewWorkDurationMetric(name string) SummaryMetric
-	NewUnfinishedWorkMicrosecondsMetric(name string) SettableGaugeMetric
+	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
 }
 
@@ -183,7 +185,7 @@ func (_ noopMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewUnfinishedWorkMicrosecondsMetric(name string) SettableGaugeMetric {
+func (_ noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
@@ -213,14 +215,14 @@ func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) qu
 		return noMetrics{}
 	}
 	return &defaultQueueMetrics{
-		clock:                      clock,
-		depth:                      mp.NewDepthMetric(name),
-		adds:                       mp.NewAddsMetric(name),
-		latency:                    mp.NewLatencyMetric(name),
-		workDuration:               mp.NewWorkDurationMetric(name),
-		unfinishedWorkMicroseconds: mp.NewUnfinishedWorkMicrosecondsMetric(name),
-		addTimes:                   map[t]time.Time{},
-		processingStartTimes:       map[t]time.Time{},
+		clock:                 clock,
+		depth:                 mp.NewDepthMetric(name),
+		adds:                  mp.NewAddsMetric(name),
+		latency:               mp.NewLatencyMetric(name),
+		workDuration:          mp.NewWorkDurationMetric(name),
+		unfinishedWorkSeconds: mp.NewUnfinishedWorkSecondsMetric(name),
+		addTimes:              map[t]time.Time{},
+		processingStartTimes:  map[t]time.Time{},
 	}
 }
 
