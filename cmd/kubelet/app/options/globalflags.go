@@ -104,6 +104,7 @@ func addGlogFlags(fs *pflag.FlagSet) {
 	register(global, local, "vmodule")
 	register(global, local, "log_backtrace_at")
 	register(global, local, "log_dir")
+	register(global, local, "log_file")
 
 	fs.AddFlagSet(local)
 }
