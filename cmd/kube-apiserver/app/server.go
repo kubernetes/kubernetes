@@ -320,7 +320,6 @@ func CreateKubeAPIServerConfig(
 
 	var (
 		issuer        serviceaccount.TokenGenerator
-		apiAudiences  []string
 		maxExpiration time.Duration
 	)
 
@@ -358,7 +357,6 @@ func CreateKubeAPIServerConfig(
 			lastErr = fmt.Errorf("failed to build token generator: %v", err)
 			return
 		}
-		apiAudiences = s.Authentication.APIAudiences
 		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
 
@@ -394,7 +392,6 @@ func CreateKubeAPIServerConfig(
 			MasterCount:            s.MasterCount,
 
 			ServiceAccountIssuer:        issuer,
-			APIAudiences:                apiAudiences,
 			ServiceAccountMaxExpiration: maxExpiration,
 
 			VersionedInformers: versionedInformers,
