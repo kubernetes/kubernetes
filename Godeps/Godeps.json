@@ -1795,47 +1795,47 @@
 		},
 		{
 			"ImportPath": "github.com/golang/mock/gomock",
-			"Comment": "v1.1.1-11-g8a44ef6",
+			"Comment": "v1.1.1-11-g8a44ef6e8be577",
 			"Rev": "8a44ef6e8be577e050008c7886f24fc705d709fb"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/jsonpb",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/any",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/struct",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/wrappers",
-			"Comment": "v1.2.0-29-gd3de96c",
+			"Comment": "v1.2.0-29-gd3de96c4c28ef8",
 			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{

@@ -424,35 +424,35 @@
 		},
 		{
 			"ImportPath": "github.com/golang/groupcache/lru",
-			"Rev": "02826c3e79038b59d737d3b1c0a1d937f71a4433"
+			"Rev": "c65c006176ff7ff98bb916961c7abbc6b0afc0aa"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/jsonpb",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/any",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/struct",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/google/btree",
