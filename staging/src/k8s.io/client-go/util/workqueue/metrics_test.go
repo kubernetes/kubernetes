@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -68,18 +69,58 @@ type testMetric struct {
 	observedCount int
 
 	notifyCh chan<- struct{}
+
+	lock sync.Mutex
 }
 
-func (m *testMetric) Inc()              { m.inc++; m.notify() }
-func (m *testMetric) Dec()              { m.dec++; m.notify() }
-func (m *testMetric) Set(f float64)     { m.set = f; m.notify() }
-func (m *testMetric) Observe(f float64) { m.observedValue = f; m.observedCount++; m.notify() }
+func (m *testMetric) Inc() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.inc++
+	m.notify()
+}
+
+func (m *testMetric) Dec() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.dec++
+	m.notify()
+}
+
+func (m *testMetric) Set(f float64) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.set = f
+	m.notify()
+}
+
+func (m *testMetric) Observe(f float64) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.observedValue = f
+	m.observedCount++
+	m.notify()
+}
 
 func (m *testMetric) gaugeValue() float64 {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if m.set != 0 {
 		return m.set
 	}
 	return float64(m.inc - m.dec)
+}
+
+func (m *testMetric) observationValue() float64 {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.observedValue
+}
+
+func (m *testMetric) observationCount() int {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.observedCount
 }
 
 func (m *testMetric) notify() {
@@ -172,10 +213,10 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("Expected %v, got %v", "foo", i)
 	}
 
-	if e, a := 50.0, mp.latency.observedValue; e != a {
+	if e, a := 50.0, mp.latency.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 1, mp.latency.observedCount; e != a {
+	if e, a := 1, mp.latency.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 0.0, mp.depth.gaugeValue(); e != a {
@@ -202,10 +243,10 @@ func TestMetrics(t *testing.T) {
 	// Finish it up
 	q.Done(i)
 
-	if e, a := 25.0, mp.duration.observedValue; e != a {
+	if e, a := 25.0, mp.duration.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 1, mp.duration.observedCount; e != a {
+	if e, a := 1, mp.duration.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -220,10 +261,10 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("Expected %v, got %v", "foo", i)
 	}
 
-	if e, a := 25.0, mp.latency.observedValue; e != a {
+	if e, a := 25.0, mp.latency.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 2, mp.latency.observedCount; e != a {
+	if e, a := 2, mp.latency.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -243,10 +284,10 @@ func TestMetrics(t *testing.T) {
 
 	// Finish that one up
 	q.Done(i)
-	if e, a := 1000.0, mp.duration.observedValue; e != a {
+	if e, a := 1000.0, mp.duration.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 2, mp.duration.observedCount; e != a {
+	if e, a := 2, mp.duration.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
