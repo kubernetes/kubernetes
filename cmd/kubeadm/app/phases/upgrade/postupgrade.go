@@ -24,7 +24,6 @@ import (
 	"time"
 
 	pkgerrors "github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -34,7 +33,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -125,12 +123,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
-		installedDeploymentName := kubeadmconstants.KubeDNS
-		deploymentToDelete := kubeadmconstants.CoreDNS
+		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
+		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
 
-		if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-			installedDeploymentName = kubeadmconstants.CoreDNS
-			deploymentToDelete = kubeadmconstants.KubeDNS
+		if cfg.DNS.Type == kubeadmapi.CoreDNS {
+			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
+			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
 		}
 
 		// If we're dry-running, we don't need to wait for the new DNS addon to become ready

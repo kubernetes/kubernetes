@@ -14,48 +14,44 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha3_test
+package v1alpha3
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestJoinConfigurationConversion(t *testing.T) {
 	testcases := map[string]struct {
-		old         *v1alpha3.JoinConfiguration
-		expectedErr string
+		old           *JoinConfiguration
+		expectedError bool
 	}{
 		"conversion succeeds": {
-			old:         &v1alpha3.JoinConfiguration{},
-			expectedErr: "",
+			old:           &JoinConfiguration{},
+			expectedError: false,
 		},
 		"cluster name fails to be converted": {
-			old: &v1alpha3.JoinConfiguration{
+			old: &JoinConfiguration{
 				ClusterName: "kubernetes",
 			},
-			expectedErr: "clusterName has been removed from JoinConfiguration and clusterName from ClusterConfiguration will be used instead. Please cleanup JoinConfiguration.ClusterName fields",
+			expectedError: true,
 		},
 		"feature gates fails to be converted": {
-			old: &v1alpha3.JoinConfiguration{
+			old: &JoinConfiguration{
 				FeatureGates: map[string]bool{
 					"someGate": true,
 				},
 			},
-			expectedErr: "featureGates has been removed from JoinConfiguration and featureGates from ClusterConfiguration will be used instead. Please cleanup JoinConfiguration.FeatureGates fields",
+			expectedError: true,
 		},
 	}
 	for _, tc := range testcases {
 		internal := &kubeadm.JoinConfiguration{}
-		err := scheme.Scheme.Convert(tc.old, internal, nil)
-		if len(tc.expectedErr) != 0 {
-			testutil.AssertError(t, err, tc.expectedErr)
-		} else if err != nil {
-			t.Errorf("no error was expected but '%s' was found", err)
+		err := Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(tc.old, internal, nil)
+		if (err != nil) != tc.expectedError {
+			t.Errorf("ImageToImageMeta returned unexpected error: %v, saw: %v", tc.expectedError, (err != nil))
+			return
 		}
 	}
 }
@@ -63,19 +59,19 @@ func TestJoinConfigurationConversion(t *testing.T) {
 func TestConvertToUseHyperKubeImage(t *testing.T) {
 	tests := []struct {
 		desc              string
-		in                *v1alpha3.ClusterConfiguration
+		in                *ClusterConfiguration
 		useHyperKubeImage bool
 		expectedErr       bool
 	}{
 		{
 			desc:              "unset UnifiedControlPlaneImage sets UseHyperKubeImage to false",
-			in:                &v1alpha3.ClusterConfiguration{},
+			in:                &ClusterConfiguration{},
 			useHyperKubeImage: false,
 			expectedErr:       false,
 		},
 		{
 			desc: "matching UnifiedControlPlaneImage sets UseHyperKubeImage to true",
-			in: &v1alpha3.ClusterConfiguration{
+			in: &ClusterConfiguration{
 				ImageRepository:          "k8s.gcr.io",
 				KubernetesVersion:        "v1.12.2",
 				UnifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2",
@@ -85,7 +81,7 @@ func TestConvertToUseHyperKubeImage(t *testing.T) {
 		},
 		{
 			desc: "mismatching UnifiedControlPlaneImage tag causes an error",
-			in: &v1alpha3.ClusterConfiguration{
+			in: &ClusterConfiguration{
 				ImageRepository:          "k8s.gcr.io",
 				KubernetesVersion:        "v1.12.0",
 				UnifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2",
@@ -94,7 +90,7 @@ func TestConvertToUseHyperKubeImage(t *testing.T) {
 		},
 		{
 			desc: "mismatching UnifiedControlPlaneImage repo causes an error",
-			in: &v1alpha3.ClusterConfiguration{
+			in: &ClusterConfiguration{
 				ImageRepository:          "my.repo",
 				KubernetesVersion:        "v1.12.2",
 				UnifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2",
@@ -103,7 +99,7 @@ func TestConvertToUseHyperKubeImage(t *testing.T) {
 		},
 		{
 			desc: "mismatching UnifiedControlPlaneImage image name causes an error",
-			in: &v1alpha3.ClusterConfiguration{
+			in: &ClusterConfiguration{
 				ImageRepository:          "k8s.gcr.io",
 				KubernetesVersion:        "v1.12.2",
 				UnifiedControlPlaneImage: "k8s.gcr.io/otherimage:v1.12.2",
@@ -115,7 +111,7 @@ func TestConvertToUseHyperKubeImage(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			out := &kubeadm.ClusterConfiguration{}
-			err := v1alpha3.Convert_v1alpha3_UnifiedControlPlaneImage_To_kubeadm_UseHyperKubeImage(test.in, out)
+			err := Convert_v1alpha3_UnifiedControlPlaneImage_To_kubeadm_UseHyperKubeImage(test.in, out)
 			if test.expectedErr {
 				if err == nil {
 					t.Fatalf("unexpected success, UseHyperKubeImage: %t", out.UseHyperKubeImage)
@@ -127,6 +123,62 @@ func TestConvertToUseHyperKubeImage(t *testing.T) {
 				if out.UseHyperKubeImage != test.useHyperKubeImage {
 					t.Fatalf("mismatching result from conversion:\n\tExpected: %t\n\tReceived: %t", test.useHyperKubeImage, out.UseHyperKubeImage)
 				}
+			}
+		})
+	}
+}
+
+func TestEtcdImageToImageMeta(t *testing.T) {
+	tests := []struct {
+		name              string
+		image             string
+		expectedImageMeta kubeadm.ImageMeta
+		expectedError     bool
+	}{
+		{
+			name:  "Empty image -> Empty image meta",
+			image: "",
+			expectedImageMeta: kubeadm.ImageMeta{
+				ImageRepository: "",
+				ImageTag:        "",
+			},
+		},
+		{
+			name:  "image with tag and repository",
+			image: "custom.repo/etcd:custom.tag",
+			expectedImageMeta: kubeadm.ImageMeta{
+				ImageRepository: "custom.repo",
+				ImageTag:        "custom.tag",
+			},
+		},
+		{
+			name:          "image with custom imageName",
+			image:         "real.repo/custom-image-name-for-etcd:real.tag",
+			expectedError: true,
+		},
+		{
+			name:          "image without repository",
+			image:         "etcd:real.tag",
+			expectedError: true,
+		},
+		{
+			name:          "image without tag",
+			image:         "real.repo/etcd",
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ret, err := etcdImageToImageMeta(test.image)
+
+			if (err != nil) != test.expectedError {
+				t.Errorf("etcdImageToImageMeta returned unexpected error: %v, saw: %v", test.expectedError, (err != nil))
+				return
+			}
+
+			if ret != test.expectedImageMeta {
+				t.Errorf("etcdImageToImageMeta returned unexpected ImageMeta: %v, saw: %v", test.expectedImageMeta, ret)
 			}
 		})
 	}

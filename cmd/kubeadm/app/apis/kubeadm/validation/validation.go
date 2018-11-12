@@ -27,7 +27,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -407,13 +406,12 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 // ValidateFeatureGates validates provided feature gates
 func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	validFeatures := features.Keys(features.InitFeatureGates)
 
 	// check valid feature names are provided
 	for k := range featureGates {
 		if !features.Supports(features.InitFeatureGates, k) {
 			allErrs = append(allErrs, field.Invalid(fldPath, featureGates,
-				fmt.Sprintf("%s is not a valid feature name. Valid features are: %s", k, validFeatures)))
+				fmt.Sprintf("%s is not a valid feature name.", k)))
 		}
 	}
 

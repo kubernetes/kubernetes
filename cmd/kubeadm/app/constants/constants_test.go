@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -203,15 +204,15 @@ func TestEtcdSupportedVersion(t *testing.T) {
 
 func TestGetKubeDNSVersion(t *testing.T) {
 	var tests = []struct {
-		dns      string
+		dns      kubeadmapi.DNSAddOnType
 		expected string
 	}{
 		{
-			dns:      KubeDNS,
+			dns:      kubeadmapi.KubeDNS,
 			expected: KubeDNSVersion,
 		},
 		{
-			dns:      CoreDNS,
+			dns:      kubeadmapi.CoreDNS,
 			expected: CoreDNSVersion,
 		},
 	}

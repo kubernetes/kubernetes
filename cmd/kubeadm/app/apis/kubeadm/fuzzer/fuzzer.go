@@ -18,7 +18,6 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -34,6 +33,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzAuditPolicyConfiguration,
 		fuzzComponentConfigs,
 		fuzzNodeRegistration,
+		fuzzDNS,
 		fuzzLocalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
@@ -58,6 +58,9 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 		AuditPolicyConfiguration: kubeadm.AuditPolicyConfiguration{
 			LogDir:    constants.StaticPodAuditPolicyLogDir,
 			LogMaxAge: &v1beta1.DefaultAuditPolicyLogMaxAge,
+		},
+		DNS: kubeadm.DNS{
+			Type: kubeadm.CoreDNS,
 		},
 		CertificatesDir: v1beta1.DefaultCertificatesDir,
 		ClusterName:     v1beta1.DefaultClusterName,
@@ -107,6 +110,14 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	}
 }
 
+func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
+	// This is intentionally not calling c.FuzzNoCustom because DNS struct does not exists in v1alpha3 api
+	// (so no random value will be applied, and this is necessary for getting roundtrip passing)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil
+	obj.Type = kubeadm.CoreDNS
+}
+
 func fuzzAuditPolicyConfiguration(obj *kubeadm.AuditPolicyConfiguration, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
 
@@ -125,6 +136,10 @@ func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.DataDir = "foo"
+
+	// Pinning values for fields that does not exists in v1alpha3 api
+	obj.ImageRepository = ""
+	obj.ImageTag = ""
 }
 
 func fuzzNetworking(obj *kubeadm.Networking, c fuzz.Continue) {

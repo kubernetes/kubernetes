@@ -99,6 +99,7 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
+	SetDefaults_DNS(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_AuditPolicyConfiguration(obj)
 	SetDefaults_APIServer(&obj.APIServer)
@@ -113,7 +114,14 @@ func SetDefaults_APIServer(obj *APIServer) {
 	}
 }
 
-// SetDefaults_Etcd assigns default values for the Proxy
+// SetDefaults_DNS assigns default values for the DNS component
+func SetDefaults_DNS(obj *ClusterConfiguration) {
+	if obj.DNS.Type == "" {
+		obj.DNS.Type = CoreDNS
+	}
+}
+
+// SetDefaults_Etcd assigns default values for the proxy
 func SetDefaults_Etcd(obj *ClusterConfiguration) {
 	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
 		obj.Etcd.Local = &LocalEtcd{}
