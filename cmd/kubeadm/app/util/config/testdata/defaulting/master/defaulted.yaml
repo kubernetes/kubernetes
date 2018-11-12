@@ -21,10 +21,6 @@ nodeRegistration:
 apiServer:
   timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta1
-auditPolicy:
-  logDir: /var/log/kubernetes/audit
-  logMaxAge: 2
-  path: ""
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""

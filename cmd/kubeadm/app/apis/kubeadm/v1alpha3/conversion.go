@@ -129,6 +129,10 @@ func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *C
 		return err
 	}
 
+	if len(in.AuditPolicyConfiguration.Path) > 0 {
+		return errors.New("AuditPolicyConfiguration has been removed from ClusterConfiguration. Please cleanup ClusterConfiguration.AuditPolicyConfiguration fields")
+	}
+
 	out.APIServer.ExtraArgs = in.APIServerExtraArgs
 	out.APIServer.CertSANs = in.APIServerCertSANs
 	out.APIServer.TimeoutForControlPlane = &metav1.Duration{

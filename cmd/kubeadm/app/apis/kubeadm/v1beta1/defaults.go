@@ -101,7 +101,6 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 
 	SetDefaults_DNS(obj)
 	SetDefaults_Etcd(obj)
-	SetDefaults_AuditPolicyConfiguration(obj)
 	SetDefaults_APIServer(&obj.APIServer)
 }
 
@@ -181,16 +180,6 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 		if err == nil && u.Scheme == "file" {
 			obj.KubeConfigPath = u.Path
 		}
-	}
-}
-
-// SetDefaults_AuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
-func SetDefaults_AuditPolicyConfiguration(obj *ClusterConfiguration) {
-	if obj.AuditPolicyConfiguration.LogDir == "" {
-		obj.AuditPolicyConfiguration.LogDir = constants.StaticPodAuditPolicyLogDir
-	}
-	if obj.AuditPolicyConfiguration.LogMaxAge == nil {
-		obj.AuditPolicyConfiguration.LogMaxAge = &DefaultAuditPolicyLogMaxAge
 	}
 }
 

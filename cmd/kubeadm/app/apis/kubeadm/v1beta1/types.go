@@ -106,9 +106,6 @@ type ClusterConfiguration struct {
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
 	UseHyperKubeImage bool `json:"useHyperKubeImage,omitempty"`
 
-	// AuditPolicyConfiguration defines the options for the api server audit system
-	AuditPolicyConfiguration AuditPolicyConfiguration `json:"auditPolicy"`
-
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 
@@ -383,15 +380,4 @@ type HostPathMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType `json:"pathType,omitempty"`
-}
-
-// AuditPolicyConfiguration holds the options for configuring the api server audit policy.
-type AuditPolicyConfiguration struct {
-	// Path is the local path to an audit policy.
-	Path string `json:"path"`
-	// LogDir is the local path to the directory where logs should be stored.
-	LogDir string `json:"logDir"`
-	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
-	LogMaxAge *int32 `json:"logMaxAge,omitempty"`
-	//TODO(chuckha) add other options for audit policy.
 }

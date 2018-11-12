@@ -30,7 +30,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		fuzzInitConfiguration,
 		fuzzClusterConfiguration,
-		fuzzAuditPolicyConfiguration,
 		fuzzComponentConfigs,
 		fuzzNodeRegistration,
 		fuzzDNS,
@@ -54,10 +53,6 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			TimeoutForControlPlane: &metav1.Duration{
 				Duration: constants.DefaultControlPlaneTimeout,
 			},
-		},
-		AuditPolicyConfiguration: kubeadm.AuditPolicyConfiguration{
-			LogDir:    constants.StaticPodAuditPolicyLogDir,
-			LogMaxAge: &v1beta1.DefaultAuditPolicyLogMaxAge,
 		},
 		DNS: kubeadm.DNS{
 			Type: kubeadm.CoreDNS,
@@ -116,14 +111,6 @@ func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil
 	obj.Type = kubeadm.CoreDNS
-}
-
-func fuzzAuditPolicyConfiguration(obj *kubeadm.AuditPolicyConfiguration, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
-
-	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
-	obj.LogDir = "foo"
-	obj.LogMaxAge = new(int32)
 }
 
 func fuzzComponentConfigs(obj *kubeadm.ComponentConfigs, c fuzz.Continue) {

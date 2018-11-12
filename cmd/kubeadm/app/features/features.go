@@ -34,9 +34,6 @@ const (
 
 	// DynamicKubeletConfig is beta in v1.11
 	DynamicKubeletConfig = "DynamicKubeletConfig"
-
-	// Auditing is beta in 1.8
-	Auditing = "Auditing"
 )
 
 var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
@@ -46,7 +43,6 @@ var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
 var InitFeatureGates = FeatureList{
 	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
 	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 }
 
 // Feature represents a feature being gated

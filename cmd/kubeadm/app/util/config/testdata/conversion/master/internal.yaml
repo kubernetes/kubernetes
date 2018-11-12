@@ -14,10 +14,6 @@ APIServer:
     PathType: ""
     ReadOnly: false
   TimeoutForControlPlane: 4m0s
-AuditPolicyConfiguration:
-  LogDir: /var/log/kubernetes/audit
-  LogMaxAge: 2
-  Path: ""
 BootstrapTokens:
 - Description: ""
   Expires: null
