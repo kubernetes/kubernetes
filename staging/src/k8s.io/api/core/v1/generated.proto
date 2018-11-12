@@ -612,9 +612,9 @@ message Container {
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-  // will be reported as an event when the container is starting. When a key exists in multiple
-  // sources, the value associated with the last source will take precedence.
+  // The keys defined within a source can contain all characters except '='. All invalid keys
+  // will be reported as an event when the container is starting.
+  // When a key exists in multiple sources, the value associated with the last source will take precedence.
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
   // +optional
@@ -1046,7 +1046,7 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
-  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // An optional identifier to prepend to each key in the ConfigMap. Except '=' character all other characters allowed.
   // +optional
   optional string prefix = 1;
 
@@ -1061,7 +1061,7 @@ message EnvFromSource {
 
 // EnvVar represents an environment variable present in a Container.
 message EnvVar {
-  // Name of the environment variable. Must be a C_IDENTIFIER.
+  // Name of the environment variable. Except '=' character all other characters allowed.
   optional string name = 1;
 
   // Variable references $(VAR_NAME) are expanded

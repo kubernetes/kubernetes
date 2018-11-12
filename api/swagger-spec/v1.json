@@ -22118,7 +22118,7 @@
       "items": {
        "$ref": "v1.EnvFromSource"
       },
-      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source can contain all characters except '='. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
      },
      "env": {
       "type": "array",
@@ -22224,7 +22224,7 @@
     "properties": {
      "prefix": {
       "type": "string",
-      "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+      "description": "An optional identifier to prepend to each key in the ConfigMap. Except '=' character all other characters allowed."
      },
      "configMapRef": {
       "$ref": "v1.ConfigMapEnvSource",
@@ -22273,7 +22273,7 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the environment variable. Must be a C_IDENTIFIER."
+      "description": "Name of the environment variable. Except '=' character all other characters allowed."
      },
      "value": {
       "type": "string",
