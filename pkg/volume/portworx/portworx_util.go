@@ -295,10 +295,10 @@ func (util *portworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost) 
 			return nil, err
 		}
 
-		glog.Infof("Using portworx cluster service at: %v:%d as api endpoint",
+		klog.Infof("Using portworx cluster service at: %v:%d as api endpoint",
 			svc.Spec.ClusterIP, osdMgmtDefaultPort)
 	} else {
-		glog.Infof("Using portworx service at: %v:%d as api endpoint",
+		klog.Infof("Using portworx service at: %v:%d as api endpoint",
 			volumeHost.GetHostName(), osdMgmtDefaultPort)
 	}
 
@@ -330,7 +330,7 @@ func (util *portworxVolumeUtil) getLocalPortworxDriver(volumeHost volume.VolumeH
 		return nil, err
 	}
 
-	glog.Infof("Using portworx local service at: %v:%d as api endpoint",
+	klog.Infof("Using portworx local service at: %v:%d as api endpoint",
 		volumeHost.GetHostName(), osgMgmtPort)
 	return volumeclient.VolumeDriver(util.portworxClient), nil
 }
@@ -351,20 +351,20 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		err := fmt.Errorf("Failed to get kubeclient when creating portworx client")
-		glog.Errorf(err.Error())
+		klog.Errorf(err.Error())
 		return nil, err
 	}
 
 	opts := metav1.GetOptions{}
 	svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
 	if err != nil {
-		glog.Errorf("Failed to get service. Err: %v", err)
+		klog.Errorf("Failed to get service. Err: %v", err)
 		return nil, err
 	}
 
 	if svc == nil {
 		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it.", pxServiceName)
-		glog.Errorf(err.Error())
+		klog.Errorf(err.Error())
 		return nil, err
 	}
 
