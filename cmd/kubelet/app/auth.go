@@ -42,8 +42,8 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient   authorizationclient.SubjectAccessReviewInterface
 	)
 	if client != nil && !reflect.ValueOf(client).IsNil() {
-		tokenClient = client.AuthenticationV1beta1().TokenReviews()
-		sarClient = client.AuthorizationV1beta1().SubjectAccessReviews()
+		tokenClient = client.AuthenticationV1().TokenReviews()
+		sarClient = client.AuthorizationV1().SubjectAccessReviews()
 	}
 
 	authenticator, err := BuildAuthn(tokenClient, config.Authentication)
