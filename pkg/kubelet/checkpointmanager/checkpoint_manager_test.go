@@ -56,6 +56,8 @@ type PortMapping struct {
 	ContainerPort *int32
 	// Port number on the host.
 	HostPort *int32
+	// Host ip to expose.
+	HostIP string
 }
 
 // CheckpointData is a sample example structure to be used in test cases for checkpointing
@@ -151,17 +153,20 @@ func TestCheckpointManager(t *testing.T) {
 	port80 := int32(80)
 	port443 := int32(443)
 	proto := protocol("tcp")
+	ip1234 := "1.2.3.4"
 
 	portMappings := []*PortMapping{
 		{
 			&proto,
 			&port80,
 			&port80,
+			ip1234,
 		},
 		{
 			&proto,
 			&port443,
 			&port443,
+			ip1234,
 		},
 	}
 	checkpoint1 := newFakeCheckpointV1("check1", portMappings, true)
