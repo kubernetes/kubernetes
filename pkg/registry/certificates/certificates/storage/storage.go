@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerhandler "k8s.io/kubernetes/pkg/printers/handler"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 )
@@ -48,7 +48,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 		DeleteStrategy: csrregistry.Strategy,
 		ExportStrategy: csrregistry.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewConvertingHumanReadablePrinterWithLegacyScheme().With(printerhandler.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

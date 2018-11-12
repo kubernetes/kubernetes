@@ -56,7 +56,7 @@ go_library(
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",

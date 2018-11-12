@@ -114,7 +114,7 @@
                 "k8s.io/kubernetes/pkg/kubelet/types",
                 "k8s.io/kubernetes/pkg/master/ports",
                 "k8s.io/kubernetes/pkg/printers",
-                "k8s.io/kubernetes/pkg/printers/internalversion",
+                "k8s.io/kubernetes/pkg/printers/handler",
                 "k8s.io/kubernetes/pkg/registry/rbac/reconciliation",
                 "k8s.io/kubernetes/pkg/registry/rbac/validation",
                 "k8s.io/kubernetes/pkg/scheduler/algorithm",

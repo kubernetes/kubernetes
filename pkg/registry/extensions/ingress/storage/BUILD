@@ -32,7 +32,7 @@ go_library(
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/extensions/ingress:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

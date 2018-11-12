@@ -23,7 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	networkingapi "k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerhandler "k8s.io/kubernetes/pkg/printers/handler"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/networking/networkpolicy"
 )
@@ -44,7 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: networkpolicy.Strategy,
 		DeleteStrategy: networkpolicy.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewConvertingHumanReadablePrinterWithLegacyScheme().With(printerhandler.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

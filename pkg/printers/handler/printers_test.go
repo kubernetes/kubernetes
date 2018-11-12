@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internalversion
+package handler
 
 import (
 	"bytes"
@@ -53,8 +53,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	genericprinters "k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -259,11 +259,11 @@ func yamlUnmarshal(data []byte, v interface{}) error {
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yamlUnmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(scheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yamlUnmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(scheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
 }
 
 func TestFormatResourceName(t *testing.T) {
@@ -389,7 +389,7 @@ func TestNamePrinter(t *testing.T) {
 			"pod/bar\n"},
 	}
 
-	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("name")
+	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("name")
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -553,8 +553,8 @@ func TestPrinters(t *testing.T) {
 
 	genericPrinters := map[string]printers.ResourcePrinter{
 		// TODO(juanvallejo): move "generic printer" tests to pkg/kubectl/genericclioptions/printers
-		"json":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
-		"yaml":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
+		"json":      genericprinters.NewTypeSetter(scheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
+		"yaml":      genericprinters.NewTypeSetter(scheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
@@ -1295,7 +1295,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Image:                  "foo/bar",
+									Image: "foo/bar",
 									TerminationMessagePath: corev1.TerminationMessagePathDefault,
 									ImagePullPolicy:        corev1.PullIfNotPresent,
 								},

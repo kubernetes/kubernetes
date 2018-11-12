@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerhandler "k8s.io/kubernetes/pkg/printers/handler"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -149,7 +149,7 @@ func TestServerSidePrint(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
-	printer := newFakePrinter(printersinternal.AddHandlers)
+	printer := newFakePrinter(printerhandler.AddHandlers)
 
 	configFlags := genericclioptions.NewTestConfigFlags().
 		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))

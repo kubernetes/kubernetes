@@ -68,7 +68,7 @@ go_library(
         "//pkg/kubectl/util/podutils:go_default_library",
         "//pkg/kubectl/util/slice:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -15,8 +15,8 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
@@ -55,7 +55,7 @@ go_library(
         "describe.go",
         "printers.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/printers/internalversion",
+    importpath = "k8s.io/kubernetes/pkg/printers/handler",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/ref:go_default_library",

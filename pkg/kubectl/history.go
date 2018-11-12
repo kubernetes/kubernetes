@@ -37,7 +37,7 @@ import (
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerhandler "k8s.io/kubernetes/pkg/printers/handler"
 )
 
 const (
@@ -166,8 +166,8 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 
 func printTemplate(template *corev1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(template, w)
+	w := printerhandler.NewPrefixWriter(buf)
+	printerhandler.DescribePodTemplate(template, w)
 	return buf.String(), nil
 }
 

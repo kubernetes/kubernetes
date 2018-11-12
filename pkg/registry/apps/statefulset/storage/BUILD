@@ -41,7 +41,7 @@ go_library(
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/autoscaling/validation:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/apps/statefulset:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

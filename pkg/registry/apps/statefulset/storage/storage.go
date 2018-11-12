@@ -34,7 +34,7 @@ import (
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerhandler "k8s.io/kubernetes/pkg/printers/handler"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/statefulset"
 )
@@ -72,7 +72,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: statefulset.Strategy,
 		DeleteStrategy: statefulset.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewConvertingHumanReadablePrinterWithLegacyScheme().With(printerhandler.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

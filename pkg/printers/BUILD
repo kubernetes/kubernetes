@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "convert_humanreadable.go",
         "customcolumn.go",
         "customcolumn_flags.go",
         "humanreadable.go",
@@ -17,6 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -44,7 +46,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/printers/internalversion:all-srcs",
+        "//pkg/printers/handler:all-srcs",
         "//pkg/printers/storage:all-srcs",
     ],
     tags = ["automanaged"],

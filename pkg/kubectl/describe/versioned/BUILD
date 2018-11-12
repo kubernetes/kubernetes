@@ -8,7 +8,7 @@ go_library(
     deps = [
         "//pkg/kubectl/describe:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
     ],

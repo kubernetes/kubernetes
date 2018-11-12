@@ -12,7 +12,7 @@ go_library(
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/rbac/rolebinding:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

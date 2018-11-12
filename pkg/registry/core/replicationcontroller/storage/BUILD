@@ -40,7 +40,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/handler:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/core/replicationcontroller:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

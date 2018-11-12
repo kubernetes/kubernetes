@@ -23,7 +23,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerhandler "k8s.io/kubernetes/pkg/printers/handler"
 )
 
 // DescriberFn gives a way to easily override the function for unit testing if needed
@@ -36,11 +36,11 @@ func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *met
 		return nil, err
 	}
 	// try to get a describer
-	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientConfig); ok {
+	if describer, ok := printerhandler.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientConfig); ok {
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible
-	if genericDescriber, ok := printersinternal.GenericDescriberFor(mapping, clientConfig); ok {
+	if genericDescriber, ok := printerhandler.GenericDescriberFor(mapping, clientConfig); ok {
 		return genericDescriber, nil
 	}
 	// otherwise return an unregistered error
