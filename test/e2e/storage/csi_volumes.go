@@ -43,6 +43,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/rand"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // List of testDrivers to be executed in below loop
@@ -152,6 +154,46 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			testsuites.RunTestSuite(f, curDriver, csiTestSuites, csiTunePattern)
 		})
 	}
+
+	Context("CSI Topology test using GCE PD driver [Feature: CSINodeInfo]", func() {
+		newConfig := config
+		newConfig.TopologyEnabled = true
+		driver := drivers.InitGcePDCSIDriver(newConfig).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
+		BeforeEach(func() {
+			driver.CreateDriver()
+		})
+
+		AfterEach(func() {
+			driver.CleanupDriver()
+		})
+
+		It("should provision zonal PD with immediate volume binding and AllowedTopologies set and mount the volume to a pod", func() {
+			suffix := "topology-positive"
+			testTopologyPositive(cs, suffix, ns.GetName(), false /* delayBinding */, true /* allowedTopologies */)
+		})
+
+		It("should provision zonal PD with delayed volume binding and mount the volume to a pod", func() {
+			suffix := "delayed"
+			testTopologyPositive(cs, suffix, ns.GetName(), true /* delayBinding */, false /* allowedTopologies */)
+		})
+
+		It("should provision zonal PD with delayed volume binding and AllowedTopologies set and mount the volume to a pod", func() {
+			suffix := "delayed-topology-positive"
+			testTopologyPositive(cs, suffix, ns.GetName(), true /* delayBinding */, true /* allowedTopologies */)
+		})
+
+		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with immediate volume binding", func() {
+			framework.SkipUnlessMultizone(cs)
+			suffix := "topology-negative"
+			testTopologyNegative(cs, suffix, ns.GetName(), false /* delayBinding */)
+		})
+
+		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with delayed volume binding", func() {
+			framework.SkipUnlessMultizone(cs)
+			suffix := "delayed-topology-negative"
+			testTopologyNegative(cs, suffix, ns.GetName(), true /* delayBinding */)
+		})
+	})
 
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 	Context("CSI attach test using HostPath driver [Feature:CSIDriverRegistry]", func() {
@@ -374,6 +416,54 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	})
 })
 
+func testTopologyPositive(cs clientset.Interface, suffix, namespace string, delayBinding, allowedTopologies bool) {
+	test := createGCEPDStorageClassTest()
+	test.DelayBinding = delayBinding
+
+	class := newStorageClass(test, namespace, suffix)
+	if allowedTopologies {
+		topoZone := getRandomClusterZone(cs)
+		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
+	}
+	claim := newClaim(test, namespace, suffix)
+	claim.Spec.StorageClassName = &class.Name
+
+	if delayBinding {
+		_, node := testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class)
+		Expect(node).ToNot(BeNil(), "Unexpected nil node found")
+	} else {
+		testsuites.TestDynamicProvisioning(test, cs, claim, class)
+	}
+}
+
+func testTopologyNegative(cs clientset.Interface, suffix, namespace string, delayBinding bool) {
+	framework.SkipUnlessMultizone(cs)
+
+	// Use different zones for pod and PV
+	zones, err := framework.GetClusterZones(cs)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(zones.Len()).To(BeNumerically(">=", 2))
+	zonesList := zones.UnsortedList()
+	podZoneIndex := rand.Intn(zones.Len())
+	podZone := zonesList[podZoneIndex]
+	pvZone := zonesList[(podZoneIndex+1)%zones.Len()]
+
+	test := createGCEPDStorageClassTest()
+	test.DelayBinding = delayBinding
+	test.NodeSelector = map[string]string{kubeletapis.LabelZoneFailureDomain: podZone}
+	test.ExpectUnschedulable = true
+
+	class := newStorageClass(test, namespace, suffix)
+	addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, pvZone)
+	claim := newClaim(test, namespace, suffix)
+	claim.Spec.StorageClassName = &class.Name
+	if delayBinding {
+		testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class)
+	} else {
+		testsuites.TestDynamicProvisioning(test, cs, claim, class)
+	}
+}
+
 func createCSIDriver(csics csiclient.Interface, name string, attachable bool, podInfoOnMountVersion *string) *csiv1alpha1.CSIDriver {
 	By("Creating CSIDriver instance")
 	driver := &csiv1alpha1.CSIDriver{
@@ -518,5 +608,27 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 			return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
 		}
 		return nil
+	}
+}
+
+func addSingleCSIZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *storagev1.StorageClass, zone string) {
+	term := v1.TopologySelectorTerm{
+		MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+			{
+				Key:    drivers.GCEPDCSIZoneTopologyKey,
+				Values: []string{zone},
+			},
+		},
+	}
+	sc.AllowedTopologies = append(sc.AllowedTopologies, term)
+}
+
+func createGCEPDStorageClassTest() testsuites.StorageClassTest {
+	return testsuites.StorageClassTest{
+		Name:         drivers.GCEPDCSIProvisionerName,
+		Provisioner:  drivers.GCEPDCSIProvisionerName,
+		Parameters:   map[string]string{"type": "pd-standard"},
+		ClaimSize:    "5Gi",
+		ExpectedSize: "5Gi",
 	}
 }
