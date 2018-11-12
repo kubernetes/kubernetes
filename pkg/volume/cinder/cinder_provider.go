@@ -120,7 +120,8 @@ func (cinder cinder) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
-func (cinder cinder) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {}
+func (cinder cinder) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 func (cinder cinder) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false

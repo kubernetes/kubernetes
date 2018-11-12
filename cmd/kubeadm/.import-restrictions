@@ -99,7 +99,6 @@
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",

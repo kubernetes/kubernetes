@@ -17,7 +17,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/cinder",
     deps = [
-        "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/keymutex:go_default_library",
