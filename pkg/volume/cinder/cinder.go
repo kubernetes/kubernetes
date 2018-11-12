@@ -221,7 +221,9 @@ func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
 
 	switch cloud := cloud.(type) {
 	case *openstack.OpenStack:
-		return cloud, nil
+		var bs interface{}
+		bs = *cloud
+		return bs.(BlockStorageProvider), nil
 	default:
 		return nil, errors.New("invalid cloud provider: expected OpenStack")
 	}
