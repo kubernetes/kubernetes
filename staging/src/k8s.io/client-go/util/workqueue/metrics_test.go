@@ -94,6 +94,7 @@ type testMetricsProvider struct {
 	latency    testMetric
 	duration   testMetric
 	unfinished testMetric
+	longest    testMetric
 	retries    testMetric
 }
 
@@ -115,6 +116,10 @@ func (m *testMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
 
 func (m *testMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
 	return &m.unfinished
+}
+
+func (m *testMetricsProvider) NewLongestRunningProcessorMicrosecondsMetric(name string) SettableGaugeMetric {
+	return &m.longest
 }
 
 func (m *testMetricsProvider) NewRetriesMetric(name string) CounterMetric {
@@ -230,6 +235,9 @@ func TestMetrics(t *testing.T) {
 	<-ch
 	mp.unfinished.notifyCh = nil
 	if e, a := .001, mp.unfinished.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1000.0, mp.longest.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 

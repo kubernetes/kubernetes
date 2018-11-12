@@ -84,6 +84,17 @@ func (prometheusMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) wor
 	return unfinished
 }
 
+func (prometheusMetricsProvider) NewLongestRunningProcessorMicrosecondsMetric(name string) workqueue.SettableGaugeMetric {
+	unfinished := prometheus.NewGauge(prometheus.GaugeOpts{
+		Subsystem: name,
+		Name:      "longest_running_procesor_microseconds",
+		Help: "How many microseconds has the longest running " +
+			"processor for " + name + " been running.",
+	})
+	prometheus.Register(unfinished)
+	return unfinished
+}
+
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
 	retries := prometheus.NewCounter(prometheus.CounterOpts{
 		Subsystem: name,

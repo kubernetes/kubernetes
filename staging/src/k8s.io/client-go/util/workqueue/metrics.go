@@ -80,7 +80,8 @@ type defaultQueueMetrics struct {
 	processingStartTimes map[t]time.Time
 
 	// how long have current threads been working?
-	unfinishedWorkSeconds SettableGaugeMetric
+	unfinishedWorkSeconds   SettableGaugeMetric
+	longestRunningProcessor SettableGaugeMetric
 }
 
 func (m *defaultQueueMetrics) add(item t) {
@@ -120,13 +121,21 @@ func (m *defaultQueueMetrics) done(item t) {
 }
 
 func (m *defaultQueueMetrics) updateUnfinishedWork() {
+	// Note that a summary metric would be better for this, but prometheus
+	// doesn't seem to have non-hacky ways to reset the summary metrics.
 	var total float64
+	var oldest float64
 	for _, t := range m.processingStartTimes {
-		total += m.sinceInMicroseconds(t)
+		age := m.sinceInMicroseconds(t)
+		total += age
+		if age > oldest {
+			oldest = age
+		}
 	}
 	// Convert to seconds; microseconds is unhelpfully granular for this.
 	total /= 1000000
 	m.unfinishedWorkSeconds.Set(total)
+	m.longestRunningProcessor.Set(oldest) // in microseconds.
 }
 
 type noMetrics struct{}
@@ -164,6 +173,7 @@ type MetricsProvider interface {
 	NewLatencyMetric(name string) SummaryMetric
 	NewWorkDurationMetric(name string) SummaryMetric
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
+	NewLongestRunningProcessorMicrosecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
 }
 
@@ -186,6 +196,10 @@ func (_ noopMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
 }
 
 func (_ noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewLongestRunningProcessorMicrosecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
@@ -215,14 +229,15 @@ func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) qu
 		return noMetrics{}
 	}
 	return &defaultQueueMetrics{
-		clock:                 clock,
-		depth:                 mp.NewDepthMetric(name),
-		adds:                  mp.NewAddsMetric(name),
-		latency:               mp.NewLatencyMetric(name),
-		workDuration:          mp.NewWorkDurationMetric(name),
-		unfinishedWorkSeconds: mp.NewUnfinishedWorkSecondsMetric(name),
-		addTimes:              map[t]time.Time{},
-		processingStartTimes:  map[t]time.Time{},
+		clock:                   clock,
+		depth:                   mp.NewDepthMetric(name),
+		adds:                    mp.NewAddsMetric(name),
+		latency:                 mp.NewLatencyMetric(name),
+		workDuration:            mp.NewWorkDurationMetric(name),
+		unfinishedWorkSeconds:   mp.NewUnfinishedWorkSecondsMetric(name),
+		longestRunningProcessor: mp.NewLongestRunningProcessorMicrosecondsMetric(name),
+		addTimes:                map[t]time.Time{},
+		processingStartTimes:    map[t]time.Time{},
 	}
 }
 
