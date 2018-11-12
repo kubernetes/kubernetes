@@ -19,8 +19,8 @@ package kubelet
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -74,7 +74,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
 
-	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	klog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 	return true, nil
 }

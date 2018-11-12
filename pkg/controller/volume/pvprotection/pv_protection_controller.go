@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -30,6 +29,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -78,8 +78,8 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting PV protection controller")
-	defer glog.Infof("Shutting down PV protection controller")
+	klog.Infof("Starting PV protection controller")
+	defer klog.Infof("Shutting down PV protection controller")
 
 	if !controller.WaitForCacheSync("PV protection", stopCh, c.pvListerSynced) {
 		return
@@ -120,15 +120,15 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) processPV(pvName string) error {
-	glog.V(4).Infof("Processing PV %s", pvName)
+	klog.V(4).Infof("Processing PV %s", pvName)
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
+		klog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
 	}()
 
 	pv, err := c.pvLister.Get(pvName)
 	if apierrs.IsNotFound(err) {
-		glog.V(4).Infof("PV %s not found, ignoring", pvName)
+		klog.V(4).Infof("PV %s not found, ignoring", pvName)
 		return nil
 	}
 	if err != nil {
@@ -163,10 +163,10 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
 	if err != nil {
-		glog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
+		klog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
 		return err
 	}
-	glog.V(3).Infof("Added protection finalizer to PV %s", pv.Name)
+	klog.V(3).Infof("Added protection finalizer to PV %s", pv.Name)
 	return nil
 }
 
@@ -175,10 +175,10 @@ func (c *Controller) removeFinalizer(pv *v1.PersistentVolume) error {
 	pvClone.ObjectMeta.Finalizers = slice.RemoveString(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
 	if err != nil {
-		glog.V(3).Infof("Error removing protection finalizer from PV %s: %v", pv.Name, err)
+		klog.V(3).Infof("Error removing protection finalizer from PV %s: %v", pv.Name, err)
 		return err
 	}
-	glog.V(3).Infof("Removed protection finalizer from PV %s", pv.Name)
+	klog.V(3).Infof("Removed protection finalizer from PV %s", pv.Name)
 	return nil
 }
 
@@ -200,7 +200,7 @@ func (c *Controller) pvAddedUpdated(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("PV informer returned non-PV object: %#v", obj))
 		return
 	}
-	glog.V(4).Infof("Got event on PV %s", pv.Name)
+	klog.V(4).Infof("Got event on PV %s", pv.Name)
 
 	if needToAddFinalizer(pv) || isDeletionCandidate(pv) {
 		c.queue.Add(pv.Name)

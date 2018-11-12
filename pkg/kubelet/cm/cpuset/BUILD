@@ -5,7 +5,7 @@ go_library(
     srcs = ["cpuset.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpuset",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/glog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
 go_test(

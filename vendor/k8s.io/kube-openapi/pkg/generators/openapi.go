@@ -30,7 +30,7 @@ import (
 	"k8s.io/gengo/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // This is the comment tag that carries parameters for open API generation.
@@ -184,7 +184,7 @@ func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 }
 
 func (g *openAPIGen) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
-	glog.V(5).Infof("generating for type %v", t)
+	klog.V(5).Infof("generating for type %v", t)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	err := newOpenAPITypeWriter(sw).generate(t)
 	if err != nil {
@@ -289,7 +289,7 @@ func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]
 			required = append(required, name)
 		}
 		if err = g.generateProperty(&m, t); err != nil {
-			glog.Errorf("Error when generating: %v, %v\n", name, m)
+			klog.Errorf("Error when generating: %v, %v\n", name, m)
 			return required, err
 		}
 	}
@@ -376,7 +376,7 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 	// Initially, we will only log struct extension errors.
 	if len(errors) > 0 {
 		for _, e := range errors {
-			glog.V(2).Infof("[%s]: %s\n", t.String(), e)
+			klog.V(2).Infof("[%s]: %s\n", t.String(), e)
 		}
 	}
 	// TODO(seans3): Validate struct extensions here.
@@ -392,7 +392,7 @@ func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *typ
 	if len(errors) > 0 {
 		errorPrefix := fmt.Sprintf("[%s] %s:", parent.String(), m.String())
 		for _, e := range errors {
-			glog.V(2).Infof("%s %s\n", errorPrefix, e)
+			klog.V(2).Infof("%s %s\n", errorPrefix, e)
 		}
 	}
 	g.emitExtensions(extensions)

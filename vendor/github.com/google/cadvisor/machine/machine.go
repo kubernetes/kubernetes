@@ -30,7 +30,7 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"golang.org/x/sys/unix"
 )
@@ -191,7 +191,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 	for idx, node := range nodes {
 		caches, err := sysinfo.GetCacheInfo(sysFs, node.Cores[0].Threads[0])
 		if err != nil {
-			glog.Errorf("failed to get cache information for node %d: %v", node.Id, err)
+			klog.Errorf("failed to get cache information for node %d: %v", node.Id, err)
 			continue
 		}
 		numThreadsPerCore := len(node.Cores[0].Threads)

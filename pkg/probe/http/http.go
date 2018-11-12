@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // New creates Prober that will skip TLS verification while probing.
@@ -96,9 +96,9 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		glog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
 		return probe.Success, body, nil
 	}
-	glog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
+	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
 	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 }

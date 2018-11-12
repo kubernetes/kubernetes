@@ -76,8 +76,8 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 	return newNamespacedCustomResourceVersionedClient(ns, client, crd, crd.Spec.Versions[0].Name)
 }
 
-// updateCustomResourceDefinitionWithRetry updates a CRD, retrying up to 5 times on version conflict errors.
-func updateCustomResourceDefinitionWithRetry(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+// UpdateCustomResourceDefinitionWithRetry updates a CRD, retrying up to 5 times on version conflict errors.
+func UpdateCustomResourceDefinitionWithRetry(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
 	for i := 0; i < 5; i++ {
 		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
 		if err != nil {

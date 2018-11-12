@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -126,7 +126,7 @@ func assertManagedStatus(
 			}
 		}
 
-		glog.Warningf(
+		klog.Warningf(
 			"For pod: %s, name: %s, expected %t, (/etc/hosts was %q), (/etc/hosts-original was %q), retryCount: %d",
 			podName, name, expectedIsManaged, etcHostsContent, etcHostsOriginalContent, retryCount)
 

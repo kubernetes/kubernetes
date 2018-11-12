@@ -21,7 +21,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
@@ -83,7 +83,7 @@ type Controller struct {
 func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter) *Controller {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
-		glog.Fatalf("failed to get listener address: %v", err)
+		klog.Fatalf("failed to get listener address: %v", err)
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic}
@@ -144,15 +144,15 @@ func (c *Controller) Start() {
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
 		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
-		glog.Fatalf("Unable to perform initial IP allocation check: %v", err)
+		klog.Fatalf("Unable to perform initial IP allocation check: %v", err)
 	}
 	if err := repairNodePorts.RunOnce(); err != nil {
 		// If we fail to repair node ports apiserver is useless. We should restart and retry.
-		glog.Fatalf("Unable to perform initial service nodePort check: %v", err)
+		klog.Fatalf("Unable to perform initial service nodePort check: %v", err)
 	}
 	// Service definition is reconciled during first run to correct port and type per expectations.
 	if err := c.UpdateKubernetesService(true); err != nil {
-		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
+		klog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
 
 	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
@@ -167,9 +167,9 @@ func (c *Controller) Stop() {
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
-		glog.Infof("Shutting down kubernetes service endpoint reconciler")
+		klog.Infof("Shutting down kubernetes service endpoint reconciler")
 		if err := c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts); err != nil {
-			glog.Error(err)
+			klog.Error(err)
 		}
 	}()
 
@@ -178,7 +178,7 @@ func (c *Controller) Stop() {
 		// done
 	case <-time.After(2 * c.EndpointInterval):
 		// don't block server shutdown forever if we can't reach etcd to remove ourselves
-		glog.Warning("StopReconciling() timed out")
+		klog.Warning("StopReconciling() timed out")
 	}
 }
 
@@ -266,7 +266,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		// The service already exists.
 		if reconcile {
 			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
-				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
+				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
 				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(svc)
 				return err
 			}

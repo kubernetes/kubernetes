@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // DockerConfigJson represents ~/.docker/config.json file info
@@ -95,21 +95,21 @@ func ReadDockercfgFile(searchPaths []string) (cfg DockerConfig, err error) {
 	for _, configPath := range searchPaths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
 		if err != nil {
-			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			klog.Errorf("while trying to canonicalize %s: %v", configPath, err)
 			continue
 		}
-		glog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
+		klog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
 		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
-			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			klog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
 			continue
 		}
 		cfg, err := readDockerConfigFileFromBytes(contents)
 		if err == nil {
-			glog.V(4).Infof("found .dockercfg at %s", absDockerConfigFileLocation)
+			klog.V(4).Infof("found .dockercfg at %s", absDockerConfigFileLocation)
 			return cfg, nil
 		}
 	}
@@ -125,18 +125,18 @@ func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error
 	for _, configPath := range searchPaths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
 		if err != nil {
-			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			klog.Errorf("while trying to canonicalize %s: %v", configPath, err)
 			continue
 		}
-		glog.V(4).Infof("looking for %s at %s", configJsonFileName, absDockerConfigFileLocation)
+		klog.V(4).Infof("looking for %s at %s", configJsonFileName, absDockerConfigFileLocation)
 		cfg, err = ReadSpecificDockerConfigJsonFile(absDockerConfigFileLocation)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+				klog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
 			}
 			continue
 		}
-		glog.V(4).Infof("found valid %s at %s", configJsonFileName, absDockerConfigFileLocation)
+		klog.V(4).Infof("found valid %s at %s", configJsonFileName, absDockerConfigFileLocation)
 		return cfg, nil
 	}
 	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configJsonFileName, searchPaths)
@@ -188,7 +188,7 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		glog.V(2).Infof("body of failing http response: %v", resp.Body)
+		klog.V(2).Infof("body of failing http response: %v", resp.Body)
 		return nil, &HttpError{
 			StatusCode: resp.StatusCode,
 			Url:        url,
@@ -213,7 +213,7 @@ func ReadDockerConfigFileFromUrl(url string, client *http.Client, header *http.H
 
 func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
 	if err = json.Unmarshal(contents, &cfg); err != nil {
-		glog.Errorf("while trying to parse blob %q: %v", contents, err)
+		klog.Errorf("while trying to parse blob %q: %v", contents, err)
 		return nil, err
 	}
 	return
@@ -222,7 +222,7 @@ func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error
 func readDockerConfigJsonFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
 	var cfgJson DockerConfigJson
 	if err = json.Unmarshal(contents, &cfgJson); err != nil {
-		glog.Errorf("while trying to parse blob %q: %v", contents, err)
+		klog.Errorf("while trying to parse blob %q: %v", contents, err)
 		return nil, err
 	}
 	cfg = cfgJson.Auths

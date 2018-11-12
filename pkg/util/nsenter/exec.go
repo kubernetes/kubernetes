@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/utils/exec"
 )
 
@@ -49,7 +49,7 @@ func NewNsenterExecutor(hostRootFsPath string, executor exec.Interface) *Executo
 func (nsExecutor *Executor) Command(cmd string, args ...string) exec.Cmd {
 	fullArgs := append([]string{fmt.Sprintf("--mount=%s", nsExecutor.hostProcMountNsPath), "--"},
 		append([]string{cmd}, args...)...)
-	glog.V(5).Infof("Running nsenter command: %v %v", nsenterPath, fullArgs)
+	klog.V(5).Infof("Running nsenter command: %v %v", nsenterPath, fullArgs)
 	return nsExecutor.executor.Command(nsenterPath, fullArgs...)
 }
 
@@ -57,7 +57,7 @@ func (nsExecutor *Executor) Command(cmd string, args ...string) exec.Cmd {
 func (nsExecutor *Executor) CommandContext(ctx context.Context, cmd string, args ...string) exec.Cmd {
 	fullArgs := append([]string{fmt.Sprintf("--mount=%s", nsExecutor.hostProcMountNsPath), "--"},
 		append([]string{cmd}, args...)...)
-	glog.V(5).Infof("Running nsenter command: %v %v", nsenterPath, fullArgs)
+	klog.V(5).Infof("Running nsenter command: %v %v", nsenterPath, fullArgs)
 	return nsExecutor.executor.CommandContext(ctx, nsenterPath, fullArgs...)
 }
 

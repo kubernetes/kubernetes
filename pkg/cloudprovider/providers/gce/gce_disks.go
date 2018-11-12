@@ -33,10 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/features"
@@ -400,7 +400,7 @@ func (manager *gceServiceManager) getRegionFromZone(zoneInfo zoneType) (string, 
 
 	region, err := GetGCERegion(zone)
 	if err != nil {
-		glog.Warningf("failed to parse GCE region from zone %q: %v", zone, err)
+		klog.Warningf("failed to parse GCE region from zone %q: %v", zone, err)
 		region = manager.gce.region
 	}
 
@@ -569,7 +569,7 @@ func (g *Cloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
+			klog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume PD %q is not attached to it.",
 				instanceName,
 				devicePath)
@@ -590,7 +590,7 @@ func (g *Cloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, 
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
+			klog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume PD %q is not attached to it.",
 				instanceName,
 				diskName)
@@ -622,7 +622,7 @@ func (g *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (m
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
+			klog.Warningf(
 				"Instance %q does not exist. DisksAreAttached will assume PD %v are not attached to it.",
 				instanceName,
 				diskNames)
@@ -676,7 +676,7 @@ func (g *Cloud) CreateDisk(
 
 	mc.Observe(err)
 	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD %q already exists, reusing", name)
+		klog.Warningf("GCE PD %q already exists, reusing", name)
 		return nil
 	}
 	return err
@@ -717,7 +717,7 @@ func (g *Cloud) CreateRegionalDisk(
 
 	mc.Observe(err)
 	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD %q already exists, reusing", name)
+		klog.Warningf("GCE PD %q already exists, reusing", name)
 		return nil
 	}
 	return err
@@ -821,7 +821,7 @@ func (g *Cloud) GetAutoLabelsForPD(name string, zone string) (map[string]string,
 		if utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
 			zoneSet, err := volumeutil.LabelZonesToSet(zone)
 			if err != nil {
-				glog.Warningf("Failed to parse zone field: %q. Will use raw field.", zone)
+				klog.Warningf("Failed to parse zone field: %q. Will use raw field.", zone)
 			}
 
 			if len(zoneSet) > 1 {
@@ -955,7 +955,7 @@ func (g *Cloud) GetDiskByNameUnknownZone(diskName string) (*Disk, error) {
 			switch zoneInfo := disk.ZoneInfo.(type) {
 			case multiZone:
 				if zoneInfo.replicaZones.Has(zone) {
-					glog.Warningf("GCE PD name (%q) was found in multiple zones (%q), but ok because it is a RegionalDisk.",
+					klog.Warningf("GCE PD name (%q) was found in multiple zones (%q), but ok because it is a RegionalDisk.",
 						diskName, zoneInfo.replicaZones)
 					continue
 				}
@@ -969,7 +969,7 @@ func (g *Cloud) GetDiskByNameUnknownZone(diskName string) (*Disk, error) {
 	if found != nil {
 		return found, nil
 	}
-	glog.Warningf("GCE persistent disk %q not found in managed zones (%s)",
+	klog.Warningf("GCE persistent disk %q not found in managed zones (%s)",
 		diskName, strings.Join(g.managedZones, ","))
 
 	return nil, cloudprovider.DiskNotFound

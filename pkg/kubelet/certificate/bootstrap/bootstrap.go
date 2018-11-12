@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,11 +54,11 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 		return err
 	}
 	if ok {
-		glog.V(2).Infof("Kubeconfig %s exists and is valid, skipping bootstrap", kubeconfigPath)
+		klog.V(2).Infof("Kubeconfig %s exists and is valid, skipping bootstrap", kubeconfigPath)
 		return nil
 	}
 
-	glog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
+	klog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
@@ -89,7 +89,7 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	// managed by the store.
 	privKeyPath := filepath.Join(certDir, tmpPrivateKeyFile)
 	if !verifyKeyData(keyData) {
-		glog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
+		klog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
 		// Note: always call LoadOrGenerateKeyFile so that private key is
 		// reused on next startup if CSR request fails.
 		keyData, _, err = certutil.LoadOrGenerateKeyFile(privKeyPath)
@@ -99,7 +99,7 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	}
 
 	if err := waitForServer(*bootstrapClientConfig, 1*time.Minute); err != nil {
-		glog.Warningf("Error waiting for apiserver to come up: %v", err)
+		klog.Warningf("Error waiting for apiserver to come up: %v", err)
 	}
 
 	certData, err := csr.RequestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
@@ -110,7 +110,7 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 		return err
 	}
 	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
-		glog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
+		klog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
 	}
 
 	pemPath := store.CurrentPath()
@@ -232,7 +232,7 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 	var connected bool
 	wait.JitterUntil(func() {
 		if _, err := cli.Get().AbsPath("/healthz").Do().Raw(); err != nil {
-			glog.Infof("Failed to connect to apiserver: %v", err)
+			klog.Infof("Failed to connect to apiserver: %v", err)
 			return
 		}
 		cancel()

@@ -72,10 +72,10 @@ import (
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 const (
@@ -191,7 +191,7 @@ func NewOptions() *Options {
 // Complete completes all the required options.
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
+		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzPortToConfig()
 	}
 
@@ -280,7 +280,7 @@ func (o *Options) writeConfigFile() error {
 		return err
 	}
 
-	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
+	klog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
 
 	return nil
 }
@@ -365,23 +365,23 @@ with the apiserver API to configure the proxy.`,
 			utilflag.PrintFlags(cmd.Flags())
 
 			if err := initForOS(opts.WindowsService); err != nil {
-				glog.Fatalf("failed OS init: %v", err)
+				klog.Fatalf("failed OS init: %v", err)
 			}
 
 			if err := opts.Complete(); err != nil {
-				glog.Fatalf("failed complete: %v", err)
+				klog.Fatalf("failed complete: %v", err)
 			}
 			if err := opts.Validate(args); err != nil {
-				glog.Fatalf("failed validate: %v", err)
+				klog.Fatalf("failed validate: %v", err)
 			}
-			glog.Fatal(opts.Run())
+			klog.Fatal(opts.Run())
 		},
 	}
 
 	var err error
 	opts.config, err = opts.ApplyDefaults(opts.config)
 	if err != nil {
-		glog.Fatalf("unable to create flag defaults: %v", err)
+		klog.Fatalf("unable to create flag defaults: %v", err)
 	}
 
 	opts.AddFlags(cmd.Flags())
@@ -426,7 +426,7 @@ func createClients(config apimachineryconfig.ClientConnectionConfiguration, mast
 	var err error
 
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		glog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
+		klog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
 		// This creates a client, first loading any specified kubeconfig
@@ -461,7 +461,7 @@ func createClients(config apimachineryconfig.ClientConnectionConfiguration, mast
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 	// remove iptables rules and exit
 	if s.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
@@ -478,16 +478,16 @@ func (s *ProxyServer) Run() error {
 	if s.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
 		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
-			glog.V(2).Info(err)
+			klog.V(2).Info(err)
 		}
 	}
 
 	if len(s.ResourceContainer) != 0 {
 		// Run in its own container.
 		if err := resourcecontainer.RunInResourceContainer(s.ResourceContainer); err != nil {
-			glog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
+			klog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
 		} else {
-			glog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
+			klog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 		}
 	}
 
@@ -595,7 +595,7 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 			return -1, fmt.Errorf("invalid config: Conntrack Max and Conntrack MaxPerCore are mutually exclusive")
 		}
-		glog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
+		klog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
 		return int(*config.Max), nil
 	}
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
@@ -605,10 +605,10 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		}
 		scaled := int(*config.MaxPerCore) * goruntime.NumCPU()
 		if scaled > floor {
-			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
+			klog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
 		}
-		glog.V(3).Infof("getConntrackMax: using conntrack-min")
+		klog.V(3).Infof("getConntrackMax: using conntrack-min")
 		return floor, nil
 	}
 	return 0, nil

@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -472,7 +472,7 @@ func (c *configFactory) skipPodUpdate(pod *v1.Pod) bool {
 	if !reflect.DeepEqual(assumedPodCopy, podCopy) {
 		return false
 	}
-	glog.V(3).Infof("Skipping pod %s/%s update", pod.Namespace, pod.Name)
+	klog.V(3).Infof("Skipping pod %s/%s update", pod.Namespace, pod.Name)
 	return true
 }
 
@@ -480,7 +480,7 @@ func (c *configFactory) onPvAdd(obj interface{}) {
 	if c.enableEquivalenceClassCache {
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.PersistentVolume: %v", obj)
+			klog.Errorf("cannot convert to *v1.PersistentVolume: %v", obj)
 			return
 		}
 		c.invalidatePredicatesForPv(pv)
@@ -498,12 +498,12 @@ func (c *configFactory) onPvUpdate(old, new interface{}) {
 	if c.enableEquivalenceClassCache {
 		newPV, ok := new.(*v1.PersistentVolume)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.PersistentVolume: %v", new)
+			klog.Errorf("cannot convert to *v1.PersistentVolume: %v", new)
 			return
 		}
 		oldPV, ok := old.(*v1.PersistentVolume)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.PersistentVolume: %v", old)
+			klog.Errorf("cannot convert to *v1.PersistentVolume: %v", old)
 			return
 		}
 		c.invalidatePredicatesForPvUpdate(oldPV, newPV)
@@ -549,11 +549,11 @@ func (c *configFactory) onPvDelete(obj interface{}) {
 			var ok bool
 			pv, ok = t.Obj.(*v1.PersistentVolume)
 			if !ok {
-				glog.Errorf("cannot convert to *v1.PersistentVolume: %v", t.Obj)
+				klog.Errorf("cannot convert to *v1.PersistentVolume: %v", t.Obj)
 				return
 			}
 		default:
-			glog.Errorf("cannot convert to *v1.PersistentVolume: %v", t)
+			klog.Errorf("cannot convert to *v1.PersistentVolume: %v", t)
 			return
 		}
 		c.invalidatePredicatesForPv(pv)
@@ -600,7 +600,7 @@ func (c *configFactory) onPvcAdd(obj interface{}) {
 	if c.enableEquivalenceClassCache {
 		pvc, ok := obj.(*v1.PersistentVolumeClaim)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", obj)
+			klog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", obj)
 			return
 		}
 		c.invalidatePredicatesForPvc(pvc)
@@ -616,12 +616,12 @@ func (c *configFactory) onPvcUpdate(old, new interface{}) {
 	if c.enableEquivalenceClassCache {
 		newPVC, ok := new.(*v1.PersistentVolumeClaim)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", new)
+			klog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", new)
 			return
 		}
 		oldPVC, ok := old.(*v1.PersistentVolumeClaim)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", old)
+			klog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", old)
 			return
 		}
 		c.invalidatePredicatesForPvcUpdate(oldPVC, newPVC)
@@ -639,11 +639,11 @@ func (c *configFactory) onPvcDelete(obj interface{}) {
 			var ok bool
 			pvc, ok = t.Obj.(*v1.PersistentVolumeClaim)
 			if !ok {
-				glog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", t.Obj)
+				klog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", t.Obj)
 				return
 			}
 		default:
-			glog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", t)
+			klog.Errorf("cannot convert to *v1.PersistentVolumeClaim: %v", t)
 			return
 		}
 		c.invalidatePredicatesForPvc(pvc)
@@ -692,7 +692,7 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 func (c *configFactory) onStorageClassAdd(obj interface{}) {
 	sc, ok := obj.(*storagev1.StorageClass)
 	if !ok {
-		glog.Errorf("cannot convert to *storagev1.StorageClass: %v", obj)
+		klog.Errorf("cannot convert to *storagev1.StorageClass: %v", obj)
 		return
 	}
 
@@ -717,11 +717,11 @@ func (c *configFactory) onStorageClassDelete(obj interface{}) {
 			var ok bool
 			sc, ok = t.Obj.(*storagev1.StorageClass)
 			if !ok {
-				glog.Errorf("cannot convert to *storagev1.StorageClass: %v", t.Obj)
+				klog.Errorf("cannot convert to *storagev1.StorageClass: %v", t.Obj)
 				return
 			}
 		default:
-			glog.Errorf("cannot convert to *storagev1.StorageClass: %v", t)
+			klog.Errorf("cannot convert to *storagev1.StorageClass: %v", t)
 			return
 		}
 		c.invalidatePredicatesForStorageClass(sc)
@@ -794,12 +794,12 @@ func (c *configFactory) GetScheduledPodLister() corelisters.PodLister {
 func (c *configFactory) addPodToCache(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		glog.Errorf("cannot convert to *v1.Pod: %v", obj)
+		klog.Errorf("cannot convert to *v1.Pod: %v", obj)
 		return
 	}
 
 	if err := c.schedulerCache.AddPod(pod); err != nil {
-		glog.Errorf("scheduler cache AddPod failed: %v", err)
+		klog.Errorf("scheduler cache AddPod failed: %v", err)
 	}
 
 	c.podQueue.AssignedPodAdded(pod)
@@ -811,12 +811,12 @@ func (c *configFactory) addPodToCache(obj interface{}) {
 func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {
 	oldPod, ok := oldObj.(*v1.Pod)
 	if !ok {
-		glog.Errorf("cannot convert oldObj to *v1.Pod: %v", oldObj)
+		klog.Errorf("cannot convert oldObj to *v1.Pod: %v", oldObj)
 		return
 	}
 	newPod, ok := newObj.(*v1.Pod)
 	if !ok {
-		glog.Errorf("cannot convert newObj to *v1.Pod: %v", newObj)
+		klog.Errorf("cannot convert newObj to *v1.Pod: %v", newObj)
 		return
 	}
 
@@ -826,7 +826,7 @@ func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.UpdatePod(oldPod, newPod); err != nil {
-		glog.Errorf("scheduler cache UpdatePod failed: %v", err)
+		klog.Errorf("scheduler cache UpdatePod failed: %v", err)
 	}
 
 	c.invalidateCachedPredicatesOnUpdatePod(newPod, oldPod)
@@ -904,11 +904,11 @@ func (c *configFactory) deletePodFromCache(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.Pod: %v", t.Obj)
+			klog.Errorf("cannot convert to *v1.Pod: %v", t.Obj)
 			return
 		}
 	default:
-		glog.Errorf("cannot convert to *v1.Pod: %v", t)
+		klog.Errorf("cannot convert to *v1.Pod: %v", t)
 		return
 	}
 	// NOTE: Updates must be written to scheduler cache before invalidating
@@ -917,7 +917,7 @@ func (c *configFactory) deletePodFromCache(obj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.RemovePod(pod); err != nil {
-		glog.Errorf("scheduler cache RemovePod failed: %v", err)
+		klog.Errorf("scheduler cache RemovePod failed: %v", err)
 	}
 
 	c.invalidateCachedPredicatesOnDeletePod(pod)
@@ -948,7 +948,7 @@ func (c *configFactory) invalidateCachedPredicatesOnDeletePod(pod *v1.Pod) {
 func (c *configFactory) addNodeToCache(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		glog.Errorf("cannot convert to *v1.Node: %v", obj)
+		klog.Errorf("cannot convert to *v1.Node: %v", obj)
 		return
 	}
 
@@ -960,7 +960,7 @@ func (c *configFactory) addNodeToCache(obj interface{}) {
 	}
 
 	if err := c.schedulerCache.AddNode(node); err != nil {
-		glog.Errorf("scheduler cache AddNode failed: %v", err)
+		klog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
 
 	c.podQueue.MoveAllToActiveQueue()
@@ -970,12 +970,12 @@ func (c *configFactory) addNodeToCache(obj interface{}) {
 func (c *configFactory) updateNodeInCache(oldObj, newObj interface{}) {
 	oldNode, ok := oldObj.(*v1.Node)
 	if !ok {
-		glog.Errorf("cannot convert oldObj to *v1.Node: %v", oldObj)
+		klog.Errorf("cannot convert oldObj to *v1.Node: %v", oldObj)
 		return
 	}
 	newNode, ok := newObj.(*v1.Node)
 	if !ok {
-		glog.Errorf("cannot convert newObj to *v1.Node: %v", newObj)
+		klog.Errorf("cannot convert newObj to *v1.Node: %v", newObj)
 		return
 	}
 
@@ -985,7 +985,7 @@ func (c *configFactory) updateNodeInCache(oldObj, newObj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.UpdateNode(oldNode, newNode); err != nil {
-		glog.Errorf("scheduler cache UpdateNode failed: %v", err)
+		klog.Errorf("scheduler cache UpdateNode failed: %v", err)
 	}
 
 	c.invalidateCachedPredicatesOnNodeUpdate(newNode, oldNode)
@@ -1019,11 +1019,11 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 
 		oldTaints, oldErr := helper.GetTaintsFromNodeAnnotations(oldNode.GetAnnotations())
 		if oldErr != nil {
-			glog.Errorf("Failed to get taints from old node annotation for equivalence cache")
+			klog.Errorf("Failed to get taints from old node annotation for equivalence cache")
 		}
 		newTaints, newErr := helper.GetTaintsFromNodeAnnotations(newNode.GetAnnotations())
 		if newErr != nil {
-			glog.Errorf("Failed to get taints from new node annotation for equivalence cache")
+			klog.Errorf("Failed to get taints from new node annotation for equivalence cache")
 		}
 		if !reflect.DeepEqual(oldTaints, newTaints) ||
 			!reflect.DeepEqual(oldNode.Spec.Taints, newNode.Spec.Taints) {
@@ -1070,11 +1070,11 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 		var ok bool
 		node, ok = t.Obj.(*v1.Node)
 		if !ok {
-			glog.Errorf("cannot convert to *v1.Node: %v", t.Obj)
+			klog.Errorf("cannot convert to *v1.Node: %v", t.Obj)
 			return
 		}
 	default:
-		glog.Errorf("cannot convert to *v1.Node: %v", t)
+		klog.Errorf("cannot convert to *v1.Node: %v", t)
 		return
 	}
 	// NOTE: Updates must be written to scheduler cache before invalidating
@@ -1083,7 +1083,7 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.RemoveNode(node); err != nil {
-		glog.Errorf("scheduler cache RemoveNode failed: %v", err)
+		klog.Errorf("scheduler cache RemoveNode failed: %v", err)
 	}
 	if c.enableEquivalenceClassCache {
 		c.equivalencePodCache.InvalidateAllPredicatesOnNode(node.GetName())
@@ -1097,7 +1097,7 @@ func (c *configFactory) Create() (*Config, error) {
 
 // Creates a scheduler from the name of a registered algorithm provider.
 func (c *configFactory) CreateFromProvider(providerName string) (*Config, error) {
-	glog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
+	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -1107,7 +1107,7 @@ func (c *configFactory) CreateFromProvider(providerName string) (*Config, error)
 
 // Creates a scheduler from the configuration file
 func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, error) {
-	glog.V(2).Infof("Creating scheduler from configuration: %v", policy)
+	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
 	if err := validation.ValidatePolicy(policy); err != nil {
@@ -1116,7 +1116,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		glog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
+		klog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
 		provider, err := GetAlgorithmProvider(DefaultProvider)
 		if err != nil {
 			return nil, err
@@ -1124,14 +1124,14 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 		predicateKeys = provider.FitPredicateKeys
 	} else {
 		for _, predicate := range policy.Predicates {
-			glog.V(2).Infof("Registering predicate: %s", predicate.Name)
+			klog.V(2).Infof("Registering predicate: %s", predicate.Name)
 			predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
 		}
 	}
 
 	priorityKeys := sets.NewString()
 	if policy.Priorities == nil {
-		glog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
+		klog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
 		provider, err := GetAlgorithmProvider(DefaultProvider)
 		if err != nil {
 			return nil, err
@@ -1139,7 +1139,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 		priorityKeys = provider.PriorityFunctionKeys
 	} else {
 		for _, priority := range policy.Priorities {
-			glog.V(2).Infof("Registering priority: %s", priority.Name)
+			klog.V(2).Infof("Registering priority: %s", priority.Name)
 			priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
 		}
 	}
@@ -1148,7 +1148,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
 		for ii := range policy.ExtenderConfigs {
-			glog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
+			klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
 			if err != nil {
 				return nil, err
@@ -1196,7 +1196,7 @@ func (c *configFactory) getBinderFunc(extenders []algorithm.SchedulerExtender) f
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error) {
-	glog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
+	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
 	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
 		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.GetHardPodAffinitySymmetricWeight())
@@ -1225,7 +1225,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache {
 		c.equivalencePodCache = equivalence.NewCache(predicates.Ordering())
-		glog.Info("Created equivalence class cache")
+		klog.Info("Created equivalence class cache")
 	}
 
 	algo := core.NewGenericScheduler(
@@ -1331,10 +1331,10 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 func (c *configFactory) getNextPod() *v1.Pod {
 	pod, err := c.podQueue.Pop()
 	if err == nil {
-		glog.V(4).Infof("About to try and schedule pod %v/%v", pod.Namespace, pod.Name)
+		klog.V(4).Infof("About to try and schedule pod %v/%v", pod.Namespace, pod.Name)
 		return pod
 	}
-	glog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
+	klog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
 	return nil
 }
 
@@ -1433,10 +1433,10 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
-			glog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
+			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
 		} else {
 			if _, ok := err.(*core.FitError); ok {
-				glog.V(4).Infof("Unable to schedule %v/%v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
+				klog.V(4).Infof("Unable to schedule %v/%v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
 			} else if errors.IsNotFound(err) {
 				if errStatus, ok := err.(errors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 					nodeName := errStatus.Status().Details.Name
@@ -1458,7 +1458,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					}
 				}
 			} else {
-				glog.Errorf("Error scheduling %v/%v: %v; retrying", pod.Namespace, pod.Name, err)
+				klog.Errorf("Error scheduling %v/%v: %v; retrying", pod.Namespace, pod.Name, err)
 			}
 		}
 
@@ -1480,7 +1480,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 			if !util.PodPriorityEnabled() {
 				entry := backoff.GetEntry(podID)
 				if !entry.TryWait(backoff.MaxDuration()) {
-					glog.Warningf("Request for pod %v already in flight, abandoning", podID)
+					klog.Warningf("Request for pod %v already in flight, abandoning", podID)
 					return
 				}
 			}
@@ -1500,7 +1500,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					break
 				}
 				if errors.IsNotFound(err) {
-					glog.Warningf("A pod %v no longer exists", podID)
+					klog.Warningf("A pod %v no longer exists", podID)
 
 					if c.volumeBinder != nil {
 						// Volume binder only wants to keep unassigned pods
@@ -1508,7 +1508,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					}
 					return
 				}
-				glog.Errorf("Error getting pod %v for retry: %v; retrying...", podID, err)
+				klog.Errorf("Error getting pod %v for retry: %v; retrying...", podID, err)
 				if getBackoff = getBackoff * 2; getBackoff > maximalGetBackoff {
 					getBackoff = maximalGetBackoff
 				}
@@ -1542,7 +1542,7 @@ type binder struct {
 
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *v1.Binding) error {
-	glog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
+	klog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
 }
 
@@ -1551,7 +1551,7 @@ type podConditionUpdater struct {
 }
 
 func (p *podConditionUpdater) Update(pod *v1.Pod, condition *v1.PodCondition) error {
-	glog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s)", pod.Namespace, pod.Name, condition.Type, condition.Status)
+	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s)", pod.Namespace, pod.Name, condition.Type, condition.Status)
 	if podutil.UpdatePodCondition(&pod.Status, condition) {
 		_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 		return err

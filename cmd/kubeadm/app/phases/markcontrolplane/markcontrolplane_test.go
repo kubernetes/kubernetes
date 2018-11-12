@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package markmaster
+package markcontrolplane
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
-func TestMarkMaster(t *testing.T) {
+func TestMarkControlPlane(t *testing.T) {
 	// Note: this test takes advantage of the deterministic marshalling of
 	// JSON provided by strategicpatch so that "expectedPatch" can use a
 	// string equality test instead of a logical JSON equality test. That
@@ -47,28 +47,28 @@ func TestMarkMaster(t *testing.T) {
 		expectedPatch  string
 	}{
 		{
-			"master label and taint missing",
+			"control-plane label and taint missing",
 			"",
 			nil,
 			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
-			"master label and taint missing but taint not wanted",
+			"control-plane label and taint missing but taint not wanted",
 			"",
 			nil,
 			nil,
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
-			"master label missing",
+			"control-plane label missing",
 			"",
 			[]v1.Taint{kubeadmconstants.MasterTaint},
 			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
-			"master taint missing",
+			"control-plane taint missing",
 			kubeadmconstants.LabelNodeRoleMaster,
 			nil,
 			[]v1.Taint{kubeadmconstants.MasterTaint},
@@ -110,9 +110,9 @@ func TestMarkMaster(t *testing.T) {
 	for _, tc := range tests {
 		hostname, err := node.GetHostname("")
 		if err != nil {
-			t.Fatalf("MarkMaster(%s): unexpected error: %v", tc.name, err)
+			t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
 		}
-		masterNode := &v1.Node{
+		controlPlaneNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: hostname,
 				Labels: map[string]string{
@@ -122,16 +122,16 @@ func TestMarkMaster(t *testing.T) {
 		}
 
 		if tc.existingLabel != "" {
-			masterNode.ObjectMeta.Labels[tc.existingLabel] = ""
+			controlPlaneNode.ObjectMeta.Labels[tc.existingLabel] = ""
 		}
 
 		if tc.existingTaints != nil {
-			masterNode.Spec.Taints = tc.existingTaints
+			controlPlaneNode.Spec.Taints = tc.existingTaints
 		}
 
-		jsonNode, err := json.Marshal(masterNode)
+		jsonNode, err := json.Marshal(controlPlaneNode)
 		if err != nil {
-			t.Fatalf("MarkMaster(%s): unexpected encoding error: %v", tc.name, err)
+			t.Fatalf("MarkControlPlane(%s): unexpected encoding error: %v", tc.name, err)
 		}
 
 		var patchRequest string
@@ -139,7 +139,7 @@ func TestMarkMaster(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 
 			if req.URL.Path != "/api/v1/nodes/"+hostname {
-				t.Errorf("MarkMaster(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
+				t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
 				http.Error(w, "", http.StatusNotFound)
 				return
 			}
@@ -149,7 +149,7 @@ func TestMarkMaster(t *testing.T) {
 			case "PATCH":
 				patchRequest = toString(req.Body)
 			default:
-				t.Errorf("MarkMaster(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
+				t.Errorf("MarkControlPlane(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
 				http.Error(w, "", http.StatusNotFound)
 				return
 			}
@@ -161,15 +161,15 @@ func TestMarkMaster(t *testing.T) {
 
 		cs, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 		if err != nil {
-			t.Fatalf("MarkMaster(%s): unexpected error building clientset: %v", tc.name, err)
+			t.Fatalf("MarkControlPlane(%s): unexpected error building clientset: %v", tc.name, err)
 		}
 
-		if err := MarkMaster(cs, hostname, tc.newTaints); err != nil {
-			t.Errorf("MarkMaster(%s) returned unexpected error: %v", tc.name, err)
+		if err := MarkControlPlane(cs, hostname, tc.newTaints); err != nil {
+			t.Errorf("MarkControlPlane(%s) returned unexpected error: %v", tc.name, err)
 		}
 
 		if tc.expectedPatch != patchRequest {
-			t.Errorf("MarkMaster(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
+			t.Errorf("MarkControlPlane(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
 		}
 	}
 }

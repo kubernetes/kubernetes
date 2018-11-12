@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -272,12 +272,12 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	iValues, err = findJSONPathResults(parser, iObj)
 	if err != nil {
-		glog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
+		klog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
 	}
 
 	jValues, err = findJSONPathResults(parser, jObj)
 	if err != nil {
-		glog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
+		klog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
 	}
 
 	if len(iValues) == 0 || len(iValues[0]) == 0 {
@@ -291,7 +291,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		glog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
+		klog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
 	}
 	return less
 }
@@ -324,7 +324,7 @@ func (t *TableSorter) Less(i, j int) bool {
 	iValues := t.parsedRows[i]
 	jValues := t.parsedRows[j]
 	if len(iValues) == 0 || len(iValues[0]) == 0 || len(jValues) == 0 || len(jValues[0]) == 0 {
-		glog.Fatalf("couldn't find any field with path %q in the list of objects", t.field)
+		klog.Fatalf("couldn't find any field with path %q in the list of objects", t.field)
 	}
 
 	iField := iValues[0][0]
@@ -332,7 +332,7 @@ func (t *TableSorter) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		glog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
+		klog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
 	}
 	return less
 }
@@ -348,13 +348,13 @@ func NewTableSorter(table *metav1beta1.Table, field string) *TableSorter {
 	parser := jsonpath.New("sorting").AllowMissingKeys(true)
 	err := parser.Parse(field)
 	if err != nil {
-		glog.Fatalf("sorting error: %v\n", err)
+		klog.Fatalf("sorting error: %v\n", err)
 	}
 
 	for i := range table.Rows {
 		parsedRow, err := findJSONPathResults(parser, table.Rows[i].Object.Object)
 		if err != nil {
-			glog.Fatalf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
+			klog.Fatalf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
 		}
 		parsedRows = append(parsedRows, parsedRow)
 	}

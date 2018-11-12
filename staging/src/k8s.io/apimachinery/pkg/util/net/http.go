@@ -31,8 +31,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/http2"
+	"k8s.io/klog"
 )
 
 // JoinPreservingTrailingSlash does a path.Join of the specified elements,
@@ -107,10 +107,10 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		glog.Infof("HTTP2 has been explicitly disabled")
+		klog.Infof("HTTP2 has been explicitly disabled")
 	} else {
 		if err := http2.ConfigureTransport(t); err != nil {
-			glog.Warningf("Transport failed http2 configuration: %v", err)
+			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
 	return t
@@ -368,7 +368,7 @@ redirectLoop:
 		resp, err := http.ReadResponse(respReader, nil)
 		if err != nil {
 			// Unable to read the backend response; let the client handle it.
-			glog.Warningf("Error reading backend response: %v", err)
+			klog.Warningf("Error reading backend response: %v", err)
 			break redirectLoop
 		}
 

@@ -28,7 +28,7 @@ go_library(
     importpath = "k8s.io/client-go/transport",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

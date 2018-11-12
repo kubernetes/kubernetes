@@ -26,7 +26,7 @@ import (
 
 	"net/http"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -35,7 +35,7 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 	var resource = "poddisruptionbudgets"
 
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
-		glog.Infof(
+		klog.Infof(
 			"Refusing to start disruption because resource %q in group %q is not available.",
 			resource, group+"/"+version)
 		return nil, false, nil

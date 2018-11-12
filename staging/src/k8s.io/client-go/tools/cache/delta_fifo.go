@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // NewDeltaFIFO returns a Store which can be used process changes to items.
@@ -506,10 +506,10 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		deletedObj, exists, err := f.knownObjects.GetByKey(k)
 		if err != nil {
 			deletedObj = nil
-			glog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
+			klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
 		} else if !exists {
 			deletedObj = nil
-			glog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
+			klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
 		}
 		queuedDeletions++
 		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
@@ -553,10 +553,10 @@ func (f *DeltaFIFO) syncKey(key string) error {
 func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
-		glog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
+		klog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
 		return nil
 	} else if !exists {
-		glog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", key)
+		klog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", key)
 		return nil
 	}
 

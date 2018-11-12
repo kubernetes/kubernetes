@@ -25,11 +25,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -61,7 +61,7 @@ type kubeConfigSpec struct {
 // to establish the control plane, including also the admin kubeconfig file.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
 func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating all kubeconfig files")
+	klog.V(1).Infoln("creating all kubeconfig files")
 	return createKubeConfigFiles(
 		outDir,
 		cfg,
@@ -89,7 +89,7 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 // CreateKubeConfigFile creates a kubeconfig file.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infof("creating kubeconfig file for %s", kubeConfigFileName)
+	klog.V(1).Infof("creating kubeconfig file for %s", kubeConfigFileName)
 	return createKubeConfigFiles(outDir, cfg, kubeConfigFileName)
 }
 

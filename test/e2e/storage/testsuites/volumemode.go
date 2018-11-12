@@ -76,6 +76,7 @@ func createVolumeModeTestInput(pattern testpatterns.TestPattern, resource volume
 		sc:               resource.sc,
 		pvc:              resource.pvc,
 		pv:               resource.pv,
+		driverName:       dInfo.Name,
 		testVolType:      pattern.VolType,
 		nodeName:         dInfo.Config.ClientNodeName,
 		volMode:          pattern.VolMode,
@@ -233,6 +234,7 @@ type volumeModeTestInput struct {
 	sc               *storagev1.StorageClass
 	pvc              *v1.PersistentVolumeClaim
 	pv               *v1.PersistentVolume
+	driverName       string
 	testVolType      testpatterns.TestVolType
 	nodeName         string
 	volMode          v1.PersistentVolumeMode
@@ -338,6 +340,9 @@ func testVolumeModeSuccessForDynamicPV(input *volumeModeTestInput) {
 		cs := f.ClientSet
 		ns := f.Namespace
 		var err error
+
+		// TODO: This skip should be removed once #70760 is fixed
+		skipTestUntilBugfix("70760", input.driverName, []string{"csi-hostpath", "com.google.csi.gcepd"})
 
 		By("Creating sc")
 		input.sc, err = cs.StorageV1().StorageClasses().Create(input.sc)

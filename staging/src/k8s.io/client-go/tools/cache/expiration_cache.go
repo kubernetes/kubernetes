@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/klog"
 )
 
 // ExpirationCache implements the store interface
@@ -95,7 +95,7 @@ func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {
 		return nil, false
 	}
 	if c.expirationPolicy.IsExpired(timestampedItem) {
-		glog.V(4).Infof("Entry %v: %+v has expired", key, timestampedItem.obj)
+		klog.V(4).Infof("Entry %v: %+v has expired", key, timestampedItem.obj)
 		c.cacheStorage.Delete(key)
 		return nil, false
 	}

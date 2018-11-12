@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"fmt"
 	"k8s.io/api/core/v1"
@@ -162,10 +162,10 @@ func (e *BootstrapSigner) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	glog.V(5).Infof("Starting workers")
+	klog.V(5).Infof("Starting workers")
 	go wait.Until(e.serviceConfigMapQueue, 0, stopCh)
 	<-stopCh
-	glog.V(1).Infof("Shutting down")
+	klog.V(1).Infof("Shutting down")
 }
 
 func (e *BootstrapSigner) pokeConfigMapSync() {
@@ -198,7 +198,7 @@ func (e *BootstrapSigner) signConfigMap() {
 	// First capture the config we are signing
 	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
 	if !ok {
-		glog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
+		klog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (e *BootstrapSigner) signConfigMap() {
 func (e *BootstrapSigner) updateConfigMap(cm *v1.ConfigMap) {
 	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-		glog.V(3).Infof("Error updating ConfigMap: %v", err)
+		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}
 }
 
@@ -295,7 +295,7 @@ func (e *BootstrapSigner) getTokens() map[string]string {
 		if _, ok := ret[tokenID]; ok {
 			// This should never happen as we ensure a consistent secret name.
 			// But leave this in here just in case.
-			glog.V(1).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
+			klog.V(1).Infof("Duplicate bootstrap tokens found for id %s, ignoring on in %s/%s", tokenID, secret.Namespace, secret.Name)
 			continue
 		}
 

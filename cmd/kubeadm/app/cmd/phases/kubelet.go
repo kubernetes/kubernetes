@@ -17,8 +17,8 @@ limitations under the License.
 package phases
 
 import (
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -68,7 +68,7 @@ func runKubeletStart(c workflow.RunData) error {
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !data.DryRun() {
-		glog.V(1).Infof("Stopping the kubelet")
+		klog.V(1).Infof("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	}
 
@@ -86,7 +86,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		glog.V(1).Infof("Starting the kubelet")
+		klog.V(1).Infof("Starting the kubelet")
 		kubeletphase.TryStartKubelet()
 	}
 

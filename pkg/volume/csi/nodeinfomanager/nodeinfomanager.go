@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/retry"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
@@ -508,7 +508,7 @@ func (nim *nodeInfoManager) uninstallDriverFromCSINodeInfo(csiDriverName string)
 func updateMaxAttachLimit(driverName string, maxLimit int64) nodeUpdateFunc {
 	return func(node *v1.Node) (*v1.Node, bool, error) {
 		if maxLimit <= 0 {
-			glog.V(4).Infof("skipping adding attach limit for %s", driverName)
+			klog.V(4).Infof("skipping adding attach limit for %s", driverName)
 			return node, false, nil
 		}
 

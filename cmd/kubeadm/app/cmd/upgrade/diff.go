@@ -20,12 +20,12 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -78,7 +78,7 @@ func NewCmdDiff(out io.Writer) *cobra.Command {
 func runDiff(flags *diffFlags, args []string) error {
 
 	// If the version is specified in config file, pick up that value.
-	glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
+	klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		case constants.KubeScheduler:
 			path = flags.schedulerManifestPath
 		default:
-			glog.Errorf("[diff] unknown spec %v", spec)
+			klog.Errorf("[diff] unknown spec %v", spec)
 			continue
 		}
 

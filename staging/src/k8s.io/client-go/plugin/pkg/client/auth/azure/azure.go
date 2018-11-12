@@ -27,7 +27,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
@@ -50,7 +50,7 @@ const (
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("azure", newAzureAuthProvider); err != nil {
-		glog.Fatalf("Failed to register azure auth plugin: %v", err)
+		klog.Fatalf("Failed to register azure auth plugin: %v", err)
 	}
 }
 
@@ -124,7 +124,7 @@ func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	token, err := r.tokenSource.Token()
 	if err != nil {
-		glog.Errorf("Failed to acquire a token: %v", err)
+		klog.Errorf("Failed to acquire a token: %v", err)
 		return nil, fmt.Errorf("acquiring a token for authorization header: %v", err)
 	}
 

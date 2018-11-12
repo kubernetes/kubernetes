@@ -37,11 +37,11 @@ import (
 
 	"k8s.io/kubernetes/test/e2e_node/remote"
 
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
+	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 )
 
@@ -174,6 +174,7 @@ type internalGCEImage struct {
 }
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Parse()
 	switch *testSuite {
 	case "conformance":
@@ -185,7 +186,7 @@ func main() {
 		// Use node e2e suite by default if no subcommand is specified.
 		suite = remote.InitNodeE2ERemote()
 	default:
-		glog.Fatalf("--test-suite must be one of default or conformance")
+		klog.Fatalf("--test-suite must be one of default or conformance")
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -196,12 +197,12 @@ func main() {
 	}
 
 	if *hosts == "" && *imageConfigFile == "" && *images == "" {
-		glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
+		klog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
 	}
 	var err error
 	computeService, err = getComputeClient()
 	if err != nil {
-		glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+		klog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
 	}
 
 	gceImages := &internalImageConfig{
@@ -216,12 +217,12 @@ func main() {
 		// parse images
 		imageConfigData, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			glog.Fatalf("Could not read image config file provided: %v", err)
+			klog.Fatalf("Could not read image config file provided: %v", err)
 		}
 		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
 		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
 		if err != nil {
-			glog.Fatalf("Could not parse image config file: %v", err)
+			klog.Fatalf("Could not parse image config file: %v", err)
 		}
 		for shortName, imageConfig := range externalImageConfig.Images {
 			var images []string
@@ -230,7 +231,7 @@ func main() {
 				isRegex = true
 				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
 				if err != nil {
-					glog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
+					klog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
 				}
 			} else {
 				images = []string{imageConfig.Image}
@@ -265,7 +266,7 @@ func main() {
 	// convenience; merge in with config file
 	if *images != "" {
 		if *imageProject == "" {
-			glog.Fatal("Must specify --image-project if you specify --images")
+			klog.Fatal("Must specify --image-project if you specify --images")
 		}
 		cliImages := strings.Split(*images, ",")
 		for _, img := range cliImages {
@@ -279,16 +280,16 @@ func main() {
 	}
 
 	if len(gceImages.images) != 0 && *zone == "" {
-		glog.Fatal("Must specify --zone flag")
+		klog.Fatal("Must specify --zone flag")
 	}
 	for shortName, image := range gceImages.images {
 		if image.project == "" {
-			glog.Fatalf("Invalid config for %v; must specify a project", shortName)
+			klog.Fatalf("Invalid config for %v; must specify a project", shortName)
 		}
 	}
 	if len(gceImages.images) != 0 {
 		if *project == "" {
-			glog.Fatal("Must specify --project flag to launch images into")
+			klog.Fatal("Must specify --project flag to launch images into")
 		}
 	}
 	if *instanceNamePrefix == "" {
@@ -394,9 +395,9 @@ func getImageMetadata(input string) *compute.Metadata {
 	if input == "" {
 		return nil
 	}
-	glog.V(3).Infof("parsing instance metadata: %q", input)
+	klog.V(3).Infof("parsing instance metadata: %q", input)
 	raw := parseInstanceMetadata(input)
-	glog.V(4).Infof("parsed instance metadata: %v", raw)
+	klog.V(4).Infof("parsed instance metadata: %v", raw)
 	metadataItems := []*compute.MetadataItems{}
 	for k, v := range raw {
 		val := v
@@ -482,7 +483,7 @@ func getGCEImages(imageRegex, project string, previousImages int) ([]string, err
 				creationTime: creationTime,
 				name:         instance.Name,
 			}
-			glog.V(4).Infof("Found image %q based on regex %q in project %q", io.string(), imageRegex, project)
+			klog.V(4).Infof("Found image %q based on regex %q in project %q", io.string(), imageRegex, project)
 			imageObjs = append(imageObjs, io)
 		}
 	}
@@ -531,12 +532,12 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
 	serialPortOutput, err := computeService.Instances.GetSerialPortOutput(*project, *zone, host).Port(1).Do()
 	if err != nil {
-		glog.Errorf("Failed to collect serial output from node %q: %v", host, err)
+		klog.Errorf("Failed to collect serial output from node %q: %v", host, err)
 	} else {
 		logFilename := "serial-1.log"
 		err := remote.WriteLog(host, logFilename, serialPortOutput.Contents)
 		if err != nil {
-			glog.Errorf("Failed to write serial output from node %q to %q: %v", host, logFilename, err)
+			klog.Errorf("Failed to write serial output from node %q to %q: %v", host, logFilename, err)
 		}
 	}
 	return result
@@ -544,7 +545,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 
 // Provision a gce instance using image
 func createInstance(imageConfig *internalGCEImage) (string, error) {
-	glog.V(1).Infof("Creating instance %+v", *imageConfig)
+	klog.V(1).Infof("Creating instance %+v", *imageConfig)
 	name := imageToInstanceName(imageConfig)
 	i := &compute.Instance{
 		Name:        name,
@@ -712,10 +713,10 @@ func getComputeClient() (*compute.Service, error) {
 }
 
 func deleteInstance(host string) {
-	glog.Infof("Deleting instance %q", host)
+	klog.Infof("Deleting instance %q", host)
 	_, err := computeService.Instances.Delete(*project, *zone, host).Do()
 	if err != nil {
-		glog.Errorf("Error deleting instance %q: %v", host, err)
+		klog.Errorf("Error deleting instance %q: %v", host, err)
 	}
 }
 
@@ -730,7 +731,7 @@ func parseInstanceMetadata(str string) map[string]string {
 		}
 		kp := strings.Split(s, "<")
 		if len(kp) != 2 {
-			glog.Fatalf("Invalid instance metadata: %q", s)
+			klog.Fatalf("Invalid instance metadata: %q", s)
 			continue
 		}
 		metaPath := kp[1]
@@ -739,7 +740,7 @@ func parseInstanceMetadata(str string) map[string]string {
 		}
 		v, err := ioutil.ReadFile(metaPath)
 		if err != nil {
-			glog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
+			klog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
 			continue
 		}
 		metadata[kp[0]] = string(v)

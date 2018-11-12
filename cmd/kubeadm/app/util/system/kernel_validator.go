@@ -29,8 +29,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	pkgerrors "github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 )
@@ -254,7 +254,7 @@ func (k *KernelValidator) parseKernelConfig(r io.Reader) (map[string]kConfigOpti
 		}
 		fields := strings.Split(line, "=")
 		if len(fields) != 2 {
-			glog.Errorf("Unexpected fields number in config %q", line)
+			klog.Errorf("Unexpected fields number in config %q", line)
 			continue
 		}
 		config[fields[0]] = kConfigOption(fields[1])

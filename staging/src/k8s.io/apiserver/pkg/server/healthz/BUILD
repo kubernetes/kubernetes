@@ -22,7 +22,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/server/healthz",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

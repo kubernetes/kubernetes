@@ -19,7 +19,7 @@ limitations under the License.
 package stats
 
 import (
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -42,7 +42,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 		}
 		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			glog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
 			continue
 		}
 		// System containers don't have a filesystem associated with them.
@@ -71,7 +71,7 @@ func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig c
 		}
 		s, err := sp.provider.GetCgroupCPUAndMemoryStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			glog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
 			continue
 		}
 		s.Name = sys

@@ -11,7 +11,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/go-units:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/accelerators:go_default_library",
         "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
         "//vendor/github.com/google/cadvisor/collector:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/version:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/clock:go_default_library",
     ],
 )

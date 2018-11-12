@@ -32,7 +32,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -219,7 +219,7 @@ func (p *PriorityQueue) addNominatedPodIfNeeded(pod *v1.Pod) {
 	if len(nnn) > 0 {
 		for _, np := range p.nominatedPods[nnn] {
 			if np.UID == pod.UID {
-				glog.Errorf("Pod %v/%v already exists in the nominated map!", pod.Namespace, pod.Name)
+				klog.Errorf("Pod %v/%v already exists in the nominated map!", pod.Namespace, pod.Name)
 				return
 			}
 		}
@@ -258,10 +258,10 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	err := p.activeQ.Add(pod)
 	if err != nil {
-		glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 	} else {
 		if p.unschedulableQ.get(pod) != nil {
-			glog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
+			klog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
 			p.deleteNominatedPodIfExists(pod)
 			p.unschedulableQ.delete(pod)
 		}
@@ -284,7 +284,7 @@ func (p *PriorityQueue) AddIfNotPresent(pod *v1.Pod) error {
 	}
 	err := p.activeQ.Add(pod)
 	if err != nil {
-		glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 	} else {
 		p.addNominatedPodIfNeeded(pod)
 		p.cond.Broadcast()
@@ -433,7 +433,7 @@ func (p *PriorityQueue) MoveAllToActiveQueue() {
 	defer p.lock.Unlock()
 	for _, pod := range p.unschedulableQ.pods {
 		if err := p.activeQ.Add(pod); err != nil {
-			glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
+			klog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 		}
 	}
 	p.unschedulableQ.clear()
@@ -448,7 +448,7 @@ func (p *PriorityQueue) movePodsToActiveQueue(pods []*v1.Pod) {
 		if err := p.activeQ.Add(pod); err == nil {
 			p.unschedulableQ.delete(pod)
 		} else {
-			glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
+			klog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 		}
 	}
 	p.receivedMoveRequest = true
@@ -469,7 +469,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(up, &term)
 				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
-					glog.Errorf("Error getting label selectors for pod: %v.", up.Name)
+					klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
 				}
 				if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
 					podsToMove = append(podsToMove, up)
