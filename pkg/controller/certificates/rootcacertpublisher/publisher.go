@@ -36,23 +36,18 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-// RootCACertCofigMapName is name of the configmap which stores certificates to access api-server
+// RootCACertCofigMapName is name of the configmap which stores certificates to
+// access api-server
 const RootCACertCofigMapName = "kube-root-ca.crt"
 
-// NewPublisher construct a new controller which would manage the configmap which stores
-// certificates in each namespace. It will make sure certificate configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+// NewPublisher construct a new controller which would manage the configmap
+// which stores certificates in each namespace. It will make sure certificate
+// configmap exists in each namespace.
+func NewPublisher(cmInformer coreinformers.ConfigMapInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
-		configMap: v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: RootCACertCofigMapName,
-			},
-			Data: map[string]string{
-				"ca.crt": string(rootCA),
-			},
-		},
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root-ca-cert-publisher"),
+		rootCA: rootCA,
+		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root-ca-cert-publisher"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -67,13 +62,6 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 	e.cmLister = cmInformer.Lister()
 	e.cmListerSynced = cmInformer.Informer().HasSynced
 
-	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    e.namespaceAdded,
-		UpdateFunc: e.namespaceUpdated,
-	})
-	e.nsLister = nsInformer.Lister()
-	e.nsListerSynced = nsInformer.Informer().HasSynced
-
 	e.syncHandler = e.syncNamespace
 
 	return e, nil
@@ -82,17 +70,14 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 
 // Publisher manages certificate ConfigMap objects inside Namespaces
 type Publisher struct {
-	client    clientset.Interface
-	configMap v1.ConfigMap
+	client clientset.Interface
+	rootCA []byte
 
 	// To allow injection for testing.
 	syncHandler func(key string) error
 
 	cmLister       corelisters.ConfigMapLister
 	cmListerSynced cache.InformerSynced
-
-	nsLister       corelisters.NamespaceLister
-	nsListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
 }
@@ -105,7 +90,7 @@ func (c *Publisher) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting root CA certificate configmap publisher")
 	defer klog.Infof("Shutting down root CA certificate configmap publisher")
 
-	if !controller.WaitForCacheSync("crt configmap", stopCh, c.cmListerSynced, c.nsListerSynced) {
+	if !controller.WaitForCacheSync("crt configmap", stopCh, c.cmListerSynced) {
 		return
 	}
 
@@ -129,24 +114,15 @@ func (c *Publisher) configMapDeleted(obj interface{}) {
 }
 
 func (c *Publisher) configMapUpdated(_, newObj interface{}) {
-	newConfigMap, err := convertToCM(newObj)
+	cm, err := convertToCM(newObj)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return
 	}
-	if newConfigMap.Name != RootCACertCofigMapName {
+	if cm.Name != RootCACertCofigMapName {
 		return
 	}
-
-	if reflect.DeepEqual(c.configMap.Data, newConfigMap.Data) {
-		return
-	}
-
-	newConfigMap.Data = make(map[string]string)
-	newConfigMap.Data["ca.crt"] = c.configMap.Data["ca.crt"]
-	if _, err := c.client.CoreV1().ConfigMaps(newConfigMap.Namespace).Update(newConfigMap); err != nil && !apierrs.IsAlreadyExists(err) {
-		utilruntime.HandleError(fmt.Errorf("configmap creation failure:%v", err))
-	}
+	c.queue.Add(cm.Namespace)
 }
 
 func (c *Publisher) namespaceAdded(obj interface{}) {
@@ -167,7 +143,8 @@ func (c *Publisher) runWorker() {
 	}
 }
 
-// processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
+// processNextWorkItem deals with one key off the queue. It returns false when
+// it's time to quit.
 func (c *Publisher) processNextWorkItem() bool {
 	key, quit := c.queue.Get()
 	if quit {
@@ -175,45 +152,50 @@ func (c *Publisher) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncHandler(key.(string))
-	if err == nil {
-		c.queue.Forget(key)
+	if err := c.syncHandler(key.(string)); err != nil {
+		utilruntime.HandleError(fmt.Errorf("syncing %q failed: %v", key, err))
+		c.queue.AddRateLimited(key)
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
-	c.queue.AddRateLimited(key)
-
+	c.queue.Forget(key)
 	return true
 }
 
-func (c *Publisher) syncNamespace(key string) error {
+func (c *Publisher) syncNamespace(ns string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 	}()
 
-	ns, err := c.nsLister.Get(key)
-	if apierrs.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	switch _, err := c.cmLister.ConfigMaps(ns.Name).Get(c.configMap.Name); {
-	case err == nil:
-		return nil
+	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertCofigMapName)
+	switch {
 	case apierrs.IsNotFound(err):
+		_, err := c.client.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: RootCACertCofigMapName,
+			},
+			Data: map[string]string{
+				"ca.crt": string(c.rootCA),
+			},
+		})
+		return err
 	case err != nil:
 		return err
 	}
 
-	cm := c.configMap.DeepCopy()
-	if _, err := c.client.CoreV1().ConfigMaps(ns.Name).Create(cm); err != nil && !apierrs.IsAlreadyExists(err) {
-		return err
+	data := map[string]string{
+		"ca.crt": string(c.rootCA),
 	}
-	return nil
+
+	if reflect.DeepEqual(cm.Data, data) {
+		return nil
+	}
+
+	cm.Data = data
+
+	_, err = c.client.CoreV1().ConfigMaps(ns).Update(cm)
+	return err
 }
 
 func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
