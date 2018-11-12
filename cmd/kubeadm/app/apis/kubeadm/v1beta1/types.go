@@ -294,7 +294,6 @@ type ExternalEtcd struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // JoinConfiguration contains elements describing a particular node.
-// TODO: This struct should be replaced by dynamic kubelet configuration.
 type JoinConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -309,12 +308,15 @@ type JoinConfiguration struct {
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
 	Discovery Discovery `json:"discovery"`
 
-	// ControlPlane flag specifies that the joining node should host an additional
-	// control plane instance.
-	ControlPlane bool `json:"controlPlane,omitempty"`
+	// ControlPlane defines the additional control plane instance to be deployed on the joining node.
+	// If nil, no additional control plane instance will be deployed.
+	ControlPlane *JoinControlPlane `json:"controlPlane,omitempty"`
+}
 
-	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
-	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
+// JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+type JoinControlPlane struct {
+	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process

@@ -540,6 +540,84 @@ func TestValidateJoinConfiguration(t *testing.T) {
 				},
 			},
 		}, false},
+		{&kubeadm.JoinConfiguration{ // Pass without JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Pass with JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         1234,
+				},
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.AdvertiseAddress validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "aaa",
+					BindPort:         1234,
+				},
+			},
+		}, false},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.BindPort validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         -1,
+				},
+			},
+		}, false},
 	}
 	for _, rt := range tests {
 		actual := ValidateJoinConfiguration(rt.s)

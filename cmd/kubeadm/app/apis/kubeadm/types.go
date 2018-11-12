@@ -329,12 +329,15 @@ type JoinConfiguration struct {
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
 	Discovery Discovery
 
-	// ControlPlane flag specifies that the joining node should host an additional
-	// control plane instance.
-	ControlPlane bool
+	// ControlPlane defines the additional control plane instance to be deployed on the joining node.
+	// If nil, no additional control plane instance will be deployed.
+	ControlPlane *JoinControlPlane
+}
 
-	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
-	APIEndpoint APIEndpoint
+// JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+type JoinControlPlane struct {
+	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+	LocalAPIEndpoint APIEndpoint
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process

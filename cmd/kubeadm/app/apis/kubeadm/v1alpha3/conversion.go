@@ -86,6 +86,13 @@ func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinCon
 		}
 	}
 
+	if in.ControlPlane == true {
+		out.ControlPlane = &kubeadm.JoinControlPlane{}
+		if err := autoConvert_v1alpha3_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.ControlPlane.LocalAPIEndpoint, s); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -105,6 +112,13 @@ func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm
 
 	} else if in.Discovery.File != nil {
 		out.DiscoveryFile = in.Discovery.File.KubeConfigPath
+	}
+
+	if in.ControlPlane != nil {
+		out.ControlPlane = true
+		if err := autoConvert_kubeadm_APIEndpoint_To_v1alpha3_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint, &out.APIEndpoint, s); err != nil {
+			return err
+		}
 	}
 
 	return nil

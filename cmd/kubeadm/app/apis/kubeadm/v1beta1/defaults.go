@@ -140,13 +140,19 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	}
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
-	SetDefaults_APIEndpoint(&obj.APIEndpoint)
+	SetDefaults_JoinControlPlane(obj.ControlPlane)
 	SetDefaults_Discovery(&obj.Discovery)
 }
 
 func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
 	if obj.CRISocket == "" {
 		obj.CRISocket = DefaultCRISocket
+	}
+}
+
+func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
+	if obj != nil {
+		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 	}
 }
 
