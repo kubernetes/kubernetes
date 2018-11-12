@@ -1271,8 +1271,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-configmap",
 				},
 				Data: map[string]string{
-					"1234": "abc",
-					"1z":   "abc",
+					"ab=c": "abc",
 					"key":  "value",
 				},
 			},
@@ -1282,7 +1281,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "value",
 				},
 			},
-			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable names.",
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [ab=c] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable names.",
 		},
 		{
 			name:               "configmap_invalid_keys_valid",
@@ -1519,8 +1518,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"1234":  []byte("abc"),
-					"1z":    []byte("abc"),
+					"ab=c":  []byte("abc"),
+					"1z=":   []byte("abc"),
 					"key.1": []byte("value"),
 				},
 			},
@@ -1530,7 +1529,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "value",
 				},
 			},
-			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1z=, ab=c] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
 		},
 		{
 			name:               "secret_invalid_keys_valid",
@@ -1560,6 +1559,31 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "abc",
 				},
 			},
+		},
+		{
+			name:               "secret_invalid_keys_invalidprefix",
+			ns:                 "test",
+			enableServiceLinks: false,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						Prefix:    "p=",
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+				},
+			},
+			masterServiceNs: "",
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"1234.name": []byte("abc"),
+				},
+			},
+			expectedEnvs:  nil,
+			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [p=1234.name] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
 		},
 	}
 
