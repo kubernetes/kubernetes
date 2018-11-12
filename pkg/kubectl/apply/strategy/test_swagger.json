@@ -325,12 +325,21 @@
     }
   },
   "securityDefinitions": {
+<<<<<<< HEAD
     "BearerToken": {
       "description": "Bearer Token authentication",
       "type": "apiKey",
       "name": "authorization",
       "in": "header"
     }
+=======
+   "BearerToken": {
+    "description": "Bearer Token authentication",
+    "type": "apiKey",
+    "name": "Authorization",
+    "in": "header"
+   }
+>>>>>>> Update OpenAPI SecurityDefinition to use Authorization header name, following HTTP standard
   },
   "security": [
     {

@@ -197,7 +197,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{
 			SecuritySchemeProps: spec.SecuritySchemeProps{
 				Type:        "apiKey",
-				Name:        "authorization",
+				Name:        "Authorization",
 				In:          "header",
 				Description: "Bearer Token authentication",
 			},
