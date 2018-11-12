@@ -105,7 +105,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 				defaultRunFunc(cmd, args)
 				return
 			}
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Complete(cmd))
 			cmdutil.CheckErr(o.ValidateArgs(cmd, args))
 			cmdutil.CheckErr(o.RunCreate(f, cmd))
 		},
@@ -177,7 +177,7 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *CreateOptions) Complete(cmd *cobra.Command) error {
 	var err error
 
 	o.RecordFlags.Complete(cmd)
