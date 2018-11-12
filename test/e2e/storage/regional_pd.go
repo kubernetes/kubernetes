@@ -74,7 +74,8 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 		})
 
 		It("should provision storage with delayed binding [Slow]", func() {
-			testRegionalDelayedBinding(c, ns)
+			testRegionalDelayedBinding(c, ns, 1 /* pvcCount */)
+			testRegionalDelayedBinding(c, ns, 3 /* pvcCount */)
 		})
 
 		It("should provision storage in the allowedTopologies [Slow]", func() {
@@ -82,7 +83,8 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 		})
 
 		It("should provision storage in the allowedTopologies with delayed binding [Slow]", func() {
-			testRegionalAllowedTopologiesWithDelayedBinding(c, ns)
+			testRegionalAllowedTopologiesWithDelayedBinding(c, ns, 1 /* pvcCount */)
+			testRegionalAllowedTopologiesWithDelayedBinding(c, ns, 3 /* pvcCount */)
 		})
 
 		It("should failover to a different zone when all nodes in one zone become unreachable [Slow] [Disruptive]", func() {
@@ -297,7 +299,7 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 	}
 }
 
-func testRegionalDelayedBinding(c clientset.Interface, ns string) {
+func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
 		Name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
@@ -311,9 +313,13 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string) {
 
 	suffix := "delayed-regional"
 	class := newStorageClass(test, ns, suffix)
-	claim := newClaim(test, ns, suffix)
-	claim.Spec.StorageClassName = &class.Name
-	pv, node := testBindingWaitForFirstConsumer(c, claim, class)
+	var claims []*v1.PersistentVolumeClaim
+	for i := 0; i < pvcCount; i++ {
+		claim := newClaim(test, ns, suffix)
+		claim.Spec.StorageClassName = &class.Name
+		claims = append(claims, claim)
+	}
+	pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -321,7 +327,9 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string) {
 	if !ok {
 		framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
 	}
-	checkZoneFromLabelAndAffinity(pv, zone, false)
+	for _, pv := range pvs {
+		checkZoneFromLabelAndAffinity(pv, zone, false)
+	}
 }
 
 func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
@@ -346,7 +354,7 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)
 }
 
-func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string) {
+func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
 		Name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
@@ -362,9 +370,13 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 	class := newStorageClass(test, ns, suffix)
 	topoZones := getTwoRandomZones(c)
 	addAllowedTopologiesToStorageClass(c, class, topoZones)
-	claim := newClaim(test, ns, suffix)
-	claim.Spec.StorageClassName = &class.Name
-	pv, node := testBindingWaitForFirstConsumer(c, claim, class)
+	var claims []*v1.PersistentVolumeClaim
+	for i := 0; i < pvcCount; i++ {
+		claim := newClaim(test, ns, suffix)
+		claim.Spec.StorageClassName = &class.Name
+		claims = append(claims, claim)
+	}
+	pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -382,7 +394,9 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 	if !zoneFound {
 		framework.Failf("zones specified in AllowedTopologies: %v does not contain zone of node where PV got provisioned: %s", topoZones, nodeZone)
 	}
-	checkZonesFromLabelAndAffinity(pv, sets.NewString(topoZones...), true)
+	for _, pv := range pvs {
+		checkZonesFromLabelAndAffinity(pv, sets.NewString(topoZones...), true)
+	}
 }
 
 func getPVC(c clientset.Interface, ns string, pvcLabels map[string]string) *v1.PersistentVolumeClaim {
