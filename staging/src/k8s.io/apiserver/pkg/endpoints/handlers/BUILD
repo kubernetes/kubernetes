@@ -109,6 +109,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/apply:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:all-srcs",
     ],
