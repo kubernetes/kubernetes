@@ -20,7 +20,6 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 )
 
@@ -51,8 +50,6 @@ func newCmdPhase(out io.Writer) *cobra.Command {
 		Short: "Invoke subsets of kubeadm functions separately for a manual install",
 		Long:  cmdutil.MacroCommandLongDescription,
 	}
-
-	cmd.AddCommand(phases.NewCmdAddon())
 
 	return cmd
 }

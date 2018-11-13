@@ -46,6 +46,9 @@ const FeatureGatesString = "feature-gates"
 // IgnorePreflightErrors sets the path a list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.
 const IgnorePreflightErrors = "ignore-preflight-errors"
 
+// ImageRepository sets the container registry to pull control plane images from.
+const ImageRepository = "image-repository"
+
 // KubeconfigDir flag sets the path where to save the kubeconfig file.
 const KubeconfigDir = "kubeconfig-dir"
 
