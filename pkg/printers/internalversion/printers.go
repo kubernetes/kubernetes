@@ -202,8 +202,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	statefulSetColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Desired", Type: "string", Description: appsv1beta1.StatefulSetSpec{}.SwaggerDoc()["replicas"]},
-		{Name: "Current", Type: "string", Description: appsv1beta1.StatefulSetStatus{}.SwaggerDoc()["replicas"]},
+		{Name: "Ready", Type: "string", Description: "Number of the pod with ready state"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
@@ -312,8 +311,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	deploymentColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Desired", Type: "string", Description: extensionsv1beta1.DeploymentSpec{}.SwaggerDoc()["replicas"]},
-		{Name: "Current", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["replicas"]},
+		{Name: "Ready", Type: "string", Description: "Number of the pod with ready state"},
 		{Name: "Up-to-date", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["updatedReplicas"]},
 		{Name: "Available", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["availableReplicas"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -1041,9 +1039,9 @@ func printStatefulSet(obj *apps.StatefulSet, options printers.PrintOptions) ([]m
 		Object: runtime.RawExtension{Object: obj},
 	}
 	desiredReplicas := obj.Spec.Replicas
-	currentReplicas := obj.Status.Replicas
+	readyReplicas := obj.Status.ReadyReplicas
 	createTime := translateTimestampSince(obj.CreationTimestamp)
-	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), createTime)
+	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%d/%d", int64(readyReplicas), int64(desiredReplicas)), createTime)
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images)
@@ -1553,8 +1551,8 @@ func printDeployment(obj *apps.Deployment, options printers.PrintOptions) ([]met
 		Object: runtime.RawExtension{Object: obj},
 	}
 	desiredReplicas := obj.Spec.Replicas
-	currentReplicas := obj.Status.Replicas
 	updatedReplicas := obj.Status.UpdatedReplicas
+	readyReplicas := obj.Status.ReadyReplicas
 	availableReplicas := obj.Status.AvailableReplicas
 	age := translateTimestampSince(obj.CreationTimestamp)
 	containers := obj.Spec.Template.Spec.Containers
@@ -1563,7 +1561,7 @@ func printDeployment(obj *apps.Deployment, options printers.PrintOptions) ([]met
 		// this shouldn't happen if LabelSelector passed validation
 		return nil, err
 	}
-	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), int64(updatedReplicas), int64(availableReplicas), age)
+	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%d/%d", int64(readyReplicas), int64(desiredReplicas)), int64(updatedReplicas), int64(availableReplicas), age)
 	if options.Wide {
 		containers, images := layoutContainerCells(containers)
 		row.Cells = append(row.Cells, containers, images, selector.String())
