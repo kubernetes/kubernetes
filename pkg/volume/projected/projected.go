@@ -326,11 +326,14 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				continue
 			}
 			tp := source.ServiceAccountToken
+
+			var auds []string
+			if len(tp.Audience) != 0 {
+				auds = []string{tp.Audience}
+			}
 			tr, err := s.plugin.getServiceAccountToken(s.pod.Namespace, s.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
 				Spec: authenticationv1.TokenRequestSpec{
-					Audiences: []string{
-						tp.Audience,
-					},
+					Audiences:         auds,
 					ExpirationSeconds: tp.ExpirationSeconds,
 					BoundObjectRef: &authenticationv1.BoundObjectReference{
 						APIVersion: "v1",
