@@ -432,9 +432,8 @@ func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, k
 		ri := index(serverOrder, r, mergeKey, kind)
 		if li >= 0 && ri >= 0 {
 			return li < ri, true
-		} else {
-			return false, false
 		}
+		return false, false
 	}
 
 	// left and right should be non-overlapping.
@@ -1385,9 +1384,8 @@ func mergeMapHandler(original, patch interface{}, schema LookupPatchMeta,
 
 	if fieldPatchStrategy != replaceDirective {
 		return mergeMap(typedOriginal, typedPatch, schema, mergeOptions)
-	} else {
-		return typedPatch, nil
 	}
+	return typedPatch, nil
 }
 
 // mergeSliceHandler handles how to merge `patchV` whose key is `key` with `original` respecting
@@ -1401,9 +1399,8 @@ func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
 
 	if fieldPatchStrategy == mergeDirective {
 		return mergeSlice(typedOriginal, typedPatch, schema, fieldPatchMergeKey, mergeOptions, isDeleteList)
-	} else {
-		return typedPatch, nil
 	}
+	return typedPatch, nil
 }
 
 // Merge two slices together. Note: This may modify both the original slice and
