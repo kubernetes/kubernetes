@@ -387,10 +387,6 @@ func (nim *nodeInfoManager) CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error
 		},
 	}
 
-	err = validateCSINodeInfo(nodeInfo)
-	if err != nil {
-		return err
-	}
 	return csiKubeClient.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
 }
 
@@ -503,7 +499,10 @@ func (nim *nodeInfoManager) uninstallDriverFromCSINodeInfo(csiDriverName string)
 			return nil
 		}
 
-		// TODO (verult) make sure CSINodeInfo has validation logic to prevent duplicate driver names
+		err = validateCSINodeInfo(nodeInfo)
+		if err != nil {
+			return err
+		}
 		_, updateErr := nodeInfoClient.Update(nodeInfo)
 		return updateErr // do not wrap error
 
@@ -568,28 +567,45 @@ func removeMaxAttachLimit(driverName string) nodeUpdateFunc {
 }
 
 // validateCSINodeInfo ensures members of CSINodeInfo object satisfies map and set semantics.
-// Before calling CSINodeInfoInterface.Create() or CSINodeInfoInterface.Update()
-// validateCSINodeInfo() should be invoked to make sure the CSINodeInfo is compliant
-// TODO: move this logic to an external webhook
+// Before calling CSINodeInfoInterface.Update(), validateCSINodeInfo() should be invoked to
+// make sure the CSINodeInfo is compliant
 func validateCSINodeInfo(nodeInfo *csiv1alpha1.CSINodeInfo) error {
-	if len(nodeInfo.CSIDrivers) < 1 {
-		return fmt.Errorf("at least one CSI Driver entry is required")
+	if len(nodeInfo.Status.Drivers) < 1 {
+		return fmt.Errorf("at least one Driver entry is required in driver statuses")
 	}
-	// check for duplicate entries for the same driver
+	if len(nodeInfo.Spec.Drivers) < 1 {
+		return fmt.Errorf("at least one Driver entry is required in driver specs")
+	}
+	if len(nodeInfo.Status.Drivers) != len(nodeInfo.Spec.Drivers) {
+		return fmt.Errorf("")
+	}
+	// check for duplicate entries for the same driver in statuses
 	var errors []string
-	driverNames := make(sets.String)
-	for _, driverInfo := range nodeInfo.CSIDrivers {
-		if driverNames.Has(driverInfo.Driver) {
-			errors = append(errors, fmt.Sprintf("duplicate entries found for driver %s", driverNames))
+	driverNamesInStatuses := make(sets.String)
+	for _, driverInfo := range nodeInfo.Status.Drivers {
+		if driverNamesInStatuses.Has(driverInfo.Name) {
+			errors = append(errors, fmt.Sprintf("duplicate entries found for driver: %s in driver statuses", driverInfo.Name))
 		}
-		driverNames.Insert(driverInfo.Driver)
+		driverNamesInStatuses.Insert(driverInfo.Name)
+	}
+	// check for duplicate entries for the same driver in specs
+	driverNamesInSpecs := make(sets.String)
+	for _, driverInfo := range nodeInfo.Spec.Drivers {
+		if driverNamesInSpecs.Has(driverInfo.Name) {
+			errors = append(errors, fmt.Sprintf("duplicate entries found for driver: %s in driver specs", driverInfo.Name))
+		}
+		driverNamesInSpecs.Insert(driverInfo.Name)
 		topoKeys := make(sets.String)
 		for _, key := range driverInfo.TopologyKeys {
 			if topoKeys.Has(key) {
-				errors = append(errors, fmt.Sprintf("duplicate topology keys %s found for driver %s", key, driverInfo.Driver))
+				errors = append(errors, fmt.Sprintf("duplicate topology keys %s found for driver %s in driver specs", key, driverInfo.Name))
 			}
 			topoKeys.Insert(key)
 		}
+	}
+	// check all entries in specs and status match
+	if !driverNamesInSpecs.Equal(driverNamesInStatuses) {
+		errors = append(errors, fmt.Sprintf("list of drivers in specs: %v does not match list of drivers in statuses: %v", driverNamesInSpecs.List(), driverNamesInStatuses.List()))
 	}
 	if len(errors) == 0 {
 		return nil

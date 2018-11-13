@@ -644,85 +644,271 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name: "multiple drivers with same ids and different topology keys",
+			name: "multiple drivers with different node IDs, topology keys and status",
 			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "driver1",
-						NodeID:       "node1",
-						TopologyKeys: []string{"key1, key2"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1, key2"},
+						},
+						{
+							Name:         "driverB",
+							NodeID:       "nodeA",
+							TopologyKeys: []string{"keyA", "keyB"},
+						},
 					},
-					{
-						Driver:       "driverB",
-						NodeID:       "nodeA",
-						TopologyKeys: []string{"keyA", "keyB"},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "in-tree",
+						},
+						{
+							Name:                  "driverB",
+							Available:             false,
+							VolumePluginMechanism: "csi",
+						},
 					},
 				},
 			},
 			expectErr: false,
 		},
 		{
-			name: "multiple drivers with same ids and similar topology keys",
+			name: "multiple drivers with same node IDs, topology keys and status",
 			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "driver1",
-						NodeID:       "node1",
-						TopologyKeys: []string{"key1"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1"},
+						},
+						{
+							Name:         "driver2",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1"},
+						},
 					},
-					{
-						Driver:       "driver2",
-						NodeID:       "node1",
-						TopologyKeys: []string{"key1"},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+						{
+							Name:                  "driver2",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
 					},
 				},
 			},
 			expectErr: false,
 		},
 		{
-			name: "duplicate drivers",
+			name: "duplicate drivers in driver specs",
 			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "driver1",
-						NodeID:       "node1",
-						TopologyKeys: []string{"key1", "key2"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1", "key2"},
+						},
+						{
+							Name:         "driver1",
+							NodeID:       "nodeX",
+							TopologyKeys: []string{"keyA", "keyB"},
+						},
 					},
-					{
-						Driver:       "driver1",
-						NodeID:       "nodeX",
-						TopologyKeys: []string{"keyA", "keyB"},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
 					},
 				},
 			},
 			expectErr: true,
 		},
 		{
-			name: "single driver with duplicate topology keys",
+			name: "duplicate drivers in driver statuses",
 			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "driver1",
-						NodeID:       "node1",
-						TopologyKeys: []string{"key1", "key1"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1", "key2"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "in-tree",
+						},
+						{
+							Name:                  "driver1",
+							Available:             false,
+							VolumePluginMechanism: "csi",
+						},
 					},
 				},
 			},
 			expectErr: true,
 		},
 		{
-			name: "multiple drivers with one set of duplicate topology keys ",
+			name: "single driver with duplicate topology keys in driver specs",
 			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "driver1",
-						NodeID:       "node1",
-						TopologyKeys: []string{"key1"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1", "key1"},
+						},
 					},
-					{
-						Driver:       "driver2",
-						NodeID:       "nodeX",
-						TopologyKeys: []string{"keyA", "keyA"},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "multiple drivers with one set of duplicate topology keys in driver specs",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1"},
+						},
+						{
+							Name:         "driver2",
+							NodeID:       "nodeX",
+							TopologyKeys: []string{"keyA", "keyA"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+						{
+							Name:                  "driver2",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "mismatch between drivers in specs and status (null intersection)",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1"},
+						},
+						{
+							Name:         "driver2",
+							NodeID:       "nodeX",
+							TopologyKeys: []string{"keyA", "keyA"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver3",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "mismatch between drivers in specs and status (specs superset of status)",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1"},
+						},
+						{
+							Name:         "driver2",
+							NodeID:       "nodeX",
+							TopologyKeys: []string{"keyA", "keyA"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "mismatch between drivers in specs and status (specs subset of status)",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "driver1",
+							NodeID:       "node1",
+							TopologyKeys: []string{"key1"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "driver1",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
+						{
+							Name:                  "driver2",
+							Available:             true,
+							VolumePluginMechanism: "csi",
+						},
 					},
 				},
 			},
