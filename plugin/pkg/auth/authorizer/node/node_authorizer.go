@@ -273,9 +273,12 @@ func (r *NodeAuthorizer) authorizeCSINodeInfo(nodeName string, attrs authorizer.
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINodeInfo", nil
 	}
 
-	if len(attrs.GetSubresource()) > 0 {
+	if len(attrs.GetSubresource()) > 0 && attrs.GetSubresource() != "status" {
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot authorize CSINodeInfo subresources", nil
+	} else if attrs.GetSubresource() == "status" && verb != "update" && verb != "patch" {
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only update or patch a CSINodeInfo status", nil
 	}
 
 	// the request must come from a node with the same name as the CSINodeInfo

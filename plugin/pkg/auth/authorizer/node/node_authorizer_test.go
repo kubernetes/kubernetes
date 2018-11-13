@@ -360,10 +360,16 @@ func TestAuthorizer(t *testing.T) {
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed CSINodeInfo with subresource - feature enabled",
+			name:     "disallowed CSINodeInfo with non-status subresource - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodeinfos", Subresource: "csiDrivers", APIGroup: "csi.storage.k8s.io", Name: "node0"},
 			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "allowed CSINodeInfo with status subresource - feature enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodeinfos", Subresource: "status", APIGroup: "csi.storage.k8s.io", Name: "node0"},
+			features: csiNodeInfoEnabledFeature,
+			expect:   authorizer.DecisionAllow,
 		},
 		{
 			name:     "disallowed get another node's CSINodeInfo - feature enabled",
