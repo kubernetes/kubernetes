@@ -161,7 +161,18 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix, config.OIDCSigningAlgs, config.OIDCRequiredClaims)
+		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
+			IssuerURL:            config.OIDCIssuerURL,
+			ClientID:             config.OIDCClientID,
+			APIAudiences:         config.APIAudiences,
+			CAFile:               config.OIDCCAFile,
+			UsernameClaim:        config.OIDCUsernameClaim,
+			UsernamePrefix:       config.OIDCUsernamePrefix,
+			GroupsClaim:          config.OIDCGroupsClaim,
+			GroupsPrefix:         config.OIDCGroupsPrefix,
+			SupportedSigningAlgs: config.OIDCSigningAlgs,
+			RequiredClaims:       config.OIDCRequiredClaims,
+		})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -240,33 +251,23 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Token or an error.
-func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string, signingAlgs []string, requiredClaims map[string]string) (authenticator.Token, error) {
+func newAuthenticatorFromOIDCIssuerURL(opts oidc.Options) (authenticator.Token, error) {
 	const noUsernamePrefix = "-"
 
-	if usernamePrefix == "" && usernameClaim != "email" {
+	if opts.UsernamePrefix == "" && opts.UsernameClaim != "email" {
 		// Old behavior. If a usernamePrefix isn't provided, prefix all claims other than "email"
 		// with the issuerURL.
 		//
 		// See https://github.com/kubernetes/kubernetes/issues/31380
-		usernamePrefix = issuerURL + "#"
+		opts.UsernamePrefix = opts.IssuerURL + "#"
 	}
 
-	if usernamePrefix == noUsernamePrefix {
+	if opts.UsernamePrefix == noUsernamePrefix {
 		// Special value indicating usernames shouldn't be prefixed.
-		usernamePrefix = ""
+		opts.UsernamePrefix = ""
 	}
 
-	tokenAuthenticator, err := oidc.New(oidc.Options{
-		IssuerURL:            issuerURL,
-		ClientID:             clientID,
-		CAFile:               caFile,
-		UsernameClaim:        usernameClaim,
-		UsernamePrefix:       usernamePrefix,
-		GroupsClaim:          groupsClaim,
-		GroupsPrefix:         groupsPrefix,
-		SupportedSigningAlgs: signingAlgs,
-		RequiredClaims:       requiredClaims,
-	})
+	tokenAuthenticator, err := oidc.New(opts)
 	if err != nil {
 		return nil, err
 	}
