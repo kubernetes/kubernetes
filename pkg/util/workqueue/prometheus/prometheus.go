@@ -71,6 +71,30 @@ func (prometheusMetricsProvider) NewWorkDurationMetric(name string) workqueue.Su
 	return workDuration
 }
 
+func (prometheusMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) workqueue.SettableGaugeMetric {
+	unfinished := prometheus.NewGauge(prometheus.GaugeOpts{
+		Subsystem: name,
+		Name:      "unfinished_work_seconds",
+		Help: "How many seconds of work " + name + " has done that " +
+			"is in progress and hasn't been observed by work_duration. Large " +
+			"values indicate stuck threads. One can deduce the number of stuck " +
+			"threads by observing the rate at which this increases.",
+	})
+	prometheus.Register(unfinished)
+	return unfinished
+}
+
+func (prometheusMetricsProvider) NewLongestRunningProcessorMicrosecondsMetric(name string) workqueue.SettableGaugeMetric {
+	unfinished := prometheus.NewGauge(prometheus.GaugeOpts{
+		Subsystem: name,
+		Name:      "longest_running_processor_microseconds",
+		Help: "How many microseconds has the longest running " +
+			"processor for " + name + " been running.",
+	})
+	prometheus.Register(unfinished)
+	return unfinished
+}
+
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
 	retries := prometheus.NewCounter(prometheus.CounterOpts{
 		Subsystem: name,
