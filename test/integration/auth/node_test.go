@@ -423,7 +423,7 @@ func TestNodeAuthorizer(t *testing.T) {
 				Spec: csiv1beta1.CSINodeInfoSpec{
 					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
-							Name:         "com.example.csi/driver1",
+							Name:         "com.example.csi-driver1",
 							NodeID:       "com.example.csi/node1",
 							TopologyKeys: []string{"com.example.csi/zone"},
 						},
@@ -432,7 +432,7 @@ func TestNodeAuthorizer(t *testing.T) {
 				Status: csiv1beta1.CSINodeInfoStatus{
 					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
-							Name:                  "com.example.csi/driver1",
+							Name:                  "com.example.csi-driver1",
 							Available:             true,
 							VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 						},
@@ -451,14 +451,14 @@ func TestNodeAuthorizer(t *testing.T) {
 			}
 			nodeInfo.Spec.Drivers = []csiv1beta1.CSIDriverInfoSpec{
 				{
-					Name:         "com.example.csi/driver1",
+					Name:         "com.example.csi-driver1",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
 				},
 			}
 			nodeInfo.Status.Drivers = []csiv1beta1.CSIDriverInfoStatus{
 				{
-					Name:                  "com.example.csi/driver1",
+					Name:                  "com.example.csi-driver1",
 					Available:             true,
 					VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 				},
