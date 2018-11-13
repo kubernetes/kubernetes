@@ -30,6 +30,9 @@ func getBlkioCgroupPath(subsystemName, cgroupParent, containerID string) (path s
 	if err != nil {
 		return "", err
 	}
+	if len(cgroupParent) <= 0 {
+		cgroupParent = DefaultCgroupParent
+	}
 	path = filepath.Join(root, subsystemName, cgroupParent, containerID)
 	// path = filepath.Join(root, "blkio", cgroupParent, containerID)
 	return path, nil
