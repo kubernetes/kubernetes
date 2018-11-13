@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Warning: This is a file generated from the base underscore template file: nodelocaldns.yaml.base
 
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nodelocaldns
+  name: node-local-dns
   namespace: kube-system
   labels:
     kubernetes.io/cluster-service: "true"
@@ -27,32 +26,31 @@ metadata:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nodelocaldns
+  name: node-local-dns
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
-
 data:
   Corefile: |
-    $DNS_DOMAIN:53 {
+    __PILLAR__DNS__DOMAIN__:53 {
         errors
         cache 30
         reload
         loop
-        bind $LOCAL_DNS_IP
-        forward . $DNS_SERVER_IP {
+        bind __PILLAR__LOCAL__DNS__
+        forward . __PILLAR__DNS__SERVER__ {
                 force_tcp
         }
         prometheus :9253
-        health $LOCAL_DNS_IP:8080
+        health __PILLAR__LOCAL__DNS__:8080
         }
     in-addr.arpa:53 {
         errors
         cache 30
         reload
         loop
-        bind $LOCAL_DNS_IP
-        forward . $DNS_SERVER_IP {
+        bind __PILLAR__LOCAL__DNS__
+        forward . __PILLAR__DNS__SERVER__ {
                 force_tcp
         }
         prometheus :9253
@@ -62,8 +60,8 @@ data:
         cache 30
         reload
         loop
-        bind $LOCAL_DNS_IP
-        forward . $DNS_SERVER_IP {
+        bind __PILLAR__LOCAL__DNS__
+        forward . __PILLAR__DNS__SERVER__ {
                 force_tcp
         }
         prometheus :9253
@@ -73,7 +71,7 @@ data:
         cache 30
         reload
         loop
-        bind $LOCAL_DNS_IP
+        bind __PILLAR__LOCAL__DNS__
         forward . /etc/resolv.conf {
                 force_tcp
         }
@@ -83,7 +81,7 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: nodelocaldns
+  name: node-local-dns
   namespace: kube-system
   labels:
     k8s-app: kube-dns
@@ -92,14 +90,14 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s-app: nodelocaldns
+      k8s-app: node-local-dns
   template:
     metadata:
        labels:
-          k8s-app: nodelocaldns
+          k8s-app: node-local-dns
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: nodelocaldns
+      serviceAccountName: node-local-dns
       hostNetwork: true
       dnsPolicy: Default  # Don't use cluster DNS.
       tolerations:
@@ -114,9 +112,9 @@ spec:
           requests:
             cpu: 25m
             memory: 5Mi
-        args: [ "-localip", "$LOCAL_DNS_IP", "-conf", "/etc/coredns/Corefile" ]
+        args: [ "-localip", "__PILLAR__LOCAL__DNS__", "-conf", "/etc/coredns/Corefile" ]
         securityContext:
-                privileged: true
+          privileged: true
         ports:
         - containerPort: 53
           name: dns
@@ -129,22 +127,18 @@ spec:
           protocol: TCP
         livenessProbe:
           httpGet:
-            host: $LOCAL_DNS_IP
+            host: __PILLAR__LOCAL__DNS__
             path: /health
             port: 8080
-            scheme: HTTP
           initialDelaySeconds: 60
           timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
         volumeMounts:
         - name: config-volume
           mountPath: /etc/coredns
       volumes:
         - name: config-volume
           configMap:
-            name: nodelocaldns
+            name: node-local-dns
             items:
             - key: Corefile
               path: Corefile
-      terminationGracePeriodSeconds: 30

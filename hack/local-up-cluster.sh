@@ -706,7 +706,7 @@ function start_kubelet {
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
     # Enable dns
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-      if [[ "${ENABLE_NODELOCAL_DNS}" = true ]]; then
+      if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
         dns_args="--cluster-dns=${LOCAL_DNS_IP} --cluster-domain=${DNS_DOMAIN}"
       else
         dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
@@ -915,22 +915,14 @@ function start_kubedns {
 }
 
 function start_nodelocaldns {
-    if [[ "${ENABLE_NODELOCAL_DNS}" = true ]]; then
-        cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/localdns.yaml.in" nodelocaldns.yaml
-        sed -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" nodelocaldns.yaml
-        sed -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" nodelocaldns.yaml
-        sed -i -e "s/{{ pillar\['local_dns_ip'\] }}/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
-        if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
-            sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${CLUSTER_IP_RANGE}@g" nodelocaldns.yaml
-        else
-            sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@0.0.0.0@g" nodelocaldns.yaml
-        fi
-        # TODO update to dns role once we have one.
-        # use kubectl to create nodelocaldns addon
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
-        echo "NodeLocalDNS addon successfully deployed."
-        rm nodelocaldns.yaml
-    fi
+  cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
+  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
+  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
+  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+  # use kubectl to create nodelocaldns addon
+  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
+  echo "NodeLocalDNS addon successfully deployed."
+  rm nodelocaldns.yaml
 }
 
 function start_kubedashboard {
@@ -1081,7 +1073,9 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   fi
   start_kubeproxy
   start_kubedns
-  start_nodelocaldns
+  if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+    start_nodelocaldns
+  fi
   start_kubedashboard
 fi
 

@@ -31,7 +31,7 @@ function deploy_dns {
   sed -i -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" kube-dns.yaml
 
   KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
-
+      
   if [ ! "$KUBEDNS" ]; then
     # use kubectl to create kube-dns addon
     ${KUBECTL} --namespace=kube-system create -f kube-dns.yaml
@@ -39,28 +39,6 @@ function deploy_dns {
     echo "Kube-dns addon is successfully deployed."
   else
     echo "Kube-dns addon is already deployed. Skipping."
-  fi
-
-  echo
-}
-
-function deploy_nodelocaldns {
-  echo "Deploying NodeLocalDNS on Kubernetes"
-  cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml.sed" nodelocaldns.yaml
-  sed -i -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" nodelocaldns.yaml
-  sed -i -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" nodelocaldns.yaml
-  sed -i -e "s/\\\$LOCAL_DNS_IP/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
-
-  NODELOCALDNS=$(${KUBECTL} get pods --namespace=kube-system -o jsonpath='{.items[*].metadata.name}' \
-    | tr ' ' "\n" | grep "nodelocaldns")
-
-  if [[ -z "${NODELOCALDNS}" ]]; then
-    # use kubectl to create nodelocaldns addon
-    ${KUBECTL} --namespace=kube-system create -f nodelocaldns.yaml
-
-    echo "NodeLocalDNS addon is successfully deployed."
-  else
-    echo "NodeLocalDNS addon is already deployed. Skipping."
   fi
 
   echo
@@ -79,14 +57,11 @@ function deploy_dashboard {
 }
 
 
-if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
+if [ "${ENABLE_CLUSTER_DNS}" == true ]; then
   deploy_dns
 fi
 
-if [[ "${ENABLE_NODELOCAL_DNS}" == "true" ]]; then
-  deploy_nodelocaldns
-fi
-if [[ "${ENABLE_CLUSTER_UI}" == "true" ]]; then
+if [ "${ENABLE_CLUSTER_UI}" == true ]; then
   deploy_dashboard
 fi
 

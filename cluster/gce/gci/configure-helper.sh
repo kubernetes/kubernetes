@@ -2351,12 +2351,12 @@ EOF
 
 # Sets up the manifests of local dns cache agent for k8s addons.
 function setup-nodelocaldns-manifest {
+  setup-addon-manifests "addons" "dns/nodelocaldns"
   local -r localdns_file="${dst_dir}/dns/nodelocaldns/nodelocaldns.yaml"
-  mv "${dst_dir}/dns/nodelocaldns/nodelocaldns.yaml.in" "${localdns_file}"
-  # Replace the salt configurations with variable values.
-  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${localdns_file}"
-  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${localdns_file}"
-  sed -i -e "s@{{ *pillar\['local_dns_ip'\] *}}@${LOCAL_DNS_IP}@g" "${localdns_file}"
+  # Replace the sed configurations with variable values.
+  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
+  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
+  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
 }
 
 # Sets up the manifests of netd for k8s addons.
@@ -2531,7 +2531,6 @@ EOF
       setup-kube-dns-manifest
     fi
     if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "dns/nodelocaldns"
       setup-nodelocaldns-manifest
     fi
   fi
