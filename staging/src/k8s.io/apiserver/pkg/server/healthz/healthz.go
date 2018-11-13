@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -141,12 +142,28 @@ func (c *healthzCheck) Check(r *http.Request) error {
 	return c.check(r)
 }
 
+// getExcludedChecks extracts the health check names to be excluded from the query param
+func getExcludedChecks(r *http.Request) sets.String {
+	checks, found := r.URL.Query()["exclude"]
+	if found {
+		return sets.NewString(checks...)
+	}
+	return sets.NewString()
+}
+
 // handleRootHealthz returns an http.HandlerFunc that serves the provided checks.
 func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		failed := false
+		excluded := getExcludedChecks(r)
 		var verboseOut bytes.Buffer
 		for _, check := range checks {
+			// no-op the check if we've specified we want to exclude the check
+			if excluded.Has(check.Name()) {
+				excluded.Delete(check.Name())
+				fmt.Fprintf(&verboseOut, "[+]%v excluded: ok\n", check.Name())
+				continue
+			}
 			if err := check.Check(r); err != nil {
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.
@@ -156,6 +173,11 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 			} else {
 				fmt.Fprintf(&verboseOut, "[+]%v ok\n", check.Name())
 			}
+		}
+		if excluded.Len() > 0 {
+			fmt.Fprintf(&verboseOut, "warn: some health checks cannot be excluded: no matches for %v\n", formatQuoted(excluded.List()...))
+			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %v",
+				formatQuoted(excluded.List()...))
 		}
 		// always be verbose on failure
 		if failed {
