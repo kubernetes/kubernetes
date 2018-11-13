@@ -752,8 +752,17 @@ func (c *configFactory) onServiceAdd(obj interface{}) {
 func (c *configFactory) onServiceUpdate(oldObj interface{}, newObj interface{}) {
 	if c.enableEquivalenceClassCache {
 		// TODO(resouer) We may need to invalidate this for specified group of pods only
-		oldService := oldObj.(*v1.Service)
-		newService := newObj.(*v1.Service)
+		newService, ok := newObj.(*v1.Service)
+		if !ok {
+			klog.Errorf("cannot convert newObj to *v1.Service: %v", newObj)
+			return
+		}
+		oldService, ok := oldObj.(*v1.Service)
+		if !ok {
+			klog.Errorf("cannot convert oldObj to *v1.Service: %v", oldObj)
+			return
+		}
+
 		if !reflect.DeepEqual(oldService.Spec.Selector, newService.Spec.Selector) {
 			c.equivalencePodCache.InvalidatePredicates(serviceAffinitySet)
 		}
