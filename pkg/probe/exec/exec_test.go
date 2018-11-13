@@ -17,25 +17,27 @@ limitations under the License.
 package exec
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/probe"
 )
 
 type FakeCmd struct {
-	out    []byte
 	stdout []byte
+	stderr []byte
 	err    error
 }
 
 func (f *FakeCmd) Run() error {
-	return nil
+	return f.err
 }
 
 func (f *FakeCmd) CombinedOutput() ([]byte, error) {
-	return f.out, f.err
+	return append(f.stdout, f.stderr...), f.err
 }
 
 func (f *FakeCmd) Output() ([]byte, error) {
@@ -52,19 +54,19 @@ func (f *FakeCmd) SetStderr(out io.Writer) {}
 
 func (f *FakeCmd) SetEnv(env []string) {}
 
+func (f *FakeCmd) StdoutPipe() (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader(f.stdout)), nil
+}
+
+func (f *FakeCmd) StderrPipe() (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader(f.stderr)), nil
+}
+
 func (f *FakeCmd) Stop() {}
 
 func (f *FakeCmd) Start() error { return nil }
 
 func (f *FakeCmd) Wait() error { return nil }
-
-func (f *FakeCmd) StdoutPipe() (io.ReadCloser, error) {
-	return nil, nil
-}
-
-func (f *FakeCmd) StderrPipe() (io.ReadCloser, error) {
-	return nil, nil
-}
 
 type fakeExitError struct {
 	exited     bool
@@ -107,8 +109,8 @@ func TestExec(t *testing.T) {
 	}
 	for i, test := range tests {
 		fake := FakeCmd{
-			out: []byte(test.output),
-			err: test.err,
+			stdout: []byte(test.output),
+			err:    test.err,
 		}
 		status, output, err := prober.Probe(&fake)
 		if status != test.expectedStatus {
