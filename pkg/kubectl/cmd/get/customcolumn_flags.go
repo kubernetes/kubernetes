@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package get
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -51,7 +52,7 @@ func (f *CustomColumnsPrintFlags) AllowedFormats() []string {
 // handling custom-column printing.
 // Returns false if the specified templateFormat does not match a supported format.
 // Supported format types can be found in pkg/printers/printers.go
-func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
+func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (printers.ResourcePrinter, error) {
 	if len(templateFormat) == 0 {
 		return nil, genericclioptions.NoCompatiblePrinterError{}
 	}
@@ -79,7 +80,8 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
 
-	decoder := scheme.Codecs.UniversalDecoder()
+	// UniversalDecoder call must specify parameter versions; otherwise it will decode to internal versions.
+	decoder := scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	if templateFormat == "custom-columns-file" {
 		file, err := os.Open(templateValue)
