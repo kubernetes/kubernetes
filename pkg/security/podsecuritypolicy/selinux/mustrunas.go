@@ -21,10 +21,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kubernetes/kubernetes/pkg/apis/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
