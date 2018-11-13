@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
@@ -51,6 +51,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 	var criSocketPath string
 	var ignorePreflightErrors []string
 	var forceReset bool
+	var client clientset.Interface
 	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
 
 	cmd := &cobra.Command{
@@ -61,8 +62,10 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, false)
-			kubeadmutil.CheckErr(err)
+			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
+				client, err = getClientset(kubeConfigFile, false)
+				kubeadmutil.CheckErr(err)
+			}
 
 			r, err := NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 			kubeadmutil.CheckErr(err)
@@ -189,11 +192,13 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 	const etcdVolumeName = "etcd-data"
 	var dataDir string
 
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
-	if err == nil {
-		return cfg.Etcd.Local.DataDir, nil
+	if client != nil {
+		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+		if err == nil {
+			return cfg.Etcd.Local.DataDir, nil
+		}
+		klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap, using etcd pod spec as fallback: %v", err)
 	}
-	klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap, using etcd pod spec as fallback: %v", err)
 
 	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
 	if err != nil {
