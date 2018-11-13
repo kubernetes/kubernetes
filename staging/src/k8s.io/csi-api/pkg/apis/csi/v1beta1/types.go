@@ -40,8 +40,8 @@ type CSIDriver struct {
 
 	// Standard object metadata.
 	// metadata.Name indicates the name of the CSI driver that this object
-	// refers to; it MUST be the same name returned by the CSI GetPluginName()
-	// call for that driver.
+	// refers to; it MUST be the same name returned by the CSI GetPluginInfo()
+	// call for that driver with all uppercase characters lowercased
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -127,7 +127,7 @@ type CSINodeInfoStatus struct {
 // CSIDriverInfoStatus holds information about the status of one CSI driver installed on a node
 type CSIDriverInfoStatus struct {
 	// name is the name of the CSI driver that this object refers to.
-	// This MUST be the same name returned by the CSI GetPluginName() call for
+	// This MUST be the same name returned by the CSI GetPluginInfo() call for
 	// that driver.
 	Name string `json:"name"`
 
@@ -148,7 +148,7 @@ type CSIDriverInfoStatus struct {
 // CSIDriverInfoSpec holds information about the specification of one CSI driver installed on a node
 type CSIDriverInfoSpec struct {
 	// name is the name of the CSI driver that this object refers to.
-	// This MUST be the same name returned by the CSI GetPluginName() call for
+	// This MUST be the same name returned by the CSI GetPluginInfo() call for
 	// that driver.
 	Name string `json:"name"`
 

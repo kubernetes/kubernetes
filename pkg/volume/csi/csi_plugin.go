@@ -614,7 +614,8 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	if p.csiDriverLister == nil {
 		return false, errors.New("CSIDriver lister does not exist")
 	}
-	csiDriver, err := p.csiDriverLister.Get(driver)
+	// Driver name may be uppercase but object must be lowercase
+	csiDriver, err := p.csiDriverLister.Get(strings.ToLower(driver))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist

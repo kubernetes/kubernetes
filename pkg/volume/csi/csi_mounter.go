@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"k8s.io/klog"
 
@@ -239,6 +240,8 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	}
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
+	// Driver name may be uppercase but object must be lowercase
+	csiDriver, err := c.plugin.csiDriverLister.Get(strings.ToLower(c.driverName))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
