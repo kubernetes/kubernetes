@@ -24,6 +24,8 @@ spec:
                   name:
                     description: The CSI driver that this object refers to.
                     type: string
+                    pattern: ^[a-zA-Z0-9][-a-zA-Z0-9_.]{0,61}[a-zA-Z0-9]$
+                    maxLength: 63
                   nodeID:
                     description: The node from the driver point of view.
                     type: string
@@ -31,6 +33,8 @@ spec:
                     description: List of keys supported by the driver.
                     items:
                       type: string
+                      pattern: ^([a-z0-9]([-a-z0-9.]{0,61}[a-z0-9])?[/])?[a-zA-Z0-9][-a-zA-Z0-9_.]{0,61}[a-zA-Z0-9]$
+                      maxLength: 63
                     type: array
         status:
           description: Status of CSINodeInfo
