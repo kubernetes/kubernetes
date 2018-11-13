@@ -7,6 +7,10 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 )
 
+var (
+	DefaultCgroupParent = "docker"
+)
+
 func init() {
 	blkioSubsystem = &fs.BlkioGroup{}
 	// blkioSubsystem = &BlkioGroupSubsystem{}

@@ -13,10 +13,16 @@ import (
 )
 
 func UpdateBlkio(containerId string, docker libdocker.Interface) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("failed update blkio. containerID:%q, %v", e)
+		}
+	}()
 	info, err := docker.InspectContainer(containerId)
 	if err != nil {
 		return fmt.Errorf("failed to inspect container %q: %v", containerId, err)
 	}
+
 	containerType, ok := info.Config.Labels[containerTypeLabelKey]
 	if !ok {
 		return fmt.Errorf("the container: %s is neither a regular container is a sandbox.", containerId)
