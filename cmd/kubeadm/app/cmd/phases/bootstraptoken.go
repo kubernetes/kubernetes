@@ -35,7 +35,7 @@ import (
 var (
 	bootstrapTokenLongDesc = normalizer.LongDesc(`
 		Bootstrap tokens are used for establishing bidirectional trust between a node joining
-		the cluster and a the master node.
+		the cluster and a the control-plane node.
 
 		This command makes all the configurations required to make bootstrap tokens works
 		and then creates an initial token.
@@ -61,8 +61,9 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "bootstrap-token",
 		Aliases: []string{"bootstraptoken"},
-		Short:   bootstrapTokenLongDesc,
-		Long:    bootstrapTokenExamples,
+		Short:   "Generates bootstrap tokens used to join a node to a cluster",
+		Example: bootstrapTokenExamples,
+		Long:    bootstrapTokenLongDesc,
 		CmdFlags: []string{
 			options.CfgPath,
 			options.KubeconfigDir,

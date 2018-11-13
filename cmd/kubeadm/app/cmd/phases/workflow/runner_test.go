@@ -269,7 +269,7 @@ func TestHelp(t *testing.T) {
 		},
 	}
 
-	expected := "The \"myCommand\" command executes the following internal workflow:\n" +
+	expected := "The \"myCommand\" command executes the following phases:\n" +
 		"```\n" +
 		"foo   long description for foo ...\n" +
 		"  /bar  long description for bar ...\n" +
