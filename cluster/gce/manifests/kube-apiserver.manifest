@@ -37,7 +37,10 @@
         "path": "/healthz"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
-      "timeoutSeconds": 15
+      "timeoutSeconds": 15,
+      "periodSeconds": 10,
+      "successThreshold": 1,
+      "failureThreshold": 3
     },
     "ports":[
       { "name": "https",
