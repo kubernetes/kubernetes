@@ -260,34 +260,6 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }
 
-// FormatBytesCert receives byte array certificate and formats in human-readable format
-func FormatBytesCert(cert []byte) (string, error) {
-	block, _ := pem.Decode(cert)
-	c, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse certificate [%v]", err)
-	}
-	return FormatCert(c), nil
-}
-
-// FormatCert receives certificate and formats in human-readable format
-func FormatCert(c *x509.Certificate) string {
-	var ips []string
-	for _, ip := range c.IPAddresses {
-		ips = append(ips, ip.String())
-	}
-	altNames := append(ips, c.DNSNames...)
-	res := fmt.Sprintf(
-		"Issuer: CN=%s | Subject: CN=%s | CA: %t\n",
-		c.Issuer.CommonName, c.Subject.CommonName, c.IsCA,
-	)
-	res += fmt.Sprintf("Not before: %s Not After: %s", c.NotBefore, c.NotAfter)
-	if len(altNames) > 0 {
-		res += fmt.Sprintf("\nAlternate Names: %v", altNames)
-	}
-	return res
-}
-
 func ipsToStrings(ips []net.IP) []string {
 	ss := make([]string, 0, len(ips))
 	for _, ip := range ips {
