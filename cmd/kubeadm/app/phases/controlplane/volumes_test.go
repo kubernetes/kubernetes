@@ -26,7 +26,6 @@ import (
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func TestGetEtcdCertVolumes(t *testing.T) {
@@ -259,7 +258,6 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
-	hostPathFile := v1.HostPathFile
 	volMap := make(map[string]map[string]v1.Volume)
 	volMap[kubeadmconstants.KubeAPIServer] = map[string]v1.Volume{}
 	volMap[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.Volume{
@@ -276,24 +274,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
 				Path: "/etc/ssl/certs",
-				Type: &hostPathDirectoryOrCreate,
-			},
-		},
-	}
-	volMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.Volume{
-		Name: "audit",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{
-				Path: "/foo/bar/baz.yaml",
-				Type: &hostPathFile,
-			},
-		},
-	}
-	volMap[kubeadmconstants.KubeAPIServer]["audit-log"] = v1.Volume{
-		Name: "audit-log",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{
-				Path: "/bar/foo",
 				Type: &hostPathDirectoryOrCreate,
 			},
 		},
@@ -347,16 +327,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name:      "ca-certs",
 		MountPath: "/etc/ssl/certs",
 		ReadOnly:  true,
-	}
-	volMountMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.VolumeMount{
-		Name:      "audit",
-		MountPath: "/etc/kubernetes/audit/audit.yaml",
-		ReadOnly:  true,
-	}
-	volMountMap[kubeadmconstants.KubeAPIServer]["audit-log"] = v1.VolumeMount{
-		Name:      "audit-log",
-		MountPath: "/var/log/kubernetes/audit",
-		ReadOnly:  false,
 	}
 	volMountMap[kubeadmconstants.KubeControllerManager] = map[string]v1.VolumeMount{}
 	volMountMap[kubeadmconstants.KubeControllerManager]["k8s-certs"] = v1.VolumeMount{
@@ -511,11 +481,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd:            kubeadmapi.Etcd{},
-				FeatureGates:    map[string]bool{features.Auditing: true},
-				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					Path:   "/foo/bar/baz.yaml",
-					LogDir: "/bar/foo",
-				},
 			},
 			vol:      volMap,
 			volMount: volMountMap,

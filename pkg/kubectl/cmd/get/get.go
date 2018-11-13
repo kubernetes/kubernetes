@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
+	corev1 "k8s.io/api/core/v1"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -768,8 +768,8 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		// we have more than one item, so coerce all items into a list.
 		// we don't want an *unstructured.Unstructured list yet, as we
 		// may be dealing with non-unstructured objects. Compose all items
-		// into an api.List, and then decode using an unstructured scheme.
-		list := api.List{
+		// into an corev1.List, and then decode using an unstructured scheme.
+		list := corev1.List{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "List",
 				APIVersion: "v1",
@@ -777,7 +777,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 			ListMeta: metav1.ListMeta{},
 		}
 		for _, info := range infos {
-			list.Items = append(list.Items, info.Object)
+			list.Items = append(list.Items, runtime.RawExtension{Object: info.Object})
 		}
 
 		listData, err := json.Marshal(list)

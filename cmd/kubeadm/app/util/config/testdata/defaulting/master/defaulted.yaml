@@ -21,18 +21,15 @@ nodeRegistration:
 apiServer:
   timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta1
-auditPolicy:
-  logDir: /var/log/kubernetes/audit
-  logMaxAge: 2
-  path: ""
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
 controllerManager: {}
+dns:
+  type: CoreDNS
 etcd:
   local:
     dataDir: /var/lib/etcd
-    image: ""
 imageRepository: my-company.com
 kind: ClusterConfiguration
 kubernetesVersion: v1.12.0

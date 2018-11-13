@@ -91,17 +91,20 @@ type ClusterConfiguration struct {
 	// Scheduler contains extra settings for the scheduler control plane component
 	Scheduler ControlPlaneComponent `json:"scheduler,omitempty"`
 
+	// DNS defines the options for the DNS add-on installed in the cluster.
+	DNS DNS `json:"dns"`
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string `json:"certificatesDir"`
 
-	// ImageRepository what container registry to pull control plane images from
+	// ImageRepository sets the container registry to pull images from.
+	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/` or `ci-cross/`)
+	// `gcr.io/kubernetes-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
+	// will be used for all the other images.
 	ImageRepository string `json:"imageRepository"`
 
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
 	UseHyperKubeImage bool `json:"useHyperKubeImage,omitempty"`
-
-	// AuditPolicyConfiguration defines the options for the api server audit system
-	AuditPolicyConfiguration AuditPolicyConfiguration `json:"auditPolicy"`
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
@@ -113,6 +116,8 @@ type ClusterConfiguration struct {
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
+	// TODO: This is temporary and ideally we would like to switch all components to
+	// use ComponentConfig + ConfigMaps.
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
@@ -128,6 +133,40 @@ type APIServer struct {
 
 	// TimeoutForControlPlane controls the timeout that we use for API server to appear
 	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
+}
+
+// DNSAddOnType defines string identifying DNS add-on types
+type DNSAddOnType string
+
+const (
+	// CoreDNS add-on type
+	CoreDNS DNSAddOnType = "CoreDNS"
+
+	// KubeDNS add-on type
+	KubeDNS DNSAddOnType = "kube-dns"
+)
+
+// DNS defines the DNS addon that should be used in the cluster
+type DNS struct {
+	// Type defines the DNS add-on to be used
+	Type DNSAddOnType `json:"type"`
+
+	// ImageMeta allows to customize the image used for the DNS component
+	ImageMeta `json:",inline"`
+}
+
+// ImageMeta allows to customize the image used for components that are not
+// originated from the Kubernetes/Kubernetes release process
+type ImageMeta struct {
+	// ImageRepository sets the container registry to pull images from.
+	// if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
+	ImageRepository string `json:"imageRepository,omitempty"`
+
+	// ImageTag allows to specify a tag for the image.
+	// In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
+	ImageTag string `json:"imageTag,omitempty"`
+
+	//TODO: evaluate if we need also a ImageName based on user feedbacks
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -220,11 +259,8 @@ type Etcd struct {
 
 // LocalEtcd describes that kubeadm should run an etcd cluster locally
 type LocalEtcd struct {
-
-	// Image specifies which container image to use for running etcd.
-	// If empty, automatically populated by kubeadm using the image
-	// repository and default etcd version.
-	Image string `json:"image"`
+	// ImageMeta allows to customize the container used for etcd
+	ImageMeta `json:",inline"`
 
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".
@@ -255,7 +291,6 @@ type ExternalEtcd struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // JoinConfiguration contains elements describing a particular node.
-// TODO: This struct should be replaced by dynamic kubelet configuration.
 type JoinConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -270,12 +305,15 @@ type JoinConfiguration struct {
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
 	Discovery Discovery `json:"discovery"`
 
-	// ControlPlane flag specifies that the joining node should host an additional
-	// control plane instance.
-	ControlPlane bool `json:"controlPlane,omitempty"`
+	// ControlPlane defines the additional control plane instance to be deployed on the joining node.
+	// If nil, no additional control plane instance will be deployed.
+	ControlPlane *JoinControlPlane `json:"controlPlane,omitempty"`
+}
 
-	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
-	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
+// JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
+type JoinControlPlane struct {
+	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
@@ -342,15 +380,4 @@ type HostPathMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType `json:"pathType,omitempty"`
-}
-
-// AuditPolicyConfiguration holds the options for configuring the api server audit policy.
-type AuditPolicyConfiguration struct {
-	// Path is the local path to an audit policy.
-	Path string `json:"path"`
-	// LogDir is the local path to the directory where logs should be stored.
-	LogDir string `json:"logDir"`
-	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
-	LogMaxAge *int32 `json:"logMaxAge,omitempty"`
-	//TODO(chuckha) add other options for audit policy.
 }

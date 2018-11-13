@@ -37,11 +37,10 @@ import (
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
-
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -943,7 +942,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
-	if !cfg.ControlPlane {
+	if cfg.ControlPlane == nil {
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
 	}
 

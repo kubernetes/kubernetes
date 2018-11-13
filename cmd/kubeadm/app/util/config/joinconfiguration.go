@@ -20,9 +20,8 @@ import (
 	"io/ioutil"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -33,15 +32,28 @@ import (
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
 func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
-
-	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, cfg.ControlPlane); err != nil {
+	addMasterTaint := false
+	if cfg.ControlPlane != nil {
+		addMasterTaint = true
+	}
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, addMasterTaint); err != nil {
 		return err
 	}
 
-	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+	if err := SetJoinControlPlaneDefaults(cfg.ControlPlane); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// SetJoinControlPlaneDefaults checks and sets configuration values for the JoinControlPlane object
+func SetJoinControlPlaneDefaults(cfg *kubeadmapi.JoinControlPlane) error {
+	if cfg != nil {
+		if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

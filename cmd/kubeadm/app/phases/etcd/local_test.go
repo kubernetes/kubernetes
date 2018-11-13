@@ -38,7 +38,6 @@ func TestGetEtcdPodSpec(t *testing.T) {
 			Etcd: kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					DataDir: "/var/lib/etcd",
-					Image:   "",
 				},
 			},
 		},
@@ -69,7 +68,6 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/var/lib/etcd",
-							Image:   "k8s.gcr.io/etcd",
 						},
 					},
 				},

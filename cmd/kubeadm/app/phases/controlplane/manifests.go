@@ -25,12 +25,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -56,7 +54,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 	staticPodSpecs := map[string]v1.Pod{
 		kubeadmconstants.KubeAPIServer: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeAPIServer,
-			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, &cfg.ClusterConfiguration),
+			Image:           images.GetKubernetesImage(kubeadmconstants.KubeAPIServer, &cfg.ClusterConfiguration),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getAPIServerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
@@ -66,7 +64,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeControllerManager,
-			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, &cfg.ClusterConfiguration),
+			Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, &cfg.ClusterConfiguration),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getControllerManagerCommand(cfg, k8sVersion),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
@@ -76,7 +74,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
-			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, &cfg.ClusterConfiguration),
+			Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, &cfg.ClusterConfiguration),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getSchedulerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
@@ -180,15 +178,6 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		defaultArguments["feature-gates"] = "DynamicKubeletConfig=true"
 	}
 
-	if features.Enabled(cfg.FeatureGates, features.Auditing) {
-		defaultArguments["audit-policy-file"] = kubeadmconstants.GetStaticPodAuditPolicyFile()
-		defaultArguments["audit-log-path"] = filepath.Join(kubeadmconstants.StaticPodAuditPolicyLogDir, kubeadmconstants.AuditPolicyLogFile)
-		if cfg.AuditPolicyConfiguration.LogMaxAge == nil {
-			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", kubeadmapiv1beta1.DefaultAuditPolicyLogMaxAge)
-		} else {
-			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
-		}
-	}
 	if cfg.APIServer.ExtraArgs == nil {
 		cfg.APIServer.ExtraArgs = map[string]string{}
 	}

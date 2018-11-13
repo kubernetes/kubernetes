@@ -28,9 +28,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -121,7 +121,7 @@ func RunPlan(flags *planFlags) error {
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.DNS.Type, upgradeVars.client)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -207,19 +207,19 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		coreDNSBeforeVersion, coreDNSAfterVersion, kubeDNSBeforeVersion, kubeDNSAfterVersion := "", "", "", ""
 
 		switch upgrade.Before.DNSType {
-		case constants.CoreDNS:
+		case kubeadmapi.CoreDNS:
 			printCoreDNS = true
 			coreDNSBeforeVersion = upgrade.Before.DNSVersion
-		case constants.KubeDNS:
+		case kubeadmapi.KubeDNS:
 			printKubeDNS = true
 			kubeDNSBeforeVersion = upgrade.Before.DNSVersion
 		}
 
 		switch upgrade.After.DNSType {
-		case constants.CoreDNS:
+		case kubeadmapi.CoreDNS:
 			printCoreDNS = true
 			coreDNSAfterVersion = upgrade.After.DNSVersion
-		case constants.KubeDNS:
+		case kubeadmapi.KubeDNS:
 			printKubeDNS = true
 			kubeDNSAfterVersion = upgrade.After.DNSVersion
 		}
