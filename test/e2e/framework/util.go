@@ -4320,13 +4320,13 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // headersForConfig extracts any http client logic necessary for the provided
 // config.
-func headersForConfig(c *restclient.Config) (http.Header, error) {
+func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 	extract := &extractRT{}
 	rt, err := restclient.HTTPWrappersForConfig(c, extract)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := rt.RoundTrip(&http.Request{}); err != nil {
+	if _, err := rt.RoundTrip(&http.Request{URL: url}); err != nil {
 		return nil, err
 	}
 	return extract.Header, nil
@@ -4350,7 +4350,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 			url.Host += ":80"
 		}
 	}
-	headers, err := headersForConfig(config)
+	headers, err := headersForConfig(config, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load http headers: %v", err)
 	}
