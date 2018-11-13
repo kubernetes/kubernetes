@@ -637,6 +637,110 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 	}
 }
 
+func TestValidateCSINodeInfo(t *testing.T) {
+	testcases := []struct {
+		name      string
+		nodeInfo  *csiv1alpha1.CSINodeInfo
+		expectErr bool
+	}{
+		{
+			name: "multiple drivers with same ids and different topology keys",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+					{
+						Driver:       "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1, key2"},
+					},
+					{
+						Driver:       "driverB",
+						NodeID:       "nodeA",
+						TopologyKeys: []string{"keyA", "keyB"},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "multiple drivers with same ids and similar topology keys",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+					{
+						Driver:       "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1"},
+					},
+					{
+						Driver:       "driver2",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1"},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "duplicate drivers",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+					{
+						Driver:       "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1", "key2"},
+					},
+					{
+						Driver:       "driver1",
+						NodeID:       "nodeX",
+						TopologyKeys: []string{"keyA", "keyB"},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "single driver with duplicate topology keys",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+					{
+						Driver:       "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1", "key1"},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "multiple drivers with one set of duplicate topology keys ",
+			nodeInfo: &csiv1alpha1.CSINodeInfo{
+				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+					{
+						Driver:       "driver1",
+						NodeID:       "node1",
+						TopologyKeys: []string{"key1"},
+					},
+					{
+						Driver:       "driver2",
+						NodeID:       "nodeX",
+						TopologyKeys: []string{"keyA", "keyA"},
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Logf("test case: %q", tc.name)
+		err := validateCSINodeInfo(tc.nodeInfo)
+		if err != nil && !tc.expectErr {
+			t.Errorf("expected no errors from validateCSINodeInfo but got error %v", err)
+		}
+		if err == nil && tc.expectErr {
+			t.Errorf("expected error from validateCSINodeInfo but got no errors")
+		}
+	}
+}
+
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()

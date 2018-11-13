@@ -21,6 +21,7 @@ package nodeinfomanager // import "k8s.io/kubernetes/pkg/volume/csi/nodeinfomana
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"k8s.io/api/core/v1"
@@ -386,6 +387,10 @@ func (nim *nodeInfoManager) CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error
 		},
 	}
 
+	err = validateCSINodeInfo(nodeInfo)
+	if err != nil {
+		return err
+	}
 	return csiKubeClient.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
 }
 
@@ -458,7 +463,11 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	nodeInfo.Spec.Drivers = newDriverSpecs
 	nodeInfo.Status.Drivers = newDriverStatuses
 
-	_, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
+	err := validateCSINodeInfo(nodeInfo)
+	if err != nil {
+		return err
+	}
+	_, err = csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
 	return err // do not wrap error
 }
 
@@ -556,4 +565,34 @@ func removeMaxAttachLimit(driverName string) nodeUpdateFunc {
 
 		return node, true, nil
 	}
+}
+
+// validateCSINodeInfo ensures members of CSINodeInfo object satisfies map and set semantics.
+// Before calling CSINodeInfoInterface.Create() or CSINodeInfoInterface.Update()
+// validateCSINodeInfo() should be invoked to make sure the CSINodeInfo is compliant
+// TODO: move this logic to an external webhook
+func validateCSINodeInfo(nodeInfo *csiv1alpha1.CSINodeInfo) error {
+	if len(nodeInfo.CSIDrivers) < 1 {
+		return fmt.Errorf("at least one CSI Driver entry is required")
+	}
+	// check for duplicate entries for the same driver
+	var errors []string
+	driverNames := make(sets.String)
+	for _, driverInfo := range nodeInfo.CSIDrivers {
+		if driverNames.Has(driverInfo.Driver) {
+			errors = append(errors, fmt.Sprintf("duplicate entries found for driver %s", driverNames))
+		}
+		driverNames.Insert(driverInfo.Driver)
+		topoKeys := make(sets.String)
+		for _, key := range driverInfo.TopologyKeys {
+			if topoKeys.Has(key) {
+				errors = append(errors, fmt.Sprintf("duplicate topology keys %s found for driver %s", key, driverInfo.Driver))
+			}
+			topoKeys.Insert(key)
+		}
+	}
+	if len(errors) == 0 {
+		return nil
+	}
+	return fmt.Errorf(strings.Join(errors, ", "))
 }
