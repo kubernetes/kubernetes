@@ -20,8 +20,10 @@ import (
 	"fmt"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -46,6 +48,34 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
 		errors = append(errors, fmt.Errorf("kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort)))
 	}
+	return errors
+}
+
+func validateTokenRequest(options *ServerRunOptions) []error {
+	errors := []error{}
+
+	enableAttempted := options.ServiceAccountSigningKeyFile != "" ||
+		options.Authentication.ServiceAccounts.Issuer != "" ||
+		len(options.Authentication.APIAudiences) != 0
+
+	enableSucceeded := options.ServiceAccountIssuer != nil
+
+	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		errors = append(errors, fmt.Errorf("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --api-audiences flags were passed"))
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		errors = append(errors, fmt.Errorf("the BoundServiceAccountTokenVolume feature depends on the TokenRequest feature, but the TokenRequest features is not enabled"))
+	}
+
+	if !enableAttempted && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+		errors = append(errors, fmt.Errorf("--service-account-signing-key-file and --service-account-issuer are required flags"))
+	}
+
+	if enableAttempted && !enableSucceeded {
+		errors = append(errors, fmt.Errorf("--service-account-signing-key-file, --service-account-issuer, and --api-audiences should be specified together"))
+	}
+
 	return errors
 }
 
@@ -83,6 +113,9 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
 	if errs := s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+	if errs := validateTokenRequest(s); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 
