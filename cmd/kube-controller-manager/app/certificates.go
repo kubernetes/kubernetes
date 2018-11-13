@@ -143,6 +143,7 @@ func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error)
 
 	sac, err := rootcacertpublisher.NewPublisher(
 		ctx.InformerFactory.Core().V1().ConfigMaps(),
+		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
 		rootCA,
 	)
