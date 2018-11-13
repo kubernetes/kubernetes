@@ -206,7 +206,10 @@ func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName str
 	// it will also fits to equivalence class of existing pods
 
 	// GeneralPredicates: will always be affected by adding a new pod
-	invalidPredicates := sets.NewString(predicates.GeneralPred)
+	// PodFitsResourcesPred and PodFitsHostPortsPred in GeneralPredicates are also added because
+	// they might be configured in scheduler policy file instead of GeneralPredicates.
+	invalidPredicates := sets.NewString(predicates.GeneralPred, predicates.PodFitsResourcesPred,
+		predicates.PodFitsHostPortsPred)
 
 	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decisioc.
 	for _, vol := range pod.Spec.Volumes {
