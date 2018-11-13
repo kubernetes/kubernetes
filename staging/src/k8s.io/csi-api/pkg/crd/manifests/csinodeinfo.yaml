@@ -49,7 +49,9 @@ spec:
                   volumePluginMechanism:
                     description: Indicates to external components the required mechanism
                       to use for any in-tree plugins replaced by this driver.
-                    pattern: in-tree|csi
+                    enum:
+                    - InTree
+                    - CSI
                     type: string
   version: v1beta1
   versions:

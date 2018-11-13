@@ -23,9 +23,9 @@ type VolumePluginMechanism string
 
 const (
 	// VolumePluginMechanismInTree means components should use the in-tree plugin for volume operations
-	VolumePluginMechanismInTree VolumePluginMechanism = "in-tree"
+	VolumePluginMechanismInTree VolumePluginMechanism = "InTree"
 	// VolumePluginMechanismCSI means components should use the CSI Driver for volume operations
-	VolumePluginMechanismCSI VolumePluginMechanism = "csi"
+	VolumePluginMechanismCSI VolumePluginMechanism = "CSI"
 )
 
 // +genclient
@@ -138,9 +138,9 @@ type CSIDriverInfoStatus struct {
 	// volumePluginMechanism announces what mechanism underlies volume plugins.
 	// It is set by Kubelet. It is used by the attach/detach controller, which
 	// needs to know how to perform attachments. The allowed values are:
-	// * "in-tree": the volume operation (e.g., attach/detach) ought to be
+	// * "InTree": the volume operation (e.g., attach/detach) ought to be
 	//   directly performed by the attach/detach controller.
-	// * "csi-plugin": the attach/detach controller ought to request
+	// * "CSI": the attach/detach controller ought to request
 	//   the csi plugin to perform the volume operation rather than perform it directly.
 	VolumePluginMechanism VolumePluginMechanism `json:"volumePluginMechanism"`
 }

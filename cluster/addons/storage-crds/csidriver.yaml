@@ -25,6 +25,8 @@ spec:
               description: Indicates this CSI volume driver requires additional pod
                 information (like podName, podUID, etc.) during mount operations.
               type: string
+              enum:
+              - "v1"
   version: v1beta1
   versions:
   - name: v1beta1
