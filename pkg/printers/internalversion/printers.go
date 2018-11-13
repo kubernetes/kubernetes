@@ -86,6 +86,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "IP", Type: "string", Priority: 1, Description: apiv1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: apiv1.PodSpec{}.SwaggerDoc()["nodeName"]},
 		{Name: "Nominated Node", Type: "string", Priority: 1, Description: apiv1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
+		{Name: "Readiness Gates", Type: "string", Priority: 1, Description: apiv1.PodSpec{}.SwaggerDoc()["readinessGates"]},
 	}
 	h.TableHandler(podColumnDefinitions, printPodList)
 	h.TableHandler(podColumnDefinitions, printPod)
@@ -661,11 +662,11 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 	}
 
 	row.Cells = append(row.Cells, pod.Name, fmt.Sprintf("%d/%d", readyContainers, totalContainers), reason, int64(restarts), translateTimestampSince(pod.CreationTimestamp))
-
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
 		nominatedNodeName := pod.Status.NominatedNodeName
 		podIP := pod.Status.PodIP
+
 		if podIP == "" {
 			podIP = "<none>"
 		}
@@ -675,7 +676,24 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 		if nominatedNodeName == "" {
 			nominatedNodeName = "<none>"
 		}
-		row.Cells = append(row.Cells, podIP, nodeName, nominatedNodeName)
+
+		readinessGates := "<none>"
+		if len(pod.Spec.ReadinessGates) > 0 {
+			trueConditions := 0
+			for _, readinessGate := range pod.Spec.ReadinessGates {
+				conditionType := readinessGate.ConditionType
+				for _, condition := range pod.Status.Conditions {
+					if condition.Type == conditionType {
+						if condition.Status == api.ConditionTrue {
+							trueConditions += 1
+						}
+						break
+					}
+				}
+			}
+			readinessGates = fmt.Sprintf("%d/%d", trueConditions, len(pod.Spec.ReadinessGates))
+		}
+		row.Cells = append(row.Cells, podIP, nodeName, nominatedNodeName, readinessGates)
 	}
 
 	return []metav1beta1.TableRow{row}, nil
