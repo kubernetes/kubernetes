@@ -811,9 +811,9 @@
 			"Rev": "20e2ce2cf8852dc78bd42b76698dcd8dcd77b7b1"
 		},
 		{
-			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi/v0",
-			"Comment": "v0.3.0",
-			"Rev": "2178fdeea87f1150a17a63252eee28d4d8141f72"
+			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi",
+			"Comment": "v1.0.0",
+			"Rev": "ed0bb0e1557548aa028307f48728767cfe8f6345"
 		},
 		{
 			"ImportPath": "github.com/containerd/console",
@@ -1804,6 +1804,11 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
+			"Comment": "v1.1.0",
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/protoc-gen-go/descriptor",
 			"Comment": "v1.1.0",
 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
