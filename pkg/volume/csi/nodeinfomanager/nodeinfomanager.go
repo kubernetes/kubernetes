@@ -497,7 +497,11 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 		return err
 	}
 	_, err = csiKubeClient.CsiV1beta1().CSINodeInfos().Update(nodeInfo)
-	return err
+	if err != nil {
+		return err
+	}
+	_, err = csiKubeClient.CsiV1beta1().CSINodeInfos().UpdateStatus(nodeInfo)
+	return err // do not wrap error
 }
 
 func (nim *nodeInfoManager) uninstallDriverFromCSINodeInfo(
@@ -548,6 +552,19 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINodeInfo(
 	if !hasModified {
 		// No changes, don't update
 		return nil
+		err = validateCSINodeInfo(nodeInfo)
+		if err != nil {
+			return err
+		}
+		_, updateErr := nodeInfoClient.Update(nodeInfo)
+		if updateErr != nil {
+			return updateErr // do not wrap error
+		}
+		_, updateErr = nodeInfoClient.UpdateStatus(nodeInfo)
+		return updateErr // do not wrap error
+	})
+	if retryErr != nil {
+		return fmt.Errorf("CSINodeInfo update failed: %v", retryErr)
 	}
 
 	err = validateCSINodeInfo(nodeInfo)

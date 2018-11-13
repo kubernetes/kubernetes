@@ -111,17 +111,13 @@ type CSINodeInfo struct {
 // CSINodeInfoSpec holds information about the specification of all CSI drivers installed on a node
 type CSINodeInfoSpec struct {
 	// drivers is a list of specifications of CSIDriverInfo
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	Drivers []CSIDriverInfoSpec `json:"drivers" patchStrategy:"merge" patchMergeKey:"name"`
+	Drivers []CSIDriverInfoSpec `json:"drivers"`
 }
 
 // CSINodeInfoStatus holds information about the status of all CSI drivers installed on a node
 type CSINodeInfoStatus struct {
 	// drivers is a list of the statuses of CSIDriverInfo
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	Drivers []CSIDriverInfoStatus `json:"drivers" patchStrategy:"merge" patchMergeKey:"name"`
+	Drivers []CSIDriverInfoStatus `json:"drivers"`
 }
 
 // CSIDriverInfoStatus holds information about the status of one CSI driver installed on a node

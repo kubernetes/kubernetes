@@ -61,3 +61,5 @@ spec:
   - name: v1alpha1
     served: false
     storage: false
+  subresources:
+    status: {}
