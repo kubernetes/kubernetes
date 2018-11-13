@@ -72,7 +72,7 @@ func UntilFirstEntryFromLocation(location string) IngestionPred {
 type TimeoutFun func([]string, []bool) error
 
 // JustTimeout returns the error with the list of names for which backend is
-// still still missing logs.
+// still missing logs.
 var JustTimeout TimeoutFun = func(names []string, ingested []bool) error {
 	failedNames := []string{}
 	for i, name := range names {

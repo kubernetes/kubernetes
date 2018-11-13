@@ -71,7 +71,7 @@ func (c *MetricConverter) Codecs() serializer.CodecFactory {
 	return c.codecs
 }
 
-// ConvertListOptionsToVersion converts converts a set of MetricListOptions
+// ConvertListOptionsToVersion converts a set of MetricListOptions
 // to the provided GroupVersion.
 func (c *MetricConverter) ConvertListOptionsToVersion(opts *cmint.MetricListOptions, version schema.GroupVersion) (runtime.Object, error) {
 	paramObj, err := c.UnsafeConvertToVersionVia(opts, version)

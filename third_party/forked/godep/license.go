@@ -42,7 +42,7 @@ func IsLicenseFile(filename string) bool {
 }
 
 // IsLegalFile returns true if the file is likely to contain some type
-// of of legal declaration or licensing information
+// of legal declaration or licensing information
 func IsLegalFile(filename string) bool {
 	lowerfile := strings.ToLower(filename)
 	for _, prefix := range LicenseFilePrefix {

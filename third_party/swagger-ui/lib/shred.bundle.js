@@ -1177,7 +1177,7 @@ var createRequest = function(request) {
       // Set up some event magic. The precedence is given first to
       // status-specific handlers, then to responses for a given event, and then
       // finally to the more general `response` handler. In the last case, we
-      // need to first make sure we're not dealing with a a redirect.
+      // need to first make sure we're not dealing with a redirect.
       var emit = function(event) {
         var emitter = request.emitter;
         var textStatus = STATUS_CODES[response.status] ? STATUS_CODES[response.status].toLowerCase() : null;

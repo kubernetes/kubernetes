@@ -23,7 +23,7 @@ import (
 )
 
 // KubeTemplatePrintFlags composes print flags that provide both a JSONPath and a go-template printer.
-// This is necessary if dealing with cases that require support both both printers, since both sets of flags
+// This is necessary if dealing with cases that require support both printers, since both sets of flags
 // require overlapping flags.
 type KubeTemplatePrintFlags struct {
 	GoTemplatePrintFlags *GoTemplatePrintFlags
