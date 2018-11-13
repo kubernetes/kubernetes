@@ -34,6 +34,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/discovery"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -951,4 +954,19 @@ func MapBlockVolume(
 	}
 
 	return nil
+}
+
+func IsCRDInstalled(name, groupVersion string, client discovery.DiscoveryInterface) (bool, error) {
+	resources, err := client.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil && errors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	for _, resource := range resources.APIResources {
+		if resource.Name == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }

@@ -349,6 +349,19 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 	driverNodeID string,
 	topology map[string]string) error {
 
+	kubeClient := nim.volumeHost.GetKubeClient()
+	if kubeClient == nil {
+		return fmt.Errorf("error getting kube client")
+	}
+	installed, err := util.IsCRDInstalled(csiv1beta1.CsiNodeInfoResourcePlural, csiv1beta1.GroupName+"/v1beta1", kubeClient.Discovery())
+	if err != nil {
+		return fmt.Errorf("error determining if csinodeinfo CRD is installed: %v", err)
+	}
+	if !installed {
+		klog.V(4).Infof("skipping updating csinodeinfo for %s as the csinodeinfo CRD is not installed", driverName)
+		return nil
+	}
+
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
