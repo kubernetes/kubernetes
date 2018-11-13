@@ -17,10 +17,9 @@ limitations under the License.
 package app
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	goruntime "runtime"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
@@ -53,9 +52,9 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *apiserverconfig.DebuggingConfiguration) *mux.PathRecorderMux {
+func NewBaseHandler(c *apiserverconfig.DebuggingConfiguration, checks ...healthz.HealthzChecker) *mux.PathRecorderMux {
 	mux := mux.NewPathRecorderMux("controller-manager")
-	healthz.InstallHandler(mux)
+	healthz.InstallHandler(mux, checks...)
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(mux)
 		if c.EnableContentionProfiling {
