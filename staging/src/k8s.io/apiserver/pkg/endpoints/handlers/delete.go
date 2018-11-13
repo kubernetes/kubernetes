@@ -141,13 +141,21 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 
 		status := http.StatusOK
 		// Return http.StatusAccepted if the resource was not deleted immediately and
-		// user requested cascading deletion by setting OrphanDependents=false.
+		// user requested cascading deletion by setting OrphanDependents=false, or
+		// PropagationPolicy=Foreground/Background.
 		// Note: We want to do this always if resource was not deleted immediately, but
 		// that will break existing clients.
 		// Other cases where resource is not instantly deleted are: namespace deletion
 		// and pod graceful deletion.
-		if !wasDeleted && options.OrphanDependents != nil && *options.OrphanDependents == false {
-			status = http.StatusAccepted
+		if !wasDeleted {
+			if options.OrphanDependents != nil && *options.OrphanDependents == false {
+				status = http.StatusAccepted
+			}
+			if options.PropagationPolicy != nil &&
+				(*options.PropagationPolicy == metav1.DeletePropagationBackground ||
+					*options.PropagationPolicy == metav1.DeletePropagationForeground) {
+				status = http.StatusAccepted
+			}
 		}
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
