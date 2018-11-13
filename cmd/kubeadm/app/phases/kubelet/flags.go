@@ -25,10 +25,10 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/klog"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -38,6 +38,7 @@ import (
 type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
 	featureGates             map[string]bool
+	pauseImage               string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
 	pidOfFunc                func(string) ([]int, error)
@@ -46,22 +47,23 @@ type kubeletFlagsOpts struct {
 
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.InitConfiguration, registerTaintsUsingFlags bool, kubeletDir string) error {
 	hostName, err := nodeutil.GetHostname("")
 	if err != nil {
 		return err
 	}
 
 	flagOpts := kubeletFlagsOpts{
-		nodeRegOpts:              nodeRegOpts,
-		featureGates:             featureGates,
+		nodeRegOpts:              &cfg.NodeRegistration,
+		featureGates:             cfg.FeatureGates,
+		pauseImage:               images.GetPauseImage(&cfg.ClusterConfiguration),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:                   utilsexec.New(),
 		pidOfFunc:                procfs.PidOf,
 		defaultHostname:          hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
-	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeRegOpts.KubeletExtraArgs)
+	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, cfg.NodeRegistration.KubeletExtraArgs)
 	envFileContent := fmt.Sprintf("%s=%s\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
@@ -80,6 +82,9 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
 		} else {
 			kubeletFlags["cgroup-driver"] = driver
+		}
+		if opts.pauseImage != "" {
+			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 		}
 	} else {
 		kubeletFlags["container-runtime"] = "remote"

@@ -209,7 +209,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 		// as we handle that ourselves in the markmaster phase
 		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.NodeRegistration, cfg.FeatureGates, false, kubeletDir); err != nil {
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(cfg, false, kubeletDir); err != nil {
 			errs = append(errs, pkgerrors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
 		}
 
