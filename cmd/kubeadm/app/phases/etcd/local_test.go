@@ -38,7 +38,6 @@ func TestGetEtcdPodSpec(t *testing.T) {
 			Etcd: kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					DataDir: "/var/lib/etcd",
-					Image:   "",
 				},
 			},
 		},
@@ -69,7 +68,6 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/var/lib/etcd",
-							Image:   "k8s.gcr.io/etcd",
 						},
 					},
 				},
@@ -124,7 +122,7 @@ func TestGetEtcdCommand(t *testing.T) {
 		{
 			name: "Default args - with empty etcd initial cluster",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
@@ -161,7 +159,7 @@ func TestGetEtcdCommand(t *testing.T) {
 		{
 			name: "Default args - With an existing etcd cluster",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
@@ -203,7 +201,7 @@ func TestGetEtcdCommand(t *testing.T) {
 		{
 			name: "Extra args",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{

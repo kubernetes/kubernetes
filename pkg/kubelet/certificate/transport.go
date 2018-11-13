@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -105,18 +105,18 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 				// the certificate has been deleted from disk or is otherwise corrupt
 				if now.After(lastCertAvailable.Add(exitAfter)) {
 					if clientCertificateManager.ServerHealthy() {
-						glog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
+						klog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
 					} else {
-						glog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
+						klog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
 					}
 				}
 			} else {
 				// the certificate is expired
 				if now.After(curr.Leaf.NotAfter) {
 					if clientCertificateManager.ServerHealthy() {
-						glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+						klog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
 					} else {
-						glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+						klog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
 					}
 				}
 				lastCertAvailable = now
@@ -129,7 +129,7 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		}
 		lastCert = curr
 
-		glog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
+		klog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
 		// The cert has been rotated. Close all existing connections to force the client
 		// to reperform its TLS handshake with new cert.
 		//

@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -113,7 +113,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		}
 		parsed, err := url.Parse(value)
 		if err != nil {
-			glog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
+			klog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
 			continue
 		}
 

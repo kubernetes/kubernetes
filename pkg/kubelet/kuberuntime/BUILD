@@ -66,9 +66,9 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/qos:go_default_library",

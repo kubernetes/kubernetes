@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -742,7 +742,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		glog.V(5).Infof("Running test case %q", name)
+		klog.V(5).Infof("Running test case %q", name)
 
 		// Setup
 		testEnv := newTestBinder(t)
@@ -964,7 +964,7 @@ func TestAssumePodVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		glog.V(5).Infof("Running test case %q", name)
+		klog.V(5).Infof("Running test case %q", name)
 
 		// Setup
 		testEnv := newTestBinder(t)
@@ -1094,7 +1094,7 @@ func TestBindAPIUpdate(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		glog.V(4).Infof("Running test case %q", name)
+		klog.V(4).Infof("Running test case %q", name)
 
 		// Setup
 		testEnv := newTestBinder(t)
@@ -1253,7 +1253,7 @@ func TestCheckBindings(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		glog.V(4).Infof("Running test case %q", name)
+		klog.V(4).Infof("Running test case %q", name)
 
 		// Setup
 		pod := makePod(nil)
@@ -1386,7 +1386,7 @@ func TestBindPodVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		glog.V(4).Infof("Running test case %q", name)
+		klog.V(4).Infof("Running test case %q", name)
 
 		// Setup
 		pod := makePod(nil)
@@ -1407,7 +1407,7 @@ func TestBindPodVolumes(t *testing.T) {
 		if scenario.delayFunc != nil {
 			go func() {
 				time.Sleep(5 * time.Second)
-				glog.V(5).Infof("Running delay function")
+				klog.V(5).Infof("Running delay function")
 				scenario.delayFunc(t, testEnv, pod, scenario.binding.pv, scenario.binding.pvc)
 			}()
 		}

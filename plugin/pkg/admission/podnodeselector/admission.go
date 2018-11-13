@@ -21,7 +21,7 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -190,7 +190,7 @@ func shouldIgnore(a admission.Attributes) bool {
 
 	_, ok := a.GetObject().(*api.Pod)
 	if !ok {
-		glog.Errorf("expected pod but got %s", a.GetKind().Kind)
+		klog.Errorf("expected pod but got %s", a.GetKind().Kind)
 		return true
 	}
 

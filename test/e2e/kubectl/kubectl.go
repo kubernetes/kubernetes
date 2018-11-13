@@ -41,7 +41,7 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"

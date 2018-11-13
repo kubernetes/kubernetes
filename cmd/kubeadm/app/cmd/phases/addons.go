@@ -19,8 +19,8 @@ package phases
 import (
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -49,7 +49,7 @@ var (
 		# Installs the CoreDNS and the kube-proxy addons components via the API server,
 		# functionally equivalent to what installed by kubeadm init. 
 
-		kubeadm alpha phase selfhosting from-staticpods
+		kubeadm alpha phase self-hosting from-staticpods
 		`)
 
 	corednsAddonsLongDesc = normalizer.LongDesc(`
@@ -83,7 +83,7 @@ func EnsureAllAddons(cfg *kubeadmapi.InitConfiguration, client clientset.Interfa
 		proxyaddon.EnsureProxyAddon,
 	}
 
-	glog.V(1).Infoln("[addon] installing all addons")
+	klog.V(1).Infoln("[addon] installing all addons")
 	for _, action := range addonActions {
 		err := action(cfg, client)
 		if err != nil {
@@ -149,8 +149,8 @@ func getAddonsSubCommands() []*cobra.Command {
 		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from`)
 
 		if properties.use == "all" || properties.use == "kube-proxy" {
-			cmd.Flags().StringVar(&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress, `The IP address the API server is accessible on`)
-			cmd.Flags().Int32Var(&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort, `The port the API server is accessible on`)
+			cmd.Flags().StringVar(&cfg.LocalAPIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.LocalAPIEndpoint.AdvertiseAddress, `The IP address the API server is accessible on`)
+			cmd.Flags().Int32Var(&cfg.LocalAPIEndpoint.BindPort, "apiserver-bind-port", cfg.LocalAPIEndpoint.BindPort, `The port the API server is accessible on`)
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, `The range of IP addresses used for the Pod network`)
 		}
 

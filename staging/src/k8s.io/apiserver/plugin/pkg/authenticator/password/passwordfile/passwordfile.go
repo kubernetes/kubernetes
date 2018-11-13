@@ -24,7 +24,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -72,7 +72,7 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 		}
 		recordNum++
 		if _, exist := users[obj.info.Name]; exist {
-			glog.Warningf("duplicate username '%s' has been found in password file '%s', record number '%d'", obj.info.Name, path, recordNum)
+			klog.Warningf("duplicate username '%s' has been found in password file '%s', record number '%d'", obj.info.Name, path, recordNum)
 		}
 		users[obj.info.Name] = obj
 	}

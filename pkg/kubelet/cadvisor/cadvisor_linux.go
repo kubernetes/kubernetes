@@ -26,7 +26,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
@@ -35,6 +34,7 @@ import (
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -67,7 +67,7 @@ func init() {
 			f.DefValue = defaultValue
 			f.Value.Set(defaultValue)
 		} else {
-			glog.Errorf("Expected cAdvisor flag %q not found", name)
+			klog.Errorf("Expected cAdvisor flag %q not found", name)
 		}
 	}
 }
@@ -199,7 +199,7 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
-		glog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
+		klog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
 	}
 
 	return res[0], nil

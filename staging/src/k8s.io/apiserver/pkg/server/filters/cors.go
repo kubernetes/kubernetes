@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // TODO: use restful.CrossOriginResourceSharing
@@ -79,7 +79,7 @@ func WithCORS(handler http.Handler, allowedOriginPatterns []string, allowedMetho
 func allowedOriginRegexps(allowedOrigins []string) []*regexp.Regexp {
 	res, err := compileRegexps(allowedOrigins)
 	if err != nil {
-		glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(allowedOrigins, ","), err)
+		klog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(allowedOrigins, ","), err)
 	}
 	return res
 }

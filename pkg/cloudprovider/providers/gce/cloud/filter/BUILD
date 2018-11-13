@@ -5,7 +5,7 @@ go_library(
     srcs = ["filter.go"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/glog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
 go_test(

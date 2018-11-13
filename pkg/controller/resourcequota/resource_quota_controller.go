@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -180,7 +180,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 
 // enqueueAll is called at the fullResyncPeriod interval to force a full recalculation of quota usage statistics
 func (rq *ResourceQuotaController) enqueueAll() {
-	defer glog.V(4).Infof("Resource quota controller queued all resource quota for full calculation of usage")
+	defer klog.V(4).Infof("Resource quota controller queued all resource quota for full calculation of usage")
 	rqs, err := rq.rqLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to enqueue all - error listing resource quotas: %v", err))
@@ -200,7 +200,7 @@ func (rq *ResourceQuotaController) enqueueAll() {
 func (rq *ResourceQuotaController) enqueueResourceQuota(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		klog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
 	rq.queue.Add(key)
@@ -209,7 +209,7 @@ func (rq *ResourceQuotaController) enqueueResourceQuota(obj interface{}) {
 func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		klog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
 
@@ -261,7 +261,7 @@ func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface)
 	return func() {
 		for {
 			if quit := workFunc(); quit {
-				glog.Infof("resource quota controller worker shutting down")
+				klog.Infof("resource quota controller worker shutting down")
 				return
 			}
 		}
@@ -273,8 +273,8 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
 
-	glog.Infof("Starting resource quota controller")
-	defer glog.Infof("Shutting down resource quota controller")
+	klog.Infof("Starting resource quota controller")
+	defer klog.Infof("Shutting down resource quota controller")
 
 	if rq.quotaMonitor != nil {
 		go rq.quotaMonitor.Run(stopCh)
@@ -298,7 +298,7 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -307,11 +307,11 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 	}
 	quota, err := rq.rqLister.ResourceQuotas(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.Infof("Resource quota has been deleted %v", key)
+		klog.Infof("Resource quota has been deleted %v", key)
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
+		klog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
 		return err
 	}
 	return rq.syncResourceQuota(quota)
@@ -426,12 +426,12 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
-			glog.V(4).Infof("no resource updates from discovery, skipping resource quota sync")
+			klog.V(4).Infof("no resource updates from discovery, skipping resource quota sync")
 			return
 		}
 
 		// Something has changed, so track the new state and perform a sync.
-		glog.V(2).Infof("syncing resource quota controller with updated resources from discovery: %v", newResources)
+		klog.V(2).Infof("syncing resource quota controller with updated resources from discovery: %v", newResources)
 		oldResources = newResources
 
 		// Ensure workers are paused to avoid processing events before informers

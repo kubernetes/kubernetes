@@ -22,7 +22,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type accountWithLocation struct {
@@ -100,7 +100,7 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, accountKind, res
 
 		if len(accounts) > 0 {
 			accountName = accounts[0].Name
-			glog.V(4).Infof("found a matching account %s type %s location %s", accounts[0].Name, accounts[0].StorageType, accounts[0].Location)
+			klog.V(4).Infof("found a matching account %s type %s location %s", accounts[0].Name, accounts[0].StorageType, accounts[0].Location)
 		}
 
 		if len(accountName) == 0 {
@@ -118,7 +118,7 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, accountKind, res
 			if accountKind != "" {
 				kind = storage.Kind(accountKind)
 			}
-			glog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s",
+			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s",
 				accountName, resourceGroup, location, accountType, kind)
 			cp := storage.AccountCreateParameters{
 				Sku:                               &storage.Sku{Name: storage.SkuName(accountType)},

@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -229,10 +229,10 @@ func (o *PatchOptions) RunPatch() error {
 
 			// if the recorder makes a change, compute and create another patch
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
-				glog.V(4).Infof("error recording current command: %v", err)
+				klog.V(4).Infof("error recording current command: %v", err)
 			} else if len(mergePatch) > 0 {
 				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
-					glog.V(4).Infof("error recording reason: %v", err)
+					klog.V(4).Infof("error recording reason: %v", err)
 				} else {
 					patchedObj = recordedObj
 				}

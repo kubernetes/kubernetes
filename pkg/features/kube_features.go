@@ -276,7 +276,7 @@ const (
 	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
 
 	// owner: @verult
-	// beta: v1.10
+	// GA: v1.13
 	//
 	// Enables the regional PD feature on GCE.
 	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
@@ -421,7 +421,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
-	ResourceLimitsPriorityFunction:              {Default: true, PreRelease: utilfeature.Beta},
+	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
@@ -429,7 +429,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
+	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},

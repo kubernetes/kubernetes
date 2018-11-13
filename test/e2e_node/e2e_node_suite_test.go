@@ -44,13 +44,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
-	"github.com/golang/glog"
 	"github.com/kardianos/osext"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	morereporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 var e2es *services.E2EServices
@@ -103,7 +103,7 @@ func TestE2eNode(t *testing.T) {
 			var err error
 			spec, err = loadSystemSpecFromFile(*systemSpecFile)
 			if err != nil {
-				glog.Exitf("Failed to load system spec: %v", err)
+				klog.Exitf("Failed to load system spec: %v", err)
 			}
 		}
 		if framework.TestContext.NodeConformance {
@@ -112,11 +112,11 @@ func TestE2eNode(t *testing.T) {
 			// TODO(random-liu): Consider to chroot the whole test process to make writing
 			// test easier.
 			if err := syscall.Chroot(rootfs); err != nil {
-				glog.Exitf("chroot %q failed: %v", rootfs, err)
+				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
 		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); err != nil {
-			glog.Exitf("system validation failed: %v", err)
+			klog.Exitf("system validation failed: %v", err)
 		}
 		return
 	}
@@ -127,7 +127,7 @@ func TestE2eNode(t *testing.T) {
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
-			glog.Errorf("Failed creating report directory: %v", err)
+			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
 			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
@@ -146,7 +146,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if framework.TestContext.PrepullImages {
-		glog.Infof("Pre-pulling images so that they are cached for the tests.")
+		klog.Infof("Pre-pulling images so that they are cached for the tests.")
 		err := PrePullAllImages()
 		Expect(err).ShouldNot(HaveOccurred())
 	}
@@ -161,12 +161,12 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
 		Expect(e2es.Start()).To(Succeed(), "should be able to start node services.")
-		glog.Infof("Node services started.  Running tests...")
+		klog.Infof("Node services started.  Running tests...")
 	} else {
-		glog.Infof("Running tests without starting services.")
+		klog.Infof("Running tests without starting services.")
 	}
 
-	glog.Infof("Wait for the node to be ready")
+	klog.Infof("Wait for the node to be ready")
 	waitForNodeReady()
 
 	// Reference common test to make the import valid.
@@ -182,12 +182,12 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 var _ = SynchronizedAfterSuite(func() {}, func() {
 	if e2es != nil {
 		if *startServices && *stopServices {
-			glog.Infof("Stopping node services...")
+			klog.Infof("Stopping node services...")
 			e2es.Stop()
 		}
 	}
 
-	glog.Infof("Tests Finished")
+	klog.Infof("Tests Finished")
 })
 
 // validateSystem runs system validation in a separate process and returns error if validation fails.
@@ -210,13 +210,13 @@ func maskLocksmithdOnCoreos() {
 	data, err := ioutil.ReadFile("/etc/os-release")
 	if err != nil {
 		// Not all distros contain this file.
-		glog.Infof("Could not read /etc/os-release: %v", err)
+		klog.Infof("Could not read /etc/os-release: %v", err)
 		return
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
 		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
-		glog.Infof("Locksmithd is masked successfully")
+		klog.Infof("Locksmithd is masked successfully")
 	}
 }
 

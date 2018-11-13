@@ -191,7 +191,7 @@ type PersistentVolumeSource struct {
 	// exposed to the pod. Provisioned by an admin.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
 	// +optional
-	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty" protobuf:"bytes,4,opt,name=glusterfs"`
+	Glusterfs *GlusterfsPersistentVolumeSource `json:"glusterfs,omitempty" protobuf:"bytes,4,opt,name=glusterfs"`
 	// NFS represents an NFS mount on the host. Provisioned by an admin.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
 	// +optional
@@ -634,6 +634,30 @@ type GlusterfsVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+}
+
+// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// Glusterfs volumes do not support ownership management or SELinux relabeling.
+type GlusterfsPersistentVolumeSource struct {
+	// EndpointsName is the endpoint name that details Glusterfs topology.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
+
+	// Path is the Glusterfs volume path.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
+
+	// ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+	// Defaults to false.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+
+	// EndpointsNamespace is the namespace that contains Glusterfs endpoint.
+	// If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// +optional
+	EndpointsNamespace *string `json:"endpointsNamespace,omitempty" protobuf:"bytes,4,opt,name=endpointsNamespace"`
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.

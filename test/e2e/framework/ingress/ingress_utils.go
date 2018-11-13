@@ -34,7 +34,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
@@ -115,11 +115,11 @@ type TestLogger interface {
 type GLogger struct{}
 
 func (l *GLogger) Infof(format string, args ...interface{}) {
-	glog.Infof(format, args...)
+	klog.Infof(format, args...)
 }
 
 func (l *GLogger) Errorf(format string, args ...interface{}) {
-	glog.Errorf(format, args...)
+	klog.Errorf(format, args...)
 }
 
 type E2ELogger struct{}

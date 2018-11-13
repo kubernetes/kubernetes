@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/probe"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // New creates Prober.
@@ -55,7 +55,7 @@ func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error
 	}
 	err = conn.Close()
 	if err != nil {
-		glog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
+		klog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
 	}
 	return probe.Success, "", nil
 }

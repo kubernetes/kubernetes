@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -104,7 +104,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
-		glog.Infof("csr for this node already exists, reusing")
+		klog.Infof("csr for this node already exists, reusing")
 		req, err = client.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return nil, formatError("cannot retrieve certificate signing request: %v", err)
@@ -112,7 +112,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		if err := ensureCompatible(req, csr, privateKey); err != nil {
 			return nil, fmt.Errorf("retrieved csr is not compatible: %v", err)
 		}
-		glog.Infof("csr for this node is still valid")
+		klog.Infof("csr for this node is still valid")
 	default:
 		return nil, formatError("cannot create certificate signing request: %v", err)
 	}
@@ -202,23 +202,23 @@ func digestedName(privateKeyData []byte, subject *pkix.Name, usages []certificat
 
 // ensureCompatible ensures that a CSR object is compatible with an original CSR
 func ensureCompatible(new, orig *certificates.CertificateSigningRequest, privateKey interface{}) error {
-	newCsr, err := ParseCSR(new)
+	newCSR, err := parseCSR(new)
 	if err != nil {
 		return fmt.Errorf("unable to parse new csr: %v", err)
 	}
-	origCsr, err := ParseCSR(orig)
+	origCSR, err := parseCSR(orig)
 	if err != nil {
 		return fmt.Errorf("unable to parse original csr: %v", err)
 	}
-	if !reflect.DeepEqual(newCsr.Subject, origCsr.Subject) {
-		return fmt.Errorf("csr subjects differ: new: %#v, orig: %#v", newCsr.Subject, origCsr.Subject)
+	if !reflect.DeepEqual(newCSR.Subject, origCSR.Subject) {
+		return fmt.Errorf("csr subjects differ: new: %#v, orig: %#v", newCSR.Subject, origCSR.Subject)
 	}
 	signer, ok := privateKey.(crypto.Signer)
 	if !ok {
 		return fmt.Errorf("privateKey is not a signer")
 	}
-	newCsr.PublicKey = signer.Public()
-	if err := newCsr.CheckSignature(); err != nil {
+	newCSR.PublicKey = signer.Public()
+	if err := newCSR.CheckSignature(); err != nil {
 		return fmt.Errorf("error validating signature new CSR against old key: %v", err)
 	}
 	if len(new.Status.Certificate) > 0 {
@@ -247,17 +247,12 @@ func formatError(format string, err error) error {
 	return fmt.Errorf(format, err)
 }
 
-// ParseCSR extracts the CSR from the API object and decodes it.
-func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+// parseCSR extracts the CSR from the API object and decodes it.
+func parseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
-	pemBytes := obj.Spec.Request
-	block, _ := pem.Decode(pemBytes)
+	block, _ := pem.Decode(obj.Spec.Request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
 		return nil, fmt.Errorf("PEM block type must be CERTIFICATE REQUEST")
 	}
-	csr, err := x509.ParseCertificateRequest(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	return csr, nil
+	return x509.ParseCertificateRequest(block.Bytes)
 }

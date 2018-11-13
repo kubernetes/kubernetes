@@ -21,8 +21,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -103,7 +103,7 @@ func DetectUnsupportedVersion(b []byte) error {
 		}
 	}
 	if mutuallyExclusiveCount > 1 {
-		glog.Warningf("WARNING: Detected resource kinds that may not apply: %v", mutuallyExclusive)
+		klog.Warningf("WARNING: Detected resource kinds that may not apply: %v", mutuallyExclusive)
 	}
 
 	return nil
@@ -141,7 +141,7 @@ func LowercaseSANs(sans []string) {
 	for i, san := range sans {
 		lowercase := strings.ToLower(san)
 		if lowercase != san {
-			glog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
+			klog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
 			sans[i] = lowercase
 		}
 	}
@@ -166,7 +166,7 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	ip, err := netutil.ChooseBindAddress(bindAddress)
 	if err != nil {
 		if netutil.IsNoRoutesError(err) {
-			glog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
+			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
 			defaultIP := net.ParseIP(constants.DefaultAPIServerBindAddress)
 			if defaultIP == nil {
 				return nil, errors.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)

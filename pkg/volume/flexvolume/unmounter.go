@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -45,7 +45,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 
 	pathExists, pathErr := util.PathExists(dir)
 	if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 

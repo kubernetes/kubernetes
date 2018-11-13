@@ -14,56 +14,69 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// These tests verify the manifest files in this package and the
+// addons directory are in sync.
 package crd_test
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/ghodss/yaml"
-	"io/ioutil"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/csi-api/pkg/crd"
-	"os"
 )
 
 func TestBootstrapCRDs(t *testing.T) {
-	testObjects(t, crd.CSIDriverCRD(), "csidriver.yaml")
-	testObjects(t, crd.CSINodeInfoCRD(), "csinodeinfo.yaml")
+	verifyCopiesAreInSync(
+		t,
+		"csidriver.yaml", /* filename */
+		"manifests",      /* sourceOfTruthDir */
+		[]string{"../../../../../../cluster/addons/storage-crds"}, /* copyDirs */
+	)
+	verifyCopiesAreInSync(
+		t,
+		"csinodeinfo.yaml", /* filename */
+		"manifests",        /* sourceOfTruthDir */
+		[]string{"../../../../../../cluster/addons/storage-crds"}, /* copyDirs */
+	)
 }
 
-func testObjects(t *testing.T, crd *apiextensionsv1beta1.CustomResourceDefinition, fixtureFilename string) {
-	filename := filepath.Join("testdata", fixtureFilename)
-	expectedYAML, err := ioutil.ReadFile(filename)
+// verifyCopiesAreInSync fails if any copies are different from source of truth.
+func verifyCopiesAreInSync(t *testing.T, filename string, sourceOfTruthDir string, copyDirs []string) {
+	sourceOfTruthFilename := filepath.Join(sourceOfTruthDir, filename)
+
+	if len(copyDirs) <= 0 {
+		t.Fatalf("copyDirs is empty. There are no copies to validate.")
+	}
+
+	expectedYAML, err := ioutil.ReadFile(sourceOfTruthFilename)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	jsonData, err := runtime.Encode(apiextensionsscheme.Codecs.LegacyCodec(apiextensionsv1beta1.SchemeGroupVersion), crd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	yamlData, err := yaml.JSONToYAML(jsonData)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(yamlData) != string(expectedYAML) {
-		t.Errorf("Bootstrap CRD data does not match the test fixture in %s", filename)
+	for _, copyDir := range copyDirs {
+		copyFilename := filepath.Join(copyDir, filename)
+		actualYAML, err := ioutil.ReadFile(copyFilename)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		const updateEnvVar = "UPDATE_CSI_CRD_FIXTURE_DATA"
-		if os.Getenv(updateEnvVar) == "true" {
-			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
-				t.Logf("Updated data in %s", filename)
-				t.Logf("Verify the diff, commit changes, and rerun the tests")
+		if string(actualYAML) != string(expectedYAML) {
+			t.Errorf("Data in %q does not match source of truth in %q.", copyFilename, sourceOfTruthFilename)
+
+			const updateEnvVar = "UPDATE_CSI_CRD_FIXTURE_DATA"
+			if os.Getenv(updateEnvVar) == "true" {
+				if err := ioutil.WriteFile(copyFilename, []byte(expectedYAML), os.FileMode(0755)); err == nil {
+					t.Logf("Updated data in %s", copyFilename)
+					t.Logf("Verify the diff, commit changes, and rerun the tests")
+				} else {
+					t.Logf("Could not update data in %s: %v", copyFilename, err)
+				}
 			} else {
-				t.Logf("Could not update data in %s: %v", filename, err)
+				t.Logf("Diff between source of truth data and copy data in %s:\n-------------\n%s", copyFilename, diff.StringDiff(string(actualYAML), string(expectedYAML)))
+				t.Logf("If the change is expected, re-run with %s=true to update the copy data", updateEnvVar)
 			}
-		} else {
-			t.Logf("Diff between data in code and fixture data in %s:\n-------------\n%s", filename, diff.StringDiff(string(yamlData), string(expectedYAML)))
-			t.Logf("If the change is expected, re-run with %s=true to update the fixtures", updateEnvVar)
 		}
 	}
 }

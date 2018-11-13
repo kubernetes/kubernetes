@@ -24,7 +24,7 @@ import (
 	e2eframework "k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -51,7 +51,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		numNodes += v.Count
 	}
 
-	glog.Infof("Making %d nodes", numNodes)
+	klog.Infof("Making %d nodes", numNodes)
 	baseNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: p.nodeNamePrefix,
@@ -77,7 +77,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 			}
 		}
 		if err != nil {
-			glog.Fatalf("Error creating node: %v", err)
+			klog.Fatalf("Error creating node: %v", err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		sum += v.Count
 		for ; index < sum; index++ {
 			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
-				glog.Errorf("Aborting node preparation: %v", err)
+				klog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
 		}
@@ -100,7 +100,7 @@ func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	for i := range nodes.Items {
 		if err := p.client.CoreV1().Nodes().Delete(nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
-			glog.Errorf("Error while deleting Node: %v", err)
+			klog.Errorf("Error while deleting Node: %v", err)
 		}
 	}
 	return nil

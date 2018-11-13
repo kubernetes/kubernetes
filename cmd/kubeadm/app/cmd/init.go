@@ -25,13 +25,13 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -44,13 +44,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
-	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
-	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
+	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -182,6 +179,8 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 	initRunner.AppendPhase(phases.NewUploadConfigPhase())
+	initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
+	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -200,11 +199,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
-		&cfg.APIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.APIEndpoint.AdvertiseAddress,
+		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
 	)
 	flagSet.Int32Var(
-		&cfg.APIEndpoint.BindPort, options.APIServerBindPort, cfg.APIEndpoint.BindPort,
+		&cfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
 	flagSet.StringVar(
@@ -314,7 +313,7 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 	if err != nil {
 		return initData{}, err
 	}
-	if err := configutil.VerifyAPIServerBindAddress(cfg.APIEndpoint.AdvertiseAddress); err != nil {
+	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		return initData{}, err
 	}
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
@@ -461,8 +460,8 @@ func (d initData) Tokens() []string {
 func runInit(i *initData, out io.Writer) error {
 
 	// Get directories to write files to; can be faked if we're dry-running
-	glog.V(1).Infof("[init] Getting certificates directory from configuration")
-	certsDirToWriteTo, kubeConfigDir, manifestDir, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
+	klog.V(1).Infof("[init] Getting certificates directory from configuration")
+	certsDirToWriteTo, kubeConfigDir, _, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
 		return errors.Wrap(err, "error getting directories to use")
 	}
@@ -479,17 +478,17 @@ func runInit(i *initData, out io.Writer) error {
 		return errors.Wrap(err, "failed to create client")
 	}
 
-	// TODO: NewControlPlaneWaiter should be converted to private after the self-hosting phase is removed.
-	timeout := i.cfg.ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
-	waiter, err := phases.NewControlPlaneWaiter(i.dryRun, timeout, client, i.outputWriter)
-	if err != nil {
-		return errors.Wrap(err, "failed to create waiter")
+	// Upload currently used configuration to the cluster
+	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
+	// depend on centralized information from this source in the future
+	klog.V(1).Infof("[init] uploading currently used configuration to the cluster")
+	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
+		return errors.Wrap(err, "error uploading configuration")
 	}
 
-	// PHASE 4: Mark the master with the right label/taint
-	glog.V(1).Infof("[init] marking the master with right label")
-	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error marking master")
+	klog.V(1).Infof("[init] creating kubelet configuration configmap")
+	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
+		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
 	// This feature is disabled by default
@@ -505,70 +504,14 @@ func runInit(i *initData, out io.Writer) error {
 		}
 	}
 
-	// PHASE 5: Set up the node bootstrap tokens
-	tokens := []string{}
-	for _, bt := range i.cfg.BootstrapTokens {
-		tokens = append(tokens, bt.Token.String())
-	}
-	if !i.skipTokenPrint {
-		if len(tokens) == 1 {
-			fmt.Printf("[bootstraptoken] using token: %s\n", tokens[0])
-		} else if len(tokens) > 1 {
-			fmt.Printf("[bootstraptoken] using tokens: %v\n", tokens)
-		}
-	}
-
-	// Create the default node bootstrap token
-	glog.V(1).Infof("[init] creating RBAC rules to generate default bootstrap token")
-	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, i.cfg.BootstrapTokens); err != nil {
-		return errors.Wrap(err, "error updating or creating token")
-	}
-	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	glog.V(1).Infof("[init] creating RBAC rules to allow bootstrap tokens to post CSR")
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
-	}
-	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	glog.V(1).Infof("[init] creating RBAC rules to automatic approval of CSRs automatically")
-	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
-	}
-
-	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	glog.V(1).Infof("[init] creating/updating RBAC rules for rotating certificate")
-	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
-		return err
-	}
-
-	// Create the cluster-info ConfigMap with the associated RBAC rules
-	glog.V(1).Infof("[init] creating bootstrap configmap")
-	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
-		return errors.Wrap(err, "error creating bootstrap configmap")
-	}
-	glog.V(1).Infof("[init] creating ClusterInfo RBAC rules")
-	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
-		return errors.Wrap(err, "error creating clusterinfo RBAC rules")
-	}
-
-	glog.V(1).Infof("[init] ensuring DNS addon")
+	klog.V(1).Infof("[init] ensuring DNS addon")
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error ensuring dns addon")
 	}
 
-	glog.V(1).Infof("[init] ensuring proxy addon")
+	klog.V(1).Infof("[init] ensuring proxy addon")
 	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
 		return errors.Wrap(err, "error ensuring proxy addon")
-	}
-
-	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
-	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
-		glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
-		// Temporary control plane is up, now we create our self hosted control
-		// plane components and remove the static manifests:
-		fmt.Println("[self-hosted] creating self-hosted control plane")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
-			return errors.Wrap(err, "error creating self hosted control plane")
-		}
 	}
 
 	// Exit earlier if we're dryrunning
@@ -578,7 +521,7 @@ func runInit(i *initData, out io.Writer) error {
 	}
 
 	// Prints the join command, multiple times in case the user has multiple tokens
-	for _, token := range tokens {
+	for _, token := range i.Tokens() {
 		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
 			return errors.Wrap(err, "failed to print join command")
 		}

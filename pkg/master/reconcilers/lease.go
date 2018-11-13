@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -72,7 +72,7 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		ipList[i] = ip.Subsets[0].Addresses[0].IP
 	}
 
-	glog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
+	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
 
 	return ipList, nil
 }
@@ -98,7 +98,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		// changing a field.
 		existing.Generation++
 
-		glog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
+		klog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
 
 		return existing, &leaseTime, nil
 	})
@@ -219,7 +219,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
+	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
 	if shouldCreate {
 		if _, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
 			err = nil

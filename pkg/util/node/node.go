@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,12 +100,12 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
 	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
 	if err != nil {
-		glog.Warningf("Failed to retrieve node info: %v", err)
+		klog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
 	}
 	nodeIP, err = GetNodeHostIP(node)
 	if err != nil {
-		glog.Warningf("Failed to retrieve node IP: %v", err)
+		klog.Warningf("Failed to retrieve node IP: %v", err)
 		return nil
 	}
 	return nodeIP

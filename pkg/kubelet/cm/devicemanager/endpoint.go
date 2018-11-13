@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"google.golang.org/grpc"
+	"k8s.io/klog"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 )
@@ -59,7 +59,7 @@ type endpointImpl struct {
 func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
-		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
+		klog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
 		return nil, err
 	}
 
@@ -95,7 +95,7 @@ func (e *endpointImpl) callback(resourceName string, devices []pluginapi.Device)
 func (e *endpointImpl) run() {
 	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
 	if err != nil {
-		glog.Errorf(errListAndWatch, e.resourceName, err)
+		klog.Errorf(errListAndWatch, e.resourceName, err)
 
 		return
 	}
@@ -103,12 +103,12 @@ func (e *endpointImpl) run() {
 	for {
 		response, err := stream.Recv()
 		if err != nil {
-			glog.Errorf(errListAndWatch, e.resourceName, err)
+			klog.Errorf(errListAndWatch, e.resourceName, err)
 			return
 		}
 
 		devs := response.Devices
-		glog.V(2).Infof("State pushed for device plugin %s", e.resourceName)
+		klog.V(2).Infof("State pushed for device plugin %s", e.resourceName)
 
 		var newDevs []pluginapi.Device
 		for _, d := range devs {

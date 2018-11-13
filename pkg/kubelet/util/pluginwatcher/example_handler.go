@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1"
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
@@ -117,7 +117,7 @@ func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
 }
 
 func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
-	glog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
+	klog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
 	p.eventChans[pluginName] <- event
 }
 

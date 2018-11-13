@@ -14,7 +14,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/coordination/v1beta1:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
@@ -25,10 +25,13 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -99,15 +99,15 @@ func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting endpoints config controller")
-	defer glog.Info("Shutting down endpoints config controller")
+	klog.Info("Starting endpoints config controller")
+	defer klog.Info("Shutting down endpoints config controller")
 
 	if !controller.WaitForCacheSync("endpoints config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		glog.V(3).Infof("Calling handler.OnEndpointsSynced()")
+		klog.V(3).Infof("Calling handler.OnEndpointsSynced()")
 		c.eventHandlers[i].OnEndpointsSynced()
 	}
 
@@ -121,7 +121,7 @@ func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsAdd")
+		klog.V(4).Infof("Calling handler.OnEndpointsAdd")
 		c.eventHandlers[i].OnEndpointsAdd(endpoints)
 	}
 }
@@ -138,7 +138,7 @@ func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsUpdate")
+		klog.V(4).Infof("Calling handler.OnEndpointsUpdate")
 		c.eventHandlers[i].OnEndpointsUpdate(oldEndpoints, endpoints)
 	}
 }
@@ -157,7 +157,7 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsDelete")
+		klog.V(4).Infof("Calling handler.OnEndpointsDelete")
 		c.eventHandlers[i].OnEndpointsDelete(endpoints)
 	}
 }
@@ -199,15 +199,15 @@ func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting service config controller")
-	defer glog.Info("Shutting down service config controller")
+	klog.Info("Starting service config controller")
+	defer klog.Info("Shutting down service config controller")
 
 	if !controller.WaitForCacheSync("service config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		glog.V(3).Info("Calling handler.OnServiceSynced()")
+		klog.V(3).Info("Calling handler.OnServiceSynced()")
 		c.eventHandlers[i].OnServiceSynced()
 	}
 
@@ -221,7 +221,7 @@ func (c *ServiceConfig) handleAddService(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Info("Calling handler.OnServiceAdd")
+		klog.V(4).Info("Calling handler.OnServiceAdd")
 		c.eventHandlers[i].OnServiceAdd(service)
 	}
 }
@@ -238,7 +238,7 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Info("Calling handler.OnServiceUpdate")
+		klog.V(4).Info("Calling handler.OnServiceUpdate")
 		c.eventHandlers[i].OnServiceUpdate(oldService, service)
 	}
 }
@@ -257,7 +257,7 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Info("Calling handler.OnServiceDelete")
+		klog.V(4).Info("Calling handler.OnServiceDelete")
 		c.eventHandlers[i].OnServiceDelete(service)
 	}
 }

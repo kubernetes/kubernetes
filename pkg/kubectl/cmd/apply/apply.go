@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
@@ -347,7 +347,7 @@ func (o *ApplyOptions) Run() error {
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		// Get the modified configuration of the object. Embed the result

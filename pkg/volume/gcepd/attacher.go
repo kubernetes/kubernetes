@@ -24,10 +24,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -85,17 +85,17 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 	attached, err := attacher.gceDisks.DiskIsAttached(pdName, nodeName)
 	if err != nil {
 		// Log error and continue with attach
-		glog.Errorf(
+		klog.Errorf(
 			"Error checking if PD (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
 			pdName, nodeName, err)
 	}
 
 	if err == nil && attached {
 		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, nodeName)
+		klog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, nodeName)
 	} else {
 		if err := attacher.gceDisks.AttachDisk(pdName, nodeName, readOnly, isRegionalPD(spec)); err != nil {
-			glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, nodeName, err)
+			klog.Errorf("Error attaching PD %q to node %q: %+v", pdName, nodeName, err)
 			return "", err
 		}
 	}
@@ -111,7 +111,7 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 		volumeSource, _, err := getVolumeSource(spec)
 		// If error is occurred, skip this volume and move to the next one
 		if err != nil {
-			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			klog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
 			continue
 		}
 		pdNameList = append(pdNameList, volumeSource.PDName)
@@ -121,7 +121,7 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 	attachedResult, err := attacher.gceDisks.DisksAreAttached(pdNameList, nodeName)
 	if err != nil {
 		// Log error and continue with attach
-		glog.Errorf(
+		klog.Errorf(
 			"Error checking if PDs (%v) are already attached to current node (%q). err=%v",
 			pdNameList, nodeName, err)
 		return volumesAttachedCheck, err
@@ -131,7 +131,7 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 		if !attached {
 			spec := volumePdNameMap[pdName]
 			volumesAttachedCheck[spec] = false
-			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", pdName, spec.Name())
+			klog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", pdName, spec.Name())
 		}
 	}
 	return volumesAttachedCheck, nil
@@ -156,7 +156,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 
 	sdBefore, err := filepath.Glob(diskSDPattern)
 	if err != nil {
-		glog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
+		klog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
 	}
 	sdBeforeSet := sets.NewString(sdBefore...)
 
@@ -164,14 +164,14 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 	for {
 		select {
 		case <-ticker.C:
-			glog.V(5).Infof("Checking GCE PD %q is attached.", pdName)
+			klog.V(5).Infof("Checking GCE PD %q is attached.", pdName)
 			path, err := verifyDevicePath(devicePaths, sdBeforeSet, pdName)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
-				glog.Errorf("Error verifying GCE PD (%q) is attached: %v", pdName, err)
+				klog.Errorf("Error verifying GCE PD (%q) is attached: %v", pdName, err)
 			} else if path != "" {
 				// A device path has successfully been created for the PD
-				glog.Infof("Successfully found attached GCE PD %q.", pdName)
+				klog.Infof("Successfully found attached GCE PD %q.", pdName)
 				return path, nil
 			}
 		case <-timer.C:
@@ -222,7 +222,7 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 			os.Remove(deviceMountPath)
 			return err
 		}
-		glog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
+		klog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
 	}
 	return nil
 }
@@ -265,19 +265,19 @@ func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName ty
 	attached, err := detacher.gceDisks.DiskIsAttached(pdName, nodeName)
 	if err != nil {
 		// Log error and continue with detach
-		glog.Errorf(
+		klog.Errorf(
 			"Error checking if PD (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
 			pdName, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is not attached to node. Success!
-		glog.Infof("Detach operation is successful. PD %q was not attached to node %q.", pdName, nodeName)
+		klog.Infof("Detach operation is successful. PD %q was not attached to node %q.", pdName, nodeName)
 		return nil
 	}
 
 	if err = detacher.gceDisks.DetachDisk(pdName, nodeName); err != nil {
-		glog.Errorf("Error detaching PD %q from node %q: %v", pdName, nodeName, err)
+		klog.Errorf("Error detaching PD %q from node %q: %v", pdName, nodeName, err)
 		return err
 	}
 

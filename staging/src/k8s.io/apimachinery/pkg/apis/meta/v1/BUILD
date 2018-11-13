@@ -25,7 +25,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

@@ -33,9 +33,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -64,7 +64,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/audit/event:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/audit/policy:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/audit/util:all-srcs",
     ],
     tags = ["automanaged"],
 )

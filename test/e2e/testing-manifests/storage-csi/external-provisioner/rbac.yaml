@@ -87,3 +87,4 @@ subjects:
 roleRef:
   kind: Role
   name: external-provisioner-cfg
+  apiGroup: rbac.authorization.k8s.io

@@ -21,8 +21,8 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -46,7 +46,7 @@ func (m *azureDiskMounter) GetAttributes() volume.Attributes {
 	readOnly := false
 	volumeSource, _, err := getVolumeSource(m.spec)
 	if err != nil {
-		glog.Infof("azureDisk - mounter failed to get volume source for spec %s %v", m.spec.Name(), err)
+		klog.Infof("azureDisk - mounter failed to get volume source for spec %s %v", m.spec.Name(), err)
 	} else if volumeSource.ReadOnly != nil {
 		readOnly = *volumeSource.ReadOnly
 	}
@@ -74,7 +74,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	volumeSource, _, err := getVolumeSource(m.spec)
 
 	if err != nil {
-		glog.Infof("azureDisk - mounter failed to get volume source for spec %s", m.spec.Name())
+		klog.Infof("azureDisk - mounter failed to get volume source for spec %s", m.spec.Name())
 		return err
 	}
 
@@ -82,20 +82,20 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 
 	if err != nil && !os.IsNotExist(err) {
-		glog.Infof("azureDisk - cannot validate mount point for disk %s on  %s %v", diskName, dir, err)
+		klog.Infof("azureDisk - cannot validate mount point for disk %s on  %s %v", diskName, dir, err)
 		return err
 	}
 	if !mountPoint {
 		// testing original mount point, make sure the mount link is valid
 		_, err := (&osIOHandler{}).ReadDir(dir)
 		if err == nil {
-			glog.V(4).Infof("azureDisk - already mounted to target %s", dir)
+			klog.V(4).Infof("azureDisk - already mounted to target %s", dir)
 			return nil
 		}
 		// mount link is invalid, now unmount and remount later
-		glog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", dir, err)
+		klog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", dir, err)
 		if err := mounter.Unmount(dir); err != nil {
-			glog.Errorf("azureDisk - Unmount directory %s failed with %v", dir, err)
+			klog.Errorf("azureDisk - Unmount directory %s failed with %v", dir, err)
 			return err
 		}
 		mountPoint = true
@@ -104,7 +104,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if runtime.GOOS != "windows" {
 		// in windows, we will use mklink to mount, will MkdirAll in Mount func
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			glog.Errorf("azureDisk - mkdir failed on disk %s on dir: %s (%v)", diskName, dir, err)
+			klog.Errorf("azureDisk - mkdir failed on disk %s on dir: %s (%v)", diskName, dir, err)
 			return err
 		}
 	}
@@ -119,7 +119,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		options = util.JoinMountOptions(m.options.MountOptions, options)
 	}
 
-	glog.V(4).Infof("azureDisk - Attempting to mount %s on %s", diskName, dir)
+	klog.V(4).Infof("azureDisk - Attempting to mount %s on %s", diskName, dir)
 	isManagedDisk := (*volumeSource.Kind == v1.AzureManagedDisk)
 	globalPDPath, err := makeGlobalPDPath(m.plugin.host, volumeSource.DataDiskURI, isManagedDisk)
 
@@ -131,7 +131,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// Everything in the following control flow is meant as an
 	// attempt cleanup a failed setupAt (bind mount)
 	if mountErr != nil {
-		glog.Infof("azureDisk - SetupAt:Mount disk:%s at dir:%s failed during mounting with error:%v, will attempt to clean up", diskName, dir, mountErr)
+		klog.Infof("azureDisk - SetupAt:Mount disk:%s at dir:%s failed during mounting with error:%v, will attempt to clean up", diskName, dir, mountErr)
 		mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 		if err != nil {
 			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup IsLikelyNotMountPoint check failed for disk:%s on dir:%s with error %v original-mountErr:%v", diskName, dir, err, mountErr)
@@ -155,7 +155,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
 		}
 
-		glog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, mountErr)
+		klog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, mountErr)
 		return mountErr
 	}
 
@@ -163,7 +163,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		volume.SetVolumeOwnership(m, fsGroup)
 	}
 
-	glog.V(2).Infof("azureDisk - successfully mounted disk %s on %s", diskName, dir)
+	klog.V(2).Infof("azureDisk - successfully mounted disk %s on %s", diskName, dir)
 	return nil
 }
 
@@ -175,11 +175,11 @@ func (u *azureDiskUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 
-	glog.V(4).Infof("azureDisk - TearDownAt: %s", dir)
+	klog.V(4).Infof("azureDisk - TearDownAt: %s", dir)
 	mounter := u.plugin.host.GetMounter(u.plugin.GetPluginName())
 	mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {

@@ -132,7 +132,6 @@
 				"github.com/ghodss/yaml",
 				"github.com/gogo/protobuf/proto",
 				"github.com/gogo/protobuf/sortkeys",
-				"github.com/golang/glog",
 				"github.com/golang/groupcache/lru",
 				"github.com/golang/protobuf/proto",
 				"github.com/golang/protobuf/protoc-gen-go/descriptor",

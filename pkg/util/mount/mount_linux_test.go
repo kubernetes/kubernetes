@@ -32,7 +32,7 @@ import (
 
 	"k8s.io/utils/exec"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
@@ -634,7 +634,7 @@ func TestSafeMakeDir(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("test %q", test.name)
+		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "safe-make-dir-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -646,7 +646,7 @@ func TestSafeMakeDir(t *testing.T) {
 			t.Errorf("test %q: %s", test.name, err)
 		}
 		if err != nil {
-			glog.Infof("got error: %s", err)
+			klog.Infof("got error: %s", err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)
@@ -792,7 +792,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("test %q", test.name)
+		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "remove-empty-dirs-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -963,7 +963,7 @@ func TestCleanSubPaths(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("test %q", test.name)
+		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "clean-subpaths-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -1219,7 +1219,7 @@ func TestBindSubPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("test %q", test.name)
+		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "bind-subpath-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -1651,7 +1651,7 @@ func TestSafeOpen(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("test %q", test.name)
+		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "safe-open-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -1664,7 +1664,7 @@ func TestSafeOpen(t *testing.T) {
 			t.Errorf("test %q: %s", test.name, err)
 		}
 		if err != nil {
-			glog.Infof("got error: %s", err)
+			klog.Infof("got error: %s", err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)
@@ -1798,7 +1798,7 @@ func TestFindExistingPrefix(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("test %q", test.name)
+		klog.V(4).Infof("test %q", test.name)
 		base, err := ioutil.TempDir("", "find-prefix-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -1810,7 +1810,7 @@ func TestFindExistingPrefix(t *testing.T) {
 			t.Errorf("test %q: %s", test.name, err)
 		}
 		if err != nil {
-			glog.Infof("got error: %s", err)
+			klog.Infof("got error: %s", err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)

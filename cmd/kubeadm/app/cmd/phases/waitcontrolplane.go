@@ -23,10 +23,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -86,7 +86,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	glog.V(1).Infof("[wait-control-plane] Waiting for the API server to be healthy")
+	klog.V(1).Infof("[wait-control-plane] Waiting for the API server to be healthy")
 
 	client, err := data.Client()
 	if err != nil {
@@ -94,7 +94,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
-	waiter, err := NewControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
+	waiter, err := newControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
@@ -144,7 +144,7 @@ func printFilesIfDryRunning(data waitControlPlaneData) error {
 
 // NewControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
 // TODO: make private (lowercase) after self-hosting phase is removed.
-func NewControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
+func newControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
 	if dryRun {
 		return dryrunutil.NewWaiter(), nil
 	}

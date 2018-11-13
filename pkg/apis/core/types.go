@@ -175,7 +175,7 @@ type PersistentVolumeSource struct {
 	HostPath *HostPathVolumeSource
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
 	// +optional
-	Glusterfs *GlusterfsVolumeSource
+	Glusterfs *GlusterfsPersistentVolumeSource
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	// +optional
 	NFS *NFSVolumeSource
@@ -933,6 +933,30 @@ type GlusterfsVolumeSource struct {
 	// the Glusterfs to be mounted with read-only permissions
 	// +optional
 	ReadOnly bool
+}
+
+// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// Glusterfs volumes do not support ownership management or SELinux relabeling.
+type GlusterfsPersistentVolumeSource struct {
+	// EndpointsName is the endpoint name that details Glusterfs topology.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	EndpointsName string
+
+	// Path is the Glusterfs volume path.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	Path string
+
+	// ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+	// Defaults to false.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// +optional
+	ReadOnly bool
+
+	// EndpointsNamespace is the namespace that contains Glusterfs endpoint.
+	// If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// +optional
+	EndpointsNamespace *string
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.

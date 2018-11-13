@@ -45,7 +45,7 @@ import (
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -438,7 +438,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 
 func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	// TODO: remove dependency on the legacyscheme
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})

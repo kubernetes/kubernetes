@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -145,31 +145,31 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 	attached, err := attacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
 	if err != nil {
 		// Log error and continue with attach
-		glog.Warningf(
+		klog.Warningf(
 			"Error checking if volume (%q) is already attached to current instance (%q). Will continue and try attach anyway. err=%v",
 			volumeID, instanceID, err)
 	}
 
 	if err == nil && attached {
 		// Volume is already attached to instance.
-		glog.Infof("Attach operation is successful. volume %q is already attached to instance %q.", volumeID, instanceID)
+		klog.Infof("Attach operation is successful. volume %q is already attached to instance %q.", volumeID, instanceID)
 	} else {
 		_, err = attacher.cinderProvider.AttachDisk(instanceID, volumeID)
 		if err == nil {
 			if err = attacher.waitDiskAttached(instanceID, volumeID); err != nil {
-				glog.Errorf("Error waiting for volume %q to be attached from node %q: %v", volumeID, nodeName, err)
+				klog.Errorf("Error waiting for volume %q to be attached from node %q: %v", volumeID, nodeName, err)
 				return "", err
 			}
-			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceID)
+			klog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceID)
 		} else {
-			glog.Infof("Attach volume %q to instance %q failed with: %v", volumeID, instanceID, err)
+			klog.Infof("Attach volume %q to instance %q failed with: %v", volumeID, instanceID, err)
 			return "", err
 		}
 	}
 
 	devicePath, err := attacher.cinderProvider.GetAttachmentDiskPath(instanceID, volumeID)
 	if err != nil {
-		glog.Infof("Can not get device path of volume %q which be attached to instance %q, failed with: %v", volumeID, instanceID, err)
+		klog.Infof("Can not get device path of volume %q which be attached to instance %q, failed with: %v", volumeID, instanceID, err)
 		return "", err
 	}
 
@@ -183,7 +183,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 	for _, spec := range specs {
 		volumeID, _, _, err := getVolumeInfo(spec)
 		if err != nil {
-			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			klog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
 			continue
 		}
 
@@ -195,7 +195,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 	attachedResult, err := attacher.cinderProvider.DisksAreAttachedByName(nodeName, volumeIDList)
 	if err != nil {
 		// Log error and continue with attach
-		glog.Errorf(
+		klog.Errorf(
 			"Error checking if Volumes (%v) are already attached to current node (%q). Will continue and try attach anyway. err=%v",
 			volumeIDList, nodeName, err)
 		return volumesAttachedCheck, err
@@ -205,7 +205,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 		if !attached {
 			spec := volumeSpecMap[volumeID]
 			volumesAttachedCheck[spec] = false
-			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
+			klog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
 		}
 	}
 	return volumesAttachedCheck, nil
@@ -231,7 +231,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 	for {
 		select {
 		case <-ticker.C:
-			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
+			klog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
 			probeAttachedVolume()
 			if !attacher.cinderProvider.ShouldTrustDevicePath() {
 				// Using the Cinder volume ID, find the real device path (See Issue #33128)
@@ -239,11 +239,11 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 			}
 			exists, err := volumeutil.PathExists(devicePath)
 			if exists && err == nil {
-				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
+				klog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
 			}
 			// Log an error, and continue checking periodically
-			glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
+			klog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
 			// Using exponential backoff instead of linear
 			ticker.Stop()
 			duration = time.Duration(float64(duration) * probeVolumeFactor)
@@ -379,26 +379,26 @@ func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.Nod
 	attached, instanceID, err := detacher.cinderProvider.DiskIsAttachedByName(nodeName, volumeID)
 	if err != nil {
 		// Log error and continue with detach
-		glog.Errorf(
+		klog.Errorf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
 			volumeID, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, nodeName)
+		klog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, nodeName)
 		return nil
 	}
 
 	if err = detacher.cinderProvider.DetachDisk(instanceID, volumeID); err != nil {
-		glog.Errorf("Error detaching volume %q from node %q: %v", volumeID, nodeName, err)
+		klog.Errorf("Error detaching volume %q from node %q: %v", volumeID, nodeName, err)
 		return err
 	}
 	if err = detacher.waitDiskDetached(instanceID, volumeID); err != nil {
-		glog.Errorf("Error waiting for volume %q to detach from node %q: %v", volumeID, nodeName, err)
+		klog.Errorf("Error waiting for volume %q to detach from node %q: %v", volumeID, nodeName, err)
 		return err
 	}
-	glog.Infof("detached volume %q from node %q", volumeID, nodeName)
+	klog.Infof("detached volume %q from node %q", volumeID, nodeName)
 	return nil
 }
 

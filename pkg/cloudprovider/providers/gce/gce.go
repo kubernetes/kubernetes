@@ -30,13 +30,13 @@ import (
 	gcfg "gopkg.in/gcfg.v1"
 
 	"cloud.google.com/go/compute/metadata"
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -262,7 +262,7 @@ func newGCECloud(config io.Reader) (gceCloud *Cloud, err error) {
 		if err != nil {
 			return nil, err
 		}
-		glog.Infof("Using GCE provider config %+v", configFile)
+		klog.Infof("Using GCE provider config %+v", configFile)
 	}
 
 	cloudConfig, err = generateCloudConfig(configFile)
@@ -275,7 +275,7 @@ func newGCECloud(config io.Reader) (gceCloud *Cloud, err error) {
 func readConfig(reader io.Reader) (*ConfigFile, error) {
 	cfg := &ConfigFile{}
 	if err := gcfg.FatalOnly(gcfg.ReadInto(cfg, reader)); err != nil {
-		glog.Errorf("Couldn't read config: %v", err)
+		klog.Errorf("Couldn't read config: %v", err)
 		return nil, err
 	}
 	return cfg, nil
@@ -466,7 +466,7 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	} else {
 		// Other consumers may use the cloudprovider without utilizing the wrapped GCE API functions
 		// or functions requiring network/subnetwork URLs (e.g. Kubelet).
-		glog.Warningf("No network name or URL specified.")
+		klog.Warningf("No network name or URL specified.")
 	}
 
 	if config.SubnetworkURL != "" {
@@ -480,20 +480,20 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		if networkName := lastComponent(networkURL); networkName != "" {
 			var n *compute.Network
 			if n, err = getNetwork(service, netProjID, networkName); err != nil {
-				glog.Warningf("Could not retrieve network %q; err: %v", networkName, err)
+				klog.Warningf("Could not retrieve network %q; err: %v", networkName, err)
 			} else {
 				switch typeOfNetwork(n) {
 				case netTypeLegacy:
-					glog.Infof("Network %q is type legacy - no subnetwork", networkName)
+					klog.Infof("Network %q is type legacy - no subnetwork", networkName)
 					isLegacyNetwork = true
 				case netTypeCustom:
-					glog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
+					klog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
 				case netTypeAuto:
 					subnetURL, err = determineSubnetURL(service, netProjID, networkName, config.Region)
 					if err != nil {
-						glog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, config.Region, err)
+						klog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, config.Region, err)
 					} else {
-						glog.Infof("Auto selecting subnetwork %q", subnetURL)
+						klog.Infof("Auto selecting subnetwork %q", subnetURL)
 					}
 				}
 			}
@@ -507,7 +507,7 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		}
 	}
 	if len(config.ManagedZones) > 1 {
-		glog.Infof("managing multiple zones: %v", config.ManagedZones)
+		klog.Infof("managing multiple zones: %v", config.ManagedZones)
 	}
 
 	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(5, 5) // 5 qps, 5 burst.
@@ -588,7 +588,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 	if isProjectNumber(projID) {
 		projName, err := getProjectID(service, projID)
 		if err != nil {
-			glog.Warningf("Failed to retrieve project %v while trying to retrieve its name. err %v", projID, err)
+			klog.Warningf("Failed to retrieve project %v while trying to retrieve its name. err %v", projID, err)
 		} else {
 			projID = projName
 		}
@@ -601,7 +601,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 	if isProjectNumber(netProjID) {
 		netProjName, err := getProjectID(service, netProjID)
 		if err != nil {
-			glog.Warningf("Failed to retrieve network project %v while trying to retrieve its name. err %v", netProjID, err)
+			klog.Warningf("Failed to retrieve network project %v while trying to retrieve its name. err %v", netProjID, err)
 		} else {
 			netProjID = netProjName
 		}
@@ -692,7 +692,7 @@ func (g *Cloud) IsLegacyNetwork() bool {
 
 // SetInformers sets up the zone handlers we need watching for node changes.
 func (g *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
-	glog.Infof("Setting up informers for Cloud")
+	klog.Infof("Setting up informers for Cloud")
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -715,12 +715,12 @@ func (g *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			if !isNode {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.Errorf("Received unexpected object: %v", obj)
+					klog.Errorf("Received unexpected object: %v", obj)
 					return
 				}
 				node, ok = deletedState.Obj.(*v1.Node)
 				if !ok {
-					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					klog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
 					return
 				}
 			}
@@ -871,12 +871,12 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 			oauth2.NoContext,
 			compute.CloudPlatformScope,
 			compute.ComputeScope)
-		glog.Infof("Using DefaultTokenSource %#v", tokenSource)
+		klog.Infof("Using DefaultTokenSource %#v", tokenSource)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		glog.Infof("Using existing Token Source %#v", tokenSource)
+		klog.Infof("Using existing Token Source %#v", tokenSource)
 	}
 
 	backoff := wait.Backoff{
@@ -887,7 +887,7 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	}
 	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		if _, err := tokenSource.Token(); err != nil {
-			glog.Errorf("error fetching initial token: %v", err)
+			klog.Errorf("error fetching initial token: %v", err)
 			return false, nil
 		}
 		return true, nil

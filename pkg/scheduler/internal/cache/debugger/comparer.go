@@ -20,10 +20,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -39,8 +39,8 @@ type CacheComparer struct {
 
 // Compare compares the nodes and pods of NodeLister with Cache.Snapshot.
 func (c *CacheComparer) Compare() error {
-	glog.V(3).Info("cache comparer started")
-	defer glog.V(3).Info("cache comparer finished")
+	klog.V(3).Info("cache comparer started")
+	defer klog.V(3).Info("cache comparer finished")
 
 	nodes, err := c.NodeLister.List(labels.Everything())
 	if err != nil {
@@ -57,11 +57,11 @@ func (c *CacheComparer) Compare() error {
 	waitingPods := c.PodQueue.WaitingPods()
 
 	if missed, redundant := c.CompareNodes(nodes, snapshot.Nodes); len(missed)+len(redundant) != 0 {
-		glog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
+		klog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
 	}
 
 	if missed, redundant := c.ComparePods(pods, waitingPods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
-		glog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
+		klog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
 	}
 
 	return nil

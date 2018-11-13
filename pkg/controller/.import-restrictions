@@ -104,7 +104,6 @@
         "github.com/cloudflare/cfssl/signer/local",
         "github.com/davecgh/go-spew/spew",
         "github.com/evanphx/json-patch",
-        "github.com/golang/glog",
         "github.com/golang/groupcache/lru",
         "github.com/prometheus/client_golang/prometheus",
         "github.com/robfig/cron",

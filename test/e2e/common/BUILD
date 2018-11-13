@@ -44,6 +44,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/common",
     deps = [
+        "//pkg/api/v1/node:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -79,11 +80,11 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

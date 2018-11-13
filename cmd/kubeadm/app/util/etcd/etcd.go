@@ -26,9 +26,9 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -145,7 +145,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	for _, e := range clusterStatus.APIEndpoints {
 		endpoints = append(endpoints, fmt.Sprintf("https://%s:%d", e.AdvertiseAddress, constants.EtcdListenClientPort))
 	}
-	glog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
+	klog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
 
 	// Creates an etcd client
 	etcdClient, err := New(
@@ -185,7 +185,7 @@ func (c Client) Sync() error {
 	if err != nil {
 		return err
 	}
-	glog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
+	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
 
 	c.Endpoints = cli.Endpoints()
 	return nil

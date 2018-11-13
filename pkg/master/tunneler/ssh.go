@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/ssh"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 )
 
 type InstallSSHKey func(ctx context.Context, user string, data []byte) error
@@ -115,20 +115,20 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 
 	// Usernames are capped @ 32
 	if len(c.SSHUser) > 32 {
-		glog.Warning("SSH User is too long, truncating to 32 chars")
+		klog.Warning("SSH User is too long, truncating to 32 chars")
 		c.SSHUser = c.SSHUser[0:32]
 	}
-	glog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
+	klog.Infof("Setting up proxy: %s %s", c.SSHUser, c.SSHKeyfile)
 
 	// public keyfile is written last, so check for that.
 	publicKeyFile := c.SSHKeyfile + ".pub"
 	exists, err := utilfile.FileExists(publicKeyFile)
 	if err != nil {
-		glog.Errorf("Error detecting if key exists: %v", err)
+		klog.Errorf("Error detecting if key exists: %v", err)
 	} else if !exists {
-		glog.Infof("Key doesn't exist, attempting to create")
+		klog.Infof("Key doesn't exist, attempting to create")
 		if err := generateSSHKey(c.SSHKeyfile, publicKeyFile); err != nil {
-			glog.Errorf("Failed to create key pair: %v", err)
+			klog.Errorf("Failed to create key pair: %v", err)
 		}
 	}
 
@@ -168,21 +168,21 @@ func (c *SSHTunneler) SecondsSinceSSHKeySync() int64 {
 func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 	go wait.Until(func() {
 		if c.InstallSSHKey == nil {
-			glog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
+			klog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
 			return
 		}
 		key, err := ssh.ParsePublicKeyFromFile(publicKeyfile)
 		if err != nil {
-			glog.Errorf("Failed to load public key: %v", err)
+			klog.Errorf("Failed to load public key: %v", err)
 			return
 		}
 		keyData, err := ssh.EncodeSSHKey(key)
 		if err != nil {
-			glog.Errorf("Failed to encode public key: %v", err)
+			klog.Errorf("Failed to encode public key: %v", err)
 			return
 		}
 		if err := c.InstallSSHKey(context.TODO(), user, keyData); err != nil {
-			glog.Errorf("Failed to install ssh key: %v", err)
+			klog.Errorf("Failed to install ssh key: %v", err)
 			return
 		}
 		atomic.StoreInt64(&c.lastSSHKeySync, c.clock.Now().Unix())
@@ -195,9 +195,9 @@ func (c *SSHTunneler) nodesSyncLoop() {
 	// TODO (cjcullen) make this watch.
 	go wait.Until(func() {
 		addrs, err := c.getAddresses()
-		glog.V(4).Infof("Calling update w/ addrs: %v", addrs)
+		klog.V(4).Infof("Calling update w/ addrs: %v", addrs)
 		if err != nil {
-			glog.Errorf("Failed to getAddresses: %v", err)
+			klog.Errorf("Failed to getAddresses: %v", err)
 		}
 		c.tunnels.Update(addrs)
 		atomic.StoreInt64(&c.lastSync, c.clock.Now().Unix())
@@ -213,11 +213,11 @@ func generateSSHKey(privateKeyfile, publicKeyfile string) error {
 	// through last time, so delete it.
 	exists, err := utilfile.FileExists(privateKeyfile)
 	if err != nil {
-		glog.Errorf("Error detecting if private key exists: %v", err)
+		klog.Errorf("Error detecting if private key exists: %v", err)
 	} else if exists {
-		glog.Infof("Private key exists, but public key does not")
+		klog.Infof("Private key exists, but public key does not")
 		if err := os.Remove(privateKeyfile); err != nil {
-			glog.Errorf("Failed to remove stale private key: %v", err)
+			klog.Errorf("Failed to remove stale private key: %v", err)
 		}
 	}
 	if err := ioutil.WriteFile(privateKeyfile, ssh.EncodePrivateKey(private), 0600); err != nil {

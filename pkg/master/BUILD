@@ -35,7 +35,6 @@ go_library(
         "//pkg/apis/scheduling/install:go_default_library",
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -115,8 +114,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -144,7 +143,6 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/storage:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/reconcilers:go_default_library",

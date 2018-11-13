@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -236,7 +236,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		}
 		if !txnResp.Succeeded {
 			getResp = (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
-			glog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
+			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
 			continue
 		}
 		return decode(s.codec, s.versioner, origState.data, out, origState.rev)
@@ -352,7 +352,7 @@ func (s *store) GuaranteedUpdate(
 		trace.Step("Transaction committed")
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
-			glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
+			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
 			origState, err = s.getState(getResp, key, v, ignoreNotFound)
 			if err != nil {
 				return err

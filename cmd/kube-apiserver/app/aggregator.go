@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,7 +167,7 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 	if !ok {
 		// if we aren't found, then we shouldn't register ourselves because it could result in a CRD group version
 		// being permanently stuck in the APIServices list.
-		glog.Infof("Skipping APIService creation for %v", gv)
+		klog.Infof("Skipping APIService creation for %v", gv)
 		return nil
 	}
 	return &apiregistration.APIService{

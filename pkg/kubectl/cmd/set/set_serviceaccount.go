@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -183,7 +183,7 @@ func (o *SetServiceAccountOptions) Run() error {
 		}
 		// record this change (for rollout history)
 		if err := o.Recorder.Record(obj); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)

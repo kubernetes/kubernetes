@@ -22,8 +22,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -306,7 +306,7 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
-		glog.Warningf(
+		klog.Warningf(
 			"Expect container to have either both podName (%s) and podNamespace (%s) labels, or neither.",
 			podName, podNamespace)
 	}
@@ -429,7 +429,7 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 		if _, ok := infos["/"]; ok {
 			// If the failure is partial, log it and return a best-effort
 			// response.
-			glog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
+			klog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
 		} else {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 		}

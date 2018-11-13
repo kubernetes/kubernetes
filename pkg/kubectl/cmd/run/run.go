@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/docker/distribution/reference"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -674,7 +674,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	if err := o.Recorder.Record(obj); err != nil {
-		glog.V(4).Infof("error recording current command: %v", err)
+		klog.V(4).Infof("error recording current command: %v", err)
 	}
 
 	actualObj := obj
