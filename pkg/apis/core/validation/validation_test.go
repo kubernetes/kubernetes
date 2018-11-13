@@ -673,15 +673,12 @@ func testVolumeClaimWithStatus(
 }
 
 func testVolumeClaimStorageClass(name string, namespace string, annval string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
-	annotations := map[string]string{
-		v1.BetaStorageClassAnnotation: annval,
-	}
+	spec.StorageClassName = &annval
 
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   namespace,
-			Annotations: annotations,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: spec,
 	}
@@ -771,18 +768,6 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
-	}
-}
-
-func testVolumeClaimStorageClassInAnnotationAndSpec(name, namespace, scNameInAnn, scName string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
-	spec.StorageClassName = &scName
-	return &core.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   namespace,
-			Annotations: map[string]string{v1.BetaStorageClassAnnotation: scNameInAnn},
-		},
-		Spec: spec,
 	}
 }
 
@@ -1323,30 +1308,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	})
 
-	validClaimStorageClassInAnnotationAndSpec := testVolumeClaimStorageClassInAnnotationAndSpec(
-		"foo", "ns", "fast", "fast", core.PersistentVolumeClaimSpec{
-			AccessModes: []core.PersistentVolumeAccessMode{
-				core.ReadOnlyMany,
-			},
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-				},
-			},
-		})
-
-	invalidClaimStorageClassInAnnotationAndSpec := testVolumeClaimStorageClassInAnnotationAndSpec(
-		"foo", "ns", "fast2", "fast", core.PersistentVolumeClaimSpec{
-			AccessModes: []core.PersistentVolumeAccessMode{
-				core.ReadOnlyMany,
-			},
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-				},
-			},
-		})
-
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *core.PersistentVolumeClaim
@@ -1522,31 +1483,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableResize:      false,
 			enableBlock:       false,
 		},
-		"valid-upgrade-storage-class-annotation-to-annotation-and-spec": {
-			isExpectedFailure: false,
-			oldClaim:          validClaimStorageClass,
-			newClaim:          validClaimStorageClassInAnnotationAndSpec,
-			enableResize:      false,
-			enableBlock:       false,
-		},
-		"invalid-upgrade-storage-class-annotation-to-annotation-and-spec": {
-			isExpectedFailure: true,
-			oldClaim:          validClaimStorageClass,
-			newClaim:          invalidClaimStorageClassInAnnotationAndSpec,
-			enableResize:      false,
-			enableBlock:       false,
-		},
 		"invalid-upgrade-storage-class-in-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          invalidClaimStorageClassInSpec,
-			enableResize:      false,
-			enableBlock:       false,
-		},
-		"invalid-downgrade-storage-class-spec-to-annotation": {
-			isExpectedFailure: true,
-			oldClaim:          validClaimStorageClassInSpec,
-			newClaim:          validClaimStorageClass,
 			enableResize:      false,
 			enableBlock:       false,
 		},
