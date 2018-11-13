@@ -150,6 +150,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			// via the subcommands automatically created by initRunner.BindToCommand
 			err = runInit(&data, out)
 			kubeadmutil.CheckErr(err)
+
+			err = showJoinCommand(&data, out)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -395,6 +398,9 @@ func (d initData) KubeConfigDir() string {
 
 // KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
 func (d initData) KubeConfigPath() string {
+	if d.dryRun {
+		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmconstants.AdminKubeConfigFileName)
+	}
 	return d.kubeconfigPath
 }
 
@@ -456,18 +462,15 @@ func (d initData) Tokens() []string {
 
 // runInit executes master node provisioning
 func runInit(i *initData, out io.Writer) error {
-
 	// Get directories to write files to; can be faked if we're dry-running
 	klog.V(1).Infof("[init] Getting certificates directory from configuration")
-	certsDirToWriteTo, kubeConfigDir, _, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
+	certsDirToWriteTo, _, _, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
 		return errors.Wrap(err, "error getting directories to use")
 	}
 
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
 	i.cfg.CertificatesDir = certsDirToWriteTo
-
-	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
 
 	// TODO: client and waiter are temporary until the rest of the phases that use them
 	// are removed from this function.
@@ -505,12 +508,6 @@ func runInit(i *initData, out io.Writer) error {
 		return nil
 	}
 
-	// Prints the join command, multiple times in case the user has multiple tokens
-	for _, token := range i.Tokens() {
-		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
-			return errors.Wrap(err, "failed to print join command")
-		}
-	}
 	return nil
 }
 
@@ -537,4 +534,18 @@ func getDirectoriesToUse(dryRun bool, dryRunDir string, defaultPkiDir string) (s
 	}
 
 	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubeletRunDirectory, nil
+}
+
+// showJoinCommand prints the join command after all the phases in init have finished
+func showJoinCommand(i *initData, out io.Writer) error {
+	adminKubeConfigPath := i.KubeConfigPath()
+
+	// Prints the join command, multiple times in case the user has multiple tokens
+	for _, token := range i.Tokens() {
+		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
+			return errors.Wrap(err, "failed to print join command")
+		}
+	}
+
+	return nil
 }
