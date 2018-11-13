@@ -29,7 +29,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -105,12 +104,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	if opts.nodeRegOpts.Name != "" && opts.nodeRegOpts.Name != opts.defaultHostname {
 		klog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
 		kubeletFlags["hostname-override"] = opts.nodeRegOpts.Name
-	}
-
-	// If the user enabled Dynamic Kubelet Configuration (which is disabled by default), set the directory
-	// in the CLI flags so that the feature actually gets enabled
-	if features.Enabled(opts.featureGates, features.DynamicKubeletConfig) {
-		kubeletFlags["dynamic-config-dir"] = filepath.Join(constants.KubeletRunDirectory, constants.DynamicKubeletConfigurationDirectoryName)
 	}
 
 	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker

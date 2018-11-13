@@ -682,10 +682,6 @@ func TestValidateFeatureGates(t *testing.T) {
 	}{
 		{featureFlag{"Unknown": true}, false},
 		{featureFlag{"Unknown": false}, false},
-		{featureFlag{"CoreDNS": true}, false},
-		{featureFlag{"CoreDNS": false}, false},
-		{featureFlag{"DynamicKubeletConfig": true}, true},
-		{featureFlag{"DynamicKubeletConfig": false}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateFeatureGates(rt.featureGates, nil)

@@ -19,7 +19,6 @@ package kubelet
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -27,7 +26,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/utils/exec"
 )
 
@@ -231,26 +229,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
 				"resolv-conf":                "/run/systemd/resolve/resolv.conf",
-			},
-		},
-		{
-			name: "dynamic kubelet config enabled",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
-					Name:      "foo",
-				},
-				featureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
-				defaultHostname: "foo",
-			},
-			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"dynamic-config-dir":         fmt.Sprintf("%s/dynamic-config", kubeadmconstants.KubeletRunDirectory),
 			},
 		},
 	}
