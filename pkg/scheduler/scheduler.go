@@ -184,34 +184,12 @@ func New(client clientset.Interface,
 		policy := &schedulerapi.Policy{}
 		switch {
 		case source.Policy.File != nil:
-			// Use a policy serialized in a file.
-			policyFile := source.Policy.File.Path
-			_, err := os.Stat(policyFile)
-			if err != nil {
-				return nil, fmt.Errorf("missing policy config file %s", policyFile)
-			}
-			data, err := ioutil.ReadFile(policyFile)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't read policy config: %v", err)
-			}
-			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
-			if err != nil {
-				return nil, fmt.Errorf("invalid policy: %v", err)
+			if err := initPolicyFromFile(source.Policy.File.Path, policy); err != nil {
+				return nil, err
 			}
 		case source.Policy.ConfigMap != nil:
-			// Use a policy serialized in a config map value.
-			policyRef := source.Policy.ConfigMap
-			policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
-			if err != nil {
-				return nil, fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
-			}
-			data, found := policyConfigMap.Data[kubeschedulerconfig.SchedulerPolicyConfigMapKey]
-			if !found {
-				return nil, fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
-			}
-			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
-			if err != nil {
-				return nil, fmt.Errorf("invalid policy: %v", err)
+			if err := initPolicyFromConfigMap(client, source.Policy.ConfigMap, policy); err != nil {
+				return nil, err
 			}
 		}
 		sc, err := configurator.CreateFromConfig(*policy)
@@ -229,6 +207,42 @@ func New(client clientset.Interface,
 	// Create the scheduler.
 	sched := NewFromConfig(config)
 	return sched, nil
+}
+
+// initPolicyFromFile initialize policy from file
+func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
+	// Use a policy serialized in a file.
+	_, err := os.Stat(policyFile)
+	if err != nil {
+		return fmt.Errorf("missing policy config file %s", policyFile)
+	}
+	data, err := ioutil.ReadFile(policyFile)
+	if err != nil {
+		return fmt.Errorf("couldn't read policy config: %v", err)
+	}
+	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	if err != nil {
+		return fmt.Errorf("invalid policy: %v", err)
+	}
+	return nil
+}
+
+// initPolicyFromConfigMap initialize policy from configMap
+func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedulerconfig.SchedulerPolicyConfigMapSource, policy *schedulerapi.Policy) error {
+	// Use a policy serialized in a config map value.
+	policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
+	}
+	data, found := policyConfigMap.Data[kubeschedulerconfig.SchedulerPolicyConfigMapKey]
+	if !found {
+		return fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
+	}
+	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	if err != nil {
+		return fmt.Errorf("invalid policy: %v", err)
+	}
+	return nil
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
