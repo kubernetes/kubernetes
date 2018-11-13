@@ -404,7 +404,9 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	}
 
 	//Add backup-volfile-servers and auto_unmount options.
-	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
+	if len(addrlist) > 1 {
+		options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[1:], ":"))
+	}
 	options = append(options, "auto_unmount")
 
 	mountOptions := volutil.JoinMountOptions(b.mountOptions, options)
