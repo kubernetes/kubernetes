@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -29,7 +30,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
@@ -168,6 +171,18 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 	if s.ServiceAccounts != nil && len(s.ServiceAccounts.Issuer) > 0 && strings.Contains(s.ServiceAccounts.Issuer, ":") {
 		if _, err := url.Parse(s.ServiceAccounts.Issuer); err != nil {
 			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
+		}
+	}
+	if s.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+			allErrors = append(allErrors, errors.New("If the BoundServiceAccountTokenVolume feature is enabled,"+
+				" the TokenRequest and TokenRequestProjection features must also be enabled"))
+		}
+		if len(s.ServiceAccounts.Issuer) == 0 {
+			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag when BoundServiceAccountTokenVolume is enabled"))
+		}
+		if len(s.ServiceAccounts.KeyFiles) == 0 {
+			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag when BoundServiceAccountTokenVolume is enabled"))
 		}
 	}
 
