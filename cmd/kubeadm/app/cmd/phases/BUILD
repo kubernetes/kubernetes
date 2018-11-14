@@ -27,7 +27,6 @@ go_library(
         "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/addons/dns:go_default_library",
         "//cmd/kubeadm/app/phases/addons/proxy:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:go_default_library",
@@ -45,7 +44,6 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
-        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -61,14 +59,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "addons_test.go",
-        "util_test.go",
-    ],
+    srcs = ["util_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
-        "//cmd/kubeadm/test/cmd:go_default_library",
         "//pkg/version:go_default_library",
     ],
 )

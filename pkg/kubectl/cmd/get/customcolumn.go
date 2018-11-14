@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package get
 
 import (
 	"bufio"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/util/jsonpath"
+	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
 )
 
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
@@ -160,7 +161,7 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 	}
 
 	if w, found := out.(*tabwriter.Writer); !found {
-		w = GetNewTabWriter(out)
+		w = utilprinters.GetNewTabWriter(out)
 		out = w
 		defer w.Flush()
 	}

@@ -99,7 +99,7 @@ func TestVolumeBinding(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, true)
 	defer config.teardown()
 
 	cases := map[string]struct {
@@ -272,7 +272,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, true)
 	defer config.teardown()
 
 	storageClassName := "local-storage"
@@ -418,7 +418,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-binding-stress-", 1, features, schedulerResyncPeriod, provisionDelaySeconds, false)
+	config := setupCluster(t, "volume-binding-stress-", 1, features, schedulerResyncPeriod, provisionDelaySeconds, true)
 	defer config.teardown()
 
 	// Set max volume limit to the number of PVCs the test will create
@@ -625,7 +625,7 @@ func TestPVAffinityConflict(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling-", 3, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling-", 3, features, 0, 0, true)
 	defer config.teardown()
 
 	pv := makePV("local-pv", classImmediate, "", "", node1)
@@ -688,7 +688,7 @@ func TestVolumeProvision(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling", 1, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling", 1, features, 0, 0, true)
 	defer config.teardown()
 
 	cases := map[string]struct {

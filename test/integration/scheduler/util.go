@@ -148,7 +148,7 @@ func initTestScheduler(
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, false, false, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, false, true, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -257,7 +257,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), true, nil, true, false, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil, true, true, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called

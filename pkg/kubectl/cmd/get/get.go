@@ -38,15 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
@@ -331,7 +331,7 @@ func (r *RuntimeSorter) Sort() error {
 		case *metav1beta1.Table:
 			includesTable = true
 
-			if err := kubectl.NewTableSorter(t, r.field).Sort(); err != nil {
+			if err := NewTableSorter(t, r.field).Sort(); err != nil {
 				continue
 			}
 		default:
@@ -354,7 +354,7 @@ func (r *RuntimeSorter) Sort() error {
 	// if not dealing with a Table response from the server, assume
 	// all objects are runtime.Object as usual, and sort using old method.
 	var err error
-	if r.positioner, err = kubectl.SortObjects(r.decoder, r.objects, r.field); err != nil {
+	if r.positioner, err = SortObjects(r.decoder, r.objects, r.field); err != nil {
 		return err
 	}
 	return nil
@@ -374,7 +374,7 @@ func (r *RuntimeSorter) WithDecoder(decoder runtime.Decoder) *RuntimeSorter {
 }
 
 func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
-	parsedField, err := printers.RelaxedJSONPathExpression(sortBy)
+	parsedField, err := RelaxedJSONPathExpression(sortBy)
 	if err != nil {
 		parsedField = sortBy
 	}
@@ -495,7 +495,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	var printer printers.ResourcePrinter
 	var lastMapping *meta.RESTMapping
 	nonEmptyObjCount := 0
-	w := printers.GetNewTabWriter(o.Out)
+	w := utilprinters.GetNewTabWriter(o.Out)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
@@ -645,7 +645,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	// print the current object
 	if !o.WatchOnly {
 		var objsToPrint []runtime.Object
-		writer := printers.GetNewTabWriter(o.Out)
+		writer := utilprinters.GetNewTabWriter(o.Out)
 
 		if isList {
 			objsToPrint, _ = meta.ExtractList(obj)
@@ -852,7 +852,7 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 
 func maybeWrapSortingPrinter(printer printers.ResourcePrinter, sortBy string) printers.ResourcePrinter {
 	if len(sortBy) != 0 {
-		return &kubectl.SortingPrinter{
+		return &SortingPrinter{
 			Delegate:  printer,
 			SortField: fmt.Sprintf("%s", sortBy),
 		}

@@ -55,6 +55,8 @@ readonly ETC_MANIFESTS=${KUBE_HOME}/etc/kubernetes/manifests
 readonly KUBE_API_SERVER_DOCKER_TAG=v1.11.0-alpha.0.1808_3c7452dc11645d-dirty
 readonly LOG_OWNER_USER=$(id -un)
 readonly LOG_OWNER_GROUP=$(id -gn)
+readonly SERVICEACCOUNT_ISSUER=https://foo.bar.baz
+readonly SERVICEACCOUNT_KEY_PATH=/foo/bar/baz.key
 {{if .EncryptionProviderConfig}}
 ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
 {{end}}

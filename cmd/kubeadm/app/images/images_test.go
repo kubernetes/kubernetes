@@ -158,6 +158,34 @@ func TestGetEtcdImage(t *testing.T) {
 	}
 }
 
+func TestGetPauseImage(t *testing.T) {
+	testcases := []struct {
+		name     string
+		cfg      *kubeadmapi.ClusterConfiguration
+		expected string
+	}{
+		{
+			name: "pause image defined",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+			},
+			expected: "test.repo/pause:" + constants.PauseVersion,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetPauseImage(tc.cfg)
+			if actual != tc.expected {
+				t.Fatalf(
+					"failed GetPauseImage:\n\texpected: %s\n\t  actual: %s",
+					tc.expected,
+					actual,
+				)
+			}
+		})
+	}
+}
+
 func TestGetAllImages(t *testing.T) {
 	testcases := []struct {
 		name   string

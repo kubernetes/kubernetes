@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -172,10 +171,6 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 				defaultArguments["etcd-servers"] = value
 			}
 		}
-	}
-
-	if features.Enabled(cfg.FeatureGates, features.DynamicKubeletConfig) {
-		defaultArguments["feature-gates"] = "DynamicKubeletConfig=true"
 	}
 
 	if cfg.APIServer.ExtraArgs == nil {
