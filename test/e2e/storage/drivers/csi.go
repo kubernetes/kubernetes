@@ -239,7 +239,7 @@ func InitGcePDExternalCSIDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name: "com.google.csi.gcepd",
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
-			FeatureTag:  "[Serial][Feature: gcePD-external]",
+			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
