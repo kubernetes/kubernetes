@@ -551,7 +551,7 @@ metadata:
   namespace: istio-system
   labels:
     k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio
     chart: istio-1.0.3
     release: istio
@@ -2970,9 +2970,6 @@ spec:
                 - --interval=10s
             initialDelaySeconds: 5
             periodSeconds: 5
-          resources:
-            requests:
-              cpu: 10m
             
       volumes:
       - name: certs
@@ -3078,9 +3075,6 @@ spec:
           - NONE
           - --discoveryAddress
           - istio-pilot:8080
-          resources:
-            requests:
-              cpu: 10m
             
           env:
           - name: POD_NAME
@@ -3225,9 +3219,6 @@ spec:
           - NONE
           - --discoveryAddress
           - istio-pilot:8080
-          resources:
-            requests:
-              cpu: 10m
             
           env:
           - name: POD_NAME
@@ -3390,9 +3381,6 @@ spec:
         env:
         - name: GODEBUG
           value: "gctrace=2"
-        resources:
-          requests:
-            cpu: 10m
           
         volumeMounts:
         - name: uds-socket
@@ -3439,9 +3427,6 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.podIP
-        resources:
-          requests:
-            cpu: 10m
           
         volumeMounts:
         - name: istio-certs
@@ -3498,9 +3483,6 @@ spec:
         env:
         - name: GODEBUG
           value: "gctrace=2"
-        resources:
-          requests:
-            cpu: 10m
           
         volumeMounts:
         - name: uds-socket
@@ -3547,9 +3529,6 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.podIP
-        resources:
-          requests:
-            cpu: 10m
           
         volumeMounts:
         - name: istio-certs
@@ -3625,10 +3604,6 @@ spec:
             value: "100"
           - name: PILOT_TRACE_SAMPLING
             value: "1"
-          resources:
-            requests:
-              cpu: 500m
-              memory: 2048Mi
             
           volumeMounts:
           - name: config-volume
@@ -3668,9 +3643,6 @@ spec:
               fieldRef:
                 apiVersion: v1
                 fieldPath: status.podIP
-          resources:
-            requests:
-              cpu: 10m
             
           volumeMounts:
           - name: istio-certs
@@ -3806,9 +3778,6 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
-        resources:
-          requests:
-            cpu: 10m
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
@@ -3912,9 +3881,6 @@ spec:
             - --citadel-storage-namespace=istio-system
             - --custom-dns-names=istio-pilot-service-account.istio-system:istio-pilot.istio-system,istio-ingressgateway-service-account.istio-system:istio-ingressgateway.istio-system
             - --self-signed-ca=true
-          resources:
-            requests:
-              cpu: 10m
             
       affinity:      
         nodeAffinity:
@@ -4016,9 +3982,6 @@ spec:
                 - --interval=4s
             initialDelaySeconds: 4
             periodSeconds: 4
-          resources:
-            requests:
-              cpu: 10m
             
       volumes:
       - name: config-volume
@@ -4076,7 +4039,7 @@ metadata:
   namespace: istio-system
   labels:
     k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
 spec:
   selector:
     istio: ingress
@@ -4098,6 +4061,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-egressgateway
     namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: EnsureExists
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4116,6 +4082,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-ingressgateway
     namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: EnsureExists
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4138,6 +4107,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-policy
     namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: EnsureExists
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4156,6 +4128,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-telemetry
     namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: EnsureExists
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4178,6 +4153,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-pilot
     namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: EnsureExists
 spec:
     maxReplicas: 5
     minReplicas: 1
