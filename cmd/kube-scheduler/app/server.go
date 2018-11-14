@@ -261,9 +261,9 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 				utilruntime.HandleError(fmt.Errorf("lost master"))
 			},
 		}
-		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
-		if err != nil {
-			return fmt.Errorf("couldn't create leader elector: %v", err)
+		leaderElector, errs := leaderelection.NewLeaderElector(*cc.LeaderElection)
+		if errs != nil {
+			return fmt.Errorf("couldn't create leader elector: %v", utilerrors.NewAggregate(errs))
 		}
 
 		leaderElector.Run(ctx)

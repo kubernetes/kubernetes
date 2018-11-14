@@ -57,6 +57,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -69,30 +70,40 @@ const (
 )
 
 // NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
-func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
-	if lec.LeaseDuration <= lec.RenewDeadline {
-		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
-	}
-	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
-		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
-	}
-	if lec.LeaseDuration < 1 {
-		return nil, fmt.Errorf("leaseDuration must be greater than zero")
-	}
-	if lec.RenewDeadline < 1 {
-		return nil, fmt.Errorf("renewDeadline must be greater than zero")
-	}
-	if lec.RetryPeriod < 1 {
-		return nil, fmt.Errorf("retryPeriod must be greater than zero")
+func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, []error) {
+	if errs := Validate(lec); len(errs) > 0 {
+		return nil, errs
 	}
 
-	if lec.Lock == nil {
-		return nil, fmt.Errorf("Lock must not be nil.")
-	}
 	return &LeaderElector{
 		config: lec,
 		clock:  clock.RealClock{},
 	}, nil
+}
+
+// Validate validates the validity of the LeaderElectionConfig value.
+func Validate(lec LeaderElectionConfig) []error {
+	var errs []error
+
+	if lec.LeaseDuration <= lec.RenewDeadline {
+		errs = append(errs, fmt.Errorf("leaseDuration[%v] must be greater than renewDeadline[%v]", lec.LeaseDuration, lec.RenewDeadline))
+	}
+	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
+		errs = append(errs, fmt.Errorf("renewDeadline[%v] must be greater than retryPeriod*JitterFactor[%v]", lec.RenewDeadline, JitterFactor*float64(lec.RetryPeriod)))
+	}
+	if lec.LeaseDuration < 1 {
+		errs = append(errs, fmt.Errorf("leaseDuration must be greater than zero"))
+	}
+	if lec.RenewDeadline < 1 {
+		errs = append(errs, fmt.Errorf("renewDeadline must be greater than zero"))
+	}
+	if lec.RetryPeriod < 1 {
+		errs = append(errs, fmt.Errorf("retryPeriod must be greater than zero"))
+	}
+	if lec.Lock == nil {
+		errs = append(errs, fmt.Errorf("Lock must not be nil."))
+	}
+	return errs
 }
 
 type LeaderElectionConfig struct {
@@ -174,9 +185,9 @@ func (le *LeaderElector) Run(ctx context.Context) {
 // RunOrDie starts a client with the provided config or panics if the config
 // fails to validate.
 func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
-	le, err := NewLeaderElector(lec)
-	if err != nil {
-		panic(err)
+	le, errs := NewLeaderElector(lec)
+	if errs != nil {
+		panic(utilerrors.NewAggregate(errs))
 	}
 	if lec.WatchDog != nil {
 		lec.WatchDog.SetLeaderElection(le)
@@ -290,7 +301,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		return false
 	}
 
-	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
+	// 3. We're going to try to update. The leaderElectionRecord is set to its default
 	// here. Let's correct it before updating.
 	if le.IsLeader() {
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
