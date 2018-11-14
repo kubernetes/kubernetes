@@ -2025,6 +2025,14 @@
 		{
 			"ImportPath": "k8s.io/utils/pointer",
 			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
+			"Rev": "261cd9791e59cf384903eff0e7281c6522f5cec7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
+			"Rev": "261cd9791e59cf384903eff0e7281c6522f5cec7"
 		}
 	]
 }
