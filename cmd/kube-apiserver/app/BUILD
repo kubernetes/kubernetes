@@ -14,7 +14,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
