@@ -316,7 +316,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case corev1.RestartPolicyAlways:
-			generatorName = generateversioned.DeploymentAppsV1Beta1GeneratorName
+			generatorName = generateversioned.DeploymentAppsV1GeneratorName
 		case corev1.RestartPolicyOnFailure:
 			generatorName = generateversioned.JobV1GeneratorName
 		case corev1.RestartPolicyNever:
