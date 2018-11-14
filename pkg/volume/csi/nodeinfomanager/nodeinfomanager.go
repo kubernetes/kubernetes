@@ -349,6 +349,7 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 	driverNodeID string,
 	topology map[string]string) error {
 
+	// Check if the CRD is not installed.
 	kubeClient := nim.volumeHost.GetKubeClient()
 	if kubeClient == nil {
 		return fmt.Errorf("error getting kube client")
@@ -358,7 +359,11 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 		return fmt.Errorf("error determining if csinodeinfo CRD is installed: %v", err)
 	}
 	if !installed {
-		klog.V(4).Infof("skipping updating csinodeinfo for %s as the csinodeinfo CRD is not installed", driverName)
+		// CRD is not installed but topology is specified by the plugin, return an error
+		if topology != nil {
+			return fmt.Errorf("plugin %s returned a topology %v but csinodeinfo CRD is not installed", driverName, topology)
+		}
+		klog.V(4).Infof("skipping updating CSINodeInfo for %s as the csinodeinfo CRD is not installed", driverName)
 		return nil
 	}
 
