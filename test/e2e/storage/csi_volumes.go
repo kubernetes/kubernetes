@@ -125,7 +125,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 
 	for _, initDriver := range csiTestDrivers {
 		curDriver := initDriver()
-		Context(fmt.Sprintf(drivers.GetDriverNameWithFeatureTags(curDriver)), func() {
+		Context(drivers.GetDriverNameWithFeatureTags(curDriver), func() {
 			driver := curDriver
 
 			BeforeEach(func() {
