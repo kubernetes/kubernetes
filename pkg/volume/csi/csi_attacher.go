@@ -95,7 +95,6 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 				PersistentVolumeName: &pvName,
 			},
 		},
-		Status: storage.VolumeAttachmentStatus{Attached: false},
 	}
 
 	_, err = c.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
