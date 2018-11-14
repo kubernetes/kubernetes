@@ -96,10 +96,10 @@ spec:
         command:
           - /pod_nanny
           - --config-dir=/etc/config
-          - --cpu={{ metrics_server_cpu }}
+          - --cpu={{ base_metrics_server_cpu }}
           - --extra-cpu=0.5m
-          - --memory={{ metrics_server_memory }}
-          - --extra-memory={{ metrics_server_memory_per_node }}
+          - --memory={{ base_metrics_server_memory }}
+          - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
           - --deployment=metrics-server-v0.3.1
           - --container=metrics-server
