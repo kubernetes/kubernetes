@@ -373,7 +373,7 @@ func TestDisablePreemption(t *testing.T) {
 	}
 }
 
-func mkPriorityPodWithGrace(tc *TestContext, name string, priority int32, grace int64) *v1.Pod {
+func mkPriorityPodWithGrace(tc *testContext, name string, priority int32, grace int64) *v1.Pod {
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},

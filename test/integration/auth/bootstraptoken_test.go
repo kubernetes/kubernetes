@@ -47,7 +47,7 @@ func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 
 // TestBootstrapTokenAuth tests the bootstrap token auth provider
 func TestBootstrapTokenAuth(t *testing.T) {
-	tokenId, err := bootstraputil.GenerateTokenId()
+	tokenID, err := bootstraputil.GenerateTokenId()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenId),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte(secret),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
@@ -74,7 +74,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenId),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte("invalid"),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
@@ -86,7 +86,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenId),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte("invalid"),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 			bootstrapapi.BootstrapTokenExpirationKey:       []byte(bootstraputil.TimeStringFromNow(-time.Hour)),
@@ -134,7 +134,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		previousResourceVersion := make(map[string]float64)
 		transport := http.DefaultTransport
 
-		token := tokenId + "." + secret
+		token := tokenID + "." + secret
 		var bodyStr string
 		if test.request.body != "" {
 			sub := ""
