@@ -66,10 +66,11 @@ type uploadConfigData interface {
 // NewUploadConfigPhase returns the phase to uploadConfig
 func NewUploadConfigPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:    "upload-config",
-		Aliases: []string{"uploadconfig"},
-		Short:   "Uploads the kubeadm and kubelet configuration to a ConfigMap",
-		Long:    cmdutil.MacroCommandLongDescription,
+		Name:     "upload-config",
+		Aliases:  []string{"uploadconfig"},
+		Short:    "Uploads the kubeadm and kubelet configuration to a ConfigMap",
+		Long:     cmdutil.MacroCommandLongDescription,
+		CmdFlags: getUploadConfigPhaseFlags(),
 		Phases: []workflow.Phase{
 			{
 				Name:     "kubeadm",
