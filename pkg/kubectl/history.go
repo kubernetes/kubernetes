@@ -34,12 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
+	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 const (
@@ -168,12 +166,8 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 
 func printTemplate(template *corev1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
+	w := describe.NewPrefixWriter(buf)
+	describe.DescribePodTemplate(template, w)
 	return buf.String(), nil
 }
 
