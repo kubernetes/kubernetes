@@ -168,6 +168,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
 		klog.Errorf("[reset] failed to remove containers: %+v", err)
 	}
+
 	dirsToClean = append(dirsToClean, []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories
@@ -183,6 +184,18 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 		klog.Warningf("[reset] WARNING: cleaning a non-default certificates directory: %q\n", r.certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
+
+	// Output help text instructing user how to remove iptables rules
+	msg := `
+	The reset process does not reset or clean up iptables rules or IPVS tables.
+	If you wish to reset iptables, you must do so manually.
+	For example: 
+	iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+
+	If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
+	to reset your system's IPVS tables.
+	`
+	fmt.Print(msg)
 
 	return nil
 }
