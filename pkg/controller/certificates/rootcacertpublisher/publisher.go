@@ -43,7 +43,7 @@ const RootCACertConfigMapName = "kube-root-ca.crt"
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
 		rootCA: rootCA,
@@ -62,6 +62,12 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, cl clientset.Inter
 	e.cmLister = cmInformer.Lister()
 	e.cmListerSynced = cmInformer.Informer().HasSynced
 
+	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    e.namespaceAdded,
+		UpdateFunc: e.namespaceUpdated,
+	})
+	e.nsListerSynced = nsInformer.Informer().HasSynced
+
 	e.syncHandler = e.syncNamespace
 
 	return e, nil
@@ -78,6 +84,8 @@ type Publisher struct {
 
 	cmLister       corelisters.ConfigMapLister
 	cmListerSynced cache.InformerSynced
+
+	nsListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
 }
