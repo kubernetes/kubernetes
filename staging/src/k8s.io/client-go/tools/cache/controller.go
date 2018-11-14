@@ -317,6 +317,20 @@ func NewIndexerInformer(
 	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
 }
 
+// newInformer returns a controller for populating the store while also
+// providing event notifications.
+//
+// Parameters
+//  * lw is list and watch functions for the source of the resource you want to
+//    be informed of.
+//  * objType is an object of the type that you expect to receive.
+//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//    calls, even if nothing changed). Otherwise, re-list will be delayed as
+//    long as possible (until the upstream source closes the watch or times out,
+//    or you stop the controller).
+//  * h is the object you want notifications sent to.
+//  * clientState is the store you want to populate
+//
 func newInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
