@@ -342,7 +342,7 @@ func testVolumeModeSuccessForDynamicPV(input *volumeModeTestInput) {
 		var err error
 
 		// TODO: This skip should be removed once #70760 is fixed
-		skipTestUntilBugfix("70760", input.driverName, []string{"csi-hostpath", "com.google.csi.gcepd"})
+		skipTestUntilBugfix("70760", input.driverName, []string{"com.google.csi.gcepd"})
 
 		By("Creating sc")
 		input.sc, err = cs.StorageV1().StorageClasses().Create(input.sc)
