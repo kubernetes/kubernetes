@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const pluginNameNotAvailable = "N/A"
@@ -166,7 +167,8 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount() volumeCount {
 			if err != nil {
 				continue
 			}
-			nodeVolumeMap.add(pod.Spec.NodeName, volumePlugin.GetPluginName())
+			pluginName := volumeutil.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeSpec)
+			nodeVolumeMap.add(pod.Spec.NodeName, pluginName)
 		}
 	}
 	return nodeVolumeMap
@@ -178,7 +180,7 @@ func (collector *attachDetachStateCollector) getTotalVolumesCount() volumeCount 
 		if plugin, err := collector.volumePluginMgr.FindPluginBySpec(v.VolumeSpec); err == nil {
 			pluginName := pluginNameNotAvailable
 			if plugin != nil {
-				pluginName = plugin.GetPluginName()
+				pluginName = volumeutil.GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), v.VolumeSpec)
 			}
 			stateVolumeMap.add("desired_state_of_world", pluginName)
 		}
@@ -187,7 +189,7 @@ func (collector *attachDetachStateCollector) getTotalVolumesCount() volumeCount 
 		if plugin, err := collector.volumePluginMgr.FindPluginBySpec(v.VolumeSpec); err == nil {
 			pluginName := pluginNameNotAvailable
 			if plugin != nil {
-				pluginName = plugin.GetPluginName()
+				pluginName = volumeutil.GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), v.VolumeSpec)
 			}
 			stateVolumeMap.add("actual_state_of_world", pluginName)
 		}

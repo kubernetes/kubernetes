@@ -1016,22 +1016,40 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 
 // WaitForPersistentVolumeClaimPhase waits for a PersistentVolumeClaim to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
-	Logf("Waiting up to %v for PersistentVolumeClaim %s to have phase %s", timeout, pvcName, phase)
+	return WaitForPersistentVolumeClaimsPhase(phase, c, ns, []string{pvcName}, Poll, timeout, true)
+}
+
+// WaitForPersistentVolumeClaimPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
+// to be in a specific phase or until timeout occurs, whichever comes first.
+func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, Poll, timeout time.Duration, matchAny bool) error {
+	if len(pvcNames) == 0 {
+		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0.")
+	}
+	Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-		if err != nil {
-			Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
-			continue
-		} else {
-			if pvc.Status.Phase == phase {
-				Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
-				return nil
+		phaseFoundInAllClaims := true
+		for _, pvcName := range pvcNames {
+			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
+			if err != nil {
+				Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
+				continue
 			} else {
-				Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
+				if pvc.Status.Phase == phase {
+					Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
+					if matchAny {
+						return nil
+					}
+				} else {
+					Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
+					phaseFoundInAllClaims = false
+				}
 			}
 		}
+		if phaseFoundInAllClaims {
+			return nil
+		}
 	}
-	return fmt.Errorf("PersistentVolumeClaim %s not in phase %s within %v", pvcName, phase, timeout)
+	return fmt.Errorf("PersistentVolumeClaims %v not all in phase %s within %v", pvcNames, phase, timeout)
 }
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -4302,13 +4320,13 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // headersForConfig extracts any http client logic necessary for the provided
 // config.
-func headersForConfig(c *restclient.Config) (http.Header, error) {
+func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 	extract := &extractRT{}
 	rt, err := restclient.HTTPWrappersForConfig(c, extract)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := rt.RoundTrip(&http.Request{}); err != nil {
+	if _, err := rt.RoundTrip(&http.Request{URL: url}); err != nil {
 		return nil, err
 	}
 	return extract.Header, nil
@@ -4332,7 +4350,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 			url.Host += ":80"
 		}
 	}
-	headers, err := headersForConfig(config)
+	headers, err := headersForConfig(config, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load http headers: %v", err)
 	}

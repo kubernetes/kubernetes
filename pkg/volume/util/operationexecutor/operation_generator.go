@@ -203,7 +203,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     volumesAreAttachedFunc,
-		CompleteFunc:      util.OperationCompleteHook("<n/a>", "verify_volumes_are_attached_per_node"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume("<n/a>", nil), "verify_volumes_are_attached_per_node"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -274,7 +274,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     bulkVolumeVerifyFunc,
-		CompleteFunc:      util.OperationCompleteHook(pluginName, "verify_volumes_are_attached"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, nil), "verify_volumes_are_attached"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 
@@ -348,7 +348,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     attachVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(attachableVolumePlugin.GetPluginName(), "volume_attach"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(attachableVolumePlugin.GetPluginName(), volumeToAttach.VolumeSpec), "volume_attach"),
 	}, nil
 }
 
@@ -427,7 +427,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     getVolumePluginMgrFunc,
-		CompleteFunc:      util.OperationCompleteHook(pluginName, "volume_detach"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec), "volume_detach"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -593,7 +593,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     mountVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(volumePlugin.GetPluginName(), "volume_mount"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "volume_mount"),
 	}, nil
 }
 
@@ -703,7 +703,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     unmountVolumeFunc,
-		CompleteFunc:      util.OperationCompleteHook(volumePlugin.GetPluginName(), "volume_unmount"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "volume_unmount"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -780,7 +780,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     unmountDeviceFunc,
-		CompleteFunc:      util.OperationCompleteHook(deviceMountableVolumePlugin.GetPluginName(), "unmount_device"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(deviceMountableVolumePlugin.GetPluginName(), deviceToDetach.VolumeSpec), "unmount_device"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -946,7 +946,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     mapVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(blockVolumePlugin.GetPluginName(), "map_volume"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(blockVolumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "map_volume"),
 	}, nil
 }
 
@@ -1015,7 +1015,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     unmapVolumeFunc,
-		CompleteFunc:      util.OperationCompleteHook(blockVolumePlugin.GetPluginName(), "unmap_volume"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(blockVolumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "unmap_volume"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -1130,7 +1130,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     unmapDeviceFunc,
-		CompleteFunc:      util.OperationCompleteHook(blockVolumePlugin.GetPluginName(), "unmap_device"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(blockVolumePlugin.GetPluginName(), deviceToDetach.VolumeSpec), "unmap_device"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
@@ -1204,7 +1204,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     verifyControllerAttachedVolumeFunc,
-		CompleteFunc:      util.OperationCompleteHook(volumePlugin.GetPluginName(), "verify_controller_attached_volume"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "verify_controller_attached_volume"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 
@@ -1321,7 +1321,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     expandVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(volumePlugin.GetPluginName(), "expand_volume"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeSpec), "expand_volume"),
 	}, nil
 }
 
@@ -1378,7 +1378,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     fsResizeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(volumePlugin.GetPluginName(), "volume_fs_resize"),
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "volume_fs_resize"),
 	}, nil
 }
 

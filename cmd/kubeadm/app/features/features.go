@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -35,16 +34,14 @@ const (
 
 	// DynamicKubeletConfig is beta in v1.11
 	DynamicKubeletConfig = "DynamicKubeletConfig"
-
-	// Auditing is beta in 1.8
-	Auditing = "Auditing"
 )
+
+var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
+	"\tUse kubeadm-config to select which DNS addon to install."
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.GA}},
-	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
+	CoreDNS: {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
 }
 
 // Feature represents a feature being gated
@@ -90,9 +87,9 @@ func Enabled(featureList map[string]bool, featureName string) bool {
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k := range featureList {
+	for k, v := range featureList {
 		if featureName == string(k) {
-			return true
+			return v.PreRelease != utilfeature.Deprecated
 		}
 	}
 	return false

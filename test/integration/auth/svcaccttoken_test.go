@@ -89,7 +89,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	}
 	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
-	masterConfig.ExtraConfig.APIAudiences = aud
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()

@@ -23,15 +23,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/spf13/pflag"
-	"k8s.io/klog"
-
 	corev1 "k8s.io/api/core/v1"
 	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -41,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -139,20 +138,23 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 	return &cfg, nil
 }
 
-// AddFlags adds flags for the scheduler options.
-func (o *Options) AddFlags(fs *pflag.FlagSet) {
+// Flags returns flags for a specific scheduler by section name
+func (o *Options) Flags() (nfs apiserverflag.NamedFlagSets) {
+	fs := nfs.FlagSet("misc")
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file. Flags override values in this file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 
-	o.SecureServing.AddFlags(fs)
-	o.CombinedInsecureServing.AddFlags(fs)
-	o.Authentication.AddFlags(fs)
-	o.Authorization.AddFlags(fs)
-	o.Deprecated.AddFlags(fs, &o.ComponentConfig)
+	o.SecureServing.AddFlags(nfs.FlagSet("secure serving"))
+	o.CombinedInsecureServing.AddFlags(nfs.FlagSet("insecure serving"))
+	o.Authentication.AddFlags(nfs.FlagSet("authentication"))
+	o.Authorization.AddFlags(nfs.FlagSet("authorization"))
+	o.Deprecated.AddFlags(nfs.FlagSet("deprecated"), &o.ComponentConfig)
 
-	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, fs)
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
+	utilfeature.DefaultFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
+
+	return nfs
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.

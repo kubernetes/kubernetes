@@ -51,6 +51,7 @@ const (
 	HorizontalPodAutoscalerV1GeneratorName  = "horizontalpodautoscaler/v1"
 	DeploymentV1Beta1GeneratorName          = "deployment/v1beta1"
 	DeploymentAppsV1Beta1GeneratorName      = "deployment/apps.v1beta1"
+	DeploymentAppsV1GeneratorName           = "deployment/apps.v1"
 	DeploymentBasicV1Beta1GeneratorName     = "deployment-basic/v1beta1"
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
 	DeploymentBasicAppsV1GeneratorName      = "deployment-basic/apps.v1"
@@ -105,6 +106,7 @@ func DefaultGenerators(cmdName string) map[string]generate.Generator {
 			RunPodV1GeneratorName:              BasicPod{},
 			DeploymentV1Beta1GeneratorName:     DeploymentV1Beta1{},
 			DeploymentAppsV1Beta1GeneratorName: DeploymentAppsV1Beta1{},
+			DeploymentAppsV1GeneratorName:      DeploymentAppsV1{},
 			JobV1GeneratorName:                 JobV1{},
 			CronJobV2Alpha1GeneratorName:       CronJobV2Alpha1{},
 			CronJobV1Beta1GeneratorName:        CronJobV1Beta1{},
@@ -146,6 +148,14 @@ func FallbackGeneratorNameIfNecessary(
 	cmdErr io.Writer,
 ) (string, error) {
 	switch generatorName {
+	case DeploymentAppsV1GeneratorName:
+		hasResource, err := HasResource(discoveryClient, appsv1.SchemeGroupVersion.WithResource("deployments"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
+			return FallbackGeneratorNameIfNecessary(DeploymentAppsV1Beta1GeneratorName, discoveryClient, cmdErr)
+		}
 	case DeploymentAppsV1Beta1GeneratorName:
 		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
 		if err != nil {

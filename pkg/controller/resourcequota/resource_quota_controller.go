@@ -347,24 +347,17 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota *v1.ResourceQ
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
-	usage := v1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            resourceQuota.Name,
-			Namespace:       resourceQuota.Namespace,
-			ResourceVersion: resourceQuota.ResourceVersion,
-			Labels:          resourceQuota.Labels,
-			Annotations:     resourceQuota.Annotations},
-		Status: v1.ResourceQuotaStatus{
-			Hard: hardLimits,
-			Used: used,
-		},
+	usage := resourceQuota.DeepCopy()
+	usage.Status = v1.ResourceQuotaStatus{
+		Hard: hardLimits,
+		Used: used,
 	}
 
 	dirty = dirty || !quota.Equals(usage.Status.Used, resourceQuota.Status.Used)
 
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
-		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(usage)
 		return err
 	}
 	return nil

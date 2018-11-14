@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package markmaster
+package markcontrolplane
 
 import (
 	"fmt"
@@ -25,20 +25,20 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-// MarkMaster taints the master and sets the master label
-func MarkMaster(client clientset.Interface, masterName string, taints []v1.Taint) error {
+// MarkControlPlane taints the control-plane and sets the control-plane label
+func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
 
-	fmt.Printf("[markmaster] Marking the node %s as master by adding the label \"%s=''\"\n", masterName, constants.LabelNodeRoleMaster)
+	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
 
 	if taints != nil && len(taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range taints {
 			taintStrs = append(taintStrs, taint.ToString())
 		}
-		fmt.Printf("[markmaster] Marking the node %s as master by adding the taints %v\n", masterName, taintStrs)
+		fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the taints %v\n", controlPlaneName, taintStrs)
 	}
 
-	return apiclient.PatchNode(client, masterName, func(n *v1.Node) {
+	return apiclient.PatchNode(client, controlPlaneName, func(n *v1.Node) {
 		markMasterNode(n, taints)
 	})
 }

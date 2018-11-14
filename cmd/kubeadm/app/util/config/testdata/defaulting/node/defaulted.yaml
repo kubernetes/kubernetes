@@ -1,6 +1,3 @@
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
-  bindPort: 6443
 apiVersion: kubeadm.k8s.io/v1beta1
 caCertPath: /etc/kubernetes/pki/ca.crt
 discovery:

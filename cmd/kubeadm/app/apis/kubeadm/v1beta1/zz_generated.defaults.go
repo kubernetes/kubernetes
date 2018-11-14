@@ -61,5 +61,8 @@ func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	if in.Discovery.File != nil {
 		SetDefaults_FileDiscovery(in.Discovery.File)
 	}
-	SetDefaults_APIEndpoint(&in.APIEndpoint)
+	if in.ControlPlane != nil {
+		SetDefaults_JoinControlPlane(in.ControlPlane)
+		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
+	}
 }

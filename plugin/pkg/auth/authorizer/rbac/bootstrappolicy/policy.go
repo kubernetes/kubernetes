@@ -306,6 +306,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
+					"controllerrevisions",
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
 					"deployments", "deployments/scale",

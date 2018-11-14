@@ -31,7 +31,6 @@ import (
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -42,19 +41,12 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
-	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
@@ -149,9 +141,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			err = initRunner.Run()
 			kubeadmutil.CheckErr(err)
 
-			// TODO: the code in runInit should be progressively converted in phases; each phase will be exposed
-			// via the subcommands automatically created by initRunner.BindToCommand
-			err = runInit(&data, out)
+			err = showJoinCommand(&data, out)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -166,6 +156,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
 	initRunner.SetPhaseSubcommandsAdditionalFlags(func(flags *flag.FlagSet) {
+		options.AddImageMetaFlags(flags, &initOptions.externalcfg.ImageRepository)
 		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
 		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
 		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalcfg.APIServer.ExtraArgs, &initOptions.externalcfg.ControllerManager.ExtraArgs, &initOptions.externalcfg.Scheduler.ExtraArgs)
@@ -180,7 +171,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 	initRunner.AppendPhase(phases.NewUploadConfigPhase())
+	initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
+	initRunner.AppendPhase(phases.NewAddonPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -397,6 +390,9 @@ func (d initData) KubeConfigDir() string {
 
 // KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
 func (d initData) KubeConfigPath() string {
+	if d.dryRun {
+		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmconstants.AdminKubeConfigFileName)
+	}
 	return d.kubeconfigPath
 }
 
@@ -456,85 +452,6 @@ func (d initData) Tokens() []string {
 	return tokens
 }
 
-// runInit executes master node provisioning
-func runInit(i *initData, out io.Writer) error {
-
-	// Get directories to write files to; can be faked if we're dry-running
-	klog.V(1).Infof("[init] Getting certificates directory from configuration")
-	certsDirToWriteTo, kubeConfigDir, _, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
-	if err != nil {
-		return errors.Wrap(err, "error getting directories to use")
-	}
-
-	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
-	i.cfg.CertificatesDir = certsDirToWriteTo
-
-	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
-
-	// TODO: client and waiter are temporary until the rest of the phases that use them
-	// are removed from this function.
-	client, err := i.Client()
-	if err != nil {
-		return errors.Wrap(err, "failed to create client")
-	}
-
-	// Upload currently used configuration to the cluster
-	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
-	// depend on centralized information from this source in the future
-	klog.V(1).Infof("[init] uploading currently used configuration to the cluster")
-	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration")
-	}
-
-	klog.V(1).Infof("[init] creating kubelet configuration configmap")
-	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
-		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
-	}
-
-	// PHASE 4: Mark the master with the right label/taint
-	klog.V(1).Infof("[init] marking the master with right label")
-	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error marking master")
-	}
-
-	// This feature is disabled by default
-	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
-		kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
-		if err != nil {
-			return err
-		}
-
-		// Enable dynamic kubelet configuration for the node.
-		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
-			return errors.Wrap(err, "error enabling dynamic kubelet configuration")
-		}
-	}
-
-	klog.V(1).Infof("[init] ensuring DNS addon")
-	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
-		return errors.Wrap(err, "error ensuring dns addon")
-	}
-
-	klog.V(1).Infof("[init] ensuring proxy addon")
-	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
-		return errors.Wrap(err, "error ensuring proxy addon")
-	}
-
-	// Exit earlier if we're dryrunning
-	if i.dryRun {
-		fmt.Println("[dryrun] finished dry-running successfully. Above are the resources that would be created")
-		return nil
-	}
-
-	// Prints the join command, multiple times in case the user has multiple tokens
-	for _, token := range i.Tokens() {
-		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
-			return errors.Wrap(err, "failed to print join command")
-		}
-	}
-	return nil
-}
-
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, skipTokenPrint bool) error {
 	joinCommand, err := cmdutil.GetJoinCommand(adminKubeConfigPath, token, skipTokenPrint)
 	if err != nil {
@@ -558,4 +475,18 @@ func getDirectoriesToUse(dryRun bool, dryRunDir string, defaultPkiDir string) (s
 	}
 
 	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubeletRunDirectory, nil
+}
+
+// showJoinCommand prints the join command after all the phases in init have finished
+func showJoinCommand(i *initData, out io.Writer) error {
+	adminKubeConfigPath := i.KubeConfigPath()
+
+	// Prints the join command, multiple times in case the user has multiple tokens
+	for _, token := range i.Tokens() {
+		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
+			return errors.Wrap(err, "failed to print join command")
+		}
+	}
+
+	return nil
 }

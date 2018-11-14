@@ -50,3 +50,8 @@ func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, control
 	fs.Var(utilflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
 	fs.Var(utilflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 }
+
+// AddImageMetaFlags adds the --image-repository flag to the given flagset
+func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string) {
+	fs.StringVar(imageRepository, ImageRepository, *imageRepository, "Choose a container registry to pull control plane images from")
+}

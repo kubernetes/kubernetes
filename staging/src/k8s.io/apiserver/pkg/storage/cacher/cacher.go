@@ -404,10 +404,15 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 // GetToList implements storage.Interface.
 func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
+	hasContinuation := pagingEnabled && len(pred.Continue) > 0
+	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	if resourceVersion == "" || hasContinuation || hasLimit {
 		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility). If a continuation or limit is
+		// storage (for backward compatibility). If a continuation is
 		// requested, serve it from the underlying storage as well.
+		// Limits are only sent to storage when resourceVersion is non-zero
+		// since the watch cache isn't able to perform continuations, and
+		// limits are ignored when resource version is zero
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 

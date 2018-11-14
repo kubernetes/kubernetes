@@ -195,7 +195,7 @@ func RunApply(flags *applyFlags) error {
 	klog.V(1).Infof("[upgrade/apply] creating prepuller")
 	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, &upgradeVars.cfg.ClusterConfiguration)
 	componentsToPrepull := constants.MasterComponents
-	if upgradeVars.cfg.Etcd.External != nil {
+	if upgradeVars.cfg.Etcd.External == nil && flags.etcdUpgrade {
 		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
 	}
 	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {

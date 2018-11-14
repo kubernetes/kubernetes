@@ -1570,11 +1570,9 @@ function start-kube-apiserver {
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
-  if [[ -n "${SERVICEACCOUNT_ISSUER:-}" ]]; then
-    params+=" --service-account-issuer=${SERVICEACCOUNT_ISSUER}"
-    params+=" --service-account-signing-key-file=${SERVICEACCOUNT_KEY_PATH}"
-    params+=" --service-account-api-audiences=${SERVICEACCOUNT_API_AUDIENCES}"
-  fi
+  params+=" --service-account-issuer=${SERVICEACCOUNT_ISSUER}"
+  params+=" --service-account-api-audiences=${SERVICEACCOUNT_ISSUER}"
+  params+=" --service-account-signing-key-file=${SERVICEACCOUNT_KEY_PATH}"
 
   local audit_policy_config_mount=""
   local audit_policy_config_volume=""
@@ -2356,6 +2354,16 @@ EOF
   fi
 }
 
+# Sets up the manifests of local dns cache agent for k8s addons.
+function setup-nodelocaldns-manifest {
+  setup-addon-manifests "addons" "dns/nodelocaldns"
+  local -r localdns_file="${dst_dir}/dns/nodelocaldns/nodelocaldns.yaml"
+  # Replace the sed configurations with variable values.
+  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
+  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
+  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
+}
+
 # Sets up the manifests of netd for k8s addons.
 function setup-netd-manifest {
   local -r netd_file="${dst_dir}/netd/netd.yaml"
@@ -2526,6 +2534,9 @@ EOF
     else
       setup-addon-manifests "addons" "dns/kube-dns"
       setup-kube-dns-manifest
+    fi
+    if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+      setup-nodelocaldns-manifest
     fi
   fi
   if [[ "${ENABLE_NETD:-}" == "true" ]]; then

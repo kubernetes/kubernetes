@@ -27,13 +27,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
-
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // ServerRunOptions runs a kubernetes api server.
@@ -70,7 +69,9 @@ type ServerRunOptions struct {
 	MasterCount            int
 	EndpointReconcilerType string
 
-	ServiceAccountSigningKeyFile string
+	ServiceAccountSigningKeyFile     string
+	ServiceAccountIssuer             serviceaccount.TokenGenerator
+	ServiceAccountTokenMaxExpiration time.Duration
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters

@@ -1129,7 +1129,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// not "OnlyLocal", but the services list will not, and the healthChecker
 	// will just drop those endpoints.
 	if err := proxier.healthChecker.SyncServices(serviceUpdateResult.hcServices); err != nil {
-		klog.Errorf("Error syncing healtcheck services: %v", err)
+		klog.Errorf("Error syncing healthcheck services: %v", err)
 	}
 	if err := proxier.healthChecker.SyncEndpoints(endpointUpdateResult.hcEndpoints); err != nil {
 		klog.Errorf("Error syncing healthcheck endpoints: %v", err)

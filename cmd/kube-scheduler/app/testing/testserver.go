@@ -86,7 +86,10 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	if err != nil {
 		return TestServer{}, err
 	}
-	s.AddFlags(fs)
+	namedFlagSets := s.Flags()
+	for _, f := range namedFlagSets.FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	fs.Parse(customFlags)
 

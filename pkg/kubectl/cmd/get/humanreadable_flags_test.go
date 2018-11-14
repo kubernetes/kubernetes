@@ -61,7 +61,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 		{
 			name:           "\"wide\" output format prints",
 			outputFormat:   "wide",
-			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +IP\\ +NODE\\ +NOMINATED NODE\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\n",
+			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +IP\\ +NODE\\ +NOMINATED NODE\\ +READINESS GATES\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
 		},
 		{
 			name:           "no-headers prints output with no headers",
@@ -72,7 +72,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "no-headers and a \"wide\" output format prints output with no headers and additional columns",
 			outputFormat:   "wide",
 			noHeaders:      true,
-			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\n",
+			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
 		},
 		{
 			name:           "show-kind displays the resource's kind, even when printing a single type of resource",

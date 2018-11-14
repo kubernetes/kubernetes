@@ -125,7 +125,7 @@ func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
 		return nil, false, nil
 	}
 
@@ -143,7 +143,6 @@ func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error)
 
 	sac, err := rootcacertpublisher.NewPublisher(
 		ctx.InformerFactory.Core().V1().ConfigMaps(),
-		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
 		rootCA,
 	)
