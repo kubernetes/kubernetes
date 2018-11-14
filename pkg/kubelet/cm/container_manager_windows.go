@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -165,4 +166,8 @@ func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLi
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
+}
+
+func (cm *containerManagerImpl) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+	return nil
 }
