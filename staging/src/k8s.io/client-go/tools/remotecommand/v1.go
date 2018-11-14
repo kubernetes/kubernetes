@@ -127,7 +127,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		// because stdin is not closed until the process exits. If we try to call
 		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
 		// exit when the process exits, instead.
-		go cp(v1.StreamTypeStdin, p.remoteStdin, p.Stdin)
+		go cp(v1.StreamTypeStdin, p.remoteStdin, readerWrapper{p.Stdin})
 	}
 
 	waitCount := 0
