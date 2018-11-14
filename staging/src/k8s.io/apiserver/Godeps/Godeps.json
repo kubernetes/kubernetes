@@ -584,15 +584,15 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/expfmt",
-			"Rev": "13ba4ddd0caa9c28ca7b7bffe1dfa9ed8d5ef207"
+			"Rev": "0b1957f9d949dfa3084171a6ec5642b38055276a"
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
-			"Rev": "13ba4ddd0caa9c28ca7b7bffe1dfa9ed8d5ef207"
+			"Rev": "0b1957f9d949dfa3084171a6ec5642b38055276a"
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/model",
-			"Rev": "13ba4ddd0caa9c28ca7b7bffe1dfa9ed8d5ef207"
+			"Rev": "0b1957f9d949dfa3084171a6ec5642b38055276a"
 		},
 		{
 			"ImportPath": "github.com/prometheus/procfs",
