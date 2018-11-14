@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,24 +18,23 @@ package kubeconfig
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"crypto/rsa"
-
-	"github.com/golang/glog"
-
+	"github.com/pkg/errors"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // clientCertAuth struct holds info required to build a client certificate to provide authentication info in a kubeconfig object
@@ -62,7 +61,7 @@ type kubeConfigSpec struct {
 // to establish the control plane, including also the admin kubeconfig file.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
 func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating all kubeconfig files")
+	klog.V(1).Infoln("creating all kubeconfig files")
 	return createKubeConfigFiles(
 		outDir,
 		cfg,
@@ -87,32 +86,11 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 	)
 }
 
-// CreateAdminKubeConfigFile create a kubeconfig file for the admin to use and for kubeadm itself.
+// CreateKubeConfigFile creates a kubeconfig file.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateAdminKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("create a kubeconfig file for the admin and for kubeadm itself")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.AdminKubeConfigFileName)
-}
-
-// CreateKubeletKubeConfigFile create a kubeconfig file for the Kubelet to use.
-// If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateKubeletKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating a kubeconfig file for the Kubelet")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.KubeletKubeConfigFileName)
-}
-
-// CreateControllerManagerKubeConfigFile create a kubeconfig file for the ControllerManager to use.
-// If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateControllerManagerKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating kubeconfig file for the ControllerManager")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.ControllerManagerKubeConfigFileName)
-}
-
-// CreateSchedulerKubeConfigFile create a create a kubeconfig file for the Scheduler to use.
-// If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateSchedulerKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	glog.V(1).Infoln("creating kubeconfig file for Scheduler")
-	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.SchedulerKubeConfigFileName)
+func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
+	klog.V(1).Infof("creating kubeconfig file for %s", kubeConfigFileName)
+	return createKubeConfigFiles(outDir, cfg, kubeConfigFileName)
 }
 
 // createKubeConfigFiles creates all the requested kubeconfig files.
@@ -129,7 +107,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		// retrives the KubeConfigSpec for given kubeConfigFileName
 		spec, exists := specs[kubeConfigFileName]
 		if !exists {
-			return fmt.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
+			return errors.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
 		}
 
 		// builds the KubeConfig object
@@ -138,7 +116,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 			return err
 		}
 
-		// writes the KubeConfig to disk if it not exists
+		// writes the kubeconfig to disk if it not exists
 		if err = createKubeConfigFileIfNotExists(outDir, kubeConfigFileName, config); err != nil {
 			return err
 		}
@@ -153,10 +131,10 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
+		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +152,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			CACert:     caCert,
 			APIServer:  masterEndpoint,
-			ClientName: fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
+			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
 				Organizations: []string{kubeadmconstants.NodesGroup},
@@ -224,7 +202,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 	}
 	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failure while creating %s client certificate: %v", spec.ClientName, err)
+		return nil, errors.Wrapf(err, "failure while creating %s client certificate", spec.ClientName)
 	}
 
 	// create a kubeconfig with the client certs
@@ -238,28 +216,18 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 	), nil
 }
 
-// createKubeConfigFileIfNotExists saves the KubeConfig object into a file if there isn't any file at the given path.
-// If there already is a KubeConfig file at the given path; kubeadm tries to load it and check if the values in the
-// existing and the expected config equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
-// but if a file exists but has old content or isn't a kubeconfig file, this function returns an error.
-func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmdapi.Config) error {
+// validateKubeConfig check if the kubeconfig file exist and has the expected CA and server URL
+func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) error {
 	kubeConfigFilePath := filepath.Join(outDir, filename)
 
-	// Check if the file exist, and if it doesn't, just write it to disk
-	if _, err := os.Stat(kubeConfigFilePath); os.IsNotExist(err) {
-		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
-		if err != nil {
-			return fmt.Errorf("failed to save kubeconfig file %s on disk: %v", kubeConfigFilePath, err)
-		}
-
-		fmt.Printf("[kubeconfig] Wrote KubeConfig file to disk: %q\n", kubeConfigFilePath)
-		return nil
+	if _, err := os.Stat(kubeConfigFilePath); err != nil {
+		return err
 	}
 
 	// The kubeconfig already exists, let's check if it has got the same CA and server URL
 	currentConfig, err := clientcmd.LoadFromFile(kubeConfigFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to load kubeconfig file %s that already exists on disk: %v", kubeConfigFilePath, err)
+		return errors.Wrapf(err, "failed to load kubeconfig file %s that already exists on disk", kubeConfigFilePath)
 	}
 
 	expectedCtx := config.CurrentContext
@@ -269,17 +237,40 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 
 	// If the current CA cert on disk doesn't match the expected CA cert, error out because we have a file, but it's stale
 	if !bytes.Equal(currentConfig.Clusters[currentCluster].CertificateAuthorityData, config.Clusters[expectedCluster].CertificateAuthorityData) {
-		return fmt.Errorf("a kubeconfig file %q exists already but has got the wrong CA cert", kubeConfigFilePath)
+		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong CA cert", kubeConfigFilePath)
 	}
 	// If the current API Server location on disk doesn't match the expected API server, error out because we have a file, but it's stale
 	if currentConfig.Clusters[currentCluster].Server != config.Clusters[expectedCluster].Server {
-		return fmt.Errorf("a kubeconfig file %q exists already but has got the wrong API Server URL", kubeConfigFilePath)
+		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong API Server URL", kubeConfigFilePath)
 	}
 
+	return nil
+}
+
+// createKubeConfigFileIfNotExists saves the KubeConfig object into a file if there isn't any file at the given path.
+// If there already is a kubeconfig file at the given path; kubeadm tries to load it and check if the values in the
+// existing and the expected config equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
+// but if a file exists but has old content or isn't a kubeconfig file, this function returns an error.
+func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmdapi.Config) error {
+	kubeConfigFilePath := filepath.Join(outDir, filename)
+
+	err := validateKubeConfig(outDir, filename, config)
+	if err != nil {
+		// Check if the file exist, and if it doesn't, just write it to disk
+		if !os.IsNotExist(err) {
+			return err
+		}
+		fmt.Printf("[kubeconfig] Writing %q kubeconfig file\n", filename)
+		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
+		if err != nil {
+			return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
+		}
+		return nil
+	}
 	// kubeadm doesn't validate the existing kubeconfig file more than this (kubeadm trusts the client certs to be valid)
 	// Basically, if we find a kubeconfig file with the same path; the same CA cert and the same server URL;
 	// kubeadm thinks those files are equal and doesn't bother writing a new file
-	fmt.Printf("[kubeconfig] Using existing up-to-date KubeConfig file: %q\n", kubeConfigFilePath)
+	fmt.Printf("[kubeconfig] Using existing up-to-date kubeconfig file: %q\n", kubeConfigFilePath)
 
 	return nil
 }
@@ -290,10 +281,10 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
+		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 	if err != nil {
 		return err
 	}
@@ -317,10 +308,10 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
+		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 	if err != nil {
 		return err
 	}
@@ -346,12 +337,44 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 		return err
 	}
 
-	// writes the KubeConfig to disk if it not exists
+	// writes the kubeconfig to disk if it not exists
 	configBytes, err := clientcmd.Write(*config)
 	if err != nil {
-		return fmt.Errorf("failure while serializing admin kubeconfig: %v", err)
+		return errors.Wrap(err, "failure while serializing admin kubeconfig")
 	}
 
 	fmt.Fprintln(out, string(configBytes))
+	return nil
+}
+
+// ValidateKubeconfigsForExternalCA check if the kubeconfig file exist and has the expected CA and server URL using kubeadmapi.InitConfiguration.
+func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfiguration) error {
+	kubeConfigFileNames := []string{
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
+	}
+
+	specs, err := getKubeConfigSpecs(cfg)
+	if err != nil {
+		return err
+	}
+
+	for _, kubeConfigFileName := range kubeConfigFileNames {
+		spec, exists := specs[kubeConfigFileName]
+		if !exists {
+			return errors.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
+		}
+
+		kubeconfig, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
+		if err != nil {
+			return err
+		}
+
+		if err = validateKubeConfig(outDir, kubeConfigFileName, kubeconfig); err != nil {
+			return err
+		}
+	}
 	return nil
 }

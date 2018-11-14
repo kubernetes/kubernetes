@@ -25,7 +25,7 @@ import (
 
 // gceProjectRouter sends requests to the appropriate project ID.
 type gceProjectRouter struct {
-	gce *GCECloud
+	gce *Cloud
 }
 
 // ProjectID returns the project ID to be used for the given operation.
@@ -40,7 +40,7 @@ func (r *gceProjectRouter) ProjectID(ctx context.Context, version meta.Version, 
 
 // gceRateLimiter implements cloud.RateLimiter.
 type gceRateLimiter struct {
-	gce *GCECloud
+	gce *Cloud
 }
 
 // Accept blocks until the operation can be performed.
@@ -63,10 +63,10 @@ func (l *gceRateLimiter) Accept(ctx context.Context, key *cloud.RateLimitKey) er
 	return nil
 }
 
-// CreateGCECloudWithCloud is a helper function to create an instance of GCECloud with the
+// CreateGCECloudWithCloud is a helper function to create an instance of Cloud with the
 // given Cloud interface implementation. Typical usage is to use cloud.NewMockGCE to get a
 // handle to a mock Cloud instance and then use that for testing.
-func CreateGCECloudWithCloud(config *CloudConfig, c cloud.Cloud) (*GCECloud, error) {
+func CreateGCECloudWithCloud(config *CloudConfig, c cloud.Cloud) (*Cloud, error) {
 	gceCloud, err := CreateGCECloud(config)
 	if err == nil {
 		gceCloud.c = c

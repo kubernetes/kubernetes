@@ -50,6 +50,7 @@ filegroup(
         "//pkg/kubeapiserver/authorizer:all-srcs",
         "//pkg/kubeapiserver/options:all-srcs",
         "//pkg/kubeapiserver/server:all-srcs",
+        "//pkg/kubeapiserver/util:all-srcs",
     ],
     tags = ["automanaged"],
 )

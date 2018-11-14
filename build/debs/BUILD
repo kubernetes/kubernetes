@@ -78,6 +78,16 @@ deb_data(
             "mode": "644",
             "dir": "/etc/systemd/system/kubelet.service.d",
         },
+        {
+            "files": ["kubeadm.conf"],
+            "mode": "644",
+            "dir": "/usr/lib/modules-load.d",
+        },
+        {
+            "files": ["50-kubeadm.conf"],
+            "mode": "644",
+            "dir": "/etc/sysctl.d",
+        },
     ],
 )
 

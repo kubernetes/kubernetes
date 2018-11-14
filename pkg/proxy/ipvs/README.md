@@ -38,7 +38,7 @@ Differences between IPVS mode and IPTABLES mode are as follows:
 
 ### When ipvs falls back to iptables
 IPVS proxier will employ iptables in doing packet filtering, SNAT or masquerade.
-Specifically, ipvs proxier will use ipset to store source or destination address of traffics that need DROP or do masquared, to make sure the number of iptables rules be constant, no metter how many services we have.
+Specifically, ipvs proxier will use ipset to store source or destination address of traffics that need DROP or do masquerade, to make sure the number of iptables rules be constant, no metter how many services we have.
 
 
 Here is the table of ipset sets that ipvs proxier used.
@@ -259,7 +259,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXT
 Currently, local-up scripts, GCE scripts and kubeadm support switching IPVS proxy mode via exporting environment variables or specifying flags.
 
 ### Prerequisite
-Ensure IPVS required kernel modules
+Ensure IPVS required kernel modules (**Notes**: use `nf_conntrack` instead of `nf_conntrack_ipv4` for Linux kernel 4.19 and later)
 ```shell
 ip_vs
 ip_vs_rr
@@ -325,7 +325,7 @@ export KUBE_PROXY_MODE=ipvs
 
 Similar to local-up cluster, kube-proxy in [clusters running on GCE](https://kubernetes.io/docs/getting-started-guides/gce/) run in iptables mode by default. Users need to  export the env `KUBE_PROXY_MODE=ipvs` before [starting a cluster](https://kubernetes.io/docs/getting-started-guides/gce/#starting-a-cluster):
 ```shell
-#before running one of the commmands chosen to start a cluster:
+#before running one of the commands chosen to start a cluster:
 # curl -sS https://get.k8s.io | bash
 # wget -q -O - https://get.k8s.io | bash
 # cluster/kube-up.sh
@@ -334,19 +334,19 @@ export KUBE_PROXY_MODE=ipvs
 
 ### Cluster Created by Kubeadm
 
-Kube-proxy will run in iptables mode by default in a cluster deployed by [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/).
-
-If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `kubeProxy` field.
+If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add `mode: ipvs` and also add `SupportIPVSProxyMode: true` below the `kubeProxy` field as part of the kubeadm configuration.
 
 ```json
-kind: MasterConfiguration
-apiVersion: kubeadm.k8s.io/v1alpha1
 ...
 kubeProxy:
   config:
+    featureGates:
+      SupportIPVSProxyMode: true
     mode: ipvs
 ...
 ```
+Note that in Kubernetes 1.11 and later, `SupportIPVSProxyMode` is set to `true` by default.
+
 before running
 
 `kube init --config <path_to_configuration_file>`

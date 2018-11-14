@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -192,103 +192,36 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
 	}
+	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
+	}
 
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
 
-	allErrors = append(allErrors, validateWebhookClientConfig(fldPath.Child("clientConfig"), &hook.ClientConfig)...)
-
-	return allErrors
-}
-
-func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.WebhookClientConfig) field.ErrorList {
-	var allErrors field.ErrorList
-	if (cc.URL == nil) == (cc.Service == nil) {
-		allErrors = append(allErrors, field.Required(fldPath.Child("url"), "exactly one of url or service is required"))
+	cc := hook.ClientConfig
+	switch {
+	case (cc.URL == nil) == (cc.Service == nil):
+		allErrors = append(allErrors, field.Required(fldPath.Child("clientConfig"), "exactly one of url or service is required"))
+	case cc.URL != nil:
+		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
+	case cc.Service != nil:
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path)...)
 	}
-
-	if cc.URL != nil {
-		const form = "; desired format: https://host[/path]"
-		if u, err := url.Parse(*cc.URL); err != nil {
-			allErrors = append(allErrors, field.Required(fldPath.Child("url"), "url must be a valid URL: "+err.Error()+form))
-		} else {
-			if u.Scheme != "https" {
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Scheme, "'https' is the only allowed URL scheme"+form))
-			}
-			if len(u.Host) == 0 {
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Host, "host must be provided"+form))
-			}
-			if u.User != nil {
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.User.String(), "user information is not permitted in the URL"))
-			}
-			if len(u.Fragment) != 0 {
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.Fragment, "fragments are not permitted in the URL"))
-			}
-			if len(u.RawQuery) != 0 {
-				allErrors = append(allErrors, field.Invalid(fldPath.Child("url"), u.RawQuery, "query parameters are not permitted in the URL"))
-			}
-		}
-	}
-
-	if cc.Service != nil {
-		allErrors = append(allErrors, validateWebhookService(fldPath.Child("service"), cc.Service)...)
-	}
-	return allErrors
-}
-
-func validateWebhookService(fldPath *field.Path, svc *admissionregistration.ServiceReference) field.ErrorList {
-	var allErrors field.ErrorList
-
-	if len(svc.Name) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("name"), "service name is required"))
-	}
-
-	if len(svc.Namespace) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("namespace"), "service namespace is required"))
-	}
-
-	if svc.Path == nil {
-		return allErrors
-	}
-
-	// TODO: replace below with url.Parse + verifying that host is empty?
-
-	urlPath := *svc.Path
-	if urlPath == "/" || len(urlPath) == 0 {
-		return allErrors
-	}
-	if urlPath == "//" {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, "segment[0] may not be empty"))
-		return allErrors
-	}
-
-	if !strings.HasPrefix(urlPath, "/") {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, "must start with a '/'"))
-	}
-
-	urlPathToCheck := urlPath[1:]
-	if strings.HasSuffix(urlPathToCheck, "/") {
-		urlPathToCheck = urlPathToCheck[:len(urlPathToCheck)-1]
-	}
-	steps := strings.Split(urlPathToCheck, "/")
-	for i, step := range steps {
-		if len(step) == 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, fmt.Sprintf("segment[%d] may not be empty", i)))
-			continue
-		}
-		failures := validation.IsDNS1123Subdomain(step)
-		for _, failure := range failures {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), urlPath, fmt.Sprintf("segment[%d]: %v", i, failure)))
-		}
-	}
-
 	return allErrors
 }
 
 var supportedFailurePolicies = sets.NewString(
 	string(admissionregistration.Ignore),
 	string(admissionregistration.Fail),
+)
+
+var supportedSideEffectClasses = sets.NewString(
+	string(admissionregistration.SideEffectClassUnknown),
+	string(admissionregistration.SideEffectClassNone),
+	string(admissionregistration.SideEffectClassSome),
+	string(admissionregistration.SideEffectClassNoneOnDryRun),
 )
 
 var supportedOperations = sets.NewString(

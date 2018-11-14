@@ -1,0 +1,76 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: node-termination-handler
+  namespace: kube-system
+  name: node-termination-handler
+spec:
+  selector:
+    matchLabels:
+      k8s-app: node-termination-handler
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s-app: node-termination-handler
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      priorityClassName: system-node-critical
+      # Necessary to reboot node
+      hostPID: true
+      affinity:
+        nodeAffinity:
+          # Restrict to GPU nodes or preemptible nodes
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-accelerator
+                    operator: Exists
+              - matchExpressions:
+                  - key: cloud.google.com/gke-preemptible
+                    operator: Exists
+      volumes:
+        - name: klet-service-account
+          hostPath:
+            path: /var/lib/kubelet
+        - name: klet-ca-crt
+          hostPath:
+            path: /etc/srv/kubernetes
+      tolerations:
+        # Run regardless of any existing taints.
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+      containers:
+        - image: k8s.gcr.io/gke-node-termination-handler@sha256:e08ca863a547754fa7b75064bdad04f04cbef86c7b0a181ecc7304e747623181
+          name: node-termination-handler
+          command: ["./node-termination-handler"]
+          args: ["--logtostderr", "--exclude-pods=$(POD_NAME):$(POD_NAMESPACE)", "-v=10", "--kubeconfig=/var/lib/kubelet/kubeconfig", "--annotation=cloud.google.com/impending-node-termination"]
+          securityContext:
+            capabilities:
+              # Necessary to reboot node
+              add: ["SYS_BOOT"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            limits:
+              cpu: 50m
+              memory: 30Mi
+          volumeMounts:
+            - name: klet-service-account
+              mountPath: /var/lib/kubelet
+            - name: klet-ca-crt
+              mountPath: /etc/srv/kubernetes

@@ -500,6 +500,21 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			expectedError: `webhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
 		{
+			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\"",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name:         "webhook.k8s.io",
+						ClientConfig: validClientConfig,
+						SideEffects: func() *admissionregistration.SideEffectClass {
+							r := admissionregistration.SideEffectClass("other")
+							return &r
+						}(),
+					},
+				}),
+			expectedError: `webhooks[0].sideEffects: Unsupported value: "other": supported values: "None", "NoneOnDryRun", "Some", "Unknown"`,
+		},
+		{
 			name: "both service and URL missing",
 			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
@@ -525,7 +540,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `[0].clientConfig.url: Required value: exactly one of url or service is required`,
+			expectedError: `[0].clientConfig: Required value: exactly one of url or service is required`,
 		},
 		{
 			name: "blank URL",

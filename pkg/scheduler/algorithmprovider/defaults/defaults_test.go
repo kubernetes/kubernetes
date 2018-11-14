@@ -59,7 +59,8 @@ func TestDefaultPriorities(t *testing.T) {
 		"BalancedResourceAllocation",
 		"NodePreferAvoidPodsPriority",
 		"NodeAffinityPriority",
-		"TaintTolerationPriority")
+		"TaintTolerationPriority",
+		"ImageLocalityPriority")
 	if expected := defaultPriorities(); !result.Equal(expected) {
 		t.Errorf("expected %v got %v", expected, result)
 	}
@@ -71,6 +72,7 @@ func TestDefaultPredicates(t *testing.T) {
 		predicates.MaxEBSVolumeCountPred,
 		predicates.MaxGCEPDVolumeCountPred,
 		predicates.MaxAzureDiskVolumeCountPred,
+		predicates.MaxCSIVolumeCountPred,
 		predicates.MatchInterPodAffinityPred,
 		predicates.NoDiskConflictPred,
 		predicates.GeneralPred,

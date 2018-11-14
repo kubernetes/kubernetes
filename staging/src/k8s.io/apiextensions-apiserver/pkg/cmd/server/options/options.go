@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 
 	"github.com/spf13/pflag"
 
@@ -30,6 +31,9 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/listers/core/v1"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
@@ -94,6 +98,8 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
 			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, serverConfig.LoopbackClientConfig),
 		},
 	}
 	return config, nil
@@ -113,4 +119,12 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 
 	return ret
+}
+
+type serviceResolver struct {
+	services v1.ServiceLister
+}
+
+func (r *serviceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+	return proxy.ResolveCluster(r.services, namespace, name)
 }

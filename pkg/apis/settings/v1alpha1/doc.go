@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/settings/v1alpha1
 
 // +groupName=settings.k8s.io
+
 package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"

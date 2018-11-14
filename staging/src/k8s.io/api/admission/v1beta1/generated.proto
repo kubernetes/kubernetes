@@ -73,6 +73,11 @@ message AdmissionRequest {
   // OldObject is the existing object. Only populated for UPDATE requests.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.RawExtension oldObject = 10;
+
+  // DryRun indicates that modifications will definitely not be persisted for this request.
+  // Defaults to false.
+  // +optional
+  optional bool dryRun = 11;
 }
 
 // AdmissionResponse describes an admission response.

@@ -20,13 +20,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -49,9 +49,9 @@ func StartApiserver() (string, ShutdownFunc) {
 	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	shutdownFunc := func() {
-		glog.Infof("destroying API server")
+		klog.Infof("destroying API server")
 		s.Close()
-		glog.Infof("destroyed API server")
+		klog.Infof("destroyed API server")
 	}
 	return s.URL, shutdownFunc
 }
@@ -59,33 +59,31 @@ func StartApiserver() (string, ShutdownFunc) {
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns a handle to the configurator for the running scheduler
 // and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (scheduler.Configurator, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface) (factory.Configurator, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	evtBroadcaster := record.NewBroadcaster()
 	evtWatch := evtBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
 		Interface: clientSet.CoreV1().Events("")})
 
-	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory)
+	stopCh := make(chan struct{})
+	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
 
-	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
+	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *factory.Config) {
 		conf.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
 	})
 	if err != nil {
-		glog.Fatalf("Error creating scheduler: %v", err)
+		klog.Fatalf("Error creating scheduler: %v", err)
 	}
 
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
-
+	informerFactory.Start(stopCh)
 	sched.Run()
 
 	shutdownFunc := func() {
-		glog.Infof("destroying scheduler")
+		klog.Infof("destroying scheduler")
 		evtWatch.Stop()
-		sched.StopEverything()
-		close(stop)
-		glog.Infof("destroyed scheduler")
+		close(stopCh)
+		klog.Infof("destroyed scheduler")
 	}
 	return schedulerConfigurator, shutdownFunc
 }
@@ -94,10 +92,8 @@ func StartScheduler(clientSet clientset.Interface) (scheduler.Configurator, Shut
 func createSchedulerConfigurator(
 	clientSet clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
-) scheduler.Configurator {
-	// Enable EnableEquivalenceClassCache for all integration tests.
-	utilfeature.DefaultFeatureGate.Set("EnableEquivalenceClassCache=true")
-
+	stopCh <-chan struct{},
+) factory.Configurator {
 	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  v1.DefaultSchedulerName,
 		Client:                         clientSet,
@@ -115,5 +111,6 @@ func createSchedulerConfigurator(
 		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		StopCh:                         stopCh,
 	})
 }

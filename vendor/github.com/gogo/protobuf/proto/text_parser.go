@@ -983,7 +983,7 @@ func (p *textParser) readAny(v reflect.Value, props *Properties) error {
 		return p.readStruct(fv, terminator)
 	case reflect.Uint32:
 		if x, err := strconv.ParseUint(tok.value, 0, 32); err == nil {
-			fv.SetUint(uint64(x))
+			fv.SetUint(x)
 			return nil
 		}
 	case reflect.Uint64:

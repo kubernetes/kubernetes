@@ -5,7 +5,6 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
-	"golang.org/x/sys/unix"
 )
 
 type GenlOp struct {
@@ -131,9 +130,9 @@ func (h *Handle) GenlFamilyList() ([]*GenlFamily, error) {
 		Command: nl.GENL_CTRL_CMD_GETFAMILY,
 		Version: nl.GENL_CTRL_VERSION,
 	}
-	req := h.newNetlinkRequest(nl.GENL_ID_CTRL, unix.NLM_F_DUMP)
+	req := h.newNetlinkRequest(nl.GENL_ID_CTRL, syscall.NLM_F_DUMP)
 	req.AddData(msg)
-	msgs, err := req.Execute(unix.NETLINK_GENERIC, 0)
+	msgs, err := req.Execute(syscall.NETLINK_GENERIC, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +151,7 @@ func (h *Handle) GenlFamilyGet(name string) (*GenlFamily, error) {
 	req := h.newNetlinkRequest(nl.GENL_ID_CTRL, 0)
 	req.AddData(msg)
 	req.AddData(nl.NewRtAttr(nl.GENL_CTRL_ATTR_FAMILY_NAME, nl.ZeroTerminated(name)))
-	msgs, err := req.Execute(unix.NETLINK_GENERIC, 0)
+	msgs, err := req.Execute(syscall.NETLINK_GENERIC, 0)
 	if err != nil {
 		return nil, err
 	}

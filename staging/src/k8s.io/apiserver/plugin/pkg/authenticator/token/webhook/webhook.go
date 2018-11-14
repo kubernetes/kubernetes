@@ -18,14 +18,14 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	authentication "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -44,54 +44,50 @@ var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
 type WebhookTokenAuthenticator struct {
 	tokenReview    authenticationclient.TokenReviewInterface
-	responseCache  *cache.LRUExpireCache
-	ttl            time.Duration
 	initialBackoff time.Duration
 }
 
-// NewFromInterface creates a webhook authenticator using the given tokenReview client
-func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(tokenReview, ttl, retryBackoff)
+// NewFromInterface creates a webhook authenticator using the given tokenReview
+// client. It is recommend to wrap this authenticator with the token cache
+// authenticator implemented in
+// k8s.io/apiserver/pkg/authentication/token/cache.
+func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface) (*WebhookTokenAuthenticator, error) {
+	return newWithBackoff(tokenReview, retryBackoff)
 }
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
-func New(kubeConfigFile string, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
+func New(kubeConfigFile string) (*WebhookTokenAuthenticator, error) {
 	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, ttl, retryBackoff)
+	return newWithBackoff(tokenReview, retryBackoff)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, cache.NewLRUExpireCache(1024), ttl, initialBackoff}, nil
+func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, initialBackoff}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	r := &authentication.TokenReview{
 		Spec: authentication.TokenReviewSpec{Token: token},
 	}
-	if entry, ok := w.responseCache.Get(r.Spec); ok {
-		r.Status = entry.(authentication.TokenReviewStatus)
-	} else {
-		var (
-			result *authentication.TokenReview
-			err    error
-		)
-		webhook.WithExponentialBackoff(w.initialBackoff, func() error {
-			result, err = w.tokenReview.Create(r)
-			return err
-		})
-		if err != nil {
-			// An error here indicates bad configuration or an outage. Log for debugging.
-			glog.Errorf("Failed to make webhook authenticator request: %v", err)
-			return nil, false, err
-		}
-		r.Status = result.Status
-		w.responseCache.Add(r.Spec, result.Status, w.ttl)
+	var (
+		result *authentication.TokenReview
+		err    error
+	)
+	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
+		result, err = w.tokenReview.Create(r)
+		return err
+	})
+	if err != nil {
+		// An error here indicates bad configuration or an outage. Log for debugging.
+		klog.Errorf("Failed to make webhook authenticator request: %v", err)
+		return nil, false, err
 	}
+	r.Status = result.Status
 	if !r.Status.Authenticated {
 		return nil, false, nil
 	}
@@ -104,11 +100,13 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 		}
 	}
 
-	return &user.DefaultInfo{
-		Name:   r.Status.User.Username,
-		UID:    r.Status.User.UID,
-		Groups: r.Status.User.Groups,
-		Extra:  extra,
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   r.Status.User.Username,
+			UID:    r.Status.User.UID,
+			Groups: r.Status.User.Groups,
+			Extra:  extra,
+		},
 	}, true, nil
 }
 

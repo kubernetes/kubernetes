@@ -17,13 +17,14 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
 
+	pkgerrors "github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/errors"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -53,7 +54,7 @@ func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (Containe
 	var toolName string
 	var runtime ContainerRuntime
 
-	if criSocket != kubeadmapiv1alpha3.DefaultCRISocket {
+	if criSocket != kubeadmapiv1beta1.DefaultCRISocket {
 		toolName = "crictl"
 		// !!! temporary work around crictl warning:
 		// Using "/var/run/crio/crio.sock" as endpoint is deprecated,
@@ -68,7 +69,7 @@ func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (Containe
 	}
 
 	if _, err := execer.LookPath(toolName); err != nil {
-		return nil, fmt.Errorf("%s is required for container runtime: %v", toolName, err)
+		return nil, pkgerrors.Wrapf(err, "%s is required for container runtime", toolName)
 	}
 
 	return runtime, nil
@@ -87,7 +88,7 @@ func (runtime *DockerRuntime) IsDocker() bool {
 // IsRunning checks if runtime is running
 func (runtime *CRIRuntime) IsRunning() error {
 	if out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "info").CombinedOutput(); err != nil {
-		return fmt.Errorf("container runtime is not running: output: %s, error: %v", string(out), err)
+		return pkgerrors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
 	}
 	return nil
 }
@@ -95,7 +96,7 @@ func (runtime *CRIRuntime) IsRunning() error {
 // IsRunning checks if runtime is running
 func (runtime *DockerRuntime) IsRunning() error {
 	if out, err := runtime.exec.Command("docker", "info").CombinedOutput(); err != nil {
-		return fmt.Errorf("container runtime is not running: output: %s, error: %v", string(out), err)
+		return pkgerrors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
 	}
 	return nil
 }
@@ -104,7 +105,7 @@ func (runtime *DockerRuntime) IsRunning() error {
 func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "pods", "-q").CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("output: %s, error: %v", string(out), err)
+		return nil, pkgerrors.Wrapf(err, "output: %s, error", string(out))
 	}
 	pods := []string{}
 	for _, pod := range strings.Fields(string(out)) {
@@ -126,11 +127,11 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 		out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "stopp", container).CombinedOutput()
 		if err != nil {
 			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, fmt.Errorf("failed to stop running pod %s: output: %s, error: %v", container, string(out), err))
+			errs = append(errs, pkgerrors.Wrapf(err, "failed to stop running pod %s: output: %s, error", container, string(out)))
 		} else {
 			out, err = runtime.exec.Command("crictl", "-r", runtime.criSocket, "rmp", container).CombinedOutput()
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to remove running container %s: output: %s, error: %v", container, string(out), err))
+				errs = append(errs, pkgerrors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
 			}
 		}
 	}
@@ -144,7 +145,7 @@ func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
 		out, err := runtime.exec.Command("docker", "rm", "--force", "--volumes", container).CombinedOutput()
 		if err != nil {
 			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, fmt.Errorf("failed to remove running container %s: output: %s, error: %v", container, string(out), err))
+			errs = append(errs, pkgerrors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
 		}
 	}
 	return errors.NewAggregate(errs)
@@ -154,7 +155,7 @@ func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
 func (runtime *CRIRuntime) PullImage(image string) error {
 	out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "pull", image).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("output: %s, error: %v", string(out), err)
+		return pkgerrors.Wrapf(err, "output: %s, error", string(out))
 	}
 	return nil
 }
@@ -163,7 +164,7 @@ func (runtime *CRIRuntime) PullImage(image string) error {
 func (runtime *DockerRuntime) PullImage(image string) error {
 	out, err := runtime.exec.Command("docker", "pull", image).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("output: %s, error: %v", string(out), err)
+		return pkgerrors.Wrapf(err, "output: %s, error", string(out))
 	}
 	return nil
 }

@@ -1,0 +1,3 @@
+# Replaced by individual roles for external-attacher and external-provisioner:
+# - https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
+# - https://github.com/kubernetes-csi/external-provisioner/blob/master/deploy/kubernetes/rbac.yaml

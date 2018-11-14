@@ -28,18 +28,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -58,6 +61,9 @@ const (
 
 	loadBalancerSkuBasic    = "basic"
 	loadBalancerSkuStandard = "standard"
+
+	externalResourceGroupLabel = "kubernetes.azure.com/resource-group"
+	managedByAzureLabel        = "kubernetes.azure.com/managed"
 )
 
 var (
@@ -153,19 +159,36 @@ type Cloud struct {
 	DisksClient             DisksClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
-	metadata                *InstanceMetadata
+	metadata                *InstanceMetadataService
 	vmSet                   VMSet
 
-	// Lock for access to nodeZones
-	nodeZonesLock sync.Mutex
+	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
+	nodeCachesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
 	// it is updated by the nodeInformer
-	nodeZones          map[string]sets.String
+	nodeZones map[string]sets.String
+	// nodeResourceGroups holds nodes external resource groups
+	nodeResourceGroups map[string]string
+	// unmanagedNodes holds a list of nodes not managed by Azure cloud provider.
+	unmanagedNodes sets.String
+	// nodeInformerSynced is for determining if the informer has synced.
 	nodeInformerSynced cache.InformerSynced
+
+	// routeCIDRsLock holds lock for routeCIDRs cache.
+	routeCIDRsLock sync.Mutex
+	// routeCIDRs holds cache for route CIDRs.
+	routeCIDRs map[string]string
 
 	// Clients for vmss.
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
+
+	// client for vm sizes list
+	VirtualMachineSizesClient VirtualMachineSizesClient
+
+	kubeClient       clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	vmCache  *timedCache
 	lbCache  *timedCache
@@ -232,11 +255,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			config.CloudProviderRateLimitQPSWrite,
 			config.CloudProviderRateLimitBucketWrite)
 
-		glog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
+		klog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPS,
 			config.CloudProviderRateLimitBucket)
 
-		glog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
+		klog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPSWrite,
 			config.CloudProviderRateLimitBucketWrite)
 	}
@@ -254,9 +277,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		rateLimiterWriter:       operationPollRateLimiterWrite,
 	}
 	az := Cloud{
-		Config:      *config,
-		Environment: *env,
-		nodeZones:   map[string]sets.String{},
+		Config:             *config,
+		Environment:        *env,
+		nodeZones:          map[string]sets.String{},
+		nodeResourceGroups: map[string]string{},
+		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
 
 		DisksClient:                     newAzDisksClient(azClientConfig),
 		RoutesClient:                    newAzRoutesClient(azClientConfig),
@@ -268,6 +294,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
 		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
 		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineSizesClient:       newAzVirtualMachineSizesClient(azClientConfig),
 		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
 		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
 		FileClient:                      &azureFileClient{env: *env},
@@ -294,14 +321,17 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			Duration: time.Duration(az.CloudProviderBackoffDuration) * time.Second,
 			Jitter:   az.CloudProviderBackoffJitter,
 		}
-		glog.V(2).Infof("Azure cloudprovider using retry backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
+		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
 			az.CloudProviderBackoffRetries,
 			az.CloudProviderBackoffExponent,
 			az.CloudProviderBackoffDuration,
 			az.CloudProviderBackoffJitter)
 	}
 
-	az.metadata = NewInstanceMetadata()
+	az.metadata, err = NewInstanceMetadataService(metadataURL)
+	if err != nil {
+		return nil, err
+	}
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
@@ -363,7 +393,12 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (az *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	az.kubeClient = clientBuilder.ClientOrDie("azure-cloud-provider")
+	az.eventBroadcaster = record.NewBroadcaster()
+	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.kubeClient.CoreV1().Events("")})
+	az.eventRecorder = az.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "azure-cloud-provider"})
+}
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
@@ -444,12 +479,12 @@ func initDiskControllers(az *Cloud) error {
 
 // SetInformers sets informers for Azure cloud provider.
 func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
-	glog.Infof("Setting up informers for Azure cloud provider")
+	klog.Infof("Setting up informers for Azure cloud provider")
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			node := obj.(*v1.Node)
-			az.updateNodeZones(nil, node)
+			az.updateNodeCaches(nil, node)
 		},
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
@@ -458,7 +493,7 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
 				return
 			}
-			az.updateNodeZones(prevNode, newNode)
+			az.updateNodeCaches(prevNode, newNode)
 		},
 		DeleteFunc: func(obj interface{}) {
 			node, isNode := obj.(*v1.Node)
@@ -467,25 +502,28 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			if !isNode {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.Errorf("Received unexpected object: %v", obj)
+					klog.Errorf("Received unexpected object: %v", obj)
 					return
 				}
 				node, ok = deletedState.Obj.(*v1.Node)
 				if !ok {
-					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					klog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
 					return
 				}
 			}
-			az.updateNodeZones(node, nil)
+			az.updateNodeCaches(node, nil)
 		},
 	})
 	az.nodeInformerSynced = nodeInformer.HasSynced
 }
 
-func (az *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
-	az.nodeZonesLock.Lock()
-	defer az.nodeZonesLock.Unlock()
+// updateNodeCaches updates local cache for node's zones and external resource groups.
+func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
+	az.nodeCachesLock.Lock()
+	defer az.nodeCachesLock.Unlock()
+
 	if prevNode != nil {
+		// Remove from nodeZones cache.
 		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(prevZone) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
@@ -493,14 +531,40 @@ func (az *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 				az.nodeZones[prevZone] = nil
 			}
 		}
+
+		// Remove from nodeResourceGroups cache.
+		_, ok = prevNode.ObjectMeta.Labels[externalResourceGroupLabel]
+		if ok {
+			delete(az.nodeResourceGroups, prevNode.ObjectMeta.Name)
+		}
+
+		// Remove from unmanagedNodes cache.
+		managed, ok := prevNode.ObjectMeta.Labels[managedByAzureLabel]
+		if ok && managed == "false" {
+			az.unmanagedNodes.Delete(prevNode.ObjectMeta.Name)
+		}
 	}
+
 	if newNode != nil {
+		// Add to nodeZones cache.
 		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()
 			}
 			az.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
+		}
+
+		// Add to nodeResourceGroups cache.
+		newRG, ok := newNode.ObjectMeta.Labels[externalResourceGroupLabel]
+		if ok && len(newRG) > 0 {
+			az.nodeResourceGroups[newNode.ObjectMeta.Name] = newRG
+		}
+
+		// Add to unmanagedNodes cache.
+		managed, ok := newNode.ObjectMeta.Labels[managedByAzureLabel]
+		if ok && managed == "false" {
+			az.unmanagedNodes.Insert(newNode.ObjectMeta.Name)
 		}
 	}
 }
@@ -511,8 +575,8 @@ func (az *Cloud) GetActiveZones() (sets.String, error) {
 		return nil, fmt.Errorf("Azure cloud provider doesn't have informers set")
 	}
 
-	az.nodeZonesLock.Lock()
-	defer az.nodeZonesLock.Unlock()
+	az.nodeCachesLock.Lock()
+	defer az.nodeCachesLock.Unlock()
 	if !az.nodeInformerSynced() {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetActiveZones")
 	}
@@ -529,4 +593,77 @@ func (az *Cloud) GetActiveZones() (sets.String, error) {
 // GetLocation returns the location in which k8s cluster is currently running.
 func (az *Cloud) GetLocation() string {
 	return az.Location
+}
+
+// GetNodeResourceGroup gets resource group for given node.
+func (az *Cloud) GetNodeResourceGroup(nodeName string) (string, error) {
+	// Kubelet won't set az.nodeInformerSynced, always return configured resourceGroup.
+	if az.nodeInformerSynced == nil {
+		return az.ResourceGroup, nil
+	}
+
+	az.nodeCachesLock.Lock()
+	defer az.nodeCachesLock.Unlock()
+	if !az.nodeInformerSynced() {
+		return "", fmt.Errorf("node informer is not synced when trying to GetNodeResourceGroup")
+	}
+
+	// Return external resource group if it has been cached.
+	if cachedRG, ok := az.nodeResourceGroups[nodeName]; ok {
+		return cachedRG, nil
+	}
+
+	// Return resource group from cloud provider options.
+	return az.ResourceGroup, nil
+}
+
+// GetResourceGroups returns a set of resource groups that all nodes are running on.
+func (az *Cloud) GetResourceGroups() (sets.String, error) {
+	// Kubelet won't set az.nodeInformerSynced, always return configured resourceGroup.
+	if az.nodeInformerSynced == nil {
+		return sets.NewString(az.ResourceGroup), nil
+	}
+
+	az.nodeCachesLock.Lock()
+	defer az.nodeCachesLock.Unlock()
+	if !az.nodeInformerSynced() {
+		return nil, fmt.Errorf("node informer is not synced when trying to GetResourceGroups")
+	}
+
+	resourceGroups := sets.NewString(az.ResourceGroup)
+	for _, rg := range az.nodeResourceGroups {
+		resourceGroups.Insert(rg)
+	}
+
+	return resourceGroups, nil
+}
+
+// GetUnmanagedNodes returns a list of nodes not managed by Azure cloud provider (e.g. on-prem nodes).
+func (az *Cloud) GetUnmanagedNodes() (sets.String, error) {
+	// Kubelet won't set az.nodeInformerSynced, always return nil.
+	if az.nodeInformerSynced == nil {
+		return nil, nil
+	}
+
+	az.nodeCachesLock.Lock()
+	defer az.nodeCachesLock.Unlock()
+	if !az.nodeInformerSynced() {
+		return nil, fmt.Errorf("node informer is not synced when trying to GetUnmanagedNodes")
+	}
+
+	return sets.NewString(az.unmanagedNodes.List()...), nil
+}
+
+// ShouldNodeExcludedFromLoadBalancer returns true if node is unmanaged or in external resource group.
+func (az *Cloud) ShouldNodeExcludedFromLoadBalancer(node *v1.Node) bool {
+	labels := node.ObjectMeta.Labels
+	if rg, ok := labels[externalResourceGroupLabel]; ok && rg != az.ResourceGroup {
+		return true
+	}
+
+	if managed, ok := labels[managedByAzureLabel]; ok && managed == "false" {
+		return true
+	}
+
+	return false
 }

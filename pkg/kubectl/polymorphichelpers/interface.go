@@ -47,7 +47,7 @@ type HistoryViewerFunc func(restClientGetter genericclioptions.RESTClientGetter,
 var HistoryViewerFn HistoryViewerFunc = historyViewer
 
 // StatusViewerFunc is a function type that can tell you how to print rollout status
-type StatusViewerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
+type StatusViewerFunc func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
 
 // StatusViewerFn gives a way to easily override the function for unit testing if needed
 var StatusViewerFn StatusViewerFunc = statusViewer

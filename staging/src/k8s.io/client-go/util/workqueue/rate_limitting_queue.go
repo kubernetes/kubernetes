@@ -20,10 +20,10 @@ package workqueue
 type RateLimitingInterface interface {
 	DelayingInterface
 
-	// AddRateLimited adds an item to the workqueue after the rate limiter says its ok
+	// AddRateLimited adds an item to the workqueue after the rate limiter says it's ok
 	AddRateLimited(item interface{})
 
-	// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
+	// Forget indicates that an item is finished being retried.  Doesn't matter whether it's for perm failing
 	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
 	// still have to call `Done` on the queue.
 	Forget(item interface{})
@@ -55,7 +55,7 @@ type rateLimitingType struct {
 	rateLimiter RateLimiter
 }
 
-// AddRateLimited AddAfter's the item based on the time when the rate limiter says its ok
+// AddRateLimited AddAfter's the item based on the time when the rate limiter says it's ok
 func (q *rateLimitingType) AddRateLimited(item interface{}) {
 	q.DelayingInterface.AddAfter(item, q.rateLimiter.When(item))
 }

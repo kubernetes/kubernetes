@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
-        "//pkg/util/version:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/upgrades:go_default_library",

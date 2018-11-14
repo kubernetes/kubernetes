@@ -37,7 +37,7 @@ const defaultRequestTimeout = 30 * time.Second
 
 type GenericWebhook struct {
 	RestClient     *rest.RESTClient
-	initialBackoff time.Duration
+	InitialBackoff time.Duration
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
@@ -83,7 +83,7 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 // it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
 func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() rest.Result) rest.Result {
 	var result rest.Result
-	WithExponentialBackoff(g.initialBackoff, func() error {
+	WithExponentialBackoff(g.InitialBackoff, func() error {
 		result = webhookFn()
 		return result.Error()
 	})

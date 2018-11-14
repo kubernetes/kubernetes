@@ -71,6 +71,10 @@ type AdmissionRequest struct {
 	// OldObject is the existing object. Only populated for UPDATE requests.
 	// +optional
 	OldObject runtime.RawExtension `json:"oldObject,omitempty" protobuf:"bytes,10,opt,name=oldObject"`
+	// DryRun indicates that modifications will definitely not be persisted for this request.
+	// Defaults to false.
+	// +optional
+	DryRun *bool `json:"dryRun,omitempty" protobuf:"varint,11,opt,name=dryRun"`
 }
 
 // AdmissionResponse describes an admission response.

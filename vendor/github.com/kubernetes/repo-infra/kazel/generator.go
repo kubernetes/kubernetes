@@ -55,7 +55,7 @@ func (v *Vendorer) walkGenerated() error {
 // findOpenAPI searches for all packages under root that request OpenAPI. It
 // returns the go import paths. It does not follow symlinks.
 func (v *Vendorer) findOpenAPI(root string) ([]string, error) {
-	for _, r := range v.skippedPaths {
+	for _, r := range v.skippedOpenAPIPaths {
 		if r.MatchString(root) {
 			return nil, nil
 		}

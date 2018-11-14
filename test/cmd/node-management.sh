@@ -72,15 +72,15 @@ __EOF__
 __EOF__
 
   # taint/untaint
-  # Pre-condition: node has no taints
-  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.taints}}" '<no value>'
+  # Pre-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
   # taint can add a taint
   kubectl taint node 127.0.0.1 dedicated=foo:PreferNoSchedule
-  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{.effect}}{{end}}' 'PreferNoSchedule'
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "dedicated=foo:PreferNoSchedule"
   # taint can remove a taint
   kubectl taint node 127.0.0.1 dedicated-
-  # Post-condition: node has no taints
-  kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.taints}}" '<no value>'
+  # Post-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .spec.taints}}{{if eq .key \"dedicated\"}}{{.key}}={{.value}}:{{.effect}}{{end}}{{end}}' "" # expect no output
 
   ### kubectl cordon update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable

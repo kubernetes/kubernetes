@@ -25,19 +25,20 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota/generic"
-	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	"k8s.io/kubernetes/pkg/quota/v1/install"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 
@@ -92,33 +93,33 @@ func validPersistentVolumeClaim(name string, resources api.ResourceRequirements)
 }
 
 func TestPrettyPrint(t *testing.T) {
-	toResourceList := func(resources map[api.ResourceName]string) api.ResourceList {
-		resourceList := api.ResourceList{}
+	toResourceList := func(resources map[corev1.ResourceName]string) corev1.ResourceList {
+		resourceList := corev1.ResourceList{}
 		for key, value := range resources {
 			resourceList[key] = resource.MustParse(value)
 		}
 		return resourceList
 	}
 	testCases := []struct {
-		input    api.ResourceList
+		input    corev1.ResourceList
 		expected string
 	}{
 		{
-			input: toResourceList(map[api.ResourceName]string{
-				api.ResourceCPU: "100m",
+			input: toResourceList(map[corev1.ResourceName]string{
+				corev1.ResourceCPU: "100m",
 			}),
 			expected: "cpu=100m",
 		},
 		{
-			input: toResourceList(map[api.ResourceName]string{
-				api.ResourcePods:                   "10",
-				api.ResourceServices:               "10",
-				api.ResourceReplicationControllers: "10",
-				api.ResourceServicesNodePorts:      "10",
-				api.ResourceRequestsCPU:            "100m",
-				api.ResourceRequestsMemory:         "100Mi",
-				api.ResourceLimitsCPU:              "100m",
-				api.ResourceLimitsMemory:           "100Mi",
+			input: toResourceList(map[corev1.ResourceName]string{
+				corev1.ResourcePods:                   "10",
+				corev1.ResourceServices:               "10",
+				corev1.ResourceReplicationControllers: "10",
+				corev1.ResourceServicesNodePorts:      "10",
+				corev1.ResourceRequestsCPU:            "100m",
+				corev1.ResourceRequestsMemory:         "100Mi",
+				corev1.ResourceLimitsCPU:              "100m",
+				corev1.ResourceLimitsMemory:           "100Mi",
 			}),
 			expected: "limits.cpu=100m,limits.memory=100Mi,pods=10,replicationcontrollers=10,requests.cpu=100m,requests.memory=100Mi,services=10,services.nodeports=10",
 		},
@@ -140,7 +141,7 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -150,7 +151,7 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 		evaluator: evaluator,
 	}
 	namespace := "default"
-	err := handler.Validate(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", api.Resource("pods").WithVersion("version"), "", admission.Delete, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", corev1.Resource("pods").WithVersion("version"), "", admission.Delete, false, nil))
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes: %v", err)
 	}
@@ -160,15 +161,15 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 // It verifies that creation of a pod that would have exceeded quota is properly failed
 // It verifies that create operations to a subresource that would have exceeded quota would succeed
 func TestAdmissionIgnoresSubresources(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{}
+	resourceQuota := &corev1.ResourceQuota{}
 	resourceQuota.Name = "quota"
 	resourceQuota.Namespace = "test"
-	resourceQuota.Status = api.ResourceQuotaStatus{
-		Hard: api.ResourceList{},
-		Used: api.ResourceList{},
+	resourceQuota.Status = corev1.ResourceQuotaStatus{
+		Hard: corev1.ResourceList{},
+		Used: corev1.ResourceList{},
 	}
-	resourceQuota.Status.Hard[api.ResourceMemory] = resource.MustParse("2Gi")
-	resourceQuota.Status.Used[api.ResourceMemory] = resource.MustParse("1Gi")
+	resourceQuota.Status.Hard[corev1.ResourceMemory] = resource.MustParse("2Gi")
+	resourceQuota.Status.Used[corev1.ResourceMemory] = resource.MustParse("1Gi")
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -176,7 +177,7 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -185,13 +186,13 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
-	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "subresource", admission.Create, false, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "subresource", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the action went to a subresource: %v", err)
 	}
@@ -199,18 +200,18 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 
 // TestAdmitBelowQuotaLimit verifies that a pod when created has its usage reflected on the quota
 func TestAdmitBelowQuotaLimit(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1"),
-				api.ResourceMemory: resource.MustParse("50Gi"),
-				api.ResourcePods:   resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
 			},
 		},
 	}
@@ -221,7 +222,7 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -230,9 +231,9 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -253,18 +254,18 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
-	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1100m"),
-				api.ResourceMemory: resource.MustParse("52Gi"),
-				api.ResourcePods:   resource.MustParse("4"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1100m"),
+				corev1.ResourceMemory: resource.MustParse("52Gi"),
+				corev1.ResourcePods:   resource.MustParse("4"),
 			},
 		},
 	}
@@ -281,18 +282,18 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 // TestAdmitDryRun verifies that a pod when created with dry-run doesn not have its usage reflected on the quota
 // and that dry-run requests can still be rejected if they would exceed the quota
 func TestAdmitDryRun(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1"),
-				api.ResourceMemory: resource.MustParse("50Gi"),
-				api.ResourcePods:   resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
 			},
 		},
 	}
@@ -303,7 +304,7 @@ func TestAdmitDryRun(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -312,16 +313,16 @@ func TestAdmitDryRun(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, true, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, true, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	newPod = validPod("too-large-pod", 1, getResourceRequirements(getResourceList("100m", "60Gi"), getResourceList("", "")))
-	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, true, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, true, nil))
 	if err == nil {
 		t.Errorf("Expected error but got none")
 	}
@@ -334,18 +335,18 @@ func TestAdmitDryRun(t *testing.T) {
 // TestAdmitHandlesOldObjects verifies that admit handles updates correctly with old objects
 func TestAdmitHandlesOldObjects(t *testing.T) {
 	// in this scenario, the old quota was based on a service type=loadbalancer
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("10"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
-				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("10"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("10"),
 			},
-			Used: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("0"),
+			Used: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("0"),
 			},
 		},
 	}
@@ -358,7 +359,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -367,7 +368,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service was a load balancer, but updated version is a node port.
 	existingService := &api.Service{
@@ -381,7 +382,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 			Ports: []api.ServicePort{{Port: 1234}},
 		},
 	}
-	err := handler.Validate(admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -404,21 +405,21 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	// verify usage decremented the loadbalancer, and incremented the nodeport, but kept the service the same.
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
-	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
 
-	// Verify service usage. Since we don't add negative values, the api.ResourceServicesLoadBalancers
+	// Verify service usage. Since we don't add negative values, the corev1.ResourceServicesLoadBalancers
 	// will remain on last reported value
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("10"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
-				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("10"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("10"),
 			},
-			Used: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("1"),
+			Used: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("1"),
 			},
 		},
 	}
@@ -433,16 +434,16 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 }
 
 func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
-				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
 			},
 		},
 	}
@@ -465,7 +466,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -474,7 +475,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	oldPVC := &api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test", ResourceVersion: "1"},
@@ -490,7 +491,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 		},
 	}
 
-	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -500,16 +501,16 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 }
 
 func TestAdmitHandlesPVCUpdates(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
-				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
 			},
 		},
 	}
@@ -532,7 +533,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -541,7 +542,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	oldPVC := &api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test", ResourceVersion: "1"},
@@ -557,7 +558,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 		},
 	}
 
-	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -580,16 +581,16 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
-	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
-				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				api.ResourceRequestsStorage:        resource.MustParse("15Gi"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("15Gi"),
 			},
 		},
 	}
@@ -607,18 +608,18 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 // TestAdmitHandlesCreatingUpdates verifies that admit handles updates which behave as creates
 func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	// in this scenario, there is an existing service
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("10"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
-				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("10"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("10"),
 			},
-			Used: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("0"),
+			Used: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("0"),
 			},
 		},
 	}
@@ -631,7 +632,7 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -640,7 +641,7 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service didn't exist, so this update is actually a create
 	oldService := &api.Service{
@@ -654,7 +655,7 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 			Ports: []api.ServicePort{{Port: 1234}},
 		},
 	}
-	err := handler.Validate(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -677,18 +678,18 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	// verify that the "old" object was ignored for calculating the new usage
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
-	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("10"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
-				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("10"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("10"),
 			},
-			Used: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("2"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("1"),
+			Used: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("1"),
 			},
 		},
 	}
@@ -704,18 +705,18 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 
 // TestAdmitExceedQuotaLimit verifies that if a pod exceeded allowed usage that its rejected during admission.
 func TestAdmitExceedQuotaLimit(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1"),
-				api.ResourceMemory: resource.MustParse("50Gi"),
-				api.ResourcePods:   resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
 			},
 		},
 	}
@@ -726,7 +727,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -735,9 +736,9 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Errorf("Expected an error exceeding quota")
 	}
@@ -747,20 +748,20 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 // specified on the pod.  In this case, we create a quota that tracks cpu request, memory request, and memory limit.
 // We ensure that a pod that does not specify a memory limit that it fails in admission.
 func TestAdmitEnforceQuotaConstraints(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:          resource.MustParse("3"),
-				api.ResourceMemory:       resource.MustParse("100Gi"),
-				api.ResourceLimitsMemory: resource.MustParse("200Gi"),
-				api.ResourcePods:         resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:          resource.MustParse("3"),
+				corev1.ResourceMemory:       resource.MustParse("100Gi"),
+				corev1.ResourceLimitsMemory: resource.MustParse("200Gi"),
+				corev1.ResourcePods:         resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:          resource.MustParse("1"),
-				api.ResourceMemory:       resource.MustParse("50Gi"),
-				api.ResourceLimitsMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:         resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:          resource.MustParse("1"),
+				corev1.ResourceMemory:       resource.MustParse("50Gi"),
+				corev1.ResourceLimitsMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:         resource.MustParse("3"),
 			},
 		},
 	}
@@ -771,7 +772,7 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -780,10 +781,10 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify all values are specified as required on the quota
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
@@ -791,20 +792,20 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 
 // TestAdmitPodInNamespaceWithoutQuota ensures that if a namespace has no quota, that a pod can get in
 func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "other", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:          resource.MustParse("3"),
-				api.ResourceMemory:       resource.MustParse("100Gi"),
-				api.ResourceLimitsMemory: resource.MustParse("200Gi"),
-				api.ResourcePods:         resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:          resource.MustParse("3"),
+				corev1.ResourceMemory:       resource.MustParse("100Gi"),
+				corev1.ResourceLimitsMemory: resource.MustParse("200Gi"),
+				corev1.ResourcePods:         resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:          resource.MustParse("1"),
-				api.ResourceMemory:       resource.MustParse("50Gi"),
-				api.ResourceLimitsMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:         resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:          resource.MustParse("1"),
+				corev1.ResourceMemory:       resource.MustParse("50Gi"),
+				corev1.ResourceLimitsMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:         resource.MustParse("3"),
 			},
 		},
 	}
@@ -819,7 +820,7 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	quotaAccessor.liveLookupCache = liveLookupCache
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
@@ -830,11 +831,11 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 		evaluator: evaluator,
 	}
 	// Add to the index
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	// Add to the lru cache so we do not do a live client lookup
-	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*api.ResourceQuota{}})
-	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*corev1.ResourceQuota{}})
+	err = handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Did not expect an error because the pod is in a different namespace than the quota")
 	}
@@ -844,39 +845,39 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 // It creates a terminating and non-terminating quota, and creates a terminating pod.
 // It ensures that the terminating quota is incremented, and the non-terminating quota is not.
 func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
-	resourceQuotaNonTerminating := &api.ResourceQuota{
+	resourceQuotaNonTerminating := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota-non-terminating", Namespace: "test", ResourceVersion: "124"},
-		Spec: api.ResourceQuotaSpec{
-			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotTerminating},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeNotTerminating},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1"),
-				api.ResourceMemory: resource.MustParse("50Gi"),
-				api.ResourcePods:   resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
 			},
 		},
 	}
-	resourceQuotaTerminating := &api.ResourceQuota{
+	resourceQuotaTerminating := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota-terminating", Namespace: "test", ResourceVersion: "124"},
-		Spec: api.ResourceQuotaSpec{
-			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeTerminating},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeTerminating},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1"),
-				api.ResourceMemory: resource.MustParse("50Gi"),
-				api.ResourcePods:   resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
 			},
 		},
 	}
@@ -887,7 +888,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -896,14 +897,14 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNonTerminating)
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaTerminating)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNonTerminating)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaTerminating)
 
 	// create a pod that has an active deadline
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	activeDeadlineSeconds := int64(30)
 	newPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -924,24 +925,24 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
-	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
 
 	// ensure only the quota-terminating was updated
 	if usage.Name != resourceQuotaTerminating.Name {
 		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaTerminating.Name, usage.Name)
 	}
 
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("3"),
-				api.ResourceMemory: resource.MustParse("100Gi"),
-				api.ResourcePods:   resource.MustParse("5"),
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourceCPU:    resource.MustParse("1100m"),
-				api.ResourceMemory: resource.MustParse("52Gi"),
-				api.ResourcePods:   resource.MustParse("4"),
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1100m"),
+				corev1.ResourceMemory: resource.MustParse("52Gi"),
+				corev1.ResourcePods:   resource.MustParse("4"),
 			},
 		},
 	}
@@ -958,31 +959,31 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 // TestAdmitBelowBestEffortQuotaLimit creates a best effort and non-best effort quota.
 // It verifies that best effort pods are properly scoped to the best effort quota document.
 func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
-	resourceQuotaBestEffort := &api.ResourceQuota{
+	resourceQuotaBestEffort := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
-		Spec: api.ResourceQuotaSpec{
-			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeBestEffort},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePods: resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePods: resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("3"),
 			},
 		},
 	}
-	resourceQuotaNotBestEffort := &api.ResourceQuota{
+	resourceQuotaNotBestEffort := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota-not-besteffort", Namespace: "test", ResourceVersion: "124"},
-		Spec: api.ResourceQuotaSpec{
-			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeNotBestEffort},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePods: resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePods: resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("3"),
 			},
 		},
 	}
@@ -993,7 +994,7 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -1002,12 +1003,12 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaBestEffort)
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNotBestEffort)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaBestEffort)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNotBestEffort)
 
 	// create a pod that is best effort because it does not make a request for anything
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1023,19 +1024,19 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	}
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
-	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
 
 	if usage.Name != resourceQuotaBestEffort.Name {
 		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaBestEffort.Name, usage.Name)
 	}
 
-	expectedUsage := api.ResourceQuota{
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePods: resource.MustParse("5"),
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePods: resource.MustParse("4"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("4"),
 			},
 		},
 	}
@@ -1065,17 +1066,17 @@ func removeListWatch(in []testcore.Action) []testcore.Action {
 // TestAdmitBestEffortQuotaLimitIgnoresBurstable validates that a besteffort quota does not match a resource
 // guaranteed pod.
 func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
-		Spec: api.ResourceQuotaSpec{
-			Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeBestEffort},
 		},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePods: resource.MustParse("5"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("5"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePods: resource.MustParse("3"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("3"),
 			},
 		},
 	}
@@ -1086,7 +1087,7 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -1095,9 +1096,9 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1110,32 +1111,32 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 
 func TestHasUsageStats(t *testing.T) {
 	testCases := map[string]struct {
-		a        api.ResourceQuota
+		a        corev1.ResourceQuota
 		expected bool
 	}{
 		"empty": {
-			a:        api.ResourceQuota{Status: api.ResourceQuotaStatus{Hard: api.ResourceList{}}},
+			a:        corev1.ResourceQuota{Status: corev1.ResourceQuotaStatus{Hard: corev1.ResourceList{}}},
 			expected: true,
 		},
 		"hard-only": {
-			a: api.ResourceQuota{
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceMemory: resource.MustParse("1Gi"),
+			a: corev1.ResourceQuota{
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
 					},
-					Used: api.ResourceList{},
+					Used: corev1.ResourceList{},
 				},
 			},
 			expected: false,
 		},
 		"hard-used": {
-			a: api.ResourceQuota{
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceMemory: resource.MustParse("1Gi"),
+			a: corev1.ResourceQuota{
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
 					},
-					Used: api.ResourceList{
-						api.ResourceMemory: resource.MustParse("500Mi"),
+					Used: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("500Mi"),
 					},
 				},
 			},
@@ -1153,14 +1154,14 @@ func TestHasUsageStats(t *testing.T) {
 // namespace, it will be set.
 func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	namespace := "test"
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: namespace, ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePods: resource.MustParse("3"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("3"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePods: resource.MustParse("1"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("1"),
 			},
 		},
 	}
@@ -1172,7 +1173,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -1181,13 +1182,13 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("pod-without-namespace", 1, getResourceRequirements(getResourceList("1", "2Gi"), getResourceList("", "")))
 
 	// unset the namespace
 	newPod.ObjectMeta.Namespace = ""
 
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
@@ -1198,16 +1199,16 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 
 // TestAdmitRejectsNegativeUsage verifies that usage for any measured resource cannot be negative.
 func TestAdmitRejectsNegativeUsage(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
-				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
-				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
 			},
 		},
 	}
@@ -1218,7 +1219,7 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -1227,17 +1228,17 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify quota rejects negative pvc storage requests
 	newPvc := validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("-1Gi")}, api.ResourceList{}))
-	err := handler.Validate(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Errorf("Expected an error because the pvc has negative storage usage")
 	}
 
 	// verify quota accepts non-negative pvc storage requests
 	newPvc = validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
-	err = handler.Validate(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, false, nil))
+	err = handler.Validate(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1245,16 +1246,16 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 
 // TestAdmitWhenUnrelatedResourceExceedsQuota verifies that if resource X exceeds quota, it does not prohibit resource Y from admission.
 func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceServices: resource.MustParse("3"),
-				api.ResourcePods:     resource.MustParse("4"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceServices: resource.MustParse("3"),
+				corev1.ResourcePods:     resource.MustParse("4"),
 			},
-			Used: api.ResourceList{
-				api.ResourceServices: resource.MustParse("4"),
-				api.ResourcePods:     resource.MustParse("1"),
+			Used: corev1.ResourceList{
+				corev1.ResourceServices: resource.MustParse("4"),
+				corev1.ResourcePods:     resource.MustParse("1"),
 			},
 		},
 	}
@@ -1265,7 +1266,7 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -1274,11 +1275,11 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
-	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// create a pod that should pass existing quota
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1293,7 +1294,7 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -1312,7 +1313,7 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 		evaluator: evaluator,
 	}
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Errorf("Expected an error for consuming a limited resource without quota.")
 	}
@@ -1327,7 +1328,7 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -1346,7 +1347,7 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 		evaluator: evaluator,
 	}
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1354,14 +1355,14 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 
 // TestAdmitLimitedResourceWithQuota verifies if a limited resource is configured with quota, it can be consumed.
 func TestAdmitLimitedResourceWithQuota(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("10"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("10"),
 			},
-			Used: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("1"),
+			Used: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1"),
 			},
 		},
 	}
@@ -1373,7 +1374,7 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1394,7 +1395,7 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 	}
 	indexer.Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1402,25 +1403,25 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 
 // TestAdmitLimitedResourceWithMultipleQuota verifies if a limited resource is configured with quota, it can be consumed if one matches.
 func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
-	resourceQuota1 := &api.ResourceQuota{
+	resourceQuota1 := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota1", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("10"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("10"),
 			},
-			Used: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("1"),
+			Used: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1"),
 			},
 		},
 	}
-	resourceQuota2 := &api.ResourceQuota{
+	resourceQuota2 := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota2", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceMemory: resource.MustParse("10Gi"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourceMemory: resource.MustParse("1Gi"),
+			Used: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
 			},
 		},
 	}
@@ -1432,7 +1433,7 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1454,7 +1455,7 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 	indexer.Add(resourceQuota1)
 	indexer.Add(resourceQuota2)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1462,14 +1463,14 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 
 // TestAdmitLimitedResourceWithQuotaThatDoesNotCover verifies if a limited resource is configured the quota must cover the resource.
 func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
-	resourceQuota := &api.ResourceQuota{
+	resourceQuota := &corev1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: api.ResourceQuotaStatus{
-			Hard: api.ResourceList{
-				api.ResourceMemory: resource.MustParse("10Gi"),
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
 			},
-			Used: api.ResourceList{
-				api.ResourceMemory: resource.MustParse("1Gi"),
+			Used: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
 			},
 		},
 	}
@@ -1481,7 +1482,7 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaAccessor, _ := newQuotaAccessor()
 	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1502,7 +1503,7 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 	}
 	indexer.Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Fatalf("Expected an error since the quota did not cover cpu")
 	}
@@ -1513,22 +1514,22 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 	testCases := []struct {
 		description  string
 		testPod      *api.Pod
-		quota        *api.ResourceQuota
-		anotherQuota *api.ResourceQuota
+		quota        *corev1.ResourceQuota
+		anotherQuota *corev1.ResourceQuota
 		config       *resourcequotaapi.Configuration
 		expErr       string
 	}{
 		{
 			description: "Covering quota exists for configured limited scope PriorityClassNameExists.",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists},
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists},
 						},
 					},
 				},
@@ -1537,10 +1538,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
@@ -1551,14 +1552,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "configured limited scope PriorityClassNameExists and limited cpu resource. No covering quota for cpu and pod admit fails.",
 			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists},
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists},
 						},
 					},
 				},
@@ -1567,10 +1568,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 						MatchContains: []string{"requests.cpu"}, // match on "requests.cpu" only
@@ -1582,15 +1583,15 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Covering quota does not exist for configured limited scope PriorityClassNameExists.",
 			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
@@ -1601,15 +1602,15 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Covering quota does not exist for configured limited scope resourceQuotaBestEffort",
 			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "fake-priority"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
@@ -1620,17 +1621,17 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Covering quota exist for configured limited scope resourceQuotaBestEffort",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "fake-priority"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+				Spec: corev1.ResourceQuotaSpec{
+					Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeBestEffort},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourcePods: resource.MustParse("5"),
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourcePods: resource.MustParse("5"),
 					},
-					Used: api.ResourceList{
-						api.ResourcePods: resource.MustParse("3"),
+					Used: corev1.ResourceList{
+						corev1.ResourcePods: resource.MustParse("3"),
 					},
 				},
 			},
@@ -1638,10 +1639,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
@@ -1652,24 +1653,24 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Neither matches pod. Pod allowed",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")), "fake-priority"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1681,24 +1682,24 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Only BestEffort scope matches pod. Pod admit fails because covering quota is missing for BestEffort scope",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "fake-priority"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1710,24 +1711,24 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Only PriorityClass scope matches pod. Pod admit fails because covering quota is missing for PriorityClass scope",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")), "cluster-services"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1739,24 +1740,24 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Pod admit fails because covering quota is missing for PriorityClass scope and BestEffort scope",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1768,17 +1769,17 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Quota available only for BestEffort scope. Pod admit fails because covering quota is missing for PriorityClass scope",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+				Spec: corev1.ResourceQuotaSpec{
+					Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeBestEffort},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourcePods: resource.MustParse("5"),
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourcePods: resource.MustParse("5"),
 					},
-					Used: api.ResourceList{
-						api.ResourcePods: resource.MustParse("3"),
+					Used: corev1.ResourceList{
+						corev1.ResourcePods: resource.MustParse("3"),
 					},
 				},
 			},
@@ -1786,19 +1787,19 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1810,14 +1811,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Quota available only for PriorityClass scope. Pod admit fails because covering quota is missing for BestEffort scope",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1828,19 +1829,19 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1852,28 +1853,28 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Quota available only for both the scopes. Pod admit success. No Error",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+				Spec: corev1.ResourceQuotaSpec{
+					Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeBestEffort},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourcePods: resource.MustParse("5"),
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourcePods: resource.MustParse("5"),
 					},
-					Used: api.ResourceList{
-						api.ResourcePods: resource.MustParse("3"),
+					Used: corev1.ResourceList{
+						corev1.ResourcePods: resource.MustParse("3"),
 					},
 				},
 			},
-			anotherQuota: &api.ResourceQuota{
+			anotherQuota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1884,19 +1885,19 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopeBestEffort,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopeBestEffort,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1908,30 +1909,30 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Pod allowed with priorityclass if limited scope PriorityClassNameExists not configured.",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config:      &resourcequotaapi.Configuration{},
 			expErr:      "",
 		},
 		{
 			description: "quota fails, though covering quota for configured limited scope PriorityClassNameExists exists.",
 			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "20Gi"), getResourceList("", "")), "fake-priority"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists},
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists},
 						},
 					},
 				},
-				Status: api.ResourceQuotaStatus{
-					Hard: api.ResourceList{
-						api.ResourceMemory: resource.MustParse("10Gi"),
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("10Gi"),
 					},
-					Used: api.ResourceList{
-						api.ResourceMemory: resource.MustParse("1Gi"),
+					Used: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
 					},
 				},
 			},
@@ -1939,10 +1940,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists,
 							},
 						},
 					},
@@ -1953,14 +1954,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Pod has different priorityclass than configured limited. Covering quota exists for configured limited scope PriorityClassIn.",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1971,10 +1972,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -1986,14 +1987,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Pod has limited priorityclass. Covering quota exists for configured limited scope PriorityClassIn.",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"cluster-services"},
 							},
 						},
@@ -2004,10 +2005,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name", "cluster-services"},
 							},
 						},
@@ -2019,14 +2020,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Pod has limited priorityclass. Covering quota  does not exist for configured limited scope PriorityClassIn.",
 			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name"},
 							},
 						},
@@ -2037,10 +2038,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name", "cluster-services"},
 							},
 						},
@@ -2052,14 +2053,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "From the above test case, just changing pod priority from cluster-services to another-priorityclass-name. expecting no error",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "another-priorityclass-name"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name"},
 							},
 						},
@@ -2070,10 +2071,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name", "cluster-services"},
 							},
 						},
@@ -2085,15 +2086,15 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Pod has limited priorityclass. Covering quota does NOT exists for configured limited scope PriorityClassIn.",
 			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
-			quota:       &api.ResourceQuota{},
+			quota:       &corev1.ResourceQuota{},
 			config: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name", "cluster-services"},
 							},
 						},
@@ -2105,14 +2106,14 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		{
 			description: "Pod has limited priorityclass. Covering quota exists for configured limited scope PriorityClassIn through PriorityClassNameExists",
 			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
-			quota: &api.ResourceQuota{
+			quota: &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-				Spec: api.ResourceQuotaSpec{
-					ScopeSelector: &api.ScopeSelector{
-						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+				Spec: corev1.ResourceQuotaSpec{
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpExists},
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpExists},
 						},
 					},
 				},
@@ -2121,10 +2122,10 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{
 						Resource: "pods",
-						MatchScopes: []api.ScopedResourceSelectorRequirement{
+						MatchScopes: []corev1.ScopedResourceSelectorRequirement{
 							{
-								ScopeName: api.ResourceQuotaScopePriorityClass,
-								Operator:  api.ScopeSelectorOpIn,
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
 								Values:    []string{"another-priorityclass-name", "cluster-services"},
 							},
 						},
@@ -2150,7 +2151,7 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 		quotaAccessor, _ := newQuotaAccessor()
 		quotaAccessor.client = kubeClient
-		quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+		quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
 
 		quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 		evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
@@ -2163,7 +2164,7 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		if testCase.anotherQuota != nil {
 			indexer.Add(testCase.anotherQuota)
 		}
-		err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+		err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 		if testCase.expErr == "" {
 			if err != nil {
 				t.Fatalf("Testcase, %v, failed with unexpected error: %v. ExpErr: %v", testCase.description, err, testCase.expErr)

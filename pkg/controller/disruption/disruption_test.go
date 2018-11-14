@@ -468,7 +468,6 @@ func TestReplicaSet(t *testing.T) {
 
 // Verify that multiple controllers doesn't allow the PDB to be set true.
 func TestMultipleControllers(t *testing.T) {
-	const rcCount = 2
 	const podCount = 2
 
 	dc, ps := newFakeDisruptionController()
@@ -610,10 +609,9 @@ func TestTwoControllers(t *testing.T) {
 	// code.  If you update a parameter here, recalculate the correct values for
 	// all of them.  Further down in the test, we use these to control loops, and
 	// that level of logic is enough complexity for me.
-	const collectionSize int32 = 11   // How big each collection is
-	const minAvailable string = "28%" // minAvailable we'll specify
-	const minimumOne int32 = 4        // integer minimum with one controller
-	const minimumTwo int32 = 7        // integer minimum with two controllers
+	const collectionSize int32 = 11 // How big each collection is
+	const minimumOne int32 = 4      // integer minimum with one controller
+	const minimumTwo int32 = 7      // integer minimum with two controllers
 
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbStore, pdb)

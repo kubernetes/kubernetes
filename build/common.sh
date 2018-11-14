@@ -88,51 +88,18 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  debian_iptables_version=v10.1
+  local arch=$1
+  local debian_base_version=0.4.0
+  local debian_iptables_version=v11.0
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
-  ### in build/BUILD.
-  case $1 in
-    "amd64")
-        local targets=(
-          cloud-controller-manager,busybox
-          kube-apiserver,busybox
-          kube-controller-manager,busybox
-          kube-scheduler,busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-amd64:${debian_iptables_version}
-        );;
-    "arm")
-        local targets=(
-          cloud-controller-manager,arm32v7/busybox
-          kube-apiserver,arm32v7/busybox
-          kube-controller-manager,arm32v7/busybox
-          kube-scheduler,arm32v7/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-arm:${debian_iptables_version}
-        );;
-    "arm64")
-        local targets=(
-          cloud-controller-manager,arm64v8/busybox
-          kube-apiserver,arm64v8/busybox
-          kube-controller-manager,arm64v8/busybox
-          kube-scheduler,arm64v8/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-arm64:${debian_iptables_version}
-        );;
-    "ppc64le")
-        local targets=(
-          cloud-controller-manager,ppc64le/busybox
-          kube-apiserver,ppc64le/busybox
-          kube-controller-manager,ppc64le/busybox
-          kube-scheduler,ppc64le/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-ppc64le:${debian_iptables_version}
-        );;
-    "s390x")
-        local targets=(
-          cloud-controller-manager,s390x/busybox
-          kube-apiserver,s390x/busybox
-          kube-controller-manager,s390x/busybox
-          kube-scheduler,s390x/busybox
-          kube-proxy,k8s.gcr.io/debian-iptables-s390x:${debian_iptables_version}
-        );;
-  esac
+  ### in build/BUILD. And kube::golang::server_image_targets
+  local targets=(
+    cloud-controller-manager,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
+    kube-apiserver,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
+    kube-controller-manager,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
+    kube-scheduler,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
+    kube-proxy,"k8s.gcr.io/debian-iptables-${arch}:${debian_iptables_version}"
+  )
 
   echo "${targets[@]}"
 }
@@ -596,9 +563,11 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
+    --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
+    --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
   )
 
   if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then

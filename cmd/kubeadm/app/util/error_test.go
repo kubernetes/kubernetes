@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 	"testing"
 )
 
@@ -36,7 +36,7 @@ func TestCheckErr(t *testing.T) {
 		expected int
 	}{
 		{nil, 0},
-		{fmt.Errorf(""), DefaultErrorExitCode},
+		{errors.New(""), DefaultErrorExitCode},
 		{&pferror{}, PreFlightExitCode},
 	}
 
@@ -63,14 +63,14 @@ func TestFormatErrMsg(t *testing.T) {
 	}{
 		{
 			errs: []error{
-				fmt.Errorf(errMsg1),
-				fmt.Errorf(errMsg2),
+				errors.New(errMsg1),
+				errors.New(errMsg2),
 			},
 			expect: "\t- " + errMsg1 + "\n" + "\t- " + errMsg2 + "\n",
 		},
 		{
 			errs: []error{
-				fmt.Errorf(errMsg1),
+				errors.New(errMsg1),
 			},
 			expect: "\t- " + errMsg1 + "\n",
 		},

@@ -1,139 +1,108 @@
-// Copyright 2017 VMware, Inc. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright (c) 2018 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+vUnless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package tags
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"github.com/vmware/govmomi/vim25/types"
+	"github.com/vmware/govmomi/vapi/internal"
+	"github.com/vmware/govmomi/vim25/mo"
 )
 
-const (
-	TagAssociationURL = "/com/vmware/cis/tagging/tag-association"
-)
-
-type AssociatedObject struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
-}
-
-type TagAssociationSpec struct {
-	ObjectID *AssociatedObject `json:"object_id,omitempty"`
-	TagID    *string           `json:"tag_id,omitempty"`
-}
-
-type AttachedTagsInfo struct {
-	Name  string
-	TagID string
-}
-
-func (c *RestClient) getAssociatedObject(ref *types.ManagedObjectReference) *AssociatedObject {
-	if ref == nil {
-		return nil
-	}
-	object := AssociatedObject{
-		ID:   ref.Value,
-		Type: ref.Type,
-	}
-	return &object
-}
-
-func (c *RestClient) getAssociationSpec(tagID *string, ref *types.ManagedObjectReference) *TagAssociationSpec {
-	object := c.getAssociatedObject(ref)
-	spec := TagAssociationSpec{
-		TagID:    tagID,
-		ObjectID: object,
-	}
-	return &spec
-}
-
-func (c *RestClient) AttachTagToObject(ctx context.Context, tagID string, ref *types.ManagedObjectReference) error {
-	spec := c.getAssociationSpec(&tagID, ref)
-	_, _, status, err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s?~action=attach", TagAssociationURL), *spec, nil)
-
-	if status != http.StatusOK || err != nil {
-		return fmt.Errorf("attach tag failed with status code: %d, error message: %s", status, err)
-	}
-	return nil
-}
-
-func (c *RestClient) DetachTagFromObject(ctx context.Context, tagID string, ref *types.ManagedObjectReference) error {
-	spec := c.getAssociationSpec(&tagID, ref)
-	_, _, status, err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s?~action=detach", TagAssociationURL), *spec, nil)
-
-	if status != http.StatusOK || err != nil {
-		return fmt.Errorf("detach tag failed with status code: %d, error message: %s", status, err)
-	}
-	return nil
-}
-
-func (c *RestClient) ListAttachedTags(ctx context.Context, ref *types.ManagedObjectReference) ([]string, error) {
-	spec := c.getAssociationSpec(nil, ref)
-	stream, _, status, err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s?~action=list-attached-tags", TagAssociationURL), *spec, nil)
-
-	if status != http.StatusOK || err != nil {
-		return nil, fmt.Errorf("detach tag failed with status code: %d, error message: %s", status, err)
-	}
-
-	type RespValue struct {
-		Value []string
-	}
-
-	var pTag RespValue
-	if err := json.NewDecoder(stream).Decode(&pTag); err != nil {
-		return nil, fmt.Errorf("decode response body failed for: %s", err)
-	}
-	return pTag.Value, nil
-}
-
-func (c *RestClient) ListAttachedTagsByName(ctx context.Context, ref *types.ManagedObjectReference) ([]AttachedTagsInfo, error) {
-	tagIds, err := c.ListAttachedTags(ctx, ref)
-	if err != nil {
-		return nil, fmt.Errorf("get attached tag failed for: %s", err)
-	}
-
-	var attachedTagsInfoSlice []AttachedTagsInfo
-	for _, cID := range tagIds {
-		tag, err := c.GetTag(ctx, cID)
+func (c *Manager) tagID(ctx context.Context, id string) (string, error) {
+	if isName(id) {
+		tag, err := c.GetTag(ctx, id)
 		if err != nil {
-			return nil, fmt.Errorf("get tag %s failed for %s", cID, err)
+			return "", err
 		}
-		attachedTagsCreate := &AttachedTagsInfo{Name: tag.Name, TagID: tag.ID}
-		attachedTagsInfoSlice = append(attachedTagsInfoSlice, *attachedTagsCreate)
+		return tag.ID, nil
 	}
-	return attachedTagsInfoSlice, nil
+	return id, nil
 }
 
-func (c *RestClient) ListAttachedObjects(ctx context.Context, tagID string) ([]AssociatedObject, error) {
-	spec := c.getAssociationSpec(&tagID, nil)
-	stream, _, status, err := c.call(ctx, http.MethodPost, fmt.Sprintf("%s?~action=list-attached-objects", TagAssociationURL), *spec, nil)
-	if status != http.StatusOK || err != nil {
-		return nil, fmt.Errorf("list object failed with status code: %d, error message: %s", status, err)
+// AttachTag attaches a tag ID to a managed object.
+func (c *Manager) AttachTag(ctx context.Context, tagID string, ref mo.Reference) error {
+	id, err := c.tagID(ctx, tagID)
+	if err != nil {
+		return err
+	}
+	spec := internal.NewAssociation(id, ref)
+	url := internal.URL(c, internal.AssociationPath).WithAction("attach")
+	return c.Do(ctx, url.Request(http.MethodPost, spec), nil)
+}
+
+// DetachTag detaches a tag ID from a managed object.
+// If the tag is already removed from the object, then this operation is a no-op and an error will not be thrown.
+func (c *Manager) DetachTag(ctx context.Context, tagID string, ref mo.Reference) error {
+	id, err := c.tagID(ctx, tagID)
+	if err != nil {
+		return err
+	}
+	spec := internal.NewAssociation(id, ref)
+	url := internal.URL(c, internal.AssociationPath).WithAction("detach")
+	return c.Do(ctx, url.Request(http.MethodPost, spec), nil)
+}
+
+// ListAttachedTags fetches the array of tag IDs attached to the given object.
+func (c *Manager) ListAttachedTags(ctx context.Context, ref mo.Reference) ([]string, error) {
+	spec := internal.NewAssociation("", ref)
+	url := internal.URL(c, internal.AssociationPath).WithAction("list-attached-tags")
+	var res []string
+	return res, c.Do(ctx, url.Request(http.MethodPost, spec), &res)
+}
+
+// GetAttachedTags fetches the array of tags attached to the given object.
+func (c *Manager) GetAttachedTags(ctx context.Context, ref mo.Reference) ([]Tag, error) {
+	ids, err := c.ListAttachedTags(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("get attached tags %s: %s", ref, err)
 	}
 
-	type RespValue struct {
-		Value []AssociatedObject
+	var info []Tag
+	for _, id := range ids {
+		tag, err := c.GetTag(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("get tag %s: %s", id, err)
+		}
+		info = append(info, *tag)
+	}
+	return info, nil
+}
+
+// ListAttachedObjects fetches the array of attached objects for the given tag ID.
+func (c *Manager) ListAttachedObjects(ctx context.Context, tagID string) ([]mo.Reference, error) {
+	id, err := c.tagID(ctx, tagID)
+	if err != nil {
+		return nil, err
+	}
+	spec := internal.Association{
+		TagID: id,
+	}
+	url := internal.URL(c, internal.AssociationPath).WithAction("list-attached-objects")
+	var res []internal.AssociatedObject
+	if err := c.Do(ctx, url.Request(http.MethodPost, spec), &res); err != nil {
+		return nil, err
 	}
 
-	var pTag RespValue
-	if err := json.NewDecoder(stream).Decode(&pTag); err != nil {
-		return nil, fmt.Errorf("decode response body failed for: %s", err)
+	refs := make([]mo.Reference, len(res))
+	for i := range res {
+		refs[i] = res[i]
 	}
-
-	return pTag.Value, nil
+	return refs, nil
 }

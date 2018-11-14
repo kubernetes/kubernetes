@@ -31,80 +31,97 @@ import (
 )
 
 const (
-	// BootstrapDiscoveryClusterRoleName sets the name for the ClusterRole that allows
+	// NodesKubeadmConfigClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-config ConfigMap during the node bootstrap/discovery
-	// phase for additional master nodes
-	BootstrapDiscoveryClusterRoleName = "kubeadm:bootstrap-discovery-kubeadm-config"
+	// or during upgrade nodes
+	NodesKubeadmConfigClusterRoleName = "kubeadm:nodes-kubeadm-config"
 )
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
-	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
-
+	// Prepare the ClusterConfiguration for upload
+	// The components store their config in their own ConfigMaps, then reset the .ComponentConfig struct;
 	// We don't want to mutate the cfg itself, so create a copy of it using .DeepCopy of it first
-	cfgToUpload := cfg.DeepCopy()
-	// Removes sensitive info from the data that will be stored in the config map
-	cfgToUpload.BootstrapTokens = nil
-	// Clear the NodeRegistration object.
-	cfgToUpload.NodeRegistration = kubeadmapi.NodeRegistrationOptions{}
-	// TODO: Reset the .ComponentConfig struct like this:
-	// cfgToUpload.ComponentConfigs = kubeadmapi.ComponentConfigs{}
-	// in order to not upload any other components' config to the kubeadm-config
-	// ConfigMap. The components store their config in their own ConfigMaps.
-	// Before this line can be uncommented util/config.loadConfigurationBytes()
-	// needs to support reading the different components' ConfigMaps first.
+	clusterConfigurationToUpload := cfg.ClusterConfiguration.DeepCopy()
+	clusterConfigurationToUpload.ComponentConfigs = kubeadmapi.ComponentConfigs{}
 
-	// Marshal the object into YAML
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfgToUpload)
+	// Marshal the ClusterConfiguration into YAML
+	clusterConfigurationYaml, err := configutil.MarshalKubeadmConfigObject(clusterConfigurationToUpload)
 	if err != nil {
-		fmt.Println("err", err.Error())
+		return err
+	}
+
+	// Prepare the ClusterStatus for upload
+	// Gets the current cluster status
+	// TODO: use configmap locks on this object on the get before the update.
+	clusterStatus, err := configutil.GetClusterStatus(client)
+	if err != nil {
+		return err
+	}
+
+	// Updates the ClusterStatus with the current control plane instance
+	if clusterStatus.APIEndpoints == nil {
+		clusterStatus.APIEndpoints = map[string]kubeadmapi.APIEndpoint{}
+	}
+	clusterStatus.APIEndpoints[cfg.NodeRegistration.Name] = cfg.LocalAPIEndpoint
+
+	// Marshal the ClusterStatus back into YAML
+	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)
+	if err != nil {
 		return err
 	}
 
 	err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.InitConfigurationConfigMap,
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
-			kubeadmconstants.InitConfigurationConfigMapKey: string(cfgYaml),
+			kubeadmconstants.ClusterConfigurationConfigMapKey: string(clusterConfigurationYaml),
+			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
 		},
 	})
 	if err != nil {
 		return err
 	}
 
-	// Ensure that the BootstrapDiscoveryClusterRole exists
+	// Ensure that the NodesKubeadmConfigClusterRoleName exists
 	err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BootstrapDiscoveryClusterRoleName,
+			Name:      NodesKubeadmConfigClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.InitConfigurationConfigMap).RuleOrDie(),
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeadmConfigConfigMap).RuleOrDie(),
 		},
 	})
 	if err != nil {
 		return err
 	}
 
-	// Binds the BootstrapDiscoveryClusterRole to all the bootstrap tokens
+	// Binds the NodesKubeadmConfigClusterRoleName to all the bootstrap tokens
 	// that are members of the system:bootstrappers:kubeadm:default-node-token group
+	// and to all nodes
 	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BootstrapDiscoveryClusterRoleName,
+			Name:      NodesKubeadmConfigClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "Role",
-			Name:     BootstrapDiscoveryClusterRoleName,
+			Name:     NodesKubeadmConfigClusterRoleName,
 		},
 		Subjects: []rbac.Subject{
 			{
 				Kind: rbac.GroupKind,
 				Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
+			},
+			{
+				Kind: rbac.GroupKind,
+				Name: kubeadmconstants.NodesGroup,
 			},
 		},
 	})

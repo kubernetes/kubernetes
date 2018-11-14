@@ -68,4 +68,8 @@ func (runner *runner) DeleteRealServer(*VirtualServer, *RealServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
+func (runner *runner) UpdateRealServer(*VirtualServer, *RealServer) error {
+	return fmt.Errorf("IPVS not supported for this platform")
+}
+
 var _ = Interface(&runner{})

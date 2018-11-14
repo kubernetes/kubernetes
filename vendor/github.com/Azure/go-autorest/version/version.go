@@ -20,7 +20,7 @@ import (
 )
 
 // Number contains the semantic version of this SDK.
-const Number = "v10.14.0"
+const Number = "v11.1.0"
 
 var (
 	userAgent = fmt.Sprintf("Go/%s (%s-%s) go-autorest/%s",

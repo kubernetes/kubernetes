@@ -1,0 +1,13 @@
+# Defined below are the security contacts for this repo.
+#
+# They are the contact point for the Product Security Team to reach out
+# to for triaging and handling of incoming issues.
+#
+# The below names agree to abide by the
+# [Embargo Policy](https://github.com/kubernetes/sig-release/blob/master/security-release-process-documentation/security-release-process.md#embargo-policy)
+# and will be removed and replaced if they violate that agreement.
+#
+# DO NOT REPORT SECURITY VULNERABILITIES DIRECTLY TO THESE NAMES, FOLLOW THE
+# INSTRUCTIONS AT https://kubernetes.io/security/
+
+saadali

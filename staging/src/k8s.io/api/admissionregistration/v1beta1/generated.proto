@@ -66,7 +66,7 @@ message Rule {
   repeated string apiVersions = 2;
 
   // Resources is a list of resources this rule applies to.
-  // 
+  //
   // For example:
   // 'pods' means pods.
   // 'pods/log' means the log subresource of pods.
@@ -74,10 +74,10 @@ message Rule {
   // 'pods/*' means all subresources of pods.
   // '*/scale' means all scale subresources.
   // '*/*' means all resources and their subresources.
-  // 
+  //
   // If wildcard is present, the validation rule will ensure resources do not
   // overlap with each other.
-  // 
+  //
   // Depending on the enclosing object, subresources might not be allowed.
   // Required.
   repeated string resources = 3;
@@ -168,7 +168,7 @@ message Webhook {
   // object itself is a namespace, the matching is performed on
   // object.metadata.labels. If the object is another cluster scoped resource,
   // it never skips the webhook.
-  // 
+  //
   // For example, to run the webhook on any objects whose namespace is not
   // associated with "runlevel" of "0" or "1";  you will set the selector as
   // follows:
@@ -184,7 +184,7 @@ message Webhook {
   //     }
   //   ]
   // }
-  // 
+  //
   // If instead you want to only run the webhook on any objects whose
   // namespace is associated with the "environment" of "prod" or "staging";
   // you will set the selector as follows:
@@ -200,61 +200,70 @@ message Webhook {
   //     }
   //   ]
   // }
-  // 
+  //
   // See
   // https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   // for more examples of label selectors.
-  // 
+  //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 5;
+
+  // SideEffects states whether this webhookk has side effects.
+  // Acceptable values are: Unknown, None, Some, NoneOnDryRun
+  // Webhooks with side effects MUST implement a reconciliation system, since a request may be
+  // rejected by a future step in the admission change and the side effects therefore need to be undone.
+  // Requests with the dryRun attribute will be auto-rejected if they match a webhook with
+  // sideEffects == Unknown or Some. Defaults to Unknown.
+  // +optional
+  optional string sideEffects = 6;
 }
 
 // WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
 message WebhookClientConfig {
   // `url` gives the location of the webhook, in standard URL form
-  // (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+  // (`scheme://host:port/path`). Exactly one of `url` or `service`
   // must be specified.
-  // 
+  //
   // The `host` should not refer to a service running in the cluster; use
   // the `service` field instead. The host might be resolved via external
   // DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
   // in-cluster DNS as that would be a layering violation). `host` may
   // also be an IP address.
-  // 
+  //
   // Please note that using `localhost` or `127.0.0.1` as a `host` is
   // risky unless you take great care to run this webhook on all hosts
   // which run an apiserver which might need to make calls to this
   // webhook. Such installs are likely to be non-portable, i.e., not easy
   // to turn up in a new cluster.
-  // 
+  //
   // The scheme must be "https"; the URL must begin with "https://".
-  // 
+  //
   // A path is optional, and if present may be any string permissible in
   // a URL. You may use the path to pass an arbitrary string to the
   // webhook, for example, a cluster identifier.
-  // 
+  //
   // Attempting to use a user or basic auth e.g. "user:password@" is not
   // allowed. Fragments ("#...") and query parameters ("?...") are not
   // allowed, either.
-  // 
+  //
   // +optional
   optional string url = 3;
 
   // `service` is a reference to the service for this webhook. Either
   // `service` or `url` must be specified.
-  // 
+  //
   // If the webhook is running within the cluster, then you should use `service`.
-  // 
+  //
   // Port 443 will be used if it is open, otherwise it is an error.
-  // 
+  //
   // +optional
   optional ServiceReference service = 1;
 
-  // `caBundle` is a PEM encoded CA bundle which will be used to validate
-  // the webhook's server certificate.
-  // Required.
+  // `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+  // If unspecified, system trust roots on the apiserver are used.
+  // +optional
   optional bytes caBundle = 2;
 }
 

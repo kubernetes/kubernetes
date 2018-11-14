@@ -73,7 +73,6 @@ for a protocol buffer variable v:
 When the .proto file specifies `syntax="proto3"`, there are some differences:
 
   - Non-repeated fields of non-message type are values instead of pointers.
-  - Getters are only generated for message and oneof fields.
   - Enum types do not get an Enum method.
 
 The simplest way to describe this is to see an example.

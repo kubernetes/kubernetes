@@ -106,6 +106,15 @@ def check_for_upgrade_needed():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
     hookenv.status_set('maintenance', 'Checking resources')
 
+    # migrate to new flags
+    if is_state('kubernetes-master.restarted-for-cloud'):
+        remove_state('kubernetes-master.restarted-for-cloud')
+        set_state('kubernetes-master.cloud.ready')
+    if is_state('kubernetes-master.cloud-request-sent'):
+        # minor change, just for consistency
+        remove_state('kubernetes-master.cloud-request-sent')
+        set_state('kubernetes-master.cloud.request-sent')
+
     migrate_from_pre_snaps()
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
@@ -427,6 +436,38 @@ def set_app_version():
     hookenv.application_version_set(version.split(b' v')[-1].rstrip())
 
 
+@when('kubernetes-master.snaps.installed')
+@when('snap.refresh.set')
+@when('leadership.is_leader')
+def process_snapd_timer():
+    ''' Set the snapd refresh timer on the leader so all cluster members
+    (present and future) will refresh near the same time. '''
+    # Get the current snapd refresh timer; we know layer-snap has set this
+    # when the 'snap.refresh.set' flag is present.
+    timer = snap.get(snapname='core', key='refresh.timer').decode('utf-8')
+
+    # The first time through, data_changed will be true. Subsequent calls
+    # should only update leader data if something changed.
+    if data_changed('master_snapd_refresh', timer):
+        hookenv.log('setting snapd_refresh timer to: {}'.format(timer))
+        leader_set({'snapd_refresh': timer})
+
+
+@when('kubernetes-master.snaps.installed')
+@when('snap.refresh.set')
+@when('leadership.changed.snapd_refresh')
+@when_not('leadership.is_leader')
+def set_snapd_timer():
+    ''' Set the snapd refresh.timer on non-leader cluster members. '''
+    # NB: This method should only be run when 'snap.refresh.set' is present.
+    # Layer-snap will always set a core refresh.timer, which may not be the
+    # same as our leader. Gating with 'snap.refresh.set' ensures layer-snap
+    # has finished and we are free to set our config to the leader's timer.
+    timer = leader_get('snapd_refresh')
+    hookenv.log('setting snapd_refresh timer to: {}'.format(timer))
+    snap.set_refresh_timer(timer)
+
+
 @hookenv.atexit
 def set_final_status():
     ''' Set the final status of the charm as we leave hook execution '''
@@ -434,6 +475,22 @@ def set_final_status():
         goal_state = hookenv.goal_state()
     except NotImplementedError:
         goal_state = {}
+
+    vsphere_joined = is_state('endpoint.vsphere.joined')
+    azure_joined = is_state('endpoint.azure.joined')
+    cloud_blocked = is_state('kubernetes-master.cloud.blocked')
+    if vsphere_joined and cloud_blocked:
+        hookenv.status_set('blocked',
+                           'vSphere integration requires K8s 1.12 or greater')
+        return
+    if azure_joined and cloud_blocked:
+        hookenv.status_set('blocked',
+                           'Azure integration requires K8s 1.11 or greater')
+        return
+
+    if is_state('kubernetes-master.cloud.pending'):
+        hookenv.status_set('waiting', 'Waiting for cloud integration')
+        return
 
     if not is_state('kube-api-endpoint.available'):
         if 'kube-api-endpoint' in goal_state.get('relations', {}):
@@ -478,16 +535,6 @@ def set_final_status():
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         return
 
-    req_sent = is_state('kubernetes-master.cloud-request-sent')
-    openstack_joined = is_state('endpoint.openstack.joined')
-    cloud_req = req_sent or openstack_joined
-    aws_ready = is_state('endpoint.aws.ready')
-    gcp_ready = is_state('endpoint.gcp.ready')
-    openstack_ready = is_state('endpoint.openstack.ready')
-    cloud_ready = aws_ready or gcp_ready or openstack_ready
-    if cloud_req and not cloud_ready:
-        hookenv.status_set('waiting', 'waiting for cloud integration')
-
     if addons_configured and not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
         return
@@ -525,7 +572,9 @@ def master_services_down():
 @when('etcd.available', 'tls_client.server.certificate.saved',
       'authentication.setup')
 @when('leadership.set.auto_storage_backend')
-@when_not('kubernetes-master.components.started')
+@when_not('kubernetes-master.components.started',
+          'kubernetes-master.cloud.pending',
+          'kubernetes-master.cloud.blocked')
 def start_master(etcd):
     '''Run the Kubernetes master components.'''
     hookenv.status_set('maintenance',
@@ -1337,6 +1386,15 @@ def configure_apiserver(etcd_connection_string):
         cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'openstack'
         api_opts['cloud-config'] = str(cloud_config_path)
+    elif (is_state('endpoint.vsphere.ready') and
+          get_version('kube-apiserver') >= (1, 12)):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'vsphere'
+        api_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.azure.ready'):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'azure'
+        api_opts['cloud-config'] = str(cloud_config_path)
 
     audit_root = '/root/cdk/audit'
     os.makedirs(audit_root, exist_ok=True)
@@ -1393,6 +1451,15 @@ def configure_controller_manager():
     elif is_state('endpoint.openstack.ready'):
         cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'openstack'
+        controller_opts['cloud-config'] = str(cloud_config_path)
+    elif (is_state('endpoint.vsphere.ready') and
+          get_version('kube-apiserver') >= (1, 12)):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'vsphere'
+        controller_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.azure.ready'):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'azure'
         controller_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
@@ -1620,9 +1687,29 @@ def clear_cluster_tag_sent():
 
 
 @when_any('endpoint.aws.joined',
-          'endpoint.gcp.joined')
+          'endpoint.gcp.joined',
+          'endpoint.openstack.joined',
+          'endpoint.vsphere.joined',
+          'endpoint.azure.joined')
+@when_not('kubernetes-master.cloud.ready')
+def set_cloud_pending():
+    k8s_version = get_version('kube-apiserver')
+    k8s_1_11 = k8s_version >= (1, 11)
+    k8s_1_12 = k8s_version >= (1, 12)
+    vsphere_joined = is_state('endpoint.vsphere.joined')
+    azure_joined = is_state('endpoint.azure.joined')
+    if (vsphere_joined and not k8s_1_12) or (azure_joined and not k8s_1_11):
+        set_state('kubernetes-master.cloud.blocked')
+    else:
+        remove_state('kubernetes-master.cloud.blocked')
+    set_state('kubernetes-master.cloud.pending')
+
+
+@when_any('endpoint.aws.joined',
+          'endpoint.gcp.joined',
+          'endpoint.azure.joined')
 @when('leadership.set.cluster_tag')
-@when_not('kubernetes-master.cloud-request-sent')
+@when_not('kubernetes-master.cloud.request-sent')
 def request_integration():
     hookenv.status_set('maintenance', 'requesting cloud integration')
     cluster_tag = leader_get('cluster_tag')
@@ -1648,32 +1735,55 @@ def request_integration():
         })
         cloud.enable_object_storage_management()
         cloud.enable_security_management()
+    elif is_state('endpoint.azure.joined'):
+        cloud = endpoint_from_flag('endpoint.azure.joined')
+        cloud.tag_instance({
+            'k8s-io-cluster-name': cluster_tag,
+            'k8s-io-role-master': 'master',
+        })
+        cloud.enable_object_storage_management()
+        cloud.enable_security_management()
     cloud.enable_instance_inspection()
     cloud.enable_network_management()
     cloud.enable_dns_management()
     cloud.enable_block_storage_management()
-    set_state('kubernetes-master.cloud-request-sent')
+    set_state('kubernetes-master.cloud.request-sent')
 
 
 @when_none('endpoint.aws.joined',
-           'endpoint.gcp.joined')
-@when('kubernetes-master.cloud-request-sent')
-def clear_requested_integration():
-    remove_state('kubernetes-master.cloud-request-sent')
+           'endpoint.gcp.joined',
+           'endpoint.openstack.joined',
+           'endpoint.vsphere.joined',
+           'endpoint.azure.joined')
+def clear_cloud_flags():
+    remove_state('kubernetes-master.cloud.pending')
+    remove_state('kubernetes-master.cloud.request-sent')
+    remove_state('kubernetes-master.cloud.blocked')
+    remove_state('kubernetes-master.cloud.ready')
 
 
 @when_any('endpoint.aws.ready',
           'endpoint.gcp.ready',
-          'endpoint.openstack.ready')
-@when_not('kubernetes-master.restarted-for-cloud')
-def restart_for_cloud():
+          'endpoint.openstack.ready',
+          'endpoint.vsphere.ready',
+          'endpoint.azure.ready')
+@when_not('kubernetes-master.cloud.blocked',
+          'kubernetes-master.cloud.ready')
+def cloud_ready():
     if is_state('endpoint.gcp.ready'):
         _write_gcp_snap_config('kube-apiserver')
         _write_gcp_snap_config('kube-controller-manager')
     elif is_state('endpoint.openstack.ready'):
         _write_openstack_snap_config('kube-apiserver')
         _write_openstack_snap_config('kube-controller-manager')
-    set_state('kubernetes-master.restarted-for-cloud')
+    elif is_state('endpoint.vsphere.ready'):
+        _write_vsphere_snap_config('kube-apiserver')
+        _write_vsphere_snap_config('kube-controller-manager')
+    elif is_state('endpoint.azure.ready'):
+        _write_azure_snap_config('kube-apiserver')
+        _write_azure_snap_config('kube-controller-manager')
+    remove_state('kubernetes-master.cloud.pending')
+    set_state('kubernetes-master.cloud.ready')
     remove_state('kubernetes-master.components.started')  # force restart
 
 
@@ -1739,3 +1849,55 @@ def _write_openstack_snap_config(component):
         'tenant-name = {}'.format(openstack.project_name),
         'domain-name = {}'.format(openstack.user_domain_name),
     ]))
+
+
+def _write_vsphere_snap_config(component):
+    # vsphere requires additional cloud config
+    vsphere = endpoint_from_flag('endpoint.vsphere.ready')
+
+    # NB: vsphere provider will ask kube-apiserver and -controller-manager to
+    # find a uuid from sysfs unless a global config value is set. Our strict
+    # snaps cannot read sysfs, so let's do it in the charm. An invalid uuid is
+    # not fatal for storage, but it will muddy the logs; try to get it right.
+    uuid_file = '/sys/class/dmi/id/product_uuid'
+    try:
+        with open(uuid_file, 'r') as f:
+            uuid = f.read().strip()
+    except IOError as err:
+        hookenv.log("Unable to read UUID from sysfs: {}".format(err))
+        uuid = 'UNKNOWN'
+
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('\n'.join([
+        '[Global]',
+        'insecure-flag = true',
+        'datacenters = "{}"'.format(vsphere.datacenter),
+        'vm-uuid = "VMware-{}"'.format(uuid),
+        '[VirtualCenter "{}"]'.format(vsphere.vsphere_ip),
+        'user = {}'.format(vsphere.user),
+        'password = {}'.format(vsphere.password),
+        '[Workspace]',
+        'server = {}'.format(vsphere.vsphere_ip),
+        'datacenter = "{}"'.format(vsphere.datacenter),
+        'default-datastore = "{}"'.format(vsphere.datastore),
+        'folder = "kubernetes"',
+        'resourcepool-path = ""',
+        '[Disk]',
+        'scsicontrollertype = "pvscsi"',
+    ]))
+
+
+def _write_azure_snap_config(component):
+    azure = endpoint_from_flag('endpoint.azure.ready')
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text(json.dumps({
+        'useInstanceMetadata': True,
+        'useManagedIdentityExtension': True,
+        'subscriptionId': azure.subscription_id,
+        'resourceGroup': azure.resource_group,
+        'location': azure.resource_group_location,
+        'vnetName': azure.vnet_name,
+        'vnetResourceGroup': azure.vnet_resource_group,
+        'subnetName': azure.subnet_name,
+        'securityGroupName': azure.security_group_name,
+    }))

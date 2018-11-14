@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 // WaitForAPIServer waits for the API Server's /healthz endpoint to report "ok" with timeout.
@@ -40,7 +40,7 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 		if healthStatus != http.StatusOK {
 			content, _ := result.Raw()
 			lastErr = fmt.Errorf("APIServer isn't healthy: %v", string(content))
-			glog.Warningf("APIServer isn't healthy yet: %v. Waiting a little while.", string(content))
+			klog.Warningf("APIServer isn't healthy yet: %v. Waiting a little while.", string(content))
 			return false, nil
 		}
 

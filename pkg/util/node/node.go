@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,9 +36,11 @@ import (
 )
 
 const (
-	// The reason and message set on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// NodeUnreachablePodReason is the reason on a pod when its state cannot be confirmed as kubelet is unresponsive
 	// on the node it is (was) running.
-	NodeUnreachablePodReason  = "NodeLost"
+	NodeUnreachablePodReason = "NodeLost"
+	// NodeUnreachablePodMessage is the message on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// on the node it is (was) running.
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
 
@@ -89,6 +93,22 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
+}
+
+// GetNodeIP returns the ip of node with the provided hostname
+func GetNodeIP(client clientset.Interface, hostname string) net.IP {
+	var nodeIP net.IP
+	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
+	if err != nil {
+		klog.Warningf("Failed to retrieve node info: %v", err)
+		return nil
+	}
+	nodeIP, err = GetNodeHostIP(node)
+	if err != nil {
+		klog.Warningf("Failed to retrieve node IP: %v", err)
+		return nil
+	}
+	return nodeIP
 }
 
 // GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;

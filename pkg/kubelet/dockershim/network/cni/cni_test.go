@@ -36,7 +36,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -254,7 +254,7 @@ func TestCNIPlugin(t *testing.T) {
 	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "1M"
 
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation)
+	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation, nil)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -291,6 +291,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	expectedBandwidth := map[string]interface{}{
 		"ingressRate": 1000.0, "egressRate": 1000.0,
+		"ingressBurst": 2147483647.0, "egressBurst": 2147483647.0,
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {
 		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)

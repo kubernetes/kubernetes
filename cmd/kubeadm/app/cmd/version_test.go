@@ -19,8 +19,8 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 	"testing"
 )
 
@@ -80,7 +80,7 @@ func TestRunVersion(t *testing.T) {
 			goto error
 		}
 		if buf.String() == "" {
-			err = fmt.Errorf("empty output")
+			err = errors.New("empty output")
 			goto error
 		}
 		if tc.shouldBeValidYAML {

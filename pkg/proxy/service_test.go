@@ -115,6 +115,15 @@ func TestServiceToServiceMap(t *testing.T) {
 			expected: map[ServicePortName]*BaseServiceInfo{},
 		},
 		{
+			desc: "headless sctp service",
+			service: makeTestService("ns2", "headless", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeClusterIP
+				svc.Spec.ClusterIP = v1.ClusterIPNone
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sip", "SCTP", 7777, 0, 0)
+			}),
+			expected: map[ServicePortName]*BaseServiceInfo{},
+		},
+		{
 			desc: "headless service without port",
 			service: makeTestService("ns2", "headless-without-port", func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeClusterIP

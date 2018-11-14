@@ -537,28 +537,3 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 
 	return false
 }
-
-// ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements
-// labels.Selector.
-func ScopedResourceSelectorRequirementsAsSelector(ssr core.ScopedResourceSelectorRequirement) (labels.Selector, error) {
-	selector := labels.NewSelector()
-	var op selection.Operator
-	switch ssr.Operator {
-	case core.ScopeSelectorOpIn:
-		op = selection.In
-	case core.ScopeSelectorOpNotIn:
-		op = selection.NotIn
-	case core.ScopeSelectorOpExists:
-		op = selection.Exists
-	case core.ScopeSelectorOpDoesNotExist:
-		op = selection.DoesNotExist
-	default:
-		return nil, fmt.Errorf("%q is not a valid scope selector operator", ssr.Operator)
-	}
-	r, err := labels.NewRequirement(string(ssr.ScopeName), op, ssr.Values)
-	if err != nil {
-		return nil, err
-	}
-	selector = selector.Add(*r)
-	return selector, nil
-}

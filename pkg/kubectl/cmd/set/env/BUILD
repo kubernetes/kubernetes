@@ -10,12 +10,13 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set/env",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/resource:go_default_library",
-        "//pkg/fieldpath:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )

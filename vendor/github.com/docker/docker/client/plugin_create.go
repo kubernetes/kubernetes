@@ -1,12 +1,12 @@
 package client
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // PluginCreate creates a plugin

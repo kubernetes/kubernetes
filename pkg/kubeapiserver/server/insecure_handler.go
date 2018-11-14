@@ -19,26 +19,20 @@ package server
 import (
 	"net/http"
 
-	"k8s.io/apiserver/pkg/authentication/user"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // DeprecatedInsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
 // You shouldn't be using this.  It makes sig-auth sad.
 // DeprecatedInsecureServingInfo *ServingInfo
 
+// BuildInsecureHandlerChain sets up the server to listen to http. Should be removed.
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
-	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
-		handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
-	} else {
-		handler = genericapifilters.WithLegacyAudit(handler, c.LegacyAuditWriter)
-	}
-	handler = genericapifilters.WithAuthentication(handler, insecureSuperuser{}, nil)
+	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+	handler = genericapifilters.WithAuthentication(handler, server.InsecureSuperuser{}, nil, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
@@ -47,16 +41,4 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
-}
-
-// insecureSuperuser implements authenticator.Request to always return a superuser.
-// This is functionally equivalent to skipping authentication and authorization,
-// but allows apiserver code to stop special-casing a nil user to skip authorization checks.
-type insecureSuperuser struct{}
-
-func (insecureSuperuser) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	return &user.DefaultInfo{
-		Name:   "system:unsecured",
-		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
-	}, true, nil
 }

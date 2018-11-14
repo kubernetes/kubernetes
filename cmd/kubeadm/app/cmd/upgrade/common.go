@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -54,20 +55,25 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
+		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+	}
+
+	// Check if the cluster is self-hosted
+	if upgrade.IsControlPlaneSelfHosted(client) {
+		return nil, errors.Errorf("cannot upgrade a self-hosted control plane")
 	}
 
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
-		return nil, fmt.Errorf("[upgrade/health] FATAL: %v", err)
+		return nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade/config", flags.cfgPath)
+	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade/config", flags.cfgPath, false)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
 			fmt.Println("")
 			fmt.Println("[upgrade/config] Next steps:")
@@ -75,9 +81,9 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your master.\n")
 			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
 			fmt.Println("")
-			err = fmt.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+		return nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
 	// If a new k8s version should be set, apply the change before printing the config
@@ -89,13 +95,21 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 		if err != nil {
-			return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+			return nil, errors.Wrap(err, "[upgrade/config] FATAL")
 		}
+	}
+
+	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
+	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
+		for _, m := range msg {
+			fmt.Printf("[upgrade/config] %s\n", m)
+		}
+		return nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
-		printConfiguration(cfg, os.Stdout)
+		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
 	}
 
 	return &upgradeVariables{
@@ -109,13 +123,13 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(cfg *kubeadmapi.InitConfiguration, w io.Writer) {
+func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
-	if cfg == nil {
+	if clustercfg == nil {
 		return
 	}
 
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfg)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 
@@ -145,7 +159,7 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		// API Server's version
 		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get server version: %v", err)
+			return nil, errors.Wrap(err, "failed to get server version")
 		}
 
 		// Get the fake clientset
@@ -157,7 +171,7 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		// we can convert it to that struct.
 		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
 		if !ok {
-			return nil, fmt.Errorf("couldn't set fake discovery's server version")
+			return nil, errors.New("couldn't set fake discovery's server version")
 		}
 		// Lastly, set the right server version to be used
 		fakeclientDiscovery.FakedServerVersion = realServerVersion
@@ -183,12 +197,12 @@ func InteractivelyConfirmUpgrade(question string) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("couldn't read from standard input: %v", err)
+		return errors.Wrap(err, "couldn't read from standard input")
 	}
 	answer := scanner.Text()
 	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
 		return nil
 	}
 
-	return fmt.Errorf("won't proceed; the user didn't answer (Y|y) in order to continue")
+	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }

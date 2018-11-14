@@ -175,7 +175,7 @@ func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupRe
 // or returns error when timeout happens
 func WaitForScaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupResource, resourceName string, namespace string, newSize uint, waitForReplicas *RetryParams) error {
 	if waitForReplicas == nil {
-		return fmt.Errorf("waitForReplicas parameter cannot be nil!")
+		return fmt.Errorf("waitForReplicas parameter cannot be nil")
 	}
 	err := wait.PollImmediate(
 		waitForReplicas.Interval,

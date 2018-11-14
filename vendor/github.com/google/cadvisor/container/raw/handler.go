@@ -25,9 +25,9 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
 
-	"github.com/golang/glog"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"k8s.io/klog"
 )
 
 type rawContainerHandler struct {
@@ -49,7 +49,7 @@ func isRootCgroup(name string) bool {
 	return name == "/"
 }
 
-func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *common.InotifyWatcher, rootFs string, ignoreMetrics container.MetricSet) (container.ContainerHandler, error) {
+func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, watcher *common.InotifyWatcher, rootFs string, includedMetrics container.MetricSet) (container.ContainerHandler, error) {
 	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	cHints, err := common.GetContainerHintsFromFile(*common.ArgContainerHints)
@@ -78,7 +78,7 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		pid = 1
 	}
 
-	handler := libcontainer.NewHandler(cgroupManager, rootFs, pid, ignoreMetrics)
+	handler := libcontainer.NewHandler(cgroupManager, rootFs, pid, includedMetrics)
 
 	return &rawContainerHandler{
 		name:                name,
@@ -134,7 +134,7 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 		// Get memory and swap limits of the running machine
 		memLimit, err := machine.GetMachineMemoryCapacity()
 		if err != nil {
-			glog.Warningf("failed to obtain memory limit for machine container")
+			klog.Warningf("failed to obtain memory limit for machine container")
 			spec.HasMemory = false
 		} else {
 			spec.Memory.Limit = uint64(memLimit)
@@ -144,7 +144,7 @@ func (self *rawContainerHandler) GetSpec() (info.ContainerSpec, error) {
 
 		swapLimit, err := machine.GetMachineSwapCapacity()
 		if err != nil {
-			glog.Warningf("failed to obtain swap limit for machine container")
+			klog.Warningf("failed to obtain swap limit for machine container")
 		} else {
 			spec.Memory.SwapLimit = uint64(swapLimit)
 		}

@@ -45,17 +45,17 @@ run_kubectl_run_tests() {
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
   # new generator was used
-  output_message=$(kubectl get deployment.extensions/nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
-  kube::test::if_has_string "${output_message}" '2'
+  output_message=$(kubectl get deployment.apps/nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
+  kube::test::if_has_string "${output_message}" '10'
   # Clean up
   kubectl delete deployment nginx-extensions "${kube_flags[@]}"
   # Command
-  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1beta1 "${kube_flags[@]}"
+  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1 "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-apps:'
   # and new generator was used, iow. new defaults are applied
   output_message=$(kubectl get deployment/nginx-apps -o jsonpath='{.spec.revisionHistoryLimit}')
-  kube::test::if_has_string "${output_message}" '2'
+  kube::test::if_has_string "${output_message}" '10'
   # Clean up
   kubectl delete deployment nginx-apps "${kube_flags[@]}"
 

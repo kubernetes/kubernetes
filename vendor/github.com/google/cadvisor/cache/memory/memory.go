@@ -15,7 +15,7 @@
 package memory
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -23,10 +23,13 @@ import (
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-// TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerCache and InMemoryCache.
+// ErrDataNotFound is the error resulting if failed to find a container in memory cache.
+var ErrDataNotFound = errors.New("unable to find data in memory cache")
+
+// TODO(vmarmol): See about refactoring this class, we have an unnecessary redirection of containerCache and InMemoryCache.
 // containerCache is used to store per-container information
 type containerCache struct {
 	ref         info.ContainerReference
@@ -88,7 +91,7 @@ func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.Conta
 		// may want to start a pool of goroutines to do write
 		// operations.
 		if err := self.backend.AddStats(cInfo, stats); err != nil {
-			glog.Error(err)
+			klog.Error(err)
 		}
 	}
 	return cstore.AddStats(stats)
@@ -101,7 +104,7 @@ func (self *InMemoryCache) RecentStats(name string, start, end time.Time, maxSta
 		self.lock.RLock()
 		defer self.lock.RUnlock()
 		if cstore, ok = self.containerCacheMap[name]; !ok {
-			return fmt.Errorf("unable to find data for container %v", name)
+			return ErrDataNotFound
 		}
 		return nil
 	}()

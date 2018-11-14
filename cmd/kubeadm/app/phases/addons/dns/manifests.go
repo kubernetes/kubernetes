@@ -22,7 +22,7 @@ const (
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kube-dns
+  name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
     k8s-app: kube-dns
@@ -50,7 +50,7 @@ spec:
           optional: true
       containers:
       - name: kubedns
-        image: {{ .ImageRepository }}/k8s-dns-kube-dns-{{ .Arch }}:{{ .Version }}
+        image: {{ .KubeDNSImage }}
         imagePullPolicy: IfNotPresent
         resources:
           # TODO: Set memory limits when we've profiled the container for large
@@ -102,7 +102,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: {{ .ImageRepository }}/k8s-dns-dnsmasq-nanny-{{ .Arch }}:{{ .Version }}
+        image: {{ .DNSMasqImage }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -143,7 +143,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: {{ .ImageRepository }}/k8s-dns-sidecar-{{ .Arch }}:{{ .Version }}
+        image: {{ .SidecarImage }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -174,8 +174,6 @@ spec:
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
-      nodeSelector:
-        beta.kubernetes.io/arch: {{ .Arch }}
 `
 
 	// KubeDNSService is the kube-dns Service manifest
@@ -215,7 +213,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: coredns
+  name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
     k8s-app: kube-dns
@@ -241,7 +239,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: coredns
-        image: {{ .ImageRepository }}/coredns:{{ .Version }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -311,7 +309,9 @@ data:
         prometheus :9153
         proxy . {{ .UpstreamNameserver }}
         cache 30
+        loop
         reload
+        loadbalance
     }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
@@ -331,6 +331,12 @@ rules:
   verbs:
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
 `
 	// CoreDNSClusterRoleBinding is the CoreDNS Clusterrolebinding manifest
 	CoreDNSClusterRoleBinding = `

@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/etcd"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	"k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 )
 
 // QuotaAccessor abstracts the get/set logic from the rest of the Evaluator.  This could be a test stub, a straight passthrough,
@@ -35,17 +35,17 @@ import (
 type QuotaAccessor interface {
 	// UpdateQuotaStatus is called to persist final status.  This method should write to persistent storage.
 	// An error indicates that write didn't complete successfully.
-	UpdateQuotaStatus(newQuota *api.ResourceQuota) error
+	UpdateQuotaStatus(newQuota *corev1.ResourceQuota) error
 
 	// GetQuotas gets all possible quotas for a given namespace
-	GetQuotas(namespace string) ([]api.ResourceQuota, error)
+	GetQuotas(namespace string) ([]corev1.ResourceQuota, error)
 }
 
 type quotaAccessor struct {
-	client clientset.Interface
+	client kubernetes.Interface
 
 	// lister can list/get quota objects from a shared informer's cache
-	lister corelisters.ResourceQuotaLister
+	lister corev1listers.ResourceQuotaLister
 
 	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
 	// This lets us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
@@ -77,8 +77,8 @@ func newQuotaAccessor() (*quotaAccessor, error) {
 	}, nil
 }
 
-func (e *quotaAccessor) UpdateQuotaStatus(newQuota *api.ResourceQuota) error {
-	updatedQuota, err := e.client.Core().ResourceQuotas(newQuota.Namespace).UpdateStatus(newQuota)
+func (e *quotaAccessor) UpdateQuotaStatus(newQuota *corev1.ResourceQuota) error {
+	updatedQuota, err := e.client.CoreV1().ResourceQuotas(newQuota.Namespace).UpdateStatus(newQuota)
 	if err != nil {
 		return err
 	}
@@ -93,13 +93,13 @@ var etcdVersioner = etcd.APIObjectVersioner{}
 // checkCache compares the passed quota against the value in the look-aside cache and returns the newer
 // if the cache is out of date, it deletes the stale entry.  This only works because of etcd resourceVersions
 // being monotonically increasing integers
-func (e *quotaAccessor) checkCache(quota *api.ResourceQuota) *api.ResourceQuota {
+func (e *quotaAccessor) checkCache(quota *corev1.ResourceQuota) *corev1.ResourceQuota {
 	key := quota.Namespace + "/" + quota.Name
 	uncastCachedQuota, ok := e.updatedQuotas.Get(key)
 	if !ok {
 		return quota
 	}
-	cachedQuota := uncastCachedQuota.(*api.ResourceQuota)
+	cachedQuota := uncastCachedQuota.(*corev1.ResourceQuota)
 
 	if etcdVersioner.CompareResourceVersion(quota, cachedQuota) >= 0 {
 		e.updatedQuotas.Remove(key)
@@ -108,7 +108,7 @@ func (e *quotaAccessor) checkCache(quota *api.ResourceQuota) *api.ResourceQuota 
 	return cachedQuota
 }
 
-func (e *quotaAccessor) GetQuotas(namespace string) ([]api.ResourceQuota, error) {
+func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, error) {
 	// determine if there are any quotas in this namespace
 	// if there are no quotas, we don't need to do anything
 	items, err := e.lister.ResourceQuotas(namespace).List(labels.Everything())
@@ -142,7 +142,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]api.ResourceQuota, error)
 		}
 	}
 
-	resourceQuotas := []api.ResourceQuota{}
+	resourceQuotas := []corev1.ResourceQuota{}
 	for i := range items {
 		quota := items[i]
 		quota = e.checkCache(quota)

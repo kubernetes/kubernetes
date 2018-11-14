@@ -83,9 +83,6 @@ function create-master-instance-internal() {
     retries=30
     sleep_sec=60
   fi
-  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud beta"
-  fi
 
   local -r master_name="${1}"
   local -r address="${2:-}"

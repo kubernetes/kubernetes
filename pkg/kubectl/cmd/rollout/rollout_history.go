@@ -24,11 +24,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -74,13 +74,14 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "history (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "history (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("View rollout history"),
-		Long:    history_long,
-		Example: history_example,
+		Short:                 i18n.T("View rollout history"),
+		Long:                  history_long,
+		Example:               history_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs: validArgs,
@@ -118,7 +119,7 @@ func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, 
 
 func (o *RolloutHistoryOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-		return fmt.Errorf("Required resource not specified.")
+		return fmt.Errorf("required resource not specified")
 	}
 	if o.Revision < 0 {
 		return fmt.Errorf("revision must be a positive integer: %v", o.Revision)
@@ -167,6 +168,6 @@ func (o *RolloutHistoryOptions) Run() error {
 			return err
 		}
 
-		return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		return printer.PrintObj(info.Object, o.Out)
 	})
 }

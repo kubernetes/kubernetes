@@ -12,6 +12,7 @@ go_library(
         "exec_windows.go",
         "memory_windows.go",
         "mksyscall.go",
+        "race.go",
         "race0.go",
         "security_windows.go",
         "service.go",
@@ -39,6 +40,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/golang.org/x/sys/windows/registry:all-srcs",
         "//vendor/golang.org/x/sys/windows/svc:all-srcs",
     ],
     tags = ["automanaged"],

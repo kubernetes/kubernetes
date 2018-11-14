@@ -19,7 +19,6 @@ package kubelet
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -27,7 +26,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/utils/exec"
 )
 
@@ -79,7 +77,7 @@ var (
 	errCgroupExecer = fakeExecer{
 		ioMap: map[string]fakeCmd{
 			"docker info": {
-				err: fmt.Errorf("no such binary: docker"),
+				err: errors.New("no such binary: docker"),
 			},
 		},
 	}
@@ -206,9 +204,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					},
 				},
 				registerTaintsUsingFlags: true,
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
-				defaultHostname: "foo",
+				execer:                   cgroupfsCgroupExecer,
+				pidOfFunc:                binaryNotRunningPidOfFunc,
+				defaultHostname:          "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -234,23 +232,21 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 		},
 		{
-			name: "dynamic kubelet config enabled",
+			name: "pause image is set",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
+					CRISocket: "/var/run/dockershim.sock",
 					Name:      "foo",
 				},
-				featureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
+				pauseImage:      "gcr.io/pause:3.1",
 				execer:          cgroupfsCgroupExecer,
 				pidOfFunc:       binaryNotRunningPidOfFunc,
 				defaultHostname: "foo",
 			},
 			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"dynamic-config-dir":         fmt.Sprintf("%s/dynamic-config", kubeadmconstants.KubeletRunDirectory),
+				"network-plugin":            "cni",
+				"cgroup-driver":             "cgroupfs",
+				"pod-infra-container-image": "gcr.io/pause:3.1",
 			},
 		},
 	}

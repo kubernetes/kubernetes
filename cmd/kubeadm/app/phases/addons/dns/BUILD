@@ -33,7 +33,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/features:go_default_library",
+        "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -45,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/github.com/mholt/caddy/caddyfile:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 

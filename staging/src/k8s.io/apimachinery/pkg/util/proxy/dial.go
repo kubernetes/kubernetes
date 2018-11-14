@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
@@ -35,7 +35,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 
 	dialer, err := utilnet.DialerFor(transport)
 	if err != nil {
-		glog.V(5).Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
+		klog.V(5).Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
 	}
 
 	switch url.Scheme {
@@ -52,7 +52,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 		var err error
 		tlsConfig, err = utilnet.TLSClientConfig(transport)
 		if err != nil {
-			glog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
+			klog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
 		}
 
 		if dialer != nil {
@@ -64,7 +64,7 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 			}
 			if tlsConfig == nil {
 				// tls.Client requires non-nil config
-				glog.Warningf("using custom dialer with no TLSClientConfig. Defaulting to InsecureSkipVerify")
+				klog.Warningf("using custom dialer with no TLSClientConfig. Defaulting to InsecureSkipVerify")
 				// tls.Handshake() requires ServerName or InsecureSkipVerify
 				tlsConfig = &tls.Config{
 					InsecureSkipVerify: true,

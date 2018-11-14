@@ -61,7 +61,7 @@ func (us *unsafeSet) Remove(value string) {
 // Contains returns whether the set contains the given value
 func (us *unsafeSet) Contains(value string) (exists bool) {
 	_, exists = us.d[value]
-	return
+	return exists
 }
 
 // ContainsAll returns whether the set contains all given values
@@ -94,7 +94,7 @@ func (us *unsafeSet) Values() (values []string) {
 	for val := range us.d {
 		values = append(values, val)
 	}
-	return
+	return values
 }
 
 // Copy creates a new Set containing the values of the first

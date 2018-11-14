@@ -24,10 +24,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
@@ -40,10 +40,6 @@ type cidrs struct {
 var (
 	lbSrcRngsFlag cidrs
 )
-
-func newLoadBalancerMetricContext(request, region string) *metricContext {
-	return newGenericMetricContext("loadbalancer", request, region, unusedMetricLabel, computeV1Version)
-}
 
 func init() {
 	var err error
@@ -91,9 +87,9 @@ func LoadBalancerSrcRanges() []string {
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (gce *GCECloud) GetLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
-	fwd, err := gce.GetRegionForwardingRule(loadBalancerName, gce.region)
+func (g *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
+	loadBalancerName := g.GetLoadBalancerName(ctx, clusterName, svc)
+	fwd, err := g.GetRegionForwardingRule(loadBalancerName, g.region)
 	if err == nil {
 		status := &v1.LoadBalancerStatus{}
 		status.Ingress = []v1.LoadBalancerIngress{{IP: fwd.IPAddress}}
@@ -104,23 +100,23 @@ func (gce *GCECloud) GetLoadBalancer(ctx context.Context, clusterName string, sv
 }
 
 // GetLoadBalancerName is an implementation of LoadBalancer.GetLoadBalancerName.
-func (gce *GCECloud) GetLoadBalancerName(ctx context.Context, clusterName string, svc *v1.Service) string {
+func (g *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, svc *v1.Service) string {
 	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(svc)
 }
 
 // EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
-func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
+func (g *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	loadBalancerName := g.GetLoadBalancerName(ctx, clusterName, svc)
 	desiredScheme := getSvcScheme(svc)
-	clusterID, err := gce.ClusterID.GetID()
+	clusterID, err := g.ClusterID.GetID()
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): ensure %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, desiredScheme)
+	klog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): ensure %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, desiredScheme)
 
-	existingFwdRule, err := gce.GetRegionForwardingRule(loadBalancerName, gce.region)
+	existingFwdRule, err := g.GetRegionForwardingRule(loadBalancerName, g.region)
 	if err != nil && !isNotFound(err) {
 		return nil, err
 	}
@@ -130,14 +126,14 @@ func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string,
 
 		// If the loadbalancer type changes between INTERNAL and EXTERNAL, the old load balancer should be deleted.
 		if existingScheme != desiredScheme {
-			glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): deleting existing %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, existingScheme)
+			klog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): deleting existing %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, existingScheme)
 			switch existingScheme {
 			case cloud.SchemeInternal:
-				err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
+				err = g.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
 			default:
-				err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
+				err = g.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
 			}
-			glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done deleting existing %v loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, existingScheme, err)
+			klog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done deleting existing %v loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, existingScheme, err)
 			if err != nil {
 				return nil, err
 			}
@@ -150,53 +146,53 @@ func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string,
 	var status *v1.LoadBalancerStatus
 	switch desiredScheme {
 	case cloud.SchemeInternal:
-		status, err = gce.ensureInternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
+		status, err = g.ensureInternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
 	default:
-		status, err = gce.ensureExternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
+		status, err = g.ensureExternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
 	}
-	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done ensuring loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, err)
+	klog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done ensuring loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
 	return status, err
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
-func (gce *GCECloud) UpdateLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service, nodes []*v1.Node) error {
-	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
+func (g *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service, nodes []*v1.Node) error {
+	loadBalancerName := g.GetLoadBalancerName(ctx, clusterName, svc)
 	scheme := getSvcScheme(svc)
-	clusterID, err := gce.ClusterID.GetID()
+	clusterID, err := g.ClusterID.GetID()
 	if err != nil {
 		return err
 	}
 
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v, %v): updating with %d nodes", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, len(nodes))
+	klog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v, %v): updating with %d nodes", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, len(nodes))
 
 	switch scheme {
 	case cloud.SchemeInternal:
-		err = gce.updateInternalLoadBalancer(clusterName, clusterID, svc, nodes)
+		err = g.updateInternalLoadBalancer(clusterName, clusterID, svc, nodes)
 	default:
-		err = gce.updateExternalLoadBalancer(clusterName, svc, nodes)
+		err = g.updateExternalLoadBalancer(clusterName, svc, nodes)
 	}
-	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v, %v): done updating. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, err)
+	klog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v, %v, %v): done updating. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
 	return err
 }
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
-func (gce *GCECloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, svc *v1.Service) error {
-	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
+func (g *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, svc *v1.Service) error {
+	loadBalancerName := g.GetLoadBalancerName(ctx, clusterName, svc)
 	scheme := getSvcScheme(svc)
-	clusterID, err := gce.ClusterID.GetID()
+	clusterID, err := g.ClusterID.GetID()
 	if err != nil {
 		return err
 	}
 
-	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): deleting loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region)
+	klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): deleting loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region)
 
 	switch scheme {
 	case cloud.SchemeInternal:
-		err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
+		err = g.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
 	default:
-		err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
+		err = g.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
 	}
-	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, err)
+	klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
 	return err
 }
 

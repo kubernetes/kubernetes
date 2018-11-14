@@ -430,7 +430,7 @@ run_recursive_resources_tests() {
   ## Attempt to rollback the replication controllers to revision 1 recursively
   output_message=$(! kubectl rollout undo -f hack/testdata/recursive/rc --recursive --to-revision=1 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 should error as they are RC's, and since busybox2 is malformed, it should error
-  kube::test::if_has_string "${output_message}" 'no rollbacker has been implemented for {"" "ReplicationController"}'
+  kube::test::if_has_string "${output_message}" 'no rollbacker has been implemented for "ReplicationController"'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Attempt to pause the replication controllers recursively
   output_message=$(! kubectl rollout pause -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")

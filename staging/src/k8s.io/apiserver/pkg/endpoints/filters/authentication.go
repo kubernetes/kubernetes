@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,27 +50,33 @@ func init() {
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, "Authorization" header is removed from the request and handler
 // is invoked to serve the request.
-func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler) http.Handler {
+func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences) http.Handler {
 	if auth == nil {
-		glog.Warningf("Authentication is disabled")
+		klog.Warningf("Authentication is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		user, ok, err := auth.AuthenticateRequest(req)
+		if len(apiAuds) > 0 {
+			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
+		}
+		resp, ok, err := auth.AuthenticateRequest(req)
 		if err != nil || !ok {
 			if err != nil {
-				glog.Errorf("Unable to authenticate the request due to an error: %v", err)
+				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
 			}
 			failed.ServeHTTP(w, req)
 			return
 		}
 
+		// TODO(mikedanese): verify the response audience matches one of apiAuds if
+		// non-empty
+
 		// authorization header is not required anymore in case of a successful authentication.
 		req.Header.Del("Authorization")
 
-		req = req.WithContext(genericapirequest.WithUser(req.Context(), user))
+		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 
-		authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
+		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
 
 		handler.ServeHTTP(w, req)
 	})

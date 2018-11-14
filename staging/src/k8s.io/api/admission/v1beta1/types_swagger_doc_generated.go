@@ -39,6 +39,7 @@ var map_AdmissionRequest = map[string]string{
 	"userInfo":    "UserInfo is information about the requesting user",
 	"object":      "Object is the object from the incoming request prior to default values being applied",
 	"oldObject":   "OldObject is the existing object. Only populated for UPDATE requests.",
+	"dryRun":      "DryRun indicates that modifications will definitely not be persisted for this request. Defaults to false.",
 }
 
 func (AdmissionRequest) SwaggerDoc() map[string]string {

@@ -18,7 +18,6 @@ package cloud
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -35,6 +35,96 @@ import (
 
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
+
+func nodeSelectorRequirementsEqual(r1, r2 v1.NodeSelectorRequirement) bool {
+	if r1.Key != r2.Key {
+		return false
+	}
+	if r1.Operator != r2.Operator {
+		return false
+	}
+	vals1 := sets.NewString(r1.Values...)
+	vals2 := sets.NewString(r2.Values...)
+	if vals1.Equal(vals2) {
+		return true
+	}
+	return false
+}
+
+func nodeSelectorTermsEqual(t1, t2 v1.NodeSelectorTerm) bool {
+	exprs1 := t1.MatchExpressions
+	exprs2 := t2.MatchExpressions
+	fields1 := t1.MatchFields
+	fields2 := t2.MatchFields
+	if len(exprs1) != len(exprs2) {
+		return false
+	}
+	if len(fields1) != len(fields2) {
+		return false
+	}
+	match := func(reqs1, reqs2 []v1.NodeSelectorRequirement) bool {
+		for _, req1 := range reqs1 {
+			reqMatched := false
+			for _, req2 := range reqs2 {
+				if nodeSelectorRequirementsEqual(req1, req2) {
+					reqMatched = true
+					break
+				}
+			}
+			if !reqMatched {
+				return false
+			}
+		}
+		return true
+	}
+	return match(exprs1, exprs2) && match(exprs2, exprs1) && match(fields1, fields2) && match(fields2, fields1)
+}
+
+// volumeNodeAffinitiesEqual performs a highly semantic comparison of two VolumeNodeAffinity data structures
+// It ignores ordering of instances of NodeSelectorRequirements in a VolumeNodeAffinity's NodeSelectorTerms as well as
+// orderding of strings in Values of NodeSelectorRequirements when matching two VolumeNodeAffinity structures.
+// Note that in most equality functions, Go considers two slices to be not equal if the order of elements in a slice do not
+// match - so reflect.DeepEqual as well as Semantic.DeepEqual do not work for comparing VolumeNodeAffinity semantically.
+// e.g. these two NodeSelectorTerms are considered semantically equal by volumeNodeAffinitiesEqual
+// &VolumeNodeAffinity{Required:&NodeSelector{NodeSelectorTerms:[{[{a In [1]} {b In [2 3]}] []}],},}
+// &VolumeNodeAffinity{Required:&NodeSelector{NodeSelectorTerms:[{[{b In [3 2]} {a In [1]}] []}],},}
+// TODO: move volumeNodeAffinitiesEqual to utils so other can use it too
+func volumeNodeAffinitiesEqual(n1, n2 *v1.VolumeNodeAffinity) bool {
+	if (n1 == nil) != (n2 == nil) {
+		return false
+	}
+	if n1 == nil || n2 == nil {
+		return true
+	}
+	ns1 := n1.Required
+	ns2 := n2.Required
+
+	if (ns1 == nil) != (ns2 == nil) {
+		return false
+	}
+	if (ns1 == nil) && (ns2 == nil) {
+		return true
+	}
+	if len(ns1.NodeSelectorTerms) != len(ns1.NodeSelectorTerms) {
+		return false
+	}
+	match := func(terms1, terms2 []v1.NodeSelectorTerm) bool {
+		for _, term1 := range terms1 {
+			termMatched := false
+			for _, term2 := range terms2 {
+				if nodeSelectorTermsEqual(term1, term2) {
+					termMatched = true
+					break
+				}
+			}
+			if !termMatched {
+				return false
+			}
+		}
+		return true
+	}
+	return match(ns1.NodeSelectorTerms, ns2.NodeSelectorTerms) && match(ns2.NodeSelectorTerms, ns1.NodeSelectorTerms)
+}
 
 func TestCreatePatch(t *testing.T) {
 	ignoredPV := v1.PersistentVolume{
@@ -288,12 +378,12 @@ func TestCreatePatch(t *testing.T) {
 						{
 							Key:      "e",
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"val4", "val5"},
+							Values:   []string{"val5", "val4"},
 						},
 						{
 							Key:      kubeletapis.LabelZoneFailureDomain,
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"1", "2", "3"},
+							Values:   []string{"3", "2", "1"},
 						},
 					},
 				},
@@ -382,7 +472,7 @@ func TestCreatePatch(t *testing.T) {
 				t.Errorf("%s: label %s expected %s got %s", d, k, v, obj.ObjectMeta.Labels[k])
 			}
 		}
-		if !reflect.DeepEqual(tc.expectedAffinity, obj.Spec.NodeAffinity) {
+		if !volumeNodeAffinitiesEqual(tc.expectedAffinity, obj.Spec.NodeAffinity) {
 			t.Errorf("Expected affinity %v does not match target affinity %v", tc.expectedAffinity, obj.Spec.NodeAffinity)
 		}
 	}

@@ -36,6 +36,8 @@ type FakeDiscovery struct {
 	FakedServerVersion *version.Info
 }
 
+// ServerResourcesForGroupVersion returns the supported resources for a group
+// and version.
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
@@ -50,6 +52,7 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
 }
 
+// ServerResources returns the supported resources for all groups and versions.
 func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
@@ -59,14 +62,20 @@ func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
 	return c.Resources, nil
 }
 
+// ServerPreferredResources returns the supported resources with the version
+// preferred by the server.
 func (c *FakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
+// ServerPreferredNamespacedResources returns the supported namespaced resources
+// with the version preferred by the server.
 func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
+// ServerGroups returns the supported groups, with information like supported
+// versions and the preferred version.
 func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	action := testing.ActionImpl{
 		Verb:     "get",
@@ -108,6 +117,7 @@ func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 
 }
 
+// ServerVersion retrieves and parses the server's version.
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
@@ -122,10 +132,13 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	return &versionInfo, nil
 }
 
+// OpenAPISchema retrieves and parses the swagger API schema the server supports.
 func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
 }
 
+// RESTClient returns a RESTClient that is used to communicate with API server
+// by this client implementation.
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil
 }

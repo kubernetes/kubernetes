@@ -44,188 +44,107 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
-
-type storageClassTest struct {
-	name               string
-	cloudProviders     []string
-	provisioner        string
-	parameters         map[string]string
-	delayBinding       bool
-	claimSize          string
-	expectedSize       string
-	pvCheck            func(volume *v1.PersistentVolume) error
-	nodeName           string
-	skipWriteReadCheck bool
-	volumeMode         *v1.PersistentVolumeMode
-}
 
 const (
 	// Plugin name of the external provisioner
 	externalPluginName = "example.com/nfs"
+	// Number of PVCs for multi PVC tests
+	multiPVCcount = 3
 )
 
-func testDynamicProvisioning(t storageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) *v1.PersistentVolume {
-	var err error
-	if class != nil {
-		By("creating a StorageClass " + class.Name)
-		class, err = client.StorageV1().StorageClasses().Create(class)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
-		}()
-	}
-
-	By("creating a claim")
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
-		// typically this claim has already been deleted
-		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
-			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
-		}
-	}()
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("checking the claim")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Check sizes
-	expectedCapacity := resource.MustParse(t.expectedSize)
-	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
-
-	requestedCapacity := resource.MustParse(t.claimSize)
-	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
-
-	// Check PV properties
-	By("checking the PV")
-	expectedAccessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
-	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
-	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
-	if class == nil {
-		Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(v1.PersistentVolumeReclaimDelete))
-	} else {
-		Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(*class.ReclaimPolicy))
-		Expect(pv.Spec.MountOptions).To(Equal(class.MountOptions))
-	}
-	if t.volumeMode != nil {
-		Expect(pv.Spec.VolumeMode).NotTo(BeNil())
-		Expect(*pv.Spec.VolumeMode).To(Equal(*t.volumeMode))
-	}
-
-	// Run the checker
-	if t.pvCheck != nil {
-		err = t.pvCheck(pv)
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	if !t.skipWriteReadCheck {
-		// We start two pods:
-		// - The first writes 'hello word' to the /mnt/test (= the volume).
-		// - The second one runs grep 'hello world' on /mnt/test.
-		// If both succeed, Kubernetes actually allocated something that is
-		// persistent across pods.
-		By("checking the created volume is writable and has the PV's mount options")
-		command := "echo 'hello world' > /mnt/test/data"
-		// We give the first pod the secondary responsibility of checking the volume has
-		// been mounted with the PV's mount options, if the PV was provisioned with any
-		for _, option := range pv.Spec.MountOptions {
-			// Get entry, get mount options at 6th word, replace brackets with commas
-			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
-		}
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.nodeName, command)
-
-		By("checking the created volume is readable and retains data")
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.nodeName, "grep 'hello world' /mnt/test/data")
-	}
-	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
-	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
-
-	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
-	// Retain, there's no use waiting because the PV won't be auto-deleted and
-	// it's expected for the caller to do it.) Technically, the first few delete
-	// attempts may fail, as the volume is still attached to a node because
-	// kubelet is slowly cleaning up the previous pod, however it should succeed
-	// in a couple of minutes. Wait 20 minutes to recover from random cloud
-	// hiccups.
-	if pv.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
-		By(fmt.Sprintf("deleting the claim's PV %q", pv.Name))
-		framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
-	}
-
-	return pv
+func testBindingWaitForFirstConsumer(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolume, *v1.Node) {
+	pvs, node := testBindingWaitForFirstConsumerMultiPVC(client, []*v1.PersistentVolumeClaim{claim}, class)
+	return pvs[0], node
 }
 
-func testBindingWaitForFirstConsumer(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolume, *v1.Node) {
+func testBindingWaitForFirstConsumerMultiPVC(client clientset.Interface, claims []*v1.PersistentVolumeClaim, class *storage.StorageClass) ([]*v1.PersistentVolume, *v1.Node) {
 	var err error
+	Expect(len(claims)).ToNot(Equal(0))
+	namespace := claims[0].Namespace
 
 	By("creating a storage class " + class.Name)
 	class, err = client.StorageV1().StorageClasses().Create(class)
 	Expect(err).NotTo(HaveOccurred())
 	defer deleteStorageClass(client, class.Name)
 
-	By("creating a claim")
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	Expect(err).NotTo(HaveOccurred())
+	By("creating claims")
+	var claimNames []string
+	var createdClaims []*v1.PersistentVolumeClaim
+	for _, claim := range claims {
+		c, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+		claimNames = append(claimNames, c.Name)
+		createdClaims = append(createdClaims, c)
+		Expect(err).NotTo(HaveOccurred())
+	}
 	defer func() {
-		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace), "Failed to delete PVC ", claim.Name)
+		var errors map[string]error
+		for _, claim := range createdClaims {
+			err := framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace)
+			if err != nil {
+				errors[claim.Name] = err
+			}
+		}
+		if len(errors) > 0 {
+			for claimName, err := range errors {
+				framework.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
+			}
+		}
 	}()
 
-	// Wait for ClaimProvisionTimeout and make sure the phase did not become Bound i.e. the Wait errors out
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
+	By("checking the claims are in pending state")
+	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, client, namespace, claimNames, 2*time.Second, framework.ClaimProvisionShortTimeout, true)
 	Expect(err).To(HaveOccurred())
+	for _, claim := range createdClaims {
+		// Get new copy of the claim
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
+	}
 
-	By("checking the claim is in pending state")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
-
-	By("creating a pod referring to the claim")
+	By("creating a pod referring to the claims")
 	// Create a pod referring to the claim and wait for it to get to running
-	pod, err := framework.CreateClientPod(client, claim.Namespace, claim)
+	pod, err := framework.CreatePod(client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		framework.DeletePodOrFail(client, pod.Namespace, pod.Name)
 	}()
-
-	By("re-checking the claim to see it binded")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	// make sure claim did bind
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
-
-	// collect node and pv details
+	// collect node details
 	node, err := client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	By("re-checking the claims to see they binded")
+	var pvs []*v1.PersistentVolume
+	for _, claim := range createdClaims {
+		// Get new copy of the claim
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		// make sure claim did bind
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		Expect(err).NotTo(HaveOccurred())
 
-	return pv, node
+		pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		pvs = append(pvs, pv)
+	}
+	Expect(len(pvs)).ToNot(Equal(0))
+	return pvs, node
+}
+
+func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZone bool) {
+	checkZonesFromLabelAndAffinity(pv, sets.NewString(zone), matchZone)
 }
 
 // checkZoneLabelAndAffinity checks the LabelZoneFailureDomain label of PV and terms
-// with key LabelZoneFailureDomain in PV's node affinity match zone
-func checkZoneLabelAndAffinity(pv *v1.PersistentVolume, zone string) {
+// with key LabelZoneFailureDomain in PV's node affinity contains zone
+// matchZones is used to indicate if zones should match perfectly
+func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, matchZones bool) {
 	By("checking PV's zone label and node affinity terms match expected zone")
 	if pv == nil {
 		framework.Failf("nil pv passed")
@@ -235,14 +154,19 @@ func checkZoneLabelAndAffinity(pv *v1.PersistentVolume, zone string) {
 		framework.Failf("label %s not found on PV", kubeletapis.LabelZoneFailureDomain)
 	}
 
-	if zone != pvLabel {
-		framework.Failf("value of %s label for PV: %s does not match expected zone: %s", kubeletapis.LabelZoneFailureDomain, pvLabel, zone)
+	zonesFromLabel, err := volumeutil.LabelZonesToSet(pvLabel)
+	if err != nil {
+		framework.Failf("unable to parse zone labels %s: %v", pvLabel, err)
 	}
-
+	if matchZones && !zonesFromLabel.Equal(zones) {
+		framework.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", kubeletapis.LabelZoneFailureDomain, zonesFromLabel, zones)
+	}
+	if !matchZones && !zonesFromLabel.IsSuperset(zones) {
+		framework.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", kubeletapis.LabelZoneFailureDomain, zonesFromLabel, zones)
+	}
 	if pv.Spec.NodeAffinity == nil {
 		framework.Failf("node affinity not found in PV spec %v", pv.Spec)
 	}
-
 	if len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
 		framework.Failf("node selector terms not found in PV spec %v", pv.Spec)
 	}
@@ -250,17 +174,18 @@ func checkZoneLabelAndAffinity(pv *v1.PersistentVolume, zone string) {
 	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
 		keyFound := false
 		for _, r := range term.MatchExpressions {
-			if r.Key == kubeletapis.LabelZoneFailureDomain {
-				keyFound = true
-				for _, val := range r.Values {
-					if zone == val {
-						framework.Logf("expected zone %s detected", val)
-					} else {
-						framework.Failf("zone %s does not match expected zone %s", val, zone)
-					}
-				}
-				break
+			if r.Key != kubeletapis.LabelZoneFailureDomain {
+				continue
 			}
+			keyFound = true
+			zonesFromNodeAffinity := sets.NewString(r.Values...)
+			if matchZones && !zonesFromNodeAffinity.Equal(zones) {
+				framework.Failf("zones from NodeAffinity of PV: %v does not equal expected zone[s]: %v", zonesFromNodeAffinity, zones)
+			}
+			if !matchZones && !zonesFromNodeAffinity.IsSuperset(zones) {
+				framework.Failf("zones from NodeAffinity of PV: %v does not contain expected zone[s]: %v", zonesFromNodeAffinity, zones)
+			}
+			break
 		}
 		if !keyFound {
 			framework.Failf("label %s not found in term %v", kubeletapis.LabelZoneFailureDomain, term)
@@ -320,7 +245,7 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 }
 
 func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
-	cloud, err := framework.GetGCECloud()
+	cloud, err := gce.GetGCECloud()
 	if err != nil {
 		return err
 	}
@@ -336,6 +261,67 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	return nil
 }
 
+func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTopology bool, pvcCount int) {
+	storageClassTestNameFmt := "Delayed binding %s storage class test %s"
+	storageClassTestNameSuffix := ""
+	if specifyAllowedTopology {
+		storageClassTestNameSuffix += " with AllowedTopologies"
+	}
+	tests := []testsuites.StorageClassTest{
+		{
+			Name:           fmt.Sprintf(storageClassTestNameFmt, "EBS", storageClassTestNameSuffix),
+			CloudProviders: []string{"aws"},
+			Provisioner:    "kubernetes.io/aws-ebs",
+			ClaimSize:      "2Gi",
+			DelayBinding:   true,
+		},
+		{
+			Name:           fmt.Sprintf(storageClassTestNameFmt, "GCE PD", storageClassTestNameSuffix),
+			CloudProviders: []string{"gce", "gke"},
+			Provisioner:    "kubernetes.io/gce-pd",
+			ClaimSize:      "2Gi",
+			DelayBinding:   true,
+		},
+	}
+	for _, test := range tests {
+		if !framework.ProviderIs(test.CloudProviders...) {
+			framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+			continue
+		}
+		action := "creating claims with class with waitForFirstConsumer"
+		suffix := "delayed"
+		var topoZone string
+		class := newStorageClass(test, ns, suffix)
+		if specifyAllowedTopology {
+			action += " and allowedTopologies"
+			suffix += "-topo"
+			topoZone = getRandomCloudZone(c)
+			addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
+		}
+		By(action)
+		var claims []*v1.PersistentVolumeClaim
+		for i := 0; i < pvcCount; i++ {
+			claim := newClaim(test, ns, suffix)
+			claim.Spec.StorageClassName = &class.Name
+			claims = append(claims, claim)
+		}
+		pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
+		if node == nil {
+			framework.Failf("unexpected nil node found")
+		}
+		zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
+		if !ok {
+			framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
+		}
+		if specifyAllowedTopology && topoZone != zone {
+			framework.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, zone)
+		}
+		for _, pv := range pvs {
+			checkZoneFromLabelAndAffinity(pv, zone, true)
+		}
+	}
+}
+
 var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
@@ -348,178 +334,178 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	Describe("DynamicProvisioner", func() {
+	Describe("DynamicProvisioner [Slow]", func() {
 		It("should provision storage with different parameters", func() {
 			cloudZone := getRandomCloudZone(c)
 
 			// This test checks that dynamic provisioning can provision a volume
 			// that can be used to persist data among pods.
-			tests := []storageClassTest{
+			tests := []testsuites.StorageClassTest{
 				// GCE/GKE
 				{
-					name:           "SSD PD on GCE/GKE",
-					cloudProviders: []string{"gce", "gke"},
-					provisioner:    "kubernetes.io/gce-pd",
-					parameters: map[string]string{
+					Name:           "SSD PD on GCE/GKE",
+					CloudProviders: []string{"gce", "gke"},
+					Provisioner:    "kubernetes.io/gce-pd",
+					Parameters: map[string]string{
 						"type": "pd-ssd",
 						"zone": cloudZone,
 					},
-					claimSize:    "1.5Gi",
-					expectedSize: "2Gi",
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "1.5Gi",
+					ExpectedSize: "2Gi",
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkGCEPD(volume, "pd-ssd")
 					},
 				},
 				{
-					name:           "HDD PD on GCE/GKE",
-					cloudProviders: []string{"gce", "gke"},
-					provisioner:    "kubernetes.io/gce-pd",
-					parameters: map[string]string{
+					Name:           "HDD PD on GCE/GKE",
+					CloudProviders: []string{"gce", "gke"},
+					Provisioner:    "kubernetes.io/gce-pd",
+					Parameters: map[string]string{
 						"type": "pd-standard",
 					},
-					claimSize:    "1.5Gi",
-					expectedSize: "2Gi",
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "1.5Gi",
+					ExpectedSize: "2Gi",
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkGCEPD(volume, "pd-standard")
 					},
 				},
 				// AWS
 				{
-					name:           "gp2 EBS on AWS",
-					cloudProviders: []string{"aws"},
-					provisioner:    "kubernetes.io/aws-ebs",
-					parameters: map[string]string{
+					Name:           "gp2 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
 						"type": "gp2",
 						"zone": cloudZone,
 					},
-					claimSize:    "1.5Gi",
-					expectedSize: "2Gi",
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "1.5Gi",
+					ExpectedSize: "2Gi",
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "gp2", false)
 					},
 				},
 				{
-					name:           "io1 EBS on AWS",
-					cloudProviders: []string{"aws"},
-					provisioner:    "kubernetes.io/aws-ebs",
-					parameters: map[string]string{
+					Name:           "io1 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
 						"type":      "io1",
 						"iopsPerGB": "50",
 					},
-					claimSize:    "3.5Gi",
-					expectedSize: "4Gi", // 4 GiB is minimum for io1
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "3.5Gi",
+					ExpectedSize: "4Gi", // 4 GiB is minimum for io1
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "io1", false)
 					},
 				},
 				{
-					name:           "sc1 EBS on AWS",
-					cloudProviders: []string{"aws"},
-					provisioner:    "kubernetes.io/aws-ebs",
-					parameters: map[string]string{
+					Name:           "sc1 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
 						"type": "sc1",
 					},
-					claimSize:    "500Gi", // minimum for sc1
-					expectedSize: "500Gi",
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "500Gi", // minimum for sc1
+					ExpectedSize: "500Gi",
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "sc1", false)
 					},
 				},
 				{
-					name:           "st1 EBS on AWS",
-					cloudProviders: []string{"aws"},
-					provisioner:    "kubernetes.io/aws-ebs",
-					parameters: map[string]string{
+					Name:           "st1 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
 						"type": "st1",
 					},
-					claimSize:    "500Gi", // minimum for st1
-					expectedSize: "500Gi",
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "500Gi", // minimum for st1
+					ExpectedSize: "500Gi",
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "st1", false)
 					},
 				},
 				{
-					name:           "encrypted EBS on AWS",
-					cloudProviders: []string{"aws"},
-					provisioner:    "kubernetes.io/aws-ebs",
-					parameters: map[string]string{
+					Name:           "encrypted EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
 						"encrypted": "true",
 					},
-					claimSize:    "1Gi",
-					expectedSize: "1Gi",
-					pvCheck: func(volume *v1.PersistentVolume) error {
+					ClaimSize:    "1Gi",
+					ExpectedSize: "1Gi",
+					PvCheck: func(volume *v1.PersistentVolume) error {
 						return checkAWSEBS(volume, "gp2", true)
 					},
 				},
 				// OpenStack generic tests (works on all OpenStack deployments)
 				{
-					name:           "generic Cinder volume on OpenStack",
-					cloudProviders: []string{"openstack"},
-					provisioner:    "kubernetes.io/cinder",
-					parameters:     map[string]string{},
-					claimSize:      "1.5Gi",
-					expectedSize:   "2Gi",
-					pvCheck:        nil, // there is currently nothing to check on OpenStack
+					Name:           "generic Cinder volume on OpenStack",
+					CloudProviders: []string{"openstack"},
+					Provisioner:    "kubernetes.io/cinder",
+					Parameters:     map[string]string{},
+					ClaimSize:      "1.5Gi",
+					ExpectedSize:   "2Gi",
+					PvCheck:        nil, // there is currently nothing to check on OpenStack
 				},
 				{
-					name:           "Cinder volume with empty volume type and zone on OpenStack",
-					cloudProviders: []string{"openstack"},
-					provisioner:    "kubernetes.io/cinder",
-					parameters: map[string]string{
+					Name:           "Cinder volume with empty volume type and zone on OpenStack",
+					CloudProviders: []string{"openstack"},
+					Provisioner:    "kubernetes.io/cinder",
+					Parameters: map[string]string{
 						"type":         "",
 						"availability": "",
 					},
-					claimSize:    "1.5Gi",
-					expectedSize: "2Gi",
-					pvCheck:      nil, // there is currently nothing to check on OpenStack
+					ClaimSize:    "1.5Gi",
+					ExpectedSize: "2Gi",
+					PvCheck:      nil, // there is currently nothing to check on OpenStack
 				},
 				// vSphere generic test
 				{
-					name:           "generic vSphere volume",
-					cloudProviders: []string{"vsphere"},
-					provisioner:    "kubernetes.io/vsphere-volume",
-					parameters:     map[string]string{},
-					claimSize:      "1.5Gi",
-					expectedSize:   "1.5Gi",
-					pvCheck:        nil,
+					Name:           "generic vSphere volume",
+					CloudProviders: []string{"vsphere"},
+					Provisioner:    "kubernetes.io/vsphere-volume",
+					Parameters:     map[string]string{},
+					ClaimSize:      "1.5Gi",
+					ExpectedSize:   "1.5Gi",
+					PvCheck:        nil,
 				},
 				// Azure
 				{
-					name:           "Azure disk volume with empty sku and location",
-					cloudProviders: []string{"azure"},
-					provisioner:    "kubernetes.io/azure-disk",
-					parameters:     map[string]string{},
-					claimSize:      "1Gi",
-					expectedSize:   "1Gi",
-					pvCheck:        nil,
+					Name:           "Azure disk volume with empty sku and location",
+					CloudProviders: []string{"azure"},
+					Provisioner:    "kubernetes.io/azure-disk",
+					Parameters:     map[string]string{},
+					ClaimSize:      "1Gi",
+					ExpectedSize:   "1Gi",
+					PvCheck:        nil,
 				},
 			}
 
-			var betaTest *storageClassTest
+			var betaTest *testsuites.StorageClassTest
 			for i, t := range tests {
 				// Beware of clojure, use local variables instead of those from
 				// outer scope
 				test := t
 
-				if !framework.ProviderIs(test.cloudProviders...) {
-					framework.Logf("Skipping %q: cloud providers is not %v", test.name, test.cloudProviders)
+				if !framework.ProviderIs(test.CloudProviders...) {
+					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
 
 				// Remember the last supported test for subsequent test of beta API
 				betaTest = &test
 
-				By("Testing " + test.name)
+				By("Testing " + test.Name)
 				suffix := fmt.Sprintf("%d", i)
 				class := newStorageClass(test, ns, suffix)
 				claim := newClaim(test, ns, suffix)
 				claim.Spec.StorageClassName = &class.Name
-				testDynamicProvisioning(test, c, claim, class)
+				testsuites.TestDynamicProvisioning(test, c, claim, class)
 			}
 
 			// Run the last test with storage.k8s.io/v1beta1 on pvc
 			if betaTest != nil {
-				By("Testing " + betaTest.name + " with beta volume provisioning")
+				By("Testing " + betaTest.Name + " with beta volume provisioning")
 				class := newBetaStorageClass(*betaTest, "beta")
 				// we need to create the class manually, testDynamicProvisioning does not accept beta class
 				class, err := c.StorageV1beta1().StorageClasses().Create(class)
@@ -528,23 +514,23 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 				claim := newClaim(*betaTest, ns, "beta")
 				claim.Spec.StorageClassName = &(class.Name)
-				testDynamicProvisioning(*betaTest, c, claim, nil)
+				testsuites.TestDynamicProvisioning(*betaTest, c, claim, nil)
 			}
 		})
 
 		It("should provision storage with non-default reclaim policy Retain", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 
-			test := storageClassTest{
-				name:           "HDD PD on GCE/GKE",
-				cloudProviders: []string{"gce", "gke"},
-				provisioner:    "kubernetes.io/gce-pd",
-				parameters: map[string]string{
+			test := testsuites.StorageClassTest{
+				Name:           "HDD PD on GCE/GKE",
+				CloudProviders: []string{"gce", "gke"},
+				Provisioner:    "kubernetes.io/gce-pd",
+				Parameters: map[string]string{
 					"type": "pd-standard",
 				},
-				claimSize:    "1Gi",
-				expectedSize: "1Gi",
-				pvCheck: func(volume *v1.PersistentVolume) error {
+				ClaimSize:    "1Gi",
+				ExpectedSize: "1Gi",
+				PvCheck: func(volume *v1.PersistentVolume) error {
 					return checkGCEPD(volume, "pd-standard")
 				},
 			}
@@ -553,7 +539,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			class.ReclaimPolicy = &retain
 			claim := newClaim(test, ns, "reclaimpolicy")
 			claim.Spec.StorageClassName = &class.Name
-			pv := testDynamicProvisioning(test, c, claim, class)
+			pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
 
 			By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
 			framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 1*time.Second, 30*time.Second))
@@ -566,29 +552,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 		})
 
-		It("should provision storage with mount options", func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
-
-			test := storageClassTest{
-				name:           "HDD PD on GCE/GKE",
-				cloudProviders: []string{"gce", "gke"},
-				provisioner:    "kubernetes.io/gce-pd",
-				parameters: map[string]string{
-					"type": "pd-standard",
-				},
-				claimSize:    "1Gi",
-				expectedSize: "1Gi",
-				pvCheck: func(volume *v1.PersistentVolume) error {
-					return checkGCEPD(volume, "pd-standard")
-				},
-			}
-			class := newStorageClass(test, ns, "mountoptions")
-			class.MountOptions = []string{"debug", "nouid32"}
-			claim := newClaim(test, ns, "mountoptions")
-			claim.Spec.StorageClassName = &class.Name
-			testDynamicProvisioning(test, c, claim, class)
-		})
-
 		It("should not provision a volume in an unmanaged GCE zone.", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"
@@ -597,7 +560,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			allZones := sets.NewString()     // all zones in the project
 			managedZones := sets.NewString() // subset of allZones
 
-			gceCloud, err := framework.GetGCECloud()
+			gceCloud, err := gce.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get all k8s managed zones (same as zones with nodes in them for test)
@@ -621,11 +584,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 
 			By("Creating a StorageClass for the unmanaged zone")
-			test := storageClassTest{
-				name:        "unmanaged_zone",
-				provisioner: "kubernetes.io/gce-pd",
-				parameters:  map[string]string{"zone": unmanagedZone},
-				claimSize:   "1Gi",
+			test := testsuites.StorageClassTest{
+				Name:        "unmanaged_zone",
+				Provisioner: "kubernetes.io/gce-pd",
+				Parameters:  map[string]string{"zone": unmanagedZone},
+				ClaimSize:   "1Gi",
 			}
 			sc := newStorageClass(test, ns, suffix)
 			sc, err = c.StorageV1().StorageClasses().Create(sc)
@@ -658,10 +621,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			const raceAttempts int = 100
 			var residualPVs []*v1.PersistentVolume
 			By(fmt.Sprintf("Creating and deleting PersistentVolumeClaims %d times", raceAttempts))
-			test := storageClassTest{
-				name:        "deletion race",
-				provisioner: "", // Use a native one based on current cloud provider
-				claimSize:   "1Gi",
+			test := testsuites.StorageClassTest{
+				Name:        "deletion race",
+				Provisioner: "", // Use a native one based on current cloud provider
+				ClaimSize:   "1Gi",
 			}
 
 			class := newStorageClass(test, ns, "race")
@@ -774,32 +737,53 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	Describe("DynamicProvisioner External", func() {
 		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
-			// persistent-volume-provisioner role
-			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns,
-				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+			// persistent-volume-provisioner clusterrole and a leader-locking role
+			serviceAccountName := "default"
+			subject := rbacv1beta1.Subject{
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Namespace: ns,
+				Name:      serviceAccountName,
+			}
 
-			err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
-				serviceaccount.MakeUsername(ns, "default"),
+			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns, subject)
+
+			roleName := "leader-locking-nfs-provisioner"
+			_, err := f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbacv1beta1.PolicyRule{{
+					APIGroups: []string{""},
+					Resources: []string{"endpoints"},
+					Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+				}},
+			})
+			framework.ExpectNoError(err, "Failed to create leader-locking role")
+
+			framework.BindRoleInNamespace(c.RbacV1beta1(), roleName, ns, subject)
+
+			err = framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+				serviceaccount.MakeUsername(ns, serviceAccountName),
 				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
-			framework.ExpectNoError(err, "Failed to update authorization: %v", err)
+			framework.ExpectNoError(err, "Failed to update authorization")
 
 			By("creating an external dynamic provisioner pod")
-			pod := startExternalProvisioner(c, ns)
+			pod := utils.StartExternalProvisioner(c, ns, externalPluginName)
 			defer framework.DeletePodOrFail(c, ns, pod.Name)
 
 			By("creating a StorageClass")
-			test := storageClassTest{
-				name:         "external provisioner test",
-				provisioner:  externalPluginName,
-				claimSize:    "1500Mi",
-				expectedSize: "1500Mi",
+			test := testsuites.StorageClassTest{
+				Name:         "external provisioner test",
+				Provisioner:  externalPluginName,
+				ClaimSize:    "1500Mi",
+				ExpectedSize: "1500Mi",
 			}
 			class := newStorageClass(test, ns, "external")
 			claim := newClaim(test, ns, "external")
 			claim.Spec.StorageClassName = &(class.Name)
 
 			By("creating a claim with a external provisioning annotation")
-			testDynamicProvisioning(test, c, claim, class)
+			testsuites.TestDynamicProvisioning(test, c, claim, class)
 		})
 	})
 
@@ -808,23 +792,23 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 
 			By("creating a claim with no annotation")
-			test := storageClassTest{
-				name:         "default",
-				claimSize:    "2Gi",
-				expectedSize: "2Gi",
+			test := testsuites.StorageClassTest{
+				Name:         "default",
+				ClaimSize:    "2Gi",
+				ExpectedSize: "2Gi",
 			}
 
 			claim := newClaim(test, ns, "default")
-			testDynamicProvisioning(test, c, claim, nil)
+			testsuites.TestDynamicProvisioning(test, c, claim, nil)
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
-			test := storageClassTest{
-				name:      "default",
-				claimSize: "2Gi",
+			test := testsuites.StorageClassTest{
+				Name:      "default",
+				ClaimSize: "2Gi",
 			}
 
 			By("setting the is-default StorageClass annotation to false")
@@ -853,9 +837,9 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
-			test := storageClassTest{
-				name:      "default",
-				claimSize: "2Gi",
+			test := testsuites.StorageClassTest{
+				Name:      "default",
+				ClaimSize: "2Gi",
 			}
 
 			By("removing the is-default StorageClass annotation")
@@ -887,13 +871,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			pod := startGlusterDpServerPod(c, ns)
 			serverUrl := "https://" + pod.Status.PodIP + ":8081"
 			By("creating a StorageClass")
-			test := storageClassTest{
-				name:               "Gluster Dynamic provisioner test",
-				provisioner:        "kubernetes.io/glusterfs",
-				claimSize:          "2Gi",
-				expectedSize:       "2Gi",
-				parameters:         map[string]string{"resturl": serverUrl},
-				skipWriteReadCheck: true,
+			test := testsuites.StorageClassTest{
+				Name:               "Gluster Dynamic provisioner test",
+				Provisioner:        "kubernetes.io/glusterfs",
+				ClaimSize:          "2Gi",
+				ExpectedSize:       "2Gi",
+				Parameters:         map[string]string{"resturl": serverUrl},
+				SkipWriteReadCheck: true,
 			}
 			suffix := fmt.Sprintf("glusterdptest")
 			class := newStorageClass(test, ns, suffix)
@@ -901,38 +885,18 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			By("creating a claim object with a suffix for gluster dynamic provisioner")
 			claim := newClaim(test, ns, suffix)
 
-			testDynamicProvisioning(test, c, claim, class)
+			testsuites.TestDynamicProvisioning(test, c, claim, class)
 		})
 	})
 
-	Describe("Block volume provisioning [Feature:BlockVolume]", func() {
-		It("should create and delete block persistent volumes", func() {
-
-			// TODO: add openstack once Cinder volume plugin supports block volumes
-			framework.SkipUnlessProviderIs("gce", "aws", "gke", "vsphere", "azure")
-
-			By("creating a claim with default class")
-			block := v1.PersistentVolumeBlock
-			test := storageClassTest{
-				name:               "default",
-				claimSize:          "2Gi",
-				expectedSize:       "2Gi",
-				volumeMode:         &block,
-				skipWriteReadCheck: true,
-			}
-			claim := newClaim(test, ns, "default")
-			claim.Spec.VolumeMode = &block
-			testDynamicProvisioning(test, c, claim, nil)
-		})
-	})
 	Describe("Invalid AWS KMS key", func() {
 		It("should report an error and create no PV", func() {
 			framework.SkipUnlessProviderIs("aws")
-			test := storageClassTest{
-				name:        "AWS EBS with invalid KMS key",
-				provisioner: "kubernetes.io/aws-ebs",
-				claimSize:   "2Gi",
-				parameters:  map[string]string{"kmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/55555555-5555-5555-5555-555555555555"},
+			test := testsuites.StorageClassTest{
+				Name:        "AWS EBS with invalid KMS key",
+				Provisioner: "kubernetes.io/aws-ebs",
+				ClaimSize:   "2Gi",
+				Parameters:  map[string]string{"kmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/55555555-5555-5555-5555-555555555555"},
 			}
 
 			By("creating a StorageClass")
@@ -972,85 +936,53 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
-	Describe("DynamicProvisioner delayed binding [Feature:DynamicProvisioningScheduling] [Slow]", func() {
-		It("should create persistent volume in the same zone as node after a pod mounting the claim is started", func() {
-			framework.SkipUnlessProviderIs("aws")
-
-			By("creating a claim with class with waitForFirstConsumer")
-			test := storageClassTest{
-				name:         "Delayed binding EBS storage class test",
-				provisioner:  "kubernetes.io/aws-ebs",
-				claimSize:    "2Gi",
-				delayBinding: true,
-			}
-			suffix := "delayed-ebs"
-			class := newStorageClass(test, ns, suffix)
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
-			pv, node := testBindingWaitForFirstConsumer(c, claim, class)
-			if node == nil {
-				framework.Failf("unexpected nil node found")
-			}
-			zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
-			if !ok {
-				framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
-			}
-			checkZoneLabelAndAffinity(pv, zone)
+	Describe("DynamicProvisioner delayed binding [Slow]", func() {
+		It("should create persistent volumes in the same zone as node after a pod mounting the claims is started", func() {
+			testZonalDelayedBinding(c, ns, false /*specifyAllowedTopology*/, 1 /*pvcCount*/)
+			testZonalDelayedBinding(c, ns, false /*specifyAllowedTopology*/, 3 /*pvcCount*/)
 		})
 	})
-	Describe("DynamicProvisioner allowedTopology [Feature:DynamicProvisioningScheduling]", func() {
-		It("should create persistent volume in the zone specified in allowedTopology of storageclass", func() {
-			framework.SkipUnlessProviderIs("aws")
-
-			By("creating a claim with class with allowedTopology set")
-			test := storageClassTest{
-				name:         "Delayed binding EBS storage class test",
-				provisioner:  "kubernetes.io/aws-ebs",
-				claimSize:    "2Gi",
-				expectedSize: "2Gi",
+	Describe("DynamicProvisioner allowedTopologies", func() {
+		It("should create persistent volume in the zone specified in allowedTopologies of storageclass", func() {
+			tests := []testsuites.StorageClassTest{
+				{
+					Name:           "AllowedTopologies EBS storage class test",
+					CloudProviders: []string{"aws"},
+					Provisioner:    "kubernetes.io/aws-ebs",
+					ClaimSize:      "2Gi",
+					ExpectedSize:   "2Gi",
+				},
+				{
+					Name:           "AllowedTopologies GCE PD storage class test",
+					CloudProviders: []string{"gce", "gke"},
+					Provisioner:    "kubernetes.io/gce-pd",
+					ClaimSize:      "2Gi",
+					ExpectedSize:   "2Gi",
+				},
 			}
-			suffix := "topo-ebs"
-			class := newStorageClass(test, ns, suffix)
-			zone := getRandomCloudZone(c)
-			addSingleZoneAllowedTopologyToStorageClass(c, class, zone)
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
-			pv := testDynamicProvisioning(test, c, claim, class)
-			checkZoneLabelAndAffinity(pv, zone)
+			for _, test := range tests {
+				if !framework.ProviderIs(test.CloudProviders...) {
+					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+					continue
+				}
+				By("creating a claim with class with allowedTopologies set")
+				suffix := "topology"
+				class := newStorageClass(test, ns, suffix)
+				zone := getRandomCloudZone(c)
+				addSingleZoneAllowedTopologyToStorageClass(c, class, zone)
+				claim := newClaim(test, ns, suffix)
+				claim.Spec.StorageClassName = &class.Name
+				pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
+				checkZoneFromLabelAndAffinity(pv, zone, true)
+			}
 		})
 	})
-	Describe("DynamicProvisioner delayed binding with allowedTopology [Feature:DynamicProvisioningScheduling] [Slow]", func() {
-		It("should create persistent volume in the same zone as specified in allowedTopology after a pod mounting the claim is started", func() {
-			framework.SkipUnlessProviderIs("aws")
-
-			By("creating a claim with class with waitForFirstConsumer")
-			test := storageClassTest{
-				name:         "Delayed binding EBS storage class test",
-				provisioner:  "kubernetes.io/aws-ebs",
-				claimSize:    "2Gi",
-				delayBinding: true,
-			}
-			suffix := "delayed-topo-ebs"
-			class := newStorageClass(test, ns, suffix)
-			topoZone := getRandomCloudZone(c)
-			addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
-			pv, node := testBindingWaitForFirstConsumer(c, claim, class)
-			if node == nil {
-				framework.Failf("unexpected nil node found")
-			}
-			nodeZone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
-			if !ok {
-				framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
-			}
-			if topoZone != nodeZone {
-				framework.Failf("zone specified in AllowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, nodeZone)
-			}
-			checkZoneLabelAndAffinity(pv, topoZone)
+	Describe("DynamicProvisioner delayed binding with allowedTopologies [Slow]", func() {
+		It("should create persistent volumes in the same zone as specified in allowedTopologies after a pod mounting the claims is started", func() {
+			testZonalDelayedBinding(c, ns, true /*specifyAllowedTopology*/, 1 /*pvcCount*/)
+			testZonalDelayedBinding(c, ns, true /*specifyAllowedTopology*/, 3 /*pvcCount*/)
 		})
 	})
-
 })
 
 func getDefaultStorageClassName(c clientset.Interface) string {
@@ -1105,7 +1037,7 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 	verifyDefaultStorageClass(c, scName, expectedDefault)
 }
 
-func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
+func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -1117,7 +1049,7 @@ func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(t.claimSize),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
 				},
 			},
 		},
@@ -1126,55 +1058,8 @@ func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
 	return &claim
 }
 
-// runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command string) {
-	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-volume-tester-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "volume-tester",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "my-volume",
-							MountPath: "/mnt/test",
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name: "my-volume",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: claimName,
-							ReadOnly:  false,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	if len(nodeName) != 0 {
-		pod.Spec.NodeName = nodeName
-	}
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
-	defer func() {
-		framework.DeletePodOrFail(c, ns, pod.Name)
-	}()
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+func newClaim(t testsuites.StorageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
+	return getClaim(t.ClaimSize, ns)
 }
 
 func getDefaultPluginName() string {
@@ -1205,8 +1090,8 @@ func addSingleZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *stora
 	sc.AllowedTopologies = append(sc.AllowedTopologies, term)
 }
 
-func newStorageClass(t storageClassTest, ns string, suffix string) *storage.StorageClass {
-	pluginName := t.provisioner
+func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *storage.StorageClass {
+	pluginName := t.Provisioner
 	if pluginName == "" {
 		pluginName = getDefaultPluginName()
 	}
@@ -1214,8 +1099,22 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 		suffix = "sc"
 	}
 	bindingMode := storage.VolumeBindingImmediate
-	if t.delayBinding {
+	if t.DelayBinding {
 		bindingMode = storage.VolumeBindingWaitForFirstConsumer
+	}
+	return getStorageClass(pluginName, t.Parameters, &bindingMode, ns, suffix)
+}
+
+func getStorageClass(
+	provisioner string,
+	parameters map[string]string,
+	bindingMode *storage.VolumeBindingMode,
+	ns string,
+	suffix string,
+) *storage.StorageClass {
+	if bindingMode == nil {
+		defaultBindingMode := storage.VolumeBindingImmediate
+		bindingMode = &defaultBindingMode
 	}
 	return &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
@@ -1225,15 +1124,15 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 			// Name must be unique, so let's base it on namespace name
 			Name: ns + "-" + suffix,
 		},
-		Provisioner:       pluginName,
-		Parameters:        t.parameters,
-		VolumeBindingMode: &bindingMode,
+		Provisioner:       provisioner,
+		Parameters:        parameters,
+		VolumeBindingMode: bindingMode,
 	}
 }
 
 // TODO: remove when storage.k8s.io/v1beta1 is removed.
-func newBetaStorageClass(t storageClassTest, suffix string) *storagebeta.StorageClass {
-	pluginName := t.provisioner
+func newBetaStorageClass(t testsuites.StorageClassTest, suffix string) *storagebeta.StorageClass {
+	pluginName := t.Provisioner
 
 	if pluginName == "" {
 		pluginName = getDefaultPluginName()
@@ -1250,7 +1149,7 @@ func newBetaStorageClass(t storageClassTest, suffix string) *storagebeta.Storage
 			GenerateName: suffix + "-",
 		},
 		Provisioner: pluginName,
-		Parameters:  t.parameters,
+		Parameters:  t.Parameters,
 	}
 }
 
@@ -1300,79 +1199,6 @@ func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
 	By("locating the provisioner pod")
 	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-	return pod
-}
-
-func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
-	podClient := c.CoreV1().Pods(ns)
-
-	provisionerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "external-provisioner-",
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9",
-					SecurityContext: &v1.SecurityContext{
-						Capabilities: &v1.Capabilities{
-							Add: []v1.Capability{"DAC_READ_SEARCH"},
-						},
-					},
-					Args: []string{
-						"-provisioner=" + externalPluginName,
-						"-grace-period=0",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "nfs", ContainerPort: 2049},
-						{Name: "mountd", ContainerPort: 20048},
-						{Name: "rpcbind", ContainerPort: 111},
-						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
-					ImagePullPolicy: v1.PullIfNotPresent,
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "export-volume",
-							MountPath: "/export",
-						},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "export-volume",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	provisionerPod, err := podClient.Create(provisionerPod)
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
-
-	By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-
 	return pod
 }
 

@@ -25,13 +25,20 @@ import (
 	"strings"
 	"testing"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clitesting "k8s.io/client-go/testing"
+	pkgauthenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
+	pkgcorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -699,13 +706,120 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 	}
 }
 
+func TestCollectDataWithServiceAccountToken(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(pkgauthenticationv1.RegisterDefaults(scheme))
+	utilruntime.Must(pkgcorev1.RegisterDefaults(scheme))
+
+	minute := int64(60)
+	cases := []struct {
+		name       string
+		svcacct    string
+		audience   string
+		expiration *int64
+		path       string
+
+		payload map[string]util.FileProjection
+	}{
+		{
+			name:       "test good service account",
+			audience:   "https://example.com",
+			path:       "token",
+			expiration: &minute,
+
+			payload: map[string]util.FileProjection{
+				"token": {Data: []byte("test_projected_namespace:foo:60:[https://example.com]"), Mode: 0600},
+			},
+		},
+		{
+			name:       "test good service account other path",
+			audience:   "https://example.com",
+			path:       "other-token",
+			expiration: &minute,
+
+			payload: map[string]util.FileProjection{
+				"other-token": {Data: []byte("test_projected_namespace:foo:60:[https://example.com]"), Mode: 0600},
+			},
+		},
+		{
+			name:       "test good service account defaults audience",
+			path:       "token",
+			expiration: &minute,
+
+			payload: map[string]util.FileProjection{
+				"token": {Data: []byte("test_projected_namespace:foo:60:[https://api]"), Mode: 0600},
+			},
+		},
+		{
+			name:     "test good service account defaults expiration",
+			audience: "https://example.com",
+			path:     "token",
+
+			payload: map[string]util.FileProjection{
+				"token": {Data: []byte("test_projected_namespace:foo:3600:[https://example.com]"), Mode: 0600},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testNamespace := "test_projected_namespace"
+			source := makeProjection(tc.name, 0600, "serviceAccountToken")
+			source.Sources[0].ServiceAccountToken.Audience = tc.audience
+			source.Sources[0].ServiceAccountToken.ExpirationSeconds = tc.expiration
+			source.Sources[0].ServiceAccountToken.Path = tc.path
+
+			testPodUID := types.UID("test_pod_uid")
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID},
+				Spec:       v1.PodSpec{ServiceAccountName: "foo"},
+			}
+			scheme.Default(pod)
+
+			client := &fake.Clientset{}
+			client.AddReactor("create", "serviceaccounts", clitesting.ReactionFunc(func(action clitesting.Action) (bool, runtime.Object, error) {
+				tr := action.(clitesting.CreateAction).GetObject().(*authenticationv1.TokenRequest)
+				scheme.Default(tr)
+				if len(tr.Spec.Audiences) == 0 {
+					tr.Spec.Audiences = []string{"https://api"}
+				}
+				tr.Status.Token = fmt.Sprintf("%v:%v:%d:%v", action.GetNamespace(), "foo", *tr.Spec.ExpirationSeconds, tr.Spec.Audiences)
+				return true, tr, nil
+			}))
+
+			_, host := newTestHost(t, client)
+
+			var myVolumeMounter = projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: source.Sources,
+					podUID:  pod.UID,
+					plugin: &projectedPlugin{
+						host:                   host,
+						getServiceAccountToken: host.GetServiceAccountTokenFunc(),
+					},
+				},
+				source: *source,
+				pod:    pod,
+			}
+
+			actualPayload, err := myVolumeMounter.collectData()
+			if err != nil {
+				t.Fatalf("unexpected failure making payload: %v", err)
+			}
+			if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected and actual payload do not match:\n%s", diff.ObjectReflectDiff(e, a))
+			}
+		})
+	}
+}
+
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
 	tempDir, err := ioutil.TempDir("/tmp", "projected_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -788,6 +902,56 @@ func TestPlugin(t *testing.T) {
 	}
 	doTestSecretDataInVolume(volumePath, secret, t)
 	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+}
+
+func TestInvalidPathProjected(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_projected_namespace"
+		testName       = "test_projected_name"
+
+		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
+		secret        = makeSecret(testNamespace, testName)
+		client        = fake.NewSimpleClientset(&secret)
+		pluginMgr     = volume.VolumePluginMgr{}
+		rootDir, host = newTestHost(t, client)
+	)
+	volumeSpec.Projected.Sources[0].Secret.Items = []v1.KeyToPath{
+		{Key: "missing", Path: "missing"},
+	}
+
+	defer os.RemoveAll(rootDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	volumePath := mounter.GetPath()
+	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~projected/%s", testVolumeName)) {
+		t.Errorf("Got unexpected path: %s", volumePath)
+	}
+
+	err = mounter.SetUp(nil)
+	if err == nil {
+		t.Errorf("Expected error while setting up secret")
+	}
+
+	_, err = os.Stat(volumePath)
+	if err == nil {
+		t.Errorf("Expected path %s to not exist", volumePath)
+	}
 }
 
 // Test the case where the plugin's ready file exists, but the volume dir is not a
@@ -1062,6 +1226,10 @@ func makeProjection(name string, defaultMode int32, kind string) *v1.ProjectedVo
 	case "downwardAPI":
 		item = v1.VolumeProjection{
 			DownwardAPI: &v1.DownwardAPIProjection{},
+		}
+	case "serviceAccountToken":
+		item = v1.VolumeProjection{
+			ServiceAccountToken: &v1.ServiceAccountTokenProjection{},
 		}
 	}
 

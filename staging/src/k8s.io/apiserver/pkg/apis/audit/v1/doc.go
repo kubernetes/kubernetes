@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=audit.k8s.io
+
 package v1 // import "k8s.io/apiserver/pkg/apis/audit/v1"

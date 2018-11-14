@@ -111,6 +111,11 @@ func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) 
 	return nil
 }
 
+// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
+func (w *Waiter) WaitForKubeletAndFunc(f func() error) error {
+	return nil
+}
+
 // SetTimeout is a no-op; we don't wait in this implementation
 func (w *Waiter) SetTimeout(_ time.Duration) {}
 

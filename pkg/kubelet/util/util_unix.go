@@ -21,11 +21,12 @@ package util
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 )
 
 const (
@@ -72,8 +73,29 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			glog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
 		}
 	}
 	return
+}
+
+func parseEndpoint(endpoint string) (string, string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", "", err
+	}
+
+	switch u.Scheme {
+	case "tcp":
+		return "tcp", u.Host, nil
+
+	case "unix":
+		return "unix", u.Path, nil
+
+	case "":
+		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+
+	default:
+		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
+	}
 }
