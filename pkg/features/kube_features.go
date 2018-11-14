@@ -386,6 +386,12 @@ const (
 	//
 	// Allow TTL controller to clean up Pods and Jobs after they finish.
 	TTLAfterFinished utilfeature.Feature = "TTLAfterFinished"
+
+	// owner: @dashpole
+	// alpha: v1.13
+	//
+	// Enables the kubelet's pod resources grpc endpoint
+	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
 )
 
 func init() {
@@ -453,6 +459,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
+	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
