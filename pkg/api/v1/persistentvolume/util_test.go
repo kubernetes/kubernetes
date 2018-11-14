@@ -25,9 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestPVSecrets(t *testing.T) {
@@ -271,57 +269,4 @@ func newHostPathType(pathType string) *corev1.HostPathType {
 	hostPathType := new(corev1.HostPathType)
 	*hostPathType = corev1.HostPathType(pathType)
 	return hostPathType
-}
-
-func TestDropAlphaPVVolumeMode(t *testing.T) {
-	vmode := corev1.PersistentVolumeFilesystem
-
-	// PersistentVolume with VolumeMode set
-	pv := corev1.PersistentVolume{
-		Spec: corev1.PersistentVolumeSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/foo",
-					Type: newHostPathType(string(corev1.HostPathDirectory)),
-				},
-			},
-			StorageClassName: "test-storage-class",
-			VolumeMode:       &vmode,
-		},
-	}
-
-	// Enable alpha feature BlockVolume
-	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err1 != nil {
-		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err1)
-	}
-
-	// now test dropping the fields - should not be dropped
-	DropDisabledAlphaFields(&pv.Spec)
-
-	// check to make sure VolumeDevices is still present
-	// if featureset is set to true
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if pv.Spec.VolumeMode == nil {
-			t.Error("VolumeMode in pv.Spec should not have been dropped based on feature-gate")
-		}
-	}
-
-	// Disable alpha feature BlockVolume
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
-	}
-
-	// now test dropping the fields
-	DropDisabledAlphaFields(&pv.Spec)
-
-	// check to make sure VolumeDevices is nil
-	// if featureset is set to false
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if pv.Spec.VolumeMode != nil {
-			t.Error("DropDisabledAlphaFields VolumeMode for pv.Spec failed")
-		}
-	}
 }

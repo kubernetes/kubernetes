@@ -1463,10 +1463,6 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorLi
 func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "CSIPersistentVolume disabled by feature-gate"))
-	}
-
 	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
 
 	if len(csi.VolumeHandle) == 0 {

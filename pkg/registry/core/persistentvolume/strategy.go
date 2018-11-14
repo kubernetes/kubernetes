@@ -53,7 +53,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 
-	pvutil.DropDisabledAlphaFields(&pv.Spec)
+	pvutil.DropDisabledFields(&pv.Spec, nil)
 }
 
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -76,8 +76,7 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
 
-	pvutil.DropDisabledAlphaFields(&newPv.Spec)
-	pvutil.DropDisabledAlphaFields(&oldPv.Spec)
+	pvutil.DropDisabledFields(&newPv.Spec, &oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
