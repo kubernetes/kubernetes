@@ -382,14 +382,14 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:         healthzServer,
 		ipvs:                  ipvs,
 		ipvsScheduler:         scheduler,
-		ipGetter:              &realIPGetter{nl: NewNetLinkHandle()},
+		ipGetter:              &realIPGetter{nl: NewNetLinkHandle(nodeIP.To4() == nil)},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
 		natChains:             bytes.NewBuffer(nil),
 		natRules:              bytes.NewBuffer(nil),
 		filterChains:          bytes.NewBuffer(nil),
 		filterRules:           bytes.NewBuffer(nil),
-		netlinkHandle:         NewNetLinkHandle(),
+		netlinkHandle:         NewNetLinkHandle(nodeIP.To4() == nil),
 		ipset:                 ipset,
 		nodePortAddresses:     nodePortAddresses,
 		networkInterfacer:     utilproxy.RealNetwork{},
@@ -576,7 +576,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 		}
 	}
 	// Delete dummy interface created by ipvs Proxier.
-	nl := NewNetLinkHandle()
+	nl := NewNetLinkHandle(false)
 	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Error deleting dummy device %s created by IPVS proxier: %v", DefaultDummyDevice, err)
