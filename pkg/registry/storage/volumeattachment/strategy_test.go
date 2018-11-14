@@ -22,6 +22,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
@@ -193,5 +194,104 @@ func TestBetaAndV1StatusCreate(t *testing.T) {
 		if va.Status.Attached != test.expectedStatus {
 			t.Errorf("expected status to be %v got %v", test.expectedStatus, va.Status.Attached)
 		}
+	}
+}
+
+func TestVolumeAttachmentValidation(t *testing.T) {
+	invalidPVName := "invalid-!@#$%^&*()"
+	validPVName := "valid-volume-name"
+	tests := []struct {
+		name             string
+		volumeAttachment *storage.VolumeAttachment
+		expectBetaError  bool
+		expectV1Error    bool
+	}{
+		{
+			"valid attachment",
+			getValidVolumeAttachment("foo"),
+			false,
+			false,
+		},
+		{
+			"invalid PV name",
+			&storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.VolumeAttachmentSpec{
+					Attacher: "valid-attacher",
+					Source: storage.VolumeAttachmentSource{
+						PersistentVolumeName: &invalidPVName,
+					},
+					NodeName: "valid-node",
+				},
+			},
+			false,
+			true,
+		},
+		{
+			"invalid attacher name",
+			&storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.VolumeAttachmentSpec{
+					Attacher: "invalid!@#$%^&*()",
+					Source: storage.VolumeAttachmentSource{
+						PersistentVolumeName: &validPVName,
+					},
+					NodeName: "valid-node",
+				},
+			},
+			false,
+			true,
+		},
+		{
+			"invalid volume attachment",
+			&storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.VolumeAttachmentSpec{
+					Attacher: "invalid!@#$%^&*()",
+					Source: storage.VolumeAttachmentSource{
+						PersistentVolumeName: nil,
+					},
+					NodeName: "valid-node",
+				},
+			},
+			true,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			testValidation := func(va *storage.VolumeAttachment, apiVersion string) field.ErrorList {
+				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+					APIGroup:   "storage.k8s.io",
+					APIVersion: apiVersion,
+					Resource:   "volumeattachments",
+				})
+				return Strategy.Validate(ctx, va)
+			}
+
+			v1Err := testValidation(test.volumeAttachment, "v1")
+			if len(v1Err) > 0 && !test.expectV1Error {
+				t.Errorf("Validation of v1 object failed: %+v", v1Err)
+			}
+			if len(v1Err) == 0 && test.expectV1Error {
+				t.Errorf("Validation of v1 object unexpectedly succeeded")
+			}
+
+			betaErr := testValidation(test.volumeAttachment, "v1beta1")
+			if len(betaErr) > 0 && !test.expectBetaError {
+				t.Errorf("Validation of v1beta1 object failed: %+v", betaErr)
+			}
+			if len(betaErr) == 0 && test.expectBetaError {
+				t.Errorf("Validation of v1beta1 object unexpectedly succeeded")
+			}
+		})
 	}
 }

@@ -63,7 +63,23 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	volumeAttachment := obj.(*storage.VolumeAttachment)
-	return validation.ValidateVolumeAttachment(volumeAttachment)
+
+	errs := validation.ValidateVolumeAttachment(volumeAttachment)
+
+	var groupVersion schema.GroupVersion
+
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+
+	switch groupVersion {
+	case storageapiv1beta1.SchemeGroupVersion:
+		// no extra validation
+	default:
+		// tighten up validation of newly created v1 attachments
+		errs = append(errs, validation.ValidateVolumeAttachmentV1(volumeAttachment)...)
+	}
+	return errs
 }
 
 // Canonicalize normalizes the object after validation.
