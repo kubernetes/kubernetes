@@ -17,19 +17,22 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
       containers:
-        - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
-          name: autoscaler
-          command:
-            - /cluster-proportional-autoscaler
-            - --namespace=kube-system
-            - --configmap=calico-typha-horizontal-autoscaler
-            - --target=deployment/calico-typha
-            - --logtostderr=true
-            - --v=2
-          resources:
-            requests:
-              cpu: 10m
-            limits:
-              cpu: 10m
+      - image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
+        name: autoscaler
+        command:
+          - /cluster-proportional-autoscaler
+          - --namespace=kube-system
+          - --configmap=calico-typha-horizontal-autoscaler
+          - --target=deployment/calico-typha
+          - --logtostderr=true
+          - --v=2
+        resources:
+          requests:
+            cpu: 10m
+          limits:
+            cpu: 10m
       serviceAccountName: typha-cpha
