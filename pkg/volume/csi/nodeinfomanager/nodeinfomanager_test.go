@@ -627,14 +627,14 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 func TestValidateCSINodeInfo(t *testing.T) {
 	testcases := []struct {
 		name      string
-		nodeInfo  *csiv1alpha1.CSINodeInfo
+		nodeInfo  *csiv1beta1.CSINodeInfo
 		expectErr bool
 	}{
 		{
 			name: "multiple drivers with different node IDs, topology keys and status",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -647,8 +647,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -666,9 +666,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "multiple drivers with same node IDs, topology keys and status",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -681,8 +681,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -700,9 +700,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "duplicate drivers in driver specs",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -715,8 +715,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -729,9 +729,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "duplicate drivers in driver statuses",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -739,8 +739,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -758,9 +758,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "single driver with duplicate topology keys in driver specs",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -768,8 +768,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -782,9 +782,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "multiple drivers with one set of duplicate topology keys in driver specs",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -797,8 +797,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -816,9 +816,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "mismatch between drivers in specs and status (null intersection)",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -831,8 +831,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver3",
 							Available:             true,
@@ -845,9 +845,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "mismatch between drivers in specs and status (specs superset of status)",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -860,8 +860,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
@@ -874,9 +874,9 @@ func TestValidateCSINodeInfo(t *testing.T) {
 		},
 		{
 			name: "mismatch between drivers in specs and status (specs subset of status)",
-			nodeInfo: &csiv1alpha1.CSINodeInfo{
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo: &csiv1beta1.CSINodeInfo{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "driver1",
 							NodeID:       "node1",
@@ -884,8 +884,8 @@ func TestValidateCSINodeInfo(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "driver1",
 							Available:             true,
