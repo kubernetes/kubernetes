@@ -317,6 +317,16 @@ func (Patch) SwaggerDoc() map[string]string {
 	return map_Patch
 }
 
+var map_PatchOptions = map[string]string{
+	"":       "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
+	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":  "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+}
+
+func (PatchOptions) SwaggerDoc() map[string]string {
+	return map_PatchOptions
+}
+
 var map_Preconditions = map[string]string{
 	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
 	"uid": "Specifies the target UID.",
@@ -395,7 +405,7 @@ func (TypeMeta) SwaggerDoc() map[string]string {
 }
 
 var map_UpdateOptions = map[string]string{
-	"":       "UpdateOptions may be provided when updating an API object.",
+	"":       "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
 	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
 }
 

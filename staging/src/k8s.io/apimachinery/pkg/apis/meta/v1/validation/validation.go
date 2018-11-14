@@ -103,7 +103,7 @@ func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchTyp
 	if patchType != types.ApplyPatchType && options.Force != nil {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
 	}
-	allErrs = append(allErrs, ValidateUpdateOptions(&options.UpdateOptions)...)
+	allErrs = append(allErrs, validateDryRun(field.NewPath("dryRun"), options.DryRun)...)
 	return allErrs
 }
 

@@ -748,6 +748,24 @@ message OwnerReference {
 message Patch {
 }
 
+// PatchOptions may be provided when patching an API object.
+// PatchOptions is meant to be a superset of UpdateOptions.
+message PatchOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 1;
+
+  // Force is going to "force" Apply requests. It means user will
+  // re-acquire conflicting fields owned by other people. Force
+  // flag must be unset for non-apply patch requests.
+  // +optional
+  optional bool force = 2;
+}
+
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 message Preconditions {
   // Specifies the target UID.
@@ -933,6 +951,7 @@ message TypeMeta {
 }
 
 // UpdateOptions may be provided when updating an API object.
+// All fields in UpdateOptions should also be present in PatchOptions.
 message UpdateOptions {
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
