@@ -60,8 +60,8 @@ type Runner struct {
 	// more than one time)
 	runData RunData
 
-	// cmdAdditionalFlags holds additional flags that could be added to the subcommands generated
-	// for each phase. Flags could be inherited from the parent command too
+	// cmdAdditionalFlags holds additional, shared flags that could be added to the subcommands generated
+	// for phases. Flags could be inherited from the parent command too or added directly to each phase
 	cmdAdditionalFlags *pflag.FlagSet
 
 	// phaseRunners is part of the internal state of the runner and provides
@@ -269,10 +269,11 @@ func (e *Runner) Help(cmdUse string) string {
 	return line
 }
 
-// SetPhaseSubcommandsAdditionalFlags allows to define flags to be added
+// SetAdditionalFlags allows to define flags to be added
 // to the subcommands generated for each phase (but not existing in the parent command).
 // Please note that this command needs to be done before BindToCommand.
-func (e *Runner) SetPhaseSubcommandsAdditionalFlags(fn func(*pflag.FlagSet)) {
+// Nb. if a flag is used only by one phase, please consider using phase LocalFlags.
+func (e *Runner) SetAdditionalFlags(fn func(*pflag.FlagSet)) {
 	// creates a new NewFlagSet
 	e.cmdAdditionalFlags = pflag.NewFlagSet("phaseAdditionalFlags", pflag.ContinueOnError)
 	// invokes the function that sets additional flags
@@ -325,11 +326,18 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 
 		// makes the new command inherits local flags from the parent command
 		// Nb. global flags will be inherited automatically
-		inheritsFlags(cmd.Flags(), phaseCmd.Flags(), p.CmdFlags)
+		inheritsFlags(cmd.Flags(), phaseCmd.Flags(), p.InheritFlags)
 
-		// If defined, additional flags for phases should be added as well
+		// makes the new command inherits additional flags for phases
 		if e.cmdAdditionalFlags != nil {
-			inheritsFlags(e.cmdAdditionalFlags, phaseCmd.Flags(), p.CmdFlags)
+			inheritsFlags(e.cmdAdditionalFlags, phaseCmd.Flags(), p.InheritFlags)
+		}
+
+		// If defined, added phase local flags
+		if p.LocalFlags != nil {
+			p.LocalFlags.VisitAll(func(f *pflag.Flag) {
+				phaseCmd.Flags().AddFlag(f)
+			})
 		}
 
 		// adds the command to parent

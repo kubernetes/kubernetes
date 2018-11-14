@@ -77,18 +77,18 @@ func NewControlPlanePhase() workflow.Phase {
 			newControlPlaneSubPhase(kubeadmconstants.KubeControllerManager),
 			newControlPlaneSubPhase(kubeadmconstants.KubeScheduler),
 		},
-		Run:      runControlPlanePhase,
-		CmdFlags: getControlPlanePhaseFlags("all"),
+		Run:          runControlPlanePhase,
+		InheritFlags: getControlPlanePhaseFlags("all"),
 	}
 	return phase
 }
 
 func newControlPlaneSubPhase(component string) workflow.Phase {
 	phase := workflow.Phase{
-		Name:     controlPlanePhaseProperties[component].name,
-		Short:    controlPlanePhaseProperties[component].short,
-		Run:      runControlPlaneSubPhase(component),
-		CmdFlags: getControlPlanePhaseFlags(component),
+		Name:         controlPlanePhaseProperties[component].name,
+		Short:        controlPlanePhaseProperties[component].short,
+		Run:          runControlPlaneSubPhase(component),
+		InheritFlags: getControlPlanePhaseFlags(component),
 	}
 	return phase
 }

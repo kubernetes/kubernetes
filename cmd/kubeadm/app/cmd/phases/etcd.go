@@ -54,18 +54,18 @@ func NewEtcdPhase() workflow.Phase {
 		Phases: []workflow.Phase{
 			newEtcdLocalSubPhase(),
 		},
-		CmdFlags: getEtcdPhaseFlags(),
+		InheritFlags: getEtcdPhaseFlags(),
 	}
 	return phase
 }
 
 func newEtcdLocalSubPhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:     "local",
-		Short:    "Generates the static Pod manifest file for a local, single-node local etcd instance.",
-		Example:  etcdLocalExample,
-		Run:      runEtcdPhaseLocal(),
-		CmdFlags: getEtcdPhaseFlags(),
+		Name:         "local",
+		Short:        "Generates the static Pod manifest file for a local, single-node local etcd instance.",
+		Example:      etcdLocalExample,
+		Run:          runEtcdPhaseLocal(),
+		InheritFlags: getEtcdPhaseFlags(),
 	}
 	return phase
 }

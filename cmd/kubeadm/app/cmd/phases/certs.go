@@ -60,11 +60,11 @@ type certsData interface {
 // NewCertsPhase returns the phase for the certs
 func NewCertsPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:     "certs",
-		Short:    "Certificate generation",
-		Phases:   newCertSubPhases(),
-		Run:      runCerts,
-		CmdFlags: getCertPhaseFlags("all"),
+		Name:         "certs",
+		Short:        "Certificate generation",
+		Phases:       newCertSubPhases(),
+		Run:          runCerts,
+		InheritFlags: getCertPhaseFlags("all"),
 	}
 }
 
@@ -107,8 +107,8 @@ func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunDa
 			certSpec.BaseName,
 			getSANDescription(certSpec),
 		),
-		Run:      run,
-		CmdFlags: getCertPhaseFlags(certSpec.Name),
+		Run:          run,
+		InheritFlags: getCertPhaseFlags(certSpec.Name),
 	}
 	return phase
 }

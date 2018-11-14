@@ -53,7 +53,7 @@ func NewPreflightMasterPhase() workflow.Phase {
 		Long:    "Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init.",
 		Example: masterPreflightExample,
 		Run:     runPreflightMaster,
-		CmdFlags: []string{
+		InheritFlags: []string{
 			options.CfgPath,
 			options.IgnorePreflightErrors,
 		},
