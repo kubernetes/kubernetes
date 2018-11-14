@@ -19,6 +19,8 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type typePair struct {
@@ -485,6 +487,12 @@ func (c *Converter) DefaultConvert(src, dest interface{}, flags FieldMatchingFla
 type conversionFunc func(sv, dv reflect.Value, scope *scope) error
 
 func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags, meta *Meta, f conversionFunc) error {
+	_, srcUnstructured := src.(runtime.Unstructured)
+	_, dstUnstructured := dest.(runtime.Unstructured)
+	if srcUnstructured && dstUnstructured {
+		return fmt.Errorf("must not do conversion between unstructured")
+	}
+
 	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
 	scope := &scope{
 		converter: c,
