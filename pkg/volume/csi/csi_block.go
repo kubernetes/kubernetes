@@ -59,14 +59,14 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 	return dir, nil
 }
 
-// getStagingPath returns a staging path (on the node) to a device file which will be bind mounted to
+// getStagingPath returns a staging path for a directory (on the node) that should be used on NodeStageVolume/NodeUnstageVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{volumeID}
 func (m *csiBlockMapper) getStagingPath() string {
 	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(m.specName)
 	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(csiPluginName), "staging", sanitizedSpecVolID)
 }
 
-// getPublishPath returns a publish path (on the node) to a device file which will be bind mounted to
+// getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{volumeID}
 func (m *csiBlockMapper) getPublishPath() string {
 	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(m.specName)
@@ -82,7 +82,7 @@ func (m *csiBlockMapper) GetPodDeviceMapPath() (string, string) {
 	return path, specName
 }
 
-// stageVolumeForBlock makes a block volume visible via the staging path
+// stageVolumeForBlock stages a block volume to stagingPath
 func (m *csiBlockMapper) stageVolumeForBlock(
 	ctx context.Context,
 	csi csiClient,
@@ -106,7 +106,6 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		return "", nil
 	}
 
-	// Start MountDevice
 	publishVolumeInfo := attachment.Status.AttachmentMetadata
 
 	nodeStageSecrets := map[string]string{}
@@ -118,27 +117,16 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		}
 	}
 
-	// setup path directory for stagingPath before call to NodeStageVolume
-	stagingDir := filepath.Dir(stagingPath)
-	if err := os.MkdirAll(stagingDir, 0750); err != nil {
-		klog.Error(log("blockMapper.stageVolumeForBlock failed to create dir %s: %v", stagingDir, err))
+	// Creating a stagingPath directory before call to NodeStageVolume
+	if err := os.MkdirAll(stagingPath, 0750); err != nil {
+		klog.Error(log("blockMapper.stageVolumeForBlock failed to create dir %s: %v", stagingPath, err))
 		return "", err
 	}
-	klog.V(4).Info(log("blockMapper.stageVolumeForBlock created directory for stagingPath successfully [%s]", stagingDir))
+	klog.V(4).Info(log("blockMapper.stageVolumeForBlock created stagingPath directory successfully [%s]", stagingPath))
 
-	// create an empty file on staging path where block device is bind mounted to
-	stagingPathFile, err := os.OpenFile(stagingPath, os.O_CREATE|os.O_RDWR, 0750)
-	if err != nil {
-		klog.Error(log("blockMapper.stageVolumeForBlock failed to create file %s: %v", stagingPathFile, err))
-		return "", err
-	}
-	if err := stagingPathFile.Close(); err != nil {
-		klog.Error(log("blockMapper.stageVolumeForBlock failed to close file %s: %v", stagingPathFile, err))
-		return "", err
-	}
-	klog.V(4).Info(log("blockMapper.stageVolumeForBlock created an empty file on staging path successfully [%s]", stagingPathFile))
-
-	// Request to attach the device to the node and to bind mount the device to stagingPath.
+	// Request to stage a block volume to stagingPath.
+	// Expected implementation for driver is creating driver specific resource on stagingPath and
+	// attaching the block volume to the node.
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
 		publishVolumeInfo,
@@ -157,7 +145,7 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 	return stagingPath, nil
 }
 
-// publishVolumeForBlock makes a block volume visible via the publish path
+// publishVolumeForBlock publishes a block volume to publishPath
 func (m *csiBlockMapper) publishVolumeForBlock(
 	ctx context.Context,
 	csi csiClient,
@@ -182,7 +170,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	}
 
 	publishPath := m.getPublishPath()
-	// setup path directory for stagingPath before call to NodeStageVolume
+	// Setup a parent directory for publishPath before call to NodePublishVolume
 	publishDir := filepath.Dir(publishPath)
 	if err := os.MkdirAll(publishDir, 0750); err != nil {
 		klog.Error(log("blockMapper.publishVolumeForBlock failed to create dir %s:  %v", publishDir, err))
@@ -190,7 +178,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	}
 	klog.V(4).Info(log("blockMapper.publishVolumeForBlock created directory for publishPath successfully [%s]", publishDir))
 
-	// create an empty file on publish path where block device is bind mounted to
+	// Create an empty file on publishPath.
 	publishPathFile, err := os.OpenFile(publishPath, os.O_CREATE|os.O_RDWR, 0750)
 	if err != nil {
 		klog.Error(log("blockMapper.publishVolumeForBlock failed to create file %s: %v", publishPathFile, err))
@@ -202,8 +190,9 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	}
 	klog.V(4).Info(log("blockMapper.publishVolumeForBlock created an empty file on publish path successfully [%s]", publishPathFile))
 
-	// Request to bind mount the device to publishPath.
-	// If driver doesn't implement NodeStageVolume, attaching the device to the node is required, here.
+	// Request to publish a block volume to publishPath.
+	// Expected implementation for driver is bind-mounting the block device to the publishPath.
+	// If driver doesn't implement NodeStageVolume, attaching the block volume to the node may be done, here.
 	err = csi.NodePublishVolume(
 		ctx,
 		m.volumeID,
@@ -289,17 +278,18 @@ func (m *csiBlockMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, vol
 
 var _ volume.BlockVolumeUnmapper = &csiBlockMapper{}
 
-// unpublishVolumeForBlock makes a block volume invisible via the publish path
+// unpublishVolumeForBlock unpublishes a block volume from publishPath
 func (m *csiBlockMapper) unpublishVolumeForBlock(ctx context.Context, csi csiClient, publishPath string) error {
-	// Request to unmount bind mount to publishPath and to detach the device from the node.
-	// If driver doesn't implement NodeUnstageVolume, detaching the device from the node is required, here.
+	// Request to unpublish a block volume from publishPath.
+	// Expected implementation for driver is unmounting the bind-mounted block volume from the publishPath.
+	// If driver doesn't implement NodeUnstageVolume, detaching the block volume from the node may be done, here.
 	if err := csi.NodeUnpublishVolume(ctx, m.volumeID, publishPath); err != nil {
 		klog.Error(log("blockMapper.unpublishVolumeForBlock failed: %v", err))
 		return err
 	}
 	klog.V(4).Infof(log("blockMapper.unpublishVolumeForBlock NodeUnpublished successfully [%s]", publishPath))
 
-	// Remove publishPath
+	// Remove publishPath file
 	if err := os.Remove(publishPath); err != nil {
 		klog.Error(log("blockMapper.unpublishVolumeForBlock failed to remove staging path after NodeUnpublishVolume() error [%s]: %v", publishPath, err))
 		return err
@@ -308,7 +298,7 @@ func (m *csiBlockMapper) unpublishVolumeForBlock(ctx context.Context, csi csiCli
 	return nil
 }
 
-// unstageVolumeForBlock makes a block volume invisible via the staging path
+// unstageVolumeForBlock unstages a block volume from stagingPath
 func (m *csiBlockMapper) unstageVolumeForBlock(ctx context.Context, csi csiClient, stagingPath string) error {
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
@@ -321,15 +311,17 @@ func (m *csiBlockMapper) unstageVolumeForBlock(ctx context.Context, csi csiClien
 		return nil
 	}
 
-	// Request to unmount bind mount to stagingPath and to detach the device from the node.
+	// Request to unstage a block volume from stagingPath.
+	// Expected implementation for driver is removing driver specific resource in stagingPath and
+	// detaching the block volume from the node.
 	if err := csi.NodeUnstageVolume(ctx, m.volumeID, stagingPath); err != nil {
 		klog.Errorf(log("blockMapper.unstageVolumeForBlock failed: %v", err))
 		return err
 	}
 	klog.V(4).Infof(log("blockMapper.unstageVolumeForBlock NodeUnstageVolume successfully [%s]", stagingPath))
 
-	// Remove stagingPath
-	if err := os.Remove(stagingPath); err != nil {
+	// Remove stagingPath directory and its contents
+	if err := os.RemoveAll(stagingPath); err != nil {
 		klog.Error(log("blockMapper.unstageVolumeForBlock failed to remove staging path after NodeUnstageVolume() error [%s]: %v", stagingPath, err))
 		return err
 	}
