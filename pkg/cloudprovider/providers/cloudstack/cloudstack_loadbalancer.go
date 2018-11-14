@@ -462,7 +462,7 @@ func (lb *loadBalancer) createLoadBalancerRule(lbRuleName string, port v1.Servic
 	}
 
 	// Do not create corresponding firewall rule.
-	p.SetOpenfirewall(false)
+	p.SetOpenfirewall(true)
 
 	// Create a new load balancer rule.
 	r, err := lb.LoadBalancer.CreateLoadBalancerRule(p)
