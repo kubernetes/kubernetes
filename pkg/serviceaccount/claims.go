@@ -80,15 +80,13 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	return sc, pc
 }
 
-func NewValidator(audiences []string, getter ServiceAccountTokenGetter) Validator {
+func NewValidator(getter ServiceAccountTokenGetter) Validator {
 	return &validator{
-		auds:   audiences,
 		getter: getter,
 	}
 }
 
 type validator struct {
-	auds   []string
 	getter ServiceAccountTokenGetter
 }
 
@@ -110,19 +108,6 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 	default:
 		klog.Errorf("unexpected validation error: %T", err)
 		return nil, errors.New("Token could not be validated.")
-	}
-
-	var audValid bool
-
-	for _, aud := range v.auds {
-		audValid = public.Audience.Contains(aud)
-		if audValid {
-			break
-		}
-	}
-
-	if !audValid {
-		return nil, errors.New("Token is invalid for this audience.")
 	}
 
 	namespace := private.Kubernetes.Namespace
