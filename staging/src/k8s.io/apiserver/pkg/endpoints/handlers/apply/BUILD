@@ -22,6 +22,7 @@ go_test(
         "decode_test.go",
         "roundtrip_test.go",
     ],
+    data = ["//api/openapi-spec:swagger-spec"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
