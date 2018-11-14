@@ -19,7 +19,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -61,7 +61,7 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/fake:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
