@@ -708,6 +708,9 @@ function build-kubelet-config {
     declare quoted_dns_server_ip
     declare quoted_dns_domain
     quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
+    if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+      quoted_dns_server_ip=$(yaml-quote "${LOCAL_DNS_IP}")
+    fi
     quoted_dns_domain=$(yaml-quote "${DNS_DOMAIN}")
     cat <<EOF
 kind: KubeletConfiguration
@@ -848,7 +851,9 @@ LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
 ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
 CLUSTER_DNS_CORE_DNS: $(yaml-quote ${CLUSTER_DNS_CORE_DNS:-true})
+ENABLE_NODELOCAL_DNS: $(yaml-quote ${ENABLE_NODELOCAL_DNS:-false})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
+LOCAL_DNS_IP: $(yaml-quote ${LOCAL_DNS_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote ${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false})
 KUBE_PROXY_DAEMONSET: $(yaml-quote ${KUBE_PROXY_DAEMONSET:-false})
