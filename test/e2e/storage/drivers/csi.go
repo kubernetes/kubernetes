@@ -237,7 +237,7 @@ var _ DynamicPVTestDriver = &gcePDExternalCSIDriver{}
 func InitGcePDExternalCSIDriver() TestDriver {
 	return &gcePDExternalCSIDriver{
 		driverInfo: DriverInfo{
-			Name: "com.google.csi.gcepd",
+			Name: "pd.csi.storage.gke.io",
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
 			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,
