@@ -18,10 +18,12 @@ package filters
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -72,16 +74,21 @@ func TestTimeout(t *testing.T) {
 	sendResponse := make(chan string, 1)
 	doPanic := make(chan struct{}, 1)
 	writeErrors := make(chan error, 1)
+	gotPanic := make(chan interface{}, 1)
 	timeout := make(chan time.Time, 1)
 	resp := "test response"
 	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 	record := &recorder{}
 
 	handler := newHandler(sendResponse, doPanic, writeErrors)
-	ts := httptest.NewServer(WithPanicRecovery(WithTimeout(handler,
-		func(req *http.Request) (<-chan time.Time, func(), *apierrors.StatusError) {
+	ts := httptest.NewServer(withPanicRecovery(
+		WithTimeout(handler, func(req *http.Request) (<-chan time.Time, func(), *apierrors.StatusError) {
 			return timeout, record.Record, timeoutErr
-		})))
+		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
+			gotPanic <- err
+			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
+		}),
+	)
 	defer ts.Close()
 
 	// No timeouts
@@ -139,5 +146,14 @@ func TestTimeout(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusInternalServerError {
 		t.Errorf("got res.StatusCode %d; expected %d due to panic", res.StatusCode, http.StatusInternalServerError)
+	}
+	select {
+	case err := <-gotPanic:
+		msg := fmt.Sprintf("%v", err)
+		if !strings.Contains(msg, "newHandler") {
+			t.Errorf("expected line with root cause panic in the stack trace, but didn't: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatalf("expected to see a handler panic, but didn't")
 	}
 }
