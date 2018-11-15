@@ -60,7 +60,7 @@ type RequestScope struct {
 	Trace           *utiltrace.Trace
 
 	TableConvertor rest.TableConvertor
-	OpenAPISchema  openapiproto.Schema
+	OpenAPIModels  openapiproto.Models
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
