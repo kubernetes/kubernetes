@@ -156,10 +156,10 @@ func (*InfoRequest) ProtoMessage()               {}
 func (*InfoRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{3} }
 
 func init() {
-	proto.RegisterType((*PluginInfo)(nil), "pluginregistration.PluginInfo")
-	proto.RegisterType((*RegistrationStatus)(nil), "pluginregistration.RegistrationStatus")
-	proto.RegisterType((*RegistrationStatusResponse)(nil), "pluginregistration.RegistrationStatusResponse")
-	proto.RegisterType((*InfoRequest)(nil), "pluginregistration.InfoRequest")
+	proto.RegisterType((*PluginInfo)(nil), "pluginregistration.v1.PluginInfo")
+	proto.RegisterType((*RegistrationStatus)(nil), "pluginregistration.v1.RegistrationStatus")
+	proto.RegisterType((*RegistrationStatusResponse)(nil), "pluginregistration.v1.RegistrationStatusResponse")
+	proto.RegisterType((*InfoRequest)(nil), "pluginregistration.v1.InfoRequest")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -187,7 +187,7 @@ func NewRegistrationClient(cc *grpc.ClientConn) RegistrationClient {
 
 func (c *registrationClient) GetInfo(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*PluginInfo, error) {
 	out := new(PluginInfo)
-	err := grpc.Invoke(ctx, "/pluginregistration.Registration/GetInfo", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/pluginregistration.v1.Registration/GetInfo", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (c *registrationClient) GetInfo(ctx context.Context, in *InfoRequest, opts 
 
 func (c *registrationClient) NotifyRegistrationStatus(ctx context.Context, in *RegistrationStatus, opts ...grpc.CallOption) (*RegistrationStatusResponse, error) {
 	out := new(RegistrationStatusResponse)
-	err := grpc.Invoke(ctx, "/pluginregistration.Registration/NotifyRegistrationStatus", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/pluginregistration.v1.Registration/NotifyRegistrationStatus", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func _Registration_GetInfo_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pluginregistration.Registration/GetInfo",
+		FullMethod: "/pluginregistration.v1.Registration/GetInfo",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RegistrationServer).GetInfo(ctx, req.(*InfoRequest))
@@ -242,7 +242,7 @@ func _Registration_NotifyRegistrationStatus_Handler(srv interface{}, ctx context
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pluginregistration.Registration/NotifyRegistrationStatus",
+		FullMethod: "/pluginregistration.v1.Registration/NotifyRegistrationStatus",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RegistrationServer).NotifyRegistrationStatus(ctx, req.(*RegistrationStatus))
@@ -251,7 +251,7 @@ func _Registration_NotifyRegistrationStatus_Handler(srv interface{}, ctx context
 }
 
 var _Registration_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "pluginregistration.Registration",
+	ServiceName: "pluginregistration.v1.Registration",
 	HandlerType: (*RegistrationServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
