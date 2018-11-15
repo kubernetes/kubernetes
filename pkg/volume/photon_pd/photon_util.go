@@ -146,8 +146,8 @@ func getCloudProvider(cloud cloudprovider.Interface) (*photon.PCCloud, error) {
 		return nil, fmt.Errorf("Photon Controller Util: Cloud provider not initialized properly")
 	}
 
-	pcc := cloud.(*photon.PCCloud)
-	if pcc == nil {
+	pcc, ok := cloud.(*photon.PCCloud)
+	if !ok || pcc == nil {
 		klog.Errorf("Invalid cloud provider: expected Photon Controller")
 		return nil, fmt.Errorf("Invalid cloud provider: expected Photon Controller")
 	}
