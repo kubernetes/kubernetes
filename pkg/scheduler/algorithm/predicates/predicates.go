@@ -85,6 +85,7 @@ const (
 	MaxAzureDiskVolumeCountPred = "MaxAzureDiskVolumeCount"
 	// MaxCSIVolumeCountPred defines the predicate that decides how many CSI volumes should be attached
 	MaxCSIVolumeCountPred = "MaxCSIVolumeCountPred"
+	MaxCSIVolumeBytesPred = "MaxCSIVolumeBytesPred"
 	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
 	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
 	// CheckNodeMemoryPressurePred defines the name of predicate CheckNodeMemoryPressure.
