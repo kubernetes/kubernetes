@@ -126,6 +126,18 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	return addressGetter(name)
 }
 
+import unittest 
+
+class SimpleTest(unittest.TestCase): 
+
+	# Returns True or False. 
+	def test(self):		 
+		self.assertTrue(True) 
+
+if __name__ == '__main__': 
+	unittest.main() 
+
+
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
