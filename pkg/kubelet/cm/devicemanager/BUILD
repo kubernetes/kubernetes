@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
-        "//pkg/kubelet/apis/pluginregistration/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/apis/podresources/v1alpha1:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/errors:go_default_library",
@@ -43,7 +43,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
-        "//pkg/kubelet/apis/pluginregistration/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/util/pluginwatcher:go_default_library",
