@@ -46,7 +46,7 @@ go_library(
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
-        "//pkg/kubelet/apis/pluginregistration/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/certificate:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
