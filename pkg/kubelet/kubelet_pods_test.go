@@ -183,9 +183,7 @@ fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
+123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -214,12 +212,8 @@ fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
-456.78.90.123	park
-456.78.90.123	doo
-456.78.90.123	boo
+123.45.67.89	foo	bar	baz
+456.78.90.123	park	doo	boo
 `,
 		},
 	}
@@ -300,9 +294,7 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
+123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -323,12 +315,8 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
-456.78.90.123	park
-456.78.90.123	doo
-456.78.90.123	boo
+123.45.67.89	foo	bar	baz
+456.78.90.123	park	doo	boo
 `,
 		},
 	}
