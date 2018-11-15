@@ -87,7 +87,7 @@ const (
 	MaxNodesForEndpointsTests = 3
 
 	// ServiceTestTimeout is used for most polling/waiting activities
-	ServiceTestTimeout = 60 * time.Second
+	ServiceTestTimeout = 120 * time.Second
 
 	// GCPMaxInstancesInInstanceGroup is the maximum number of instances supported in
 	// one instance group on GCP.
