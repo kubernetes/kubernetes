@@ -332,6 +332,73 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	}
 }
 
+func TestAttacherWaitForAttach(t *testing.T) {
+	tests := []struct {
+		name             string
+		driver           string
+		makeAttachment   func() *storage.VolumeAttachment
+		expectedAttachID string
+		expectError      bool
+	}{
+		{
+			name:   "successful attach",
+			driver: "attachable",
+			makeAttachment: func() *storage.VolumeAttachment {
+
+				testAttachID := getAttachmentName("test-vol", "attachable", "node")
+				successfulAttachment := makeTestAttachment(testAttachID, "node", "test-pv")
+				successfulAttachment.Status.Attached = true
+				return successfulAttachment
+			},
+			expectedAttachID: getAttachmentName("test-vol", "attachable", "node"),
+			expectError:      false,
+		},
+		{
+			name:        "failed attach",
+			driver:      "attachable",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plug, _, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			attacher, err := plug.NewAttacher()
+			if err != nil {
+				t.Fatalf("failed to create new attacher: %v", err)
+			}
+			csiAttacher := attacher.(*csiAttacher)
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
+
+			if test.makeAttachment != nil {
+				attachment := test.makeAttachment()
+				_, err = csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+				if err != nil {
+					t.Fatalf("failed to create VolumeAttachment: %v", err)
+				}
+				gotAttachment, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Get(attachment.Name, meta.GetOptions{})
+				if err != nil {
+					t.Fatalf("failed to get created VolumeAttachment: %v", err)
+				}
+				t.Logf("created test VolumeAttachment %+v", gotAttachment)
+			}
+
+			attachID, err := csiAttacher.WaitForAttach(spec, "", nil, time.Second)
+			if err != nil && !test.expectError {
+				t.Errorf("Unexpected error: %s", err)
+			}
+			if err == nil && test.expectError {
+				t.Errorf("Expected error, got none")
+			}
+			if attachID != test.expectedAttachID {
+				t.Errorf("Expected attachID %q, got %q", test.expectedAttachID, attachID)
+			}
+		})
+	}
+}
+
 func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 	nodeName := "test-node"
 	testCases := []struct {
