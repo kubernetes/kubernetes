@@ -223,7 +223,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 			t.Errorf("test failed to set dynamic defaults: %v", err)
 			break
 		}
-		err = EnsureProxyAddon(intMaster, client)
+		err = EnsureProxyAddon(&intMaster.ClusterConfiguration, &intMaster.LocalAPIEndpoint, client)
 
 		// Compare actual to expected errors
 		actErr := "No error"

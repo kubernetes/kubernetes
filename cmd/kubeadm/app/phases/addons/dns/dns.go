@@ -74,14 +74,14 @@ func DeployedDNSAddon(client clientset.Interface) (kubeadmapi.DNSAddOnType, stri
 }
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
-func EnsureDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
 	if cfg.DNS.Type == kubeadmapi.CoreDNS {
 		return coreDNSAddon(cfg, client)
 	}
 	return kubeDNSAddon(cfg, client)
 }
 
-func kubeDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
 		return err
 	}
@@ -103,9 +103,9 @@ func kubeDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface)
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment,
 		struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
 			DeploymentName: kubeadmconstants.KubeDNSDeploymentName,
-			KubeDNSImage:   images.GetDNSImage(&cfg.ClusterConfiguration, kubeadmconstants.KubeDNSKubeDNSImageName),
-			DNSMasqImage:   images.GetDNSImage(&cfg.ClusterConfiguration, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
-			SidecarImage:   images.GetDNSImage(&cfg.ClusterConfiguration, kubeadmconstants.KubeDNSSidecarImageName),
+			KubeDNSImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
+			DNSMasqImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
+			SidecarImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
 			DNSBindAddr:    dnsBindAddr,
 			DNSProbeAddr:   dnsProbeAddr,
 			DNSDomain:      cfg.Networking.DNSDomain,
@@ -155,11 +155,11 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 	return createDNSService(kubednsService, serviceBytes, client)
 }
 
-func coreDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct{ DeploymentName, Image, MasterTaintKey string }{
 		DeploymentName: kubeadmconstants.CoreDNSDeploymentName,
-		Image:          images.GetDNSImage(&cfg.ClusterConfiguration, kubeadmconstants.CoreDNSImageName),
+		Image:          images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
 		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {

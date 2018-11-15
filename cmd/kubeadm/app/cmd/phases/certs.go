@@ -204,13 +204,8 @@ func runCertsSa(c workflow.RunData) error {
 		return nil
 	}
 
-	// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)
-	cfg := data.Cfg()
-	cfg.CertificatesDir = data.CertificateWriteDir()
-	defer func() { cfg.CertificatesDir = data.CertificateDir() }()
-
 	// create the new service account key (or use existing)
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg)
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir())
 }
 
 func runCerts(c workflow.RunData) error {

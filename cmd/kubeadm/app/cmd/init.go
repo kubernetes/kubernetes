@@ -333,7 +333,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	}
 
 	// Checks if an external CA is provided by the user.
-	externalCA, _ := certsphase.UsingExternalCA(cfg)
+	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
 	if externalCA {
 		kubeconfigDir := kubeadmconstants.KubernetesDir
 		if options.dryRun {

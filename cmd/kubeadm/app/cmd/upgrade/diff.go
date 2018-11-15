@@ -105,7 +105,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		return err
 	}
 
-	specs := controlplane.GetStaticPodSpecs(cfg, k8sVer)
+	specs := controlplane.GetStaticPodSpecs(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, k8sVer)
 	for spec, pod := range specs {
 		var path string
 		switch spec {
