@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -835,13 +836,15 @@ func TestFinishRequest(t *testing.T) {
 	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
 	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
 	testcases := []struct {
-		timeout     time.Duration
-		fn          resultFunc
-		expectedObj runtime.Object
-		expectedErr error
+		name          string
+		timeout       time.Duration
+		fn            resultFunc
+		expectedObj   runtime.Object
+		expectedErr   error
+		expectedPanic string
 	}{
 		{
-			// Expected obj is returned.
+			name:    "Expected obj is returned",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return exampleObj, nil
@@ -850,7 +853,7 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			// Expected error is returned.
+			name:    "Expected error is returned",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return nil, exampleErr
@@ -859,7 +862,7 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: exampleErr,
 		},
 		{
-			// Successful status object is returned as expected.
+			name:    "Successful status object is returned as expected",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return successStatusObj, nil
@@ -868,7 +871,7 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			// Error status object is converted to StatusError.
+			name:    "Error status object is converted to StatusError",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return errorStatusObj, nil
@@ -876,15 +879,50 @@ func TestFinishRequest(t *testing.T) {
 			expectedObj: nil,
 			expectedErr: apierrors.FromObject(errorStatusObj),
 		},
+		{
+			name:    "Panic is propagated up",
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				panic("my panic")
+				return nil, nil
+			},
+			expectedObj:   nil,
+			expectedErr:   nil,
+			expectedPanic: "my panic",
+		},
+		{
+			name:    "Panic is propagated with stack",
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				panic("my panic")
+				return nil, nil
+			},
+			expectedObj:   nil,
+			expectedErr:   nil,
+			expectedPanic: "rest_test.go",
+		},
 	}
 	for i, tc := range testcases {
-		obj, err := finishRequest(tc.timeout, tc.fn)
-		if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
-			t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
-		}
-		if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
-			t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				r := recover()
+				switch {
+				case r == nil && len(tc.expectedPanic) > 0:
+					t.Errorf("expected panic containing '%s', got none", tc.expectedPanic)
+				case r != nil && len(tc.expectedPanic) == 0:
+					t.Errorf("unexpected panic: %v", r)
+				case r != nil && len(tc.expectedPanic) > 0 && !strings.Contains(fmt.Sprintf("%v", r), tc.expectedPanic):
+					t.Errorf("expected panic containing '%s', got '%v'", tc.expectedPanic, r)
+				}
+			}()
+			obj, err := finishRequest(tc.timeout, tc.fn)
+			if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
+				t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
+			}
+			if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
+				t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
+			}
+		})
 	}
 }
 
