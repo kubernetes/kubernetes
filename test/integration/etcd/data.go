@@ -291,6 +291,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/storage/v1
+		gvr("storage.k8s.io", "v1", "volumeattachments"): {
+			Stub:             `{"metadata": {"name": "va3"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv3"}}}`,
+			ExpectedEtcdPath: "/registry/volumeattachments/va3",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		gvr("storage.k8s.io", "v1beta1", "storageclasses"): {
 			Stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,
