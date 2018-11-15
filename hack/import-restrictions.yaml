@@ -123,6 +123,7 @@
   - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/klog
+  - k8s.io/kube-openapi
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
