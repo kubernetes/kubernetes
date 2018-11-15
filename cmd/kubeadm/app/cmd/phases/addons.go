@@ -47,23 +47,23 @@ type addonData interface {
 // NewAddonPhase returns the addon Cobra command
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:     "addon",
-		Short:    "Installs required addons for passing Conformance tests",
-		CmdFlags: getAddonPhaseFlags("all"),
+		Name:         "addon",
+		Short:        "Installs required addons for passing Conformance tests",
+		InheritFlags: getAddonPhaseFlags("all"),
 		Phases: []workflow.Phase{
 			{
-				Name:     "coredns",
-				Short:    "Installs the CoreDNS addon to a Kubernetes cluster",
-				Long:     coreDNSAddonLongDesc,
-				CmdFlags: getAddonPhaseFlags("coredns"),
-				Run:      runCoreDNSAddon,
+				Name:         "coredns",
+				Short:        "Installs the CoreDNS addon to a Kubernetes cluster",
+				Long:         coreDNSAddonLongDesc,
+				InheritFlags: getAddonPhaseFlags("coredns"),
+				Run:          runCoreDNSAddon,
 			},
 			{
-				Name:     "kube-proxy",
-				Short:    "Installs the kube-proxy addon to a Kubernetes cluster",
-				Long:     kubeProxyAddonLongDesc,
-				CmdFlags: getAddonPhaseFlags("kube-proxy"),
-				Run:      runKubeProxyAddon,
+				Name:         "kube-proxy",
+				Short:        "Installs the kube-proxy addon to a Kubernetes cluster",
+				Long:         kubeProxyAddonLongDesc,
+				InheritFlags: getAddonPhaseFlags("kube-proxy"),
+				Run:          runKubeProxyAddon,
 			},
 		},
 	}

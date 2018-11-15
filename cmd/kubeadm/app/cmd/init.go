@@ -155,7 +155,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
-	initRunner.SetPhaseSubcommandsAdditionalFlags(func(flags *flag.FlagSet) {
+	initRunner.SetAdditionalFlags(func(flags *flag.FlagSet) {
 		options.AddImageMetaFlags(flags, &initOptions.externalcfg.ImageRepository)
 		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
 		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
