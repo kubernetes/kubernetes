@@ -119,15 +119,18 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 
 	klog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
 
+	// TODO(71164): In 1.15, return empty devicePath
 	return attachID, nil
 }
 
-func (c *csiAttacher) WaitForAttach(spec *volume.Spec, attachID string, pod *v1.Pod, timeout time.Duration) (string, error) {
+func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, timeout time.Duration) (string, error) {
 	source, err := getCSISourceFromSpec(spec)
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
 		return "", err
 	}
+
+	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
 
 	skip, err := c.plugin.skipAttach(source.Driver)
 	if err != nil {
