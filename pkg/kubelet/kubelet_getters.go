@@ -57,6 +57,14 @@ func (kl *Kubelet) getPluginsDir() string {
 	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsDirName)
 }
 
+// getPluginsRegistrationDir returns the full path to the directory under which
+// plugins socket should be placed to be registered.
+// More information is available about plugin registration in the pluginwatcher
+// module
+func (kl *Kubelet) getPluginsRegistrationDir() string {
+	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsRegistrationDirName)
+}
+
 // getPluginDir returns a data directory name for a given plugin name.
 // Plugins can use these directories to store data that they need to persist.
 // For per-pod plugin data, see getPodPluginDir.
