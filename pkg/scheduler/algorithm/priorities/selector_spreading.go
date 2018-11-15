@@ -39,6 +39,7 @@ type SelectorSpread struct {
 	controllerLister  algorithm.ControllerLister
 	replicaSetLister  algorithm.ReplicaSetLister
 	statefulSetLister algorithm.StatefulSetLister
+	podLister         algorithm.PodLister
 }
 
 // NewSelectorSpreadPriority creates a SelectorSpread.
@@ -46,12 +47,14 @@ func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
 	replicaSetLister algorithm.ReplicaSetLister,
-	statefulSetLister algorithm.StatefulSetLister) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+	statefulSetLister algorithm.StatefulSetLister,
+	podLister algorithm.PodLister) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
 		replicaSetLister:  replicaSetLister,
 		statefulSetLister: statefulSetLister,
+		podLister:         podLister,
 	}
 	return selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce
 }
@@ -84,26 +87,8 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 		}, nil
 	}
 
-	count := int(0)
-	for _, nodePod := range nodeInfo.Pods() {
-		if pod.Namespace != nodePod.Namespace {
-			continue
-		}
-		// When we are replacing a failed pod, we often see the previous
-		// deleted version while scheduling the replacement.
-		// Ignore the previous deleted version for spreading purposes
-		// (it can still be considered for resource restrictions etc.)
-		if nodePod.DeletionTimestamp != nil {
-			klog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
-			continue
-		}
-		for _, selector := range selectors {
-			if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
-				count++
-				break
-			}
-		}
-	}
+	filteredPods := filteredPodsMatchAllSelectors(pod.Namespace, selectors, nodeInfo.Pods())
+	count := len(filteredPods)
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: int(count),
@@ -115,27 +100,50 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+	var selectors []labels.Selector
+	priorityMeta, ok := meta.(*priorityMetadata)
+	if ok {
+		selectors = priorityMeta.podSelectors
+	} else {
+		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
+	}
+
 	countsByZone := make(map[string]int, 10)
+	countsByNodeName := make(map[string]int, 10)
 	maxCountByZone := int(0)
 	maxCountByNodeName := int(0)
 
-	for i := range result {
-		if result[i].Score > maxCountByNodeName {
-			maxCountByNodeName = result[i].Score
-		}
-		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
-		if zoneID == "" {
-			continue
-		}
-		countsByZone[zoneID] += result[i].Score
-	}
+	if len(selectors) > 0 {
+		pods, _ := s.podLister.List(selectors[0])
+		filteredPods := filteredPodsMatchAllSelectors(pod.Namespace, selectors, pods)
 
-	for zoneID := range countsByZone {
-		if countsByZone[zoneID] > maxCountByZone {
-			maxCountByZone = countsByZone[zoneID]
+		for _, pod := range filteredPods {
+			if pod.Spec.NodeName == "" {
+				continue
+			}
+			countsByNodeName[pod.Spec.NodeName]++
+			if maxCountByNodeName < countsByNodeName[pod.Spec.NodeName] {
+				maxCountByNodeName = countsByNodeName[pod.Spec.NodeName]
+			}
+
+			if nodeNameToInfo[pod.Spec.NodeName] == nil {
+				continue
+			}
+			zoneID := utilnode.GetZoneKey(nodeNameToInfo[pod.Spec.NodeName].Node())
+			if zoneID != "" {
+				countsByZone[zoneID]++
+				if countsByZone[zoneID] > maxCountByZone {
+					maxCountByZone = countsByZone[zoneID]
+				}
+			}
+		}
+
+		if klog.V(10) {
+			for zone, cnt := range countsByZone {
+				klog.Infof("pod: %s namespace: %s countsByZone(%s): %d", pod.Name, pod.Namespace, zone, cnt)
+			}
 		}
 	}
-
 	haveZones := len(countsByZone) != 0
 
 	maxCountByNodeNameFloat64 := float64(maxCountByNodeName)
@@ -199,6 +207,30 @@ func (s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (m
 		}
 	}
 	return labeledNodes, nonLabeledNodes
+}
+
+// filteredPodsMatchAllSelectors get pods based on namespace and matching all selectors
+func filteredPodsMatchAllSelectors(namespace string, selectors []labels.Selector, pods []*v1.Pod) (filteredPods []*v1.Pod) {
+	if pods == nil || len(pods) == 0 || selectors == nil {
+		return []*v1.Pod{}
+	}
+	for _, pod := range pods {
+		// Ignore pods being deleted for spreading purposes
+		// Ignore pods that do not match all selectors
+		if namespace == pod.Namespace && pod.DeletionTimestamp == nil {
+			matches := true
+			for _, selector := range selectors {
+				if !selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
+					matches = false
+					break
+				}
+			}
+			if matches {
+				filteredPods = append(filteredPods, pod)
+			}
+		}
+	}
+	return
 }
 
 // filteredPod get pods based on namespace and selector
