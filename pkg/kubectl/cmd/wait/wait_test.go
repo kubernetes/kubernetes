@@ -446,6 +446,28 @@ func TestWaitForCondition(t *testing.T) {
 			},
 		},
 		{
+			name: "handles empty object name",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
+			},
+			timeout:     10 * time.Second,
+			expectedErr: "resource name must be provided",
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
+		{
 			name: "times out",
 			infos: []*resource.Info{
 				{
