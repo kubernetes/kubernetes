@@ -1,54 +1,51 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: csi-gce-controller
+  name: csi-gce-pd-controller
 spec:
   serviceName: "csi-gce-pd"
   replicas: 1
   selector:
     matchLabels:
-      app: csi-gce-pd-driver
+      app: gcp-compute-persistent-disk-csi-driver
   template:
     metadata:
       labels:
-        app: csi-gce-pd-driver
+        app: gcp-compute-persistent-disk-csi-driver
     spec:
-      serviceAccountName: csi-controller
+      serviceAccountName: csi-controller-sa
       containers:
-        - name: csi-external-provisioner
-          imagePullPolicy: Always
-          image: gcr.io/gke-release/csi-provisioner:v0.4.1-gke.0
+        - name: csi-provisioner
+          image: gcr.io/gke-release/csi-provisioner:v1.0.0-gke.0
           args:
             - "--v=5"
-            - "--provisioner=com.google.csi.gcepd"
+            - "--provisioner=pd.csi.storage.gke.io"
             - "--csi-address=/csi/csi.sock"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          imagePullPolicy: Always
-          image: gcr.io/gke-release/csi-attacher:v0.4.1-gke.0
+          image: gcr.io/gke-release/csi-attacher:v1.0.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
-        - name: gce-driver
-          imagePullPolicy: Always
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.2.0-gke.0
+        - name: gce-pd-driver
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.3.0-gke.0
           args:
             - "--v=5"
-            - "--endpoint=unix:///csi/csi.sock"
+            - "--endpoint=unix:/csi/csi.sock"
           env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/service-account/cloud-sa.json"
+              value: "/etc/cloud-sa/cloud-sa.json"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
             - name: cloud-sa-volume
               readOnly: true
-              mountPath: "/etc/service-account"
+              mountPath: "/etc/cloud-sa"
       volumes:
         - name: socket-dir
           emptyDir: {}
