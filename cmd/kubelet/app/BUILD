@@ -8,8 +8,22 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "server_bootstrap_test.go",
+        "server_test.go",
+    ],
     embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/github.com/cloudflare/cfssl/config:go_default_library",
+        "//vendor/github.com/cloudflare/cfssl/signer:go_default_library",
+        "//vendor/github.com/cloudflare/cfssl/signer/local:go_default_library",
+    ],
 )
 
 go_library(
@@ -119,6 +133,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",

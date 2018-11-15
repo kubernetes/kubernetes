@@ -50,6 +50,8 @@ var certificateWaitBackoff = wait.Backoff{Duration: 30 * time.Second, Steps: 4, 
 type Manager interface {
 	// Start the API server status sync loop.
 	Start()
+	// Stop the cert manager loop.
+	Stop()
 	// Current returns the currently selected certificate from the
 	// certificate manager, as well as the associated certificate and key data
 	// in PEM format.
@@ -164,6 +166,8 @@ type manager struct {
 	// the clientFn must only be accessed under the clientAccessLock
 	clientAccessLock sync.Mutex
 	clientFn         CSRClientFunc
+	stopCh           chan struct{}
+	stopped          bool
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -184,6 +188,7 @@ func NewManager(config *Config) (Manager, error) {
 	}
 
 	m := manager{
+		stopCh:                make(chan struct{}),
 		clientFn:              config.ClientFn,
 		getTemplate:           getTemplate,
 		dynamicTemplate:       config.GetTemplate != nil,
@@ -219,6 +224,17 @@ func (m *manager) ServerHealthy() bool {
 	return m.serverHealth
 }
 
+// Stop terminates the manager.
+func (m *manager) Stop() {
+	m.clientAccessLock.Lock()
+	defer m.clientAccessLock.Unlock()
+	if m.stopped {
+		return
+	}
+	close(m.stopCh)
+	m.stopped = true
+}
+
 // Start will start the background work of rotating the certificates.
 func (m *manager) Start() {
 	// Certificate rotation depends on access to the API server certificate
@@ -232,7 +248,7 @@ func (m *manager) Start() {
 	klog.V(2).Infof("Certificate rotation is enabled.")
 
 	templateChanged := make(chan struct{})
-	go wait.Forever(func() {
+	go wait.Until(func() {
 		deadline := m.nextRotationDeadline()
 		if sleepInterval := deadline.Sub(time.Now()); sleepInterval > 0 {
 			klog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
@@ -267,17 +283,17 @@ func (m *manager) Start() {
 			utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to rotate certs: %v", err))
 			wait.PollInfinite(32*time.Second, m.rotateCerts)
 		}
-	}, time.Second)
+	}, time.Second, m.stopCh)
 
 	if m.dynamicTemplate {
-		go wait.Forever(func() {
+		go wait.Until(func() {
 			// check if the current template matches what we last requested
 			if !m.certSatisfiesTemplate() && !reflect.DeepEqual(m.getLastRequest(), m.getTemplate()) {
 				// if the template is different, queue up an interrupt of the rotation deadline loop.
 				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
 				templateChanged <- struct{}{}
 			}
-		}, time.Second)
+		}, time.Second, m.stopCh)
 	}
 }
 
@@ -332,11 +348,19 @@ func (m *manager) getClient() (certificatesclient.CertificateSigningRequestInter
 	return m.clientFn(current)
 }
 
+// RotateCerts is exposed for testing only and is not a part of the public interface.
+// Returns true if it changed the cert, false otherwise. Error is only returned in
+// exceptional cases.
+func (m *manager) RotateCerts() (bool, error) {
+	return m.rotateCerts()
+}
+
 // rotateCerts attempts to request a client cert from the server, wait a reasonable
 // period of time for it to be signed, and then update the cert on disk. If it cannot
 // retrieve a cert, it will return false. It will only return error in exceptional cases.
 // This method also keeps track of "server health" by interpreting the responses it gets
 // from the server on the various calls it makes.
+// TODO: return errors, have callers handle and log them correctly
 func (m *manager) rotateCerts() (bool, error) {
 	klog.V(2).Infof("Rotating certificates")
 

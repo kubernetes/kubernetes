@@ -56,6 +56,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/certificate"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -743,42 +744,20 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 			return nil, nil, err
 		}
 
-		newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
-			// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
-			// credentials.
-			// XXX: When an external bootstrap source is available, it should be possible to always use that source
-			//      to retrieve new credentials.
-			config := certConfig
-			if current != nil {
-				config = clientConfig
-			}
-			client, err := clientset.NewForConfig(config)
-			if err != nil {
-				return nil, err
-			}
-			return client.CertificatesV1beta1().CertificateSigningRequests(), nil
-		}
-
-		clientCertificateManager, err := kubeletcertificate.NewKubeletClientCertificateManager(
-			s.CertDirectory,
-			nodeName,
-			clientConfig.CertFile,
-			clientConfig.KeyFile,
-			newClientFn,
-		)
+		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// the rotating transport will use the cert from the cert manager instead of these files
-		transportConfig := *clientConfig
+		transportConfig := restclient.CopyConfig(clientConfig)
 		transportConfig.CertFile = ""
 		transportConfig.KeyFile = ""
 
 		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
 		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
 		// or the bootstrapping credentials to potentially lay down new initial config.
-		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, &transportConfig, clientCertificateManager, 5*time.Minute)
+		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, transportConfig, clientCertificateManager, 5*time.Minute)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -786,7 +765,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		klog.V(2).Info("Starting client certificate rotation.")
 		clientCertificateManager.Start()
 
-		return &transportConfig, closeAllConns, nil
+		return transportConfig, closeAllConns, nil
 	}
 
 	if len(s.BootstrapKubeconfig) > 0 {
@@ -800,6 +779,35 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		return nil, nil, fmt.Errorf("invalid kubeconfig: %v", err)
 	}
 	return clientConfig, nil, nil
+}
+
+// buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
+// if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
+// write out).
+func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
+	newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
+		// credentials. In the future it would be desirable to change the behavior of bootstrap
+		// to always fall back to the external bootstrap credentials when such credentials are
+		// provided by a fundamental trust system like cloud VM identity or an HSM module.
+		config := certConfig
+		if current != nil {
+			config = clientConfig
+		}
+		client, err := clientset.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return client.CertificatesV1beta1().CertificateSigningRequests(), nil
+	}
+
+	return kubeletcertificate.NewKubeletClientCertificateManager(
+		certDir,
+		nodeName,
+		clientConfig.CertFile,
+		clientConfig.KeyFile,
+		newClientFn,
+	)
 }
 
 // getNodeName returns the node name according to the cloud provider
