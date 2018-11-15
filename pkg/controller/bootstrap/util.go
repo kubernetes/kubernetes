@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -52,24 +52,24 @@ func parseSecretName(name string) (secretID string, ok bool) {
 func validateSecretForSigning(secret *v1.Secret) (tokenID, tokenSecret string, ok bool) {
 	nameTokenID, ok := parseSecretName(secret.Name)
 	if !ok {
-		glog.V(3).Infof("Invalid secret name: %s. Must be of form %s<secret-id>.", secret.Name, bootstrapapi.BootstrapTokenSecretPrefix)
+		klog.V(3).Infof("Invalid secret name: %s. Must be of form %s<secret-id>.", secret.Name, bootstrapapi.BootstrapTokenSecretPrefix)
 		return "", "", false
 	}
 
 	tokenID = getSecretString(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
-		glog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenIDKey, secret.Namespace, secret.Name)
+		klog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenIDKey, secret.Namespace, secret.Name)
 		return "", "", false
 	}
 
 	if nameTokenID != tokenID {
-		glog.V(3).Infof("Token ID (%s) doesn't match secret name: %s", tokenID, nameTokenID)
+		klog.V(3).Infof("Token ID (%s) doesn't match secret name: %s", tokenID, nameTokenID)
 		return "", "", false
 	}
 
 	tokenSecret = getSecretString(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if len(tokenSecret) == 0 {
-		glog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenSecretKey, secret.Namespace, secret.Name)
+		klog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenSecretKey, secret.Namespace, secret.Name)
 		return "", "", false
 	}
 
@@ -95,12 +95,12 @@ func isSecretExpired(secret *v1.Secret) bool {
 	if len(expiration) > 0 {
 		expTime, err2 := time.Parse(time.RFC3339, expiration)
 		if err2 != nil {
-			glog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
+			klog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
 				expiration, secret.Namespace, secret.Name, err2)
 			return true
 		}
 		if time.Now().After(expTime) {
-			glog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
+			klog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
 				secret.Namespace, secret.Name, expiration)
 			return true
 		}

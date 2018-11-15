@@ -66,7 +66,7 @@ func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 func (o *ApiVersionsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "unexpected args: %v", args)
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
 	var err error
 	o.discoveryClient, err = f.ToDiscoveryClient()

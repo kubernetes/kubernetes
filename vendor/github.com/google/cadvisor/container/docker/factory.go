@@ -36,8 +36,8 @@ import (
 	"github.com/google/cadvisor/zfs"
 
 	docker "github.com/docker/docker/client"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
@@ -337,7 +337,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 	if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
 		thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
 		if err != nil {
-			glog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
+			klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
 		}
 
 		// Safe to ignore error - driver status should always be populated.
@@ -349,11 +349,11 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 	if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
 		zfsWatcher, err = startZfsWatcher(dockerInfo)
 		if err != nil {
-			glog.Errorf("zfs filesystem stats will not be reported: %v", err)
+			klog.Errorf("zfs filesystem stats will not be reported: %v", err)
 		}
 	}
 
-	glog.V(1).Infof("Registering Docker factory")
+	klog.V(1).Infof("Registering Docker factory")
 	f := &dockerFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,

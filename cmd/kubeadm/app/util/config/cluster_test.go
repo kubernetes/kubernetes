@@ -459,7 +459,7 @@ func TestGetAPIEndpoint(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			cfg := &kubeadmapi.InitConfiguration{}
-			err := getAPIEndpoint(rt.configMap.data, nodeName, &cfg.APIEndpoint)
+			err := getAPIEndpoint(rt.configMap.data, nodeName, &cfg.LocalAPIEndpoint)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getInitConfigurationFromCluster: %v", err)
 				return
@@ -468,7 +468,7 @@ func TestGetAPIEndpoint(t *testing.T) {
 				return
 			}
 
-			if cfg.APIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.APIEndpoint.BindPort != 1234 {
+			if cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234 {
 				t.Errorf("invalid cfg.APIEndpoint")
 			}
 		})
@@ -757,8 +757,8 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			if cfg.ClusterConfiguration.KubernetesVersion != k8sVersionString {
 				t.Errorf("invalid ClusterConfiguration.KubernetesVersion")
 			}
-			if !rt.newControlPlane && (cfg.APIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.APIEndpoint.BindPort != 1234) {
-				t.Errorf("invalid cfg.APIEndpoint")
+			if !rt.newControlPlane && (cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234) {
+				t.Errorf("invalid cfg.LocalAPIEndpoint")
 			}
 			if cfg.ComponentConfigs.Kubelet == nil {
 				t.Errorf("invalid cfg.ComponentConfigs.Kubelet")

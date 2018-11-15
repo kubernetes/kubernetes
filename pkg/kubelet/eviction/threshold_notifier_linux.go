@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 )
 
 const (
@@ -104,7 +104,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		Events: unix.EPOLLIN,
 	})
 	if err != nil {
-		glog.Warningf("eviction manager: error adding epoll eventfd: %v", err)
+		klog.Warningf("eviction manager: error adding epoll eventfd: %v", err)
 		return
 	}
 	for {
@@ -115,7 +115,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		}
 		event, err := wait(n.epfd, n.eventfd, notifierRefreshInterval)
 		if err != nil {
-			glog.Warningf("eviction manager: error while waiting for memcg events: %v", err)
+			klog.Warningf("eviction manager: error while waiting for memcg events: %v", err)
 			return
 		} else if !event {
 			// Timeout on wait.  This is expected if the threshold was not crossed
@@ -125,7 +125,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		buf := make([]byte, eventSize)
 		_, err = unix.Read(n.eventfd, buf)
 		if err != nil {
-			glog.Warningf("eviction manager: error reading memcg events: %v", err)
+			klog.Warningf("eviction manager: error reading memcg events: %v", err)
 			return
 		}
 		eventCh <- struct{}{}

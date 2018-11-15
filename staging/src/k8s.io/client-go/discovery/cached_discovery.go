@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/googleapis/gnostic/OpenAPIv2"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,23 +67,23 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 	if err == nil {
 		cachedResources := &metav1.APIResourceList{}
 		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
-			glog.V(10).Infof("returning cached discovery info from %v", filename)
+			klog.V(10).Infof("returning cached discovery info from %v", filename)
 			return cachedResources, nil
 		}
 	}
 
 	liveResources, err := d.delegate.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
-		glog.V(3).Infof("skipped caching discovery info due to %v", err)
+		klog.V(3).Infof("skipped caching discovery info due to %v", err)
 		return liveResources, err
 	}
 	if liveResources == nil || len(liveResources.APIResources) == 0 {
-		glog.V(3).Infof("skipped caching discovery info, no resources found")
+		klog.V(3).Infof("skipped caching discovery info, no resources found")
 		return liveResources, err
 	}
 
 	if err := d.writeCachedFile(filename, liveResources); err != nil {
-		glog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
+		klog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
 	}
 
 	return liveResources, nil
@@ -103,23 +103,23 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	if err == nil {
 		cachedGroups := &metav1.APIGroupList{}
 		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
-			glog.V(10).Infof("returning cached discovery info from %v", filename)
+			klog.V(10).Infof("returning cached discovery info from %v", filename)
 			return cachedGroups, nil
 		}
 	}
 
 	liveGroups, err := d.delegate.ServerGroups()
 	if err != nil {
-		glog.V(3).Infof("skipped caching discovery info due to %v", err)
+		klog.V(3).Infof("skipped caching discovery info due to %v", err)
 		return liveGroups, err
 	}
 	if liveGroups == nil || len(liveGroups.Groups) == 0 {
-		glog.V(3).Infof("skipped caching discovery info, no groups found")
+		klog.V(3).Infof("skipped caching discovery info, no groups found")
 		return liveGroups, err
 	}
 
 	if err := d.writeCachedFile(filename, liveGroups); err != nil {
-		glog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
+		klog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
 	}
 
 	return liveGroups, nil

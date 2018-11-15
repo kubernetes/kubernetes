@@ -128,12 +128,14 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		// 	host, err = framework.GetNodeInternalIP(&node)
 		// }
 		framework.ExpectNoError(err)
-		master := framework.GetMasterAddress(cs)
+		masterAddresses := framework.GetAllMasterAddresses(cs)
 		taint := newUnreachableNoExecuteTaint()
 
 		defer func() {
 			By(fmt.Sprintf("Unblocking traffic from node %s to the master", node.Name))
-			framework.UnblockNetwork(host, master)
+			for _, masterAddress := range masterAddresses {
+				framework.UnblockNetwork(host, masterAddress)
+			}
 
 			if CurrentGinkgoTestDescription().Failed {
 				framework.Failf("Current e2e test has failed, so return from here.")
@@ -147,7 +149,9 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 			framework.ExpectNoError(err)
 		}()
 
-		framework.BlockNetwork(host, master)
+		for _, masterAddress := range masterAddresses {
+			framework.BlockNetwork(host, masterAddress)
+		}
 
 		By(fmt.Sprintf("Expecting to see node %q becomes NotReady", nodeName))
 		if !framework.WaitForNodeToBeNotReady(cs, nodeName, time.Minute*3) {

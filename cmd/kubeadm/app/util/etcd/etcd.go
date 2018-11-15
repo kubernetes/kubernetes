@@ -26,9 +26,9 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -113,27 +113,55 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	return &client, nil
 }
 
-// NewFromStaticPod creates a GenericClient from the given endpoints, manifestDir, and certificatesDir
-func NewFromStaticPod(endpoints []string, manifestDir string, certificatesDir string) (*Client, error) {
-	hasTLS, err := PodManifestsHaveTLS(manifestDir)
+// NewFromCluster creates an etcd client for the the etcd endpoints defined in the ClusterStatus value stored in
+// the kubeadm-config ConfigMap in kube-system namespace.
+// Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
+func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
+
+	// Kubeadm v1.13 should manage v1.12 clusters and v1.13 clusters
+	// v1.12 clusters can be have etcd listening on localhost only (if the cluster was created with kubeadm v1.12)
+	// or etcd listening on localhost and API server advertise address (if the cluster was created with kubeadm v1.13).
+	// The first case should be dropped in v1.14 when support for v1.12 clusters can be removed from the codebase.
+
+	// Detect which type of etcd we are dealing with
+	oldManifest := false
+	klog.V(1).Infoln("checking etcd manifest")
+
+	etcdManifestFile := constants.GetStaticPodFilepath(constants.Etcd, constants.GetStaticPodDirectory())
+	etcdPod, err := staticpod.ReadStaticPodFromDisk(etcdManifestFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not read manifests from: %s, error", manifestDir)
+		return nil, errors.Wrap(err, "error reading etcd manifest file")
 	}
-	if hasTLS {
-		return New(
+	etcdContainer := etcdPod.Spec.Containers[0]
+	for _, arg := range etcdContainer.Command {
+		if arg == "--listen-client-urls=https://127.0.0.1:2379" {
+			klog.V(1).Infoln("etcd manifest created by kubeadm v1.12")
+			oldManifest = true
+		}
+	}
+
+	// if etcd is listening on localhost only
+	if oldManifest == true {
+		// etcd cluster has a single member "by design"
+		endpoints := []string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)}
+
+		etcdClient, err := New(
 			endpoints,
 			filepath.Join(certificatesDir, constants.EtcdCACertName),
 			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
 			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
 		)
-	}
-	return New(endpoints, "", "", "")
-}
+		if err != nil {
+			return nil, errors.Wrapf(err, "error creating etcd client for %v endpoint", endpoints)
+		}
 
-// NewFromCluster creates an etcd client for the the etcd endpoints defined in the ClusterStatus value stored in
-// the kubeadm-config ConfigMap in kube-system namespace.
-// Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
-func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
+		return etcdClient, nil
+	}
+
+	// etcd is listening on localhost and API server advertise address, and
+	// the etcd cluster can have more than one etcd members, so it is necessary to get the
+	// list of endpoints from kubeadm cluster status before connecting
+
 	// Gets the cluster status
 	clusterStatus, err := config.GetClusterStatus(client)
 	if err != nil {
@@ -145,7 +173,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	for _, e := range clusterStatus.APIEndpoints {
 		endpoints = append(endpoints, fmt.Sprintf("https://%s:%d", e.AdvertiseAddress, constants.EtcdListenClientPort))
 	}
-	glog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
+	klog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
 
 	// Creates an etcd client
 	etcdClient, err := New(
@@ -155,13 +183,13 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 		filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error creating etcd client for %v endpoints", endpoints)
 	}
 
 	// synchronizes client's endpoints with the known endpoints from the etcd membership.
 	err = etcdClient.Sync()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error syncing endpoints with etc")
 	}
 
 	return etcdClient, nil
@@ -185,7 +213,7 @@ func (c Client) Sync() error {
 	if err != nil {
 		return err
 	}
-	glog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
+	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
 
 	c.Endpoints = cli.Endpoints()
 	return nil

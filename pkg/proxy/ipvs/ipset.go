@@ -22,7 +22,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 
 	"fmt"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -125,7 +125,7 @@ func (set *IPSet) resetEntries() {
 func (set *IPSet) syncIPSetEntries() {
 	appliedEntries, err := set.handle.ListEntries(set.Name)
 	if err != nil {
-		glog.Errorf("Failed to list ip set entries, error: %v", err)
+		klog.Errorf("Failed to list ip set entries, error: %v", err)
 		return
 	}
 
@@ -140,18 +140,18 @@ func (set *IPSet) syncIPSetEntries() {
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
-					glog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
+					klog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
 				}
 			} else {
-				glog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
+				klog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				glog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
+				klog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
 			} else {
-				glog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
+				klog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
 			}
 		}
 	}
@@ -159,7 +159,7 @@ func (set *IPSet) syncIPSetEntries() {
 
 func ensureIPSet(set *IPSet) error {
 	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-		glog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
+		klog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
 		return err
 	}
 	return nil
@@ -169,13 +169,13 @@ func ensureIPSet(set *IPSet) error {
 func checkMinVersion(vstring string) bool {
 	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
-		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		klog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
 		return false
 	}
 
 	minVersion, err := utilversion.ParseGeneric(MinIPSetCheckVersion)
 	if err != nil {
-		glog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
+		klog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
 		return false
 	}
 	return !version.LessThan(minVersion)

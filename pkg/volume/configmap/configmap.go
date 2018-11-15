@@ -19,11 +19,11 @@ package configmap
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -180,7 +180,7 @@ func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
 }
 
 func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
+	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
 	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
@@ -192,7 +192,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
-			glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
+			klog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
 			return err
 		}
 		configMap = &v1.ConfigMap{
@@ -204,7 +204,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	totalBytes := totalBytes(configMap)
-	glog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
+	klog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
 		b.pod.Namespace,
 		b.source.Name,
 		len(configMap.Data)+len(configMap.BinaryData),
@@ -228,12 +228,12 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		if !setupSuccess {
 			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
 			if unmountCreateErr != nil {
-				glog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
+				klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
 				return
 			}
 			tearDownErr := unmounter.TearDown()
 			if tearDownErr != nil {
-				glog.Errorf("Error tearing down volume %s with : %v", b.volName, tearDownErr)
+				klog.Errorf("Error tearing down volume %s with : %v", b.volName, tearDownErr)
 			}
 		}
 	}()
@@ -241,19 +241,19 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
 	if err != nil {
-		glog.Errorf("Error creating atomic writer: %v", err)
+		klog.Errorf("Error creating atomic writer: %v", err)
 		return err
 	}
 
 	err = writer.Write(payload)
 	if err != nil {
-		glog.Errorf("Error writing payload to dir: %v", err)
+		klog.Errorf("Error writing payload to dir: %v", err)
 		return err
 	}
 
 	err = volume.SetVolumeOwnership(b, fsGroup)
 	if err != nil {
-		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
 	setupSuccess = true

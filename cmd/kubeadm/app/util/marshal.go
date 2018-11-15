@@ -21,8 +21,8 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/ghodss/yaml"
 	pkgerrors "github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -84,7 +84,7 @@ func (populator *pvcPopulator) Run(stopCh <-chan struct{}) {
 func (populator *pvcPopulator) Sync() {
 	pvcs, err := populator.pvcLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("Listing PVCs failed in populator : %v", err)
+		klog.Errorf("Listing PVCs failed in populator : %v", err)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (populator *pvcPopulator) Sync() {
 		pv, err := getPersistentVolume(pvc, populator.pvLister)
 
 		if err != nil {
-			glog.V(5).Infof("Error getting persistent volume for PVC %q : %v", pvc.UID, err)
+			klog.V(5).Infof("Error getting persistent volume for PVC %q : %v", pvc.UID, err)
 			continue
 		}
 
@@ -110,7 +110,7 @@ func (populator *pvcPopulator) Sync() {
 			}
 			populator.recorder.Event(pvc, eventType, events.ExternalExpanding,
 				fmt.Sprintf("Ignoring the PVC: %v.", err))
-			glog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
+			klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
 				util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
 			continue
 		}

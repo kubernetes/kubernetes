@@ -22,11 +22,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -137,7 +137,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		if err != nil {
 			return nil, err
 		}
-		glog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
+		klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
 		return &fcDiskMounter{
 			fcDisk:       fcDisk,
 			fsType:       fc.FSType,
@@ -276,7 +276,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 				FC: &v1.FCVolumeSource{TargetWWNs: []string{wwnLun[0]}, Lun: &lun32},
 			},
 		}
-		glog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v",
+		klog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v",
 			fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun)
 	} else {
 		fcVolume = &v1.Volume{
@@ -285,7 +285,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 				FC: &v1.FCVolumeSource{WWIDs: []string{volumeInfo}},
 			},
 		}
-		glog.V(5).Infof("ConstructVolumeSpec: WWIDs: %v", fcVolume.VolumeSource.FC.WWIDs)
+		klog.V(5).Infof("ConstructVolumeSpec: WWIDs: %v", fcVolume.VolumeSource.FC.WWIDs)
 	}
 	return volume.NewSpecFromVolume(fcVolume), nil
 }
@@ -304,7 +304,7 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	klog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 
 	// Retrieve volumePluginDependentPath from globalMapPathUUID
 	// globalMapPathUUID examples:
@@ -328,13 +328,13 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 		lun32 := int32(lun)
 		fcPV = createPersistentVolumeFromFCVolumeSource(volumeName,
 			v1.FCVolumeSource{TargetWWNs: []string{wwnLun[0]}, Lun: &lun32})
-		glog.V(5).Infof("ConstructBlockVolumeSpec: TargetWWNs: %v, Lun: %v",
+		klog.V(5).Infof("ConstructBlockVolumeSpec: TargetWWNs: %v, Lun: %v",
 			fcPV.Spec.PersistentVolumeSource.FC.TargetWWNs,
 			*fcPV.Spec.PersistentVolumeSource.FC.Lun)
 	} else {
 		fcPV = createPersistentVolumeFromFCVolumeSource(volumeName,
 			v1.FCVolumeSource{WWIDs: []string{volumeInfo}})
-		glog.V(5).Infof("ConstructBlockVolumeSpec: WWIDs: %v", fcPV.Spec.PersistentVolumeSource.FC.WWIDs)
+		klog.V(5).Infof("ConstructBlockVolumeSpec: WWIDs: %v", fcPV.Spec.PersistentVolumeSource.FC.WWIDs)
 	}
 	return volume.NewSpecFromPersistentVolume(fcPV, false), nil
 }
@@ -363,7 +363,7 @@ func (fc *fcDisk) GetPath() string {
 func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
 	mounter, err := volumeSpecToMounter(spec, fc.plugin.host)
 	if err != nil {
-		glog.Warningf("failed to get fc mounter: %v", err)
+		klog.Warningf("failed to get fc mounter: %v", err)
 		return "", err
 	}
 	return fc.manager.MakeGlobalVDPDName(*mounter.fcDisk), nil
@@ -409,7 +409,7 @@ func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {
-		glog.Errorf("fc: failed to setup")
+		klog.Errorf("fc: failed to setup")
 	}
 	return err
 }
@@ -462,12 +462,12 @@ func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	if err != nil {
 		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", mapPath, err)
 	}
-	glog.V(4).Infof("fc: %q is unmounted, deleting the directory", mapPath)
+	klog.V(4).Infof("fc: %q is unmounted, deleting the directory", mapPath)
 	err = os.RemoveAll(mapPath)
 	if err != nil {
 		return fmt.Errorf("fc: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
-	glog.V(4).Infof("fc: successfully detached disk: %s", mapPath)
+	klog.V(4).Infof("fc: successfully detached disk: %s", mapPath)
 	return nil
 }
 

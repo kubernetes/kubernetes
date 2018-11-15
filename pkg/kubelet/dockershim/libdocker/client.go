@@ -23,7 +23,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 	dockerapi "github.com/docker/docker/client"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -72,7 +72,7 @@ type Interface interface {
 // DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
-		glog.Infof("Connecting to docker on %s", dockerEndpoint)
+		klog.Infof("Connecting to docker on %s", dockerEndpoint)
 		return dockerapi.NewClient(dockerEndpoint, "", nil, nil)
 	}
 	return dockerapi.NewEnvClient()
@@ -99,8 +99,8 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 	}
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
-		glog.Fatalf("Couldn't connect to docker: %v", err)
+		klog.Fatalf("Couldn't connect to docker: %v", err)
 	}
-	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
+	klog.Infof("Start docker client with request timeout=%v", requestTimeout)
 	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
 }

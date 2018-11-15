@@ -24,7 +24,6 @@ import (
 	"time"
 
 	pkgerrors "github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -34,7 +33,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -42,7 +40,6 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -94,11 +91,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	// Upgrade to a self-hosted control plane if possible
-	if err := upgradeToSelfHosting(client, cfg, dryRun); err != nil {
-		errs = append(errs, err)
-	}
-
 	// TODO: Is this needed to do here? I think that updating cluster info should probably be separate from a normal upgrade
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
@@ -131,12 +123,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
-		installedDeploymentName := kubeadmconstants.KubeDNS
-		deploymentToDelete := kubeadmconstants.CoreDNS
+		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
+		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
 
-		if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-			installedDeploymentName = kubeadmconstants.CoreDNS
-			deploymentToDelete = kubeadmconstants.KubeDNS
+		if cfg.DNS.Type == kubeadmapi.CoreDNS {
+			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
+			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
 		}
 
 		// If we're dry-running, we don't need to wait for the new DNS addon to become ready
@@ -158,20 +150,6 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration,
 		}
 		return nil
 	}, 10)
-}
-
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
-	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) {
-
-		waiter := getWaiter(dryRun, client)
-
-		// kubeadm will now convert the static Pod-hosted control plane into a self-hosted one
-		fmt.Println("[self-hosted] Creating self-hosted control plane.")
-		if err := selfhosting.CreateSelfHostedControlPlane(kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubernetesDir, cfg, client, waiter, dryRun); err != nil {
-			return pkgerrors.Wrap(err, "error creating self hosted control plane")
-		}
-	}
-	return nil
 }
 
 // BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
@@ -231,7 +209,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 		// as we handle that ourselves in the markmaster phase
 		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.NodeRegistration, cfg.FeatureGates, false, kubeletDir); err != nil {
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(cfg, false, kubeletDir); err != nil {
 			errs = append(errs, pkgerrors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
 		}
 
@@ -240,15 +218,6 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		}
 	}
 	return errors.NewAggregate(errs)
-}
-
-// getWaiter gets the right waiter implementation for the right occasion
-// TODO: Consolidate this with what's in init.go?
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
-	if dryRun {
-		return dryrunutil.NewWaiter()
-	}
-	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
 }
 
 // getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.

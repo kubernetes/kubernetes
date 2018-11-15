@@ -36,8 +36,8 @@ func ValidateAuditSink(as *auditregistration.AuditSink) field.ErrorList {
 // ValidateAuditSinkSpec validates the sink spec for audit
 func ValidateAuditSinkSpec(s auditregistration.AuditSinkSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, ValidatePolicy(s.Policy, field.NewPath("policy"))...)
-	allErrs = append(allErrs, ValidateWebhook(s.Webhook, field.NewPath("webhook"))...)
+	allErrs = append(allErrs, ValidatePolicy(s.Policy, fldPath.Child("policy"))...)
+	allErrs = append(allErrs, ValidateWebhook(s.Webhook, fldPath.Child("webhook"))...)
 	return allErrs
 }
 

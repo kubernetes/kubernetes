@@ -29,8 +29,8 @@ import (
 	"strings"
 
 	"github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -287,7 +287,7 @@ func (o *EditOptions) Run() error {
 			if len(results.file) > 0 {
 				os.Remove(results.file)
 			}
-			glog.V(4).Infof("User edited:\n%s", string(edited))
+			klog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
 			schema, err := o.f.Validator(o.EnableValidation)
@@ -606,12 +606,12 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			patchType = types.MergePatchType
 			patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
 			if err != nil {
-				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 				return err
 			}
 			for _, precondition := range preconditions {
 				if !precondition(patch) {
-					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
 			}
@@ -621,7 +621,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			patchType = types.StrategicMergePatchType
 			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
 			if err != nil {
-				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 				if mergepatch.IsPreconditionFailed(err) {
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
@@ -674,7 +674,7 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 			}
 		}
 		if err := o.Recorder.Record(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return nil

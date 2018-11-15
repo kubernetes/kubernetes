@@ -24,9 +24,11 @@ import (
 	"time"
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,8 +36,8 @@ import (
 	externalclientset "k8s.io/client-go/kubernetes"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
-	csicrd "k8s.io/csi-api/pkg/crd"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -156,7 +158,12 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	etcd.CreateTestCRDs(t, superuserCRDClient, false, csicrd.CSINodeInfoCRD())
+	csiNodeInfoCRD, err := crdFromManifest("../../../staging/src/k8s.io/csi-api/pkg/crd/manifests/csinodeinfo.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	etcd.CreateTestCRDs(t, superuserCRDClient, false, csiNodeInfoCRD)
 
 	getSecret := func(client clientset.Interface) func() error {
 		return func() error {
@@ -413,11 +420,22 @@ func TestNodeAuthorizer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
-				CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-					{
-						Driver:       "com.example.csi/driver1",
-						NodeID:       "com.example.csi/node1",
-						TopologyKeys: []string{"com.example.csi/zone"},
+				Spec: csiv1alpha1.CSINodeInfoSpec{
+					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+						{
+							Name:         "com.example.csi/driver1",
+							NodeID:       "com.example.csi/node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+						},
+					},
+				},
+				Status: csiv1alpha1.CSINodeInfoStatus{
+					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+						{
+							Name:                  "com.example.csi/driver1",
+							Available:             true,
+							VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+						},
 					},
 				},
 			}
@@ -431,11 +449,18 @@ func TestNodeAuthorizer(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			nodeInfo.CSIDrivers = []csiv1alpha1.CSIDriverInfo{
+			nodeInfo.Spec.Drivers = []csiv1alpha1.CSIDriverInfoSpec{
 				{
-					Driver:       "com.example.csi/driver1",
+					Name:         "com.example.csi/driver1",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
+				},
+			}
+			nodeInfo.Status.Drivers = []csiv1alpha1.CSIDriverInfoStatus{
+				{
+					Name:                  "com.example.csi/driver1",
+					Available:             true,
+					VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
 				},
 			}
 			_, err = client.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
@@ -663,4 +688,18 @@ func expectAllowed(t *testing.T, f func() error) {
 	if ok, err := expect(t, f, func(e error) bool { return e == nil }); !ok {
 		t.Errorf("Expected no error, got %v", err)
 	}
+}
+
+// crdFromManifest reads a .json/yaml file and returns the CRD in it.
+func crdFromManifest(filename string) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+	var crd apiextensionsv1beta1.CustomResourceDefinition
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, &crd); err != nil {
+		return nil, err
+	}
+	return &crd, nil
 }

@@ -26,13 +26,15 @@ BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.4.0
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
+
 build:
 	cp ./* $(TEMP_DIR)
 	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
 
 ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
 
 	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)

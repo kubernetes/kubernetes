@@ -22,13 +22,13 @@ import (
 	"os"
 	"path"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/keymutex"
@@ -234,7 +234,7 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("Found volume %s mounted to %s", sourceName, mountPath)
+	klog.V(4).Infof("Found volume %s mounted to %s", sourceName, mountPath)
 	cinderVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -263,7 +263,7 @@ func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resour
 		return oldSize, err
 	}
 
-	glog.V(2).Infof("volume %s expanded to new size %d successfully", volumeID, int(newSize.Value()))
+	klog.V(2).Infof("volume %s expanded to new size %d successfully", volumeID, int(newSize.Value()))
 	return expandedSize, nil
 }
 
@@ -342,18 +342,18 @@ func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
 
 // SetUp bind mounts to the volume path.
 func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
+	klog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
 
 	b.plugin.volumeLocks.LockKey(b.pdName)
 	defer b.plugin.volumeLocks.UnlockKey(b.pdName)
 
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
-		glog.V(4).Infof("Something is already mounted to target %s", dir)
+		klog.V(4).Infof("Something is already mounted to target %s", dir)
 		return nil
 	}
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
@@ -364,46 +364,46 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
+		klog.V(4).Infof("Could not create directory %s: %v", dir, err)
 		return err
 	}
 
 	mountOptions := util.JoinMountOptions(options, b.mountOptions)
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, mountOptions)
+	klog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, mountOptions)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
-		glog.V(4).Infof("Mount failed: %v", err)
+		klog.V(4).Infof("Mount failed: %v", err)
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notmnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notmnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
 				return err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("Failed to mount %s: %v", dir, err)
+		klog.Errorf("Failed to mount %s: %v", dir, err)
 		return err
 	}
 
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
-	glog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
+	klog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
 
 	return nil
 }
@@ -432,18 +432,18 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 
-	glog.V(5).Infof("Cinder TearDown of %s", dir)
+	klog.V(5).Infof("Cinder TearDown of %s", dir)
 	notmnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.V(4).Infof("IsLikelyNotMountPoint check failed: %v", err)
+		klog.V(4).Infof("IsLikelyNotMountPoint check failed: %v", err)
 		return err
 	}
 	if notmnt {
-		glog.V(4).Infof("Nothing is mounted to %s, ignoring", dir)
+		klog.V(4).Infof("Nothing is mounted to %s, ignoring", dir)
 		return os.Remove(dir)
 	}
 
@@ -452,15 +452,15 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	// NewMounter. We could then find volumeID there without probing MountRefs.
 	refs, err := c.mounter.GetMountRefs(dir)
 	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed: %v", err)
+		klog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err
 	}
 	if len(refs) == 0 {
-		glog.V(4).Infof("Directory %s is not mounted", dir)
+		klog.V(4).Infof("Directory %s is not mounted", dir)
 		return fmt.Errorf("directory %s is not mounted", dir)
 	}
 	c.pdName = path.Base(refs[0])
-	glog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
+	klog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
 
 	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
 	c.plugin.volumeLocks.LockKey(c.pdName)
@@ -469,23 +469,23 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	// Reload list of references, there might be SetUpAt finished in the meantime
 	refs, err = c.mounter.GetMountRefs(dir)
 	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed: %v", err)
+		klog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err
 	}
 	if err := c.mounter.Unmount(dir); err != nil {
-		glog.V(4).Infof("Unmount failed: %v", err)
+		klog.V(4).Infof("Unmount failed: %v", err)
 		return err
 	}
-	glog.V(3).Infof("Successfully unmounted: %s\n", dir)
+	klog.V(3).Infof("Successfully unmounted: %s\n", dir)
 
 	notmnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+		klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
 	if notmnt {
 		if err := os.Remove(dir); err != nil {
-			glog.V(4).Infof("Failed to remove directory after unmount: %v", err)
+			klog.V(4).Infof("Failed to remove directory after unmount: %v", err)
 			return err
 		}
 	}

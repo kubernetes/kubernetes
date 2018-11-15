@@ -1,6 +1,3 @@
-APIEndpoint:
-  AdvertiseAddress: 192.168.2.2
-  BindPort: 6443
 APIServer:
   CertSANs: null
   ExtraArgs:
@@ -17,10 +14,6 @@ APIServer:
     PathType: ""
     ReadOnly: false
   TimeoutForControlPlane: 4m0s
-AuditPolicyConfiguration:
-  LogDir: /var/log/kubernetes/audit
-  LogMaxAge: 2
-  Path: ""
 BootstrapTokens:
 - Description: ""
   Expires: null
@@ -141,6 +134,7 @@ ComponentConfigs:
     MaxOpenFiles: 1000000
     MaxPods: 110
     NodeLeaseDurationSeconds: 40
+    NodeStatusReportFrequency: 1m0s
     NodeStatusUpdateFrequency: 10s
     OOMScoreAdj: -999
     PodCIDR: ""
@@ -174,17 +168,25 @@ ControlPlaneEndpoint: ""
 ControllerManager:
   ExtraArgs: null
   ExtraVolumes: null
+DNS:
+  ImageRepository: ""
+  ImageTag: ""
+  Type: CoreDNS
 Etcd:
   External: null
   Local:
     DataDir: /var/lib/etcd
     ExtraArgs: null
-    Image: ""
+    ImageRepository: ""
+    ImageTag: ""
     PeerCertSANs: null
     ServerCertSANs: null
 FeatureGates: null
 ImageRepository: k8s.gcr.io
 KubernetesVersion: v1.11.2
+LocalAPIEndpoint:
+  AdvertiseAddress: 192.168.2.2
+  BindPort: 6443
 Networking:
   DNSDomain: cluster.local
   PodSubnet: ""
@@ -199,4 +201,4 @@ NodeRegistration:
 Scheduler:
   ExtraArgs: null
   ExtraVolumes: null
-UnifiedControlPlaneImage: ""
+UseHyperKubeImage: true

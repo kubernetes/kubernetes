@@ -51,9 +51,9 @@ go_library(
             "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
             "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
             "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
-            "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/vishvananda/netlink:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [

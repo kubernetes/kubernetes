@@ -14,6 +14,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/proxy:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )

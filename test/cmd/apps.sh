@@ -369,7 +369,8 @@ run_deployment_tests() {
   kubectl create -f hack/testdata/configmap.yaml "${kube_flags[@]}"
   kubectl create -f hack/testdata/secret.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-config:'
+  #configmap is special here due to controller will create kube-root-ca.crt for each namespace automatically
+  kube::test::get_object_assert 'configmaps/test-set-env-config' "{{$id_field}}" 'test-set-env-config'
   kube::test::get_object_assert secret "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-secret:'
   # Set env of deployments by configmap from keys
   kubectl set env deployment nginx-deployment --keys=key-2 --from=configmap/test-set-env-config "${kube_flags[@]}"

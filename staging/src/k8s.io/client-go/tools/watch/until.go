@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 )
 
 // PreconditionFunc returns true if the condition has been reached, false if it has not been reached yet,
@@ -135,7 +135,7 @@ func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.
 func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if timeout < 0 {
 		// This should be handled in validation
-		glog.Errorf("Timeout for context shall not be negative!")
+		klog.Errorf("Timeout for context shall not be negative!")
 		timeout = 0
 	}
 

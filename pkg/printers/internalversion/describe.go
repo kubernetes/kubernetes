@@ -30,7 +30,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"github.com/fatih/camelcase"
 
@@ -185,7 +185,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.Describer, bool) {
 	describers, err := describerMap(clientConfig)
 	if err != nil {
-		glog.V(1).Info(err)
+		klog.V(1).Info(err)
 		return nil, false
 	}
 
@@ -323,7 +323,7 @@ func init() {
 		describeNamespace,
 	)
 	if err != nil {
-		glog.Fatalf("Cannot register describers: %v", err)
+		klog.Fatalf("Cannot register describers: %v", err)
 	}
 	DefaultObjectDescriber = d
 }
@@ -626,7 +626,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, pod); err != nil {
-			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
 			events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, ref)
@@ -679,6 +679,21 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
+		if len(pod.Spec.ReadinessGates) > 0 {
+			w.Write(LEVEL_0, "Readiness Gates:\n  Type\tStatus\n")
+			for _, g := range pod.Spec.ReadinessGates {
+				status := "<none>"
+				for _, c := range pod.Status.Conditions {
+					if c.Type == g.ConditionType {
+						status = fmt.Sprintf("%v", c.Status)
+						break
+					}
+				}
+				w.Write(LEVEL_1, "%v \t%v \n",
+					g.ConditionType,
+					status)
+			}
+		}
 		if len(pod.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -927,6 +942,15 @@ func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWr
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
+}
+
+func printGlusterfsPersistentVolumeSource(glusterfs *api.GlusterfsPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
+		"    EndpointsName:\t%v\n"+
+		"    EndpointsNamespace:\t%v\n"+
+		"    Path:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		glusterfs.EndpointsName, glusterfs.EndpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
 }
 
 func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, w PrefixWriter) {
@@ -1311,7 +1335,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.ISCSI != nil:
 			printISCSIPersistentVolumeSource(pv.Spec.ISCSI, w)
 		case pv.Spec.Glusterfs != nil:
-			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
+			printGlusterfsPersistentVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:
 			printRBDPersistentVolumeSource(pv.Spec.RBD, w)
 		case pv.Spec.Quobyte != nil:
@@ -2786,7 +2810,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, node); err != nil {
-			glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
 			ref.UID = types.UID(ref.Name)

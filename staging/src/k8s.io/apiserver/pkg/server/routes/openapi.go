@@ -18,7 +18,7 @@ package routes
 
 import (
 	restful "github.com/emicklei/go-restful"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/kube-openapi/pkg/common"
@@ -37,10 +37,10 @@ func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) {
 	// are tracked at: https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
 	_, err := handler.BuildAndRegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, mux)
 	if err != nil {
-		glog.Fatalf("Failed to register open api spec for root: %v", err)
+		klog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
 	_, err = handler.BuildAndRegisterOpenAPIVersionedService("/openapi/v2", c.RegisteredWebServices(), oa.Config, mux)
 	if err != nil {
-		glog.Fatalf("Failed to register versioned open api spec for root: %v", err)
+		klog.Fatalf("Failed to register versioned open api spec for root: %v", err)
 	}
 }

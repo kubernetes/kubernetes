@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -99,7 +99,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 	return func(args *WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
-		glog.V(0).Infof("NoExecuteTaintManager is deleting Pod: %v", args.NamespacedName.String())
+		klog.V(0).Infof("NoExecuteTaintManager is deleting Pod: %v", args.NamespacedName.String())
 		if emitEventFunc != nil {
 			emitEventFunc(args.NamespacedName)
 		}
@@ -170,12 +170,12 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc) *NoExecuteTaintManager {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	if c != nil {
-		glog.V(0).Infof("Sending events to api server.")
+		klog.V(0).Infof("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
 	} else {
-		glog.Fatalf("kubeClient is nil when starting NodeController")
+		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
 	tm := &NoExecuteTaintManager{
@@ -195,7 +195,7 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 
 // Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
 func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
-	glog.V(0).Infof("Starting NoExecuteTaintManager")
+	klog.V(0).Infof("Starting NoExecuteTaintManager")
 
 	for i := 0; i < UpdateWorkerSize; i++ {
 		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan nodeUpdateItem, NodeUpdateChannelSize))
@@ -356,7 +356,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 	}
 	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
 	if !allTolerated {
-		glog.V(2).Infof("Not all taints are tolerated after update for Pod %v on %v", podNamespacedName.String(), nodeName)
+		klog.V(2).Infof("Not all taints are tolerated after update for Pod %v on %v", podNamespacedName.String(), nodeName)
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.cancelWorkWithEvent(podNamespacedName)
 		tc.taintEvictionQueue.AddWork(NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())
@@ -365,7 +365,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 	minTolerationTime := getMinTolerationTime(usedTolerations)
 	// getMinTolerationTime returns negative value to denote infinite toleration.
 	if minTolerationTime < 0 {
-		glog.V(4).Infof("New tolerations for %v tolerate forever. Scheduled deletion won't be cancelled if already scheduled.", podNamespacedName.String())
+		klog.V(4).Infof("New tolerations for %v tolerate forever. Scheduled deletion won't be cancelled if already scheduled.", podNamespacedName.String())
 		return
 	}
 
@@ -388,7 +388,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
 		if apierrors.IsNotFound(err) {
 			// Delete
 			podNamespacedName := types.NamespacedName{Namespace: podUpdate.podNamespace, Name: podUpdate.podName}
-			glog.V(4).Infof("Noticed pod deletion: %#v", podNamespacedName)
+			klog.V(4).Infof("Noticed pod deletion: %#v", podNamespacedName)
 			tc.cancelWorkWithEvent(podNamespacedName)
 			return
 		}
@@ -403,7 +403,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
 
 	// Create or Update
 	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-	glog.V(4).Infof("Noticed pod update: %#v", podNamespacedName)
+	klog.V(4).Infof("Noticed pod update: %#v", podNamespacedName)
 	nodeName := pod.Spec.NodeName
 	if nodeName == "" {
 		return
@@ -427,7 +427,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Delete
-			glog.V(4).Infof("Noticed node deletion: %#v", nodeUpdate.nodeName)
+			klog.V(4).Infof("Noticed node deletion: %#v", nodeUpdate.nodeName)
 			tc.taintedNodesLock.Lock()
 			defer tc.taintedNodesLock.Unlock()
 			delete(tc.taintedNodes, nodeUpdate.nodeName)
@@ -438,12 +438,12 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	}
 
 	// Create or Update
-	glog.V(4).Infof("Noticed node update: %#v", nodeUpdate)
+	klog.V(4).Infof("Noticed node update: %#v", nodeUpdate)
 	taints := getNoExecuteTaints(node.Spec.Taints)
 	func() {
 		tc.taintedNodesLock.Lock()
 		defer tc.taintedNodesLock.Unlock()
-		glog.V(4).Infof("Updating known taints on node %v: %v", node.Name, taints)
+		klog.V(4).Infof("Updating known taints on node %v: %v", node.Name, taints)
 		if len(taints) == 0 {
 			delete(tc.taintedNodes, node.Name)
 		} else {
@@ -452,7 +452,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	}()
 	pods, err := getPodsAssignedToNode(tc.client, node.Name)
 	if err != nil {
-		glog.Errorf(err.Error())
+		klog.Errorf(err.Error())
 		return
 	}
 	if len(pods) == 0 {
@@ -460,7 +460,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	}
 	// Short circuit, to make this controller a bit faster.
 	if len(taints) == 0 {
-		glog.V(4).Infof("All taints were removed from the Node %v. Cancelling all evictions...", node.Name)
+		klog.V(4).Infof("All taints were removed from the Node %v. Cancelling all evictions...", node.Name)
 		for i := range pods {
 			tc.cancelWorkWithEvent(types.NamespacedName{Namespace: pods[i].Namespace, Name: pods[i].Name})
 		}

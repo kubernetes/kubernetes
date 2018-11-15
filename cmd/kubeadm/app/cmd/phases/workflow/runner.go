@@ -250,7 +250,7 @@ func (e *Runner) Help(cmdUse string) string {
 
 	// prints the list of phases indented by level and formatted using the maxlength
 	// the list is enclosed in a mardown code block for ensuring better readability in the public web site
-	line := fmt.Sprintf("The %q command executes the following internal workflow:\n", cmdUse)
+	line := fmt.Sprintf("The %q command executes the following phases:\n", cmdUse)
 	line += "```\n"
 	offset := 2
 	e.visitAll(func(p *phaseRunner) error {
@@ -312,6 +312,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			Short:   p.Short,
 			Long:    p.Long,
 			Example: p.Example,
+			Aliases: p.Aliases,
 			Run: func(cmd *cobra.Command, args []string) {
 				e.Options.FilterPhases = []string{p.generatedName}
 				if err := e.Run(); err != nil {

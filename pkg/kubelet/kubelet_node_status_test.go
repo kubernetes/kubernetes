@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -795,6 +796,239 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
 }
 
+func TestUpdateNodeStatusWithLease(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	clock := testKubelet.fakeClock
+	kubelet := testKubelet.kubelet
+	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
+	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatableReservation: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+		},
+	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+	kubelet.nodeStatusReportFrequency = time.Minute
+
+	kubeClient := testKubelet.fakeKubeClient
+	existingNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*existingNode}}).ReactionChain
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 20E9,
+	}
+	kubelet.machineInfo = machineInfo
+
+	now := metav1.NewTime(clock.Now()).Rfc3339Copy()
+	expectedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Spec:       v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeMemoryPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientMemory",
+					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodeDiskPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasNoDiskPressure",
+					Message:            fmt.Sprintf("kubelet has no disk pressure"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodePIDPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientPID",
+					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+			},
+			NodeInfo: v1.NodeSystemInfo{
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           cadvisortest.FakeKernelVersion,
+				OSImage:                 cadvisortest.FakeContainerOsVersion,
+				OperatingSystem:         goruntime.GOOS,
+				Architecture:            goruntime.GOARCH,
+				ContainerRuntimeVersion: "test://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			// images will be sorted from max to min in node status.
+			Images: []v1.ContainerImage{
+				{
+					Names:     []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
+					SizeBytes: 123,
+				},
+				{
+					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
+					SizeBytes: 456,
+				},
+			},
+		},
+	}
+
+	// Update node status when node status is created.
+	// Report node status.
+	kubelet.updateRuntimeUp()
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	actions := kubeClient.Actions()
+	assert.Len(t, actions, 2)
+	assert.IsType(t, core.GetActionImpl{}, actions[0])
+	assert.IsType(t, core.PatchActionImpl{}, actions[1])
+	patchAction := actions[1].(core.PatchActionImpl)
+
+	updatedNode, err := applyNodeStatusPatch(existingNode, patchAction.GetPatch())
+	require.NoError(t, err)
+	for _, cond := range updatedNode.Status.Conditions {
+		cond.LastHeartbeatTime = cond.LastHeartbeatTime.Rfc3339Copy()
+		cond.LastTransitionTime = cond.LastTransitionTime.Rfc3339Copy()
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
+		"NodeReady should be the last condition")
+
+	// Update node status again when nothing is changed (except heatbeat time).
+	// Report node status if it has exceeded the duration of nodeStatusReportFrequency.
+	clock.Step(time.Minute)
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	// 2 more action (There were 2 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 4)
+	assert.IsType(t, core.GetActionImpl{}, actions[2])
+	assert.IsType(t, core.PatchActionImpl{}, actions[3])
+	patchAction = actions[3].(core.PatchActionImpl)
+
+	updatedNode, err = applyNodeStatusPatch(updatedNode, patchAction.GetPatch())
+	require.NoError(t, err)
+	for _, cond := range updatedNode.Status.Conditions {
+		cond.LastHeartbeatTime = cond.LastHeartbeatTime.Rfc3339Copy()
+		cond.LastTransitionTime = cond.LastTransitionTime.Rfc3339Copy()
+	}
+
+	// Expect LastHearbeat updated, other things unchanged.
+	for i, cond := range expectedNode.Status.Conditions {
+		expectedNode.Status.Conditions[i].LastHeartbeatTime = metav1.NewTime(cond.LastHeartbeatTime.Time.Add(time.Minute)).Rfc3339Copy()
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
+
+	// Update node status again when nothing is changed (except heatbeat time).
+	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	// Only 1 more action (There were 4 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 5)
+	assert.IsType(t, core.GetActionImpl{}, actions[4])
+
+	// Update node status again when something is changed.
+	// Report node status even if it is still within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	var newMemoryCapacity int64 = 40E9
+	kubelet.machineInfo.MemoryCapacity = uint64(newMemoryCapacity)
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	// 2 more action (There were 5 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 7)
+	assert.IsType(t, core.GetActionImpl{}, actions[5])
+	assert.IsType(t, core.PatchActionImpl{}, actions[6])
+	patchAction = actions[6].(core.PatchActionImpl)
+
+	updatedNode, err = applyNodeStatusPatch(updatedNode, patchAction.GetPatch())
+	require.NoError(t, err)
+	memCapacity, _ := updatedNode.Status.Capacity[v1.ResourceMemory]
+	updatedMemoryCapacity, _ := (&memCapacity).AsInt64()
+	assert.Equal(t, newMemoryCapacity, updatedMemoryCapacity, "Memory capacity")
+
+	now = metav1.NewTime(clock.Now()).Rfc3339Copy()
+	for _, cond := range updatedNode.Status.Conditions {
+		// Expect LastHearbeat updated, while LastTransitionTime unchanged.
+		assert.Equal(t, now, cond.LastHeartbeatTime.Rfc3339Copy(),
+			"LastHeartbeatTime for condition %v", cond.Type)
+		assert.Equal(t, now, metav1.NewTime(cond.LastTransitionTime.Time.Add(time.Minute+20*time.Second)).Rfc3339Copy(),
+			"LastTransitionTime for condition %v", cond.Type)
+	}
+
+	// Update node status when changing pod CIDR.
+	// Report node status if it is still within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	assert.Equal(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
+	podCIDR := "10.0.0.0/24"
+	updatedNode.Spec.PodCIDR = podCIDR
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
+	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
+	// 2 more action (There were 7 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 9)
+	assert.IsType(t, core.GetActionImpl{}, actions[7])
+	assert.IsType(t, core.PatchActionImpl{}, actions[8])
+	patchAction = actions[8].(core.PatchActionImpl)
+
+	// Update node status when keeping the pod CIDR.
+	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+	assert.NoError(t, kubelet.updateNodeStatus())
+	// Only 1 more action (There were 9 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 10)
+	assert.IsType(t, core.GetActionImpl{}, actions[9])
+}
+
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -1528,4 +1762,160 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 		return
 	})
+}
+
+func TestNodeStatusHasChanged(t *testing.T) {
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeFuture := metav1.Time{Time: fakeNow.Time.Add(time.Minute)}
+	readyCondition := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  fakeNow,
+		LastTransitionTime: fakeNow,
+	}
+	readyConditionAtDiffHearbeatTime := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  fakeFuture,
+		LastTransitionTime: fakeNow,
+	}
+	readyConditionAtDiffTransitionTime := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  fakeFuture,
+		LastTransitionTime: fakeFuture,
+	}
+	notReadyCondition := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionFalse,
+		LastHeartbeatTime:  fakeNow,
+		LastTransitionTime: fakeNow,
+	}
+	memoryPressureCondition := v1.NodeCondition{
+		Type:               v1.NodeMemoryPressure,
+		Status:             v1.ConditionFalse,
+		LastHeartbeatTime:  fakeNow,
+		LastTransitionTime: fakeNow,
+	}
+	testcases := []struct {
+		name           string
+		originalStatus *v1.NodeStatus
+		status         *v1.NodeStatus
+		expectChange   bool
+	}{
+		{
+			name:           "Node status does not change with nil status.",
+			originalStatus: nil,
+			status:         nil,
+			expectChange:   false,
+		},
+		{
+			name:           "Node status does not change with default status.",
+			originalStatus: &v1.NodeStatus{},
+			status:         &v1.NodeStatus{},
+			expectChange:   false,
+		},
+		{
+			name:           "Node status changes with nil and default status.",
+			originalStatus: nil,
+			status:         &v1.NodeStatus{},
+			expectChange:   true,
+		},
+		{
+			name:           "Node status changes with nil and status.",
+			originalStatus: nil,
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name:           "Node status does not change with empty conditions.",
+			originalStatus: &v1.NodeStatus{Conditions: []v1.NodeCondition{}},
+			status:         &v1.NodeStatus{Conditions: []v1.NodeCondition{}},
+			expectChange:   false,
+		},
+		{
+			name: "Node status does not change",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			expectChange: false,
+		},
+		{
+			name: "Node status does not change even if heartbeat time changes.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyConditionAtDiffHearbeatTime, memoryPressureCondition},
+			},
+			expectChange: false,
+		},
+		{
+			name: "Node status does not change even if the orders of conditions are different.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{memoryPressureCondition, readyConditionAtDiffHearbeatTime},
+			},
+			expectChange: false,
+		},
+		{
+			name: "Node status changes if condition status differs.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{notReadyCondition, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name: "Node status changes if transition time changes.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyConditionAtDiffTransitionTime, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name: "Node status changes with different number of conditions.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name: "Node status changes with different phase.",
+			originalStatus: &v1.NodeStatus{
+				Phase:      v1.NodePending,
+				Conditions: []v1.NodeCondition{readyCondition},
+			},
+			status: &v1.NodeStatus{
+				Phase:      v1.NodeRunning,
+				Conditions: []v1.NodeCondition{readyCondition},
+			},
+			expectChange: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalStatusCopy := tc.originalStatus.DeepCopy()
+			statusCopy := tc.status.DeepCopy()
+			changed := nodeStatusHasChanged(tc.originalStatus, tc.status)
+			assert.Equal(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
+			assert.True(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", diff.ObjectDiff(originalStatusCopy, tc.originalStatus))
+			assert.True(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", diff.ObjectDiff(statusCopy, tc.status))
+		})
+	}
 }

@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
+	"k8s.io/klog"
 )
 
 // TokenSourceWrapTransport returns a WrapTransport that injects bearer tokens
@@ -131,7 +131,7 @@ func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
 		if ts.tok == nil {
 			return nil, err
 		}
-		glog.Errorf("Unable to rotate token: %v", err)
+		klog.Errorf("Unable to rotate token: %v", err)
 		return ts.tok, nil
 	}
 

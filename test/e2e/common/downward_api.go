@@ -35,7 +35,7 @@ var (
 	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
 )
 
-var _ = Describe("[sig-api-machinery] Downward API", func() {
+var _ = Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*

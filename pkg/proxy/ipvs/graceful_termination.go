@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"fmt"
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
@@ -63,7 +63,7 @@ func (q *graceTerminateRSList) add(rs *listItem) bool {
 		return false
 	}
 
-	glog.V(5).Infof("Adding rs %v to graceful delete rsList", rs)
+	klog.V(5).Infof("Adding rs %v to graceful delete rsList", rs)
 	q.list[uniqueRS] = rs
 	return true
 }
@@ -86,11 +86,11 @@ func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (boo
 	for name, rs := range q.list {
 		deleted, err := handler(rs)
 		if err != nil {
-			glog.Errorf("Try delete rs %q err: %v", name, err)
+			klog.Errorf("Try delete rs %q err: %v", name, err)
 			success = false
 		}
 		if deleted {
-			glog.Infof("lw: remote out of the list: %s", name)
+			klog.Infof("lw: remote out of the list: %s", name)
 			q.remove(rs)
 		}
 	}
@@ -141,7 +141,7 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 	}
 	deleted, err := m.deleteRsFunc(ele)
 	if err != nil {
-		glog.Errorf("Delete rs %q err: %v", ele.String(), err)
+		klog.Errorf("Delete rs %q err: %v", ele.String(), err)
 	}
 	if deleted {
 		return nil
@@ -151,13 +151,13 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 	if err != nil {
 		return err
 	}
-	glog.V(5).Infof("Adding an element to graceful delete rsList: %+v", ele)
+	klog.V(5).Infof("Adding an element to graceful delete rsList: %+v", ele)
 	m.rsList.add(ele)
 	return nil
 }
 
 func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, error) {
-	glog.Infof("Trying to delete rs: %s", rsToDelete.String())
+	klog.Infof("Trying to delete rs: %s", rsToDelete.String())
 	rss, err := m.ipvs.GetRealServers(rsToDelete.VirtualServer)
 	if err != nil {
 		return false, err
@@ -167,7 +167,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 			if rs.ActiveConn != 0 {
 				return false, nil
 			}
-			glog.Infof("Deleting rs: %s", rsToDelete.String())
+			klog.Infof("Deleting rs: %s", rsToDelete.String())
 			err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rs)
 			if err != nil {
 				return false, fmt.Errorf("Delete destination %q err: %v", rs.String(), err)
@@ -180,7 +180,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 
 func (m *GracefulTerminationManager) tryDeleteRs() {
 	if !m.rsList.flushList(m.deleteRsFunc) {
-		glog.Errorf("Try flush graceful termination list err")
+		klog.Errorf("Try flush graceful termination list err")
 	}
 }
 
@@ -203,12 +203,12 @@ func (m *GracefulTerminationManager) Run() {
 	// before start, add leftover in delete rs to graceful delete rsList
 	vss, err := m.ipvs.GetVirtualServers()
 	if err != nil {
-		glog.Errorf("IPVS graceful delete manager failed to get IPVS virtualserver")
+		klog.Errorf("IPVS graceful delete manager failed to get IPVS virtualserver")
 	}
 	for _, vs := range vss {
 		rss, err := m.ipvs.GetRealServers(vs)
 		if err != nil {
-			glog.Errorf("IPVS graceful delete manager failed to get %v realserver", vs)
+			klog.Errorf("IPVS graceful delete manager failed to get %v realserver", vs)
 			continue
 		}
 		for _, rs := range rss {

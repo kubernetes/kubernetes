@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var (
@@ -227,7 +227,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		"scheduler-perf-",
 	)
 	if err := nodePreparer.PrepareNodes(); err != nil {
-		glog.Fatalf("%v", err)
+		klog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
 
@@ -239,7 +239,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	for {
 		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		if len(scheduled) >= numExistingPods {
 			break
@@ -257,7 +257,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
 		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		if len(scheduled) >= numExistingPods+b.N {
 			break

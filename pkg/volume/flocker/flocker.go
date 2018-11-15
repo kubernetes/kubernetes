@@ -22,9 +22,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -310,9 +310,9 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("flockerVolume set up: %s %v %v, datasetUUID %v readOnly %v", dir, !notMnt, err, datasetUUID, b.readOnly)
+	klog.V(4).Infof("flockerVolume set up: %s %v %v, datasetUUID %v readOnly %v", dir, !notMnt, err, datasetUUID, b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notMnt {
@@ -320,7 +320,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
 
@@ -331,33 +331,33 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	globalFlockerPath := makeGlobalFlockerPath(datasetUUID)
-	glog.V(4).Infof("attempting to mount %s", dir)
+	klog.V(4).Infof("attempting to mount %s", dir)
 
 	err = b.mounter.Mount(globalFlockerPath, dir, "", options)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("failed to unmount: %v", mntErr)
+				klog.Errorf("failed to unmount: %v", mntErr)
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("mount of disk %s failed: %v", dir, err)
+		klog.Errorf("mount of disk %s failed: %v", dir, err)
 		return err
 	}
 
@@ -365,7 +365,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
 
-	glog.V(4).Infof("successfully mounted %s", dir)
+	klog.V(4).Infof("successfully mounted %s", dir)
 	return nil
 }
 

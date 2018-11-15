@@ -25,12 +25,12 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 // Initialize the prometheus instrumentation and client related flags.
@@ -245,7 +245,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 	lastSeenBinaryVersion := ""
 	for {
 		if err := getVersion(&lastSeenBinaryVersion); err != nil {
-			glog.Errorf("Failed to fetch etcd version: %v", err)
+			klog.Errorf("Failed to fetch etcd version: %v", err)
 		}
 		select {
 		case <-stopCh:
@@ -399,7 +399,7 @@ func main() {
 	go getVersionPeriodically(stopCh)
 
 	// Serve our metrics on listenAddress/metricsPath.
-	glog.Infof("Listening on: %v", listenAddress)
+	klog.Infof("Listening on: %v", listenAddress)
 	http.Handle(metricsPath, promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
-	glog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
+	klog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
 }

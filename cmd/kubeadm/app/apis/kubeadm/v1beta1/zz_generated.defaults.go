@@ -51,7 +51,7 @@ func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 		SetDefaults_BootstrapToken(a)
 	}
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
-	SetDefaults_APIEndpoint(&in.APIEndpoint)
+	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
@@ -61,5 +61,8 @@ func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	if in.Discovery.File != nil {
 		SetDefaults_FileDiscovery(in.Discovery.File)
 	}
-	SetDefaults_APIEndpoint(&in.APIEndpoint)
+	if in.ControlPlane != nil {
+		SetDefaults_JoinControlPlane(in.ControlPlane)
+		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
+	}
 }
