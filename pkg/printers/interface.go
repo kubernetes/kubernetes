@@ -17,7 +17,6 @@ limitations under the License.
 package printers
 
 import (
-	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,37 +56,4 @@ type PrintOptions struct {
 
 	// indicates if it is OK to ignore missing keys for rendering an output template.
 	AllowMissingKeys bool
-}
-
-// Describer generates output for the named resource or an error
-// if the output could not be generated. Implementers typically
-// abstract the retrieval of the named object from a remote server.
-type Describer interface {
-	Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error)
-}
-
-// DescriberSettings holds display configuration for each object
-// describer to control what is printed.
-type DescriberSettings struct {
-	ShowEvents bool
-}
-
-// ObjectDescriber is an interface for displaying arbitrary objects with extra
-// information. Use when an object is in hand (on disk, or already retrieved).
-// Implementers may ignore the additional information passed on extra, or use it
-// by default. ObjectDescribers may return ErrNoDescriber if no suitable describer
-// is found.
-type ObjectDescriber interface {
-	DescribeObject(object interface{}, extra ...interface{}) (output string, err error)
-}
-
-// ErrNoDescriber is a structured error indicating the provided object or objects
-// cannot be described.
-type ErrNoDescriber struct {
-	Types []string
-}
-
-// Error implements the error interface.
-func (e ErrNoDescriber) Error() string {
-	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
