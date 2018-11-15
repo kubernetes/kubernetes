@@ -46,10 +46,10 @@ go_library(
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/docker/docker/client:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/api/v1/node:go_default_library",
@@ -89,7 +89,6 @@ go_test(
         "gke_environment_test.go",
         "hugepages_test.go",
         "image_id_test.go",
-        "kubelet_test.go",
         "log_path_test.go",
         "mirror_pod_test.go",
         "node_container_manager_test.go",
@@ -150,12 +149,12 @@ go_test(
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/onsi/gomega/gstruct:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//cmd/kubeadm/app/util/system:go_default_library",

@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -142,11 +142,11 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	o := NewCreateRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   roleLong,
-		Long:    roleLong,
-		Example: roleExample,
+		Short:                 roleLong,
+		Long:                  roleLong,
+		Example:               roleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

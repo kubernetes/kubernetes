@@ -131,7 +131,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions,
 // Patch applies the patch and returns the patched persistentVolumeClaim.
 func (c *FakePersistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, data, subresources...), &core.PersistentVolumeClaim{})
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), &core.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err

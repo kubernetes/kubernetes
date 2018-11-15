@@ -21,7 +21,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -80,7 +79,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 	for i, usage := range cfg.Usages {
 		certsAPIUsage, ok := usageMap[usage]
 		if !ok {
-			return nil, nil, fmt.Errorf("unknown key usage: %v", usage)
+			return nil, nil, errors.Errorf("unknown key usage: %v", usage)
 		}
 		usages[i] = certsAPIUsage
 	}
@@ -112,20 +111,23 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 	select {
 	case ev := <-watcher.ResultChan():
 		if ev.Type != watch.Modified {
-			return nil, nil, fmt.Errorf("unexpected event received: %q", ev.Type)
+			return nil, nil, errors.Errorf("unexpected event received: %q", ev.Type)
 		}
 	case <-time.After(watchTimeout):
 		return nil, nil, errors.New("timeout trying to sign certificate")
 	}
 
 	req, err = r.client.CertificateSigningRequests().Get(req.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get certificate signing request")
+	}
 	if len(req.Status.Conditions) < 1 {
 		return nil, nil, errors.New("certificate signing request has no statuses")
 	}
 
 	// TODO: under what circumstances are there more than one?
 	if status := req.Status.Conditions[0].Type; status != certsapi.CertificateApproved {
-		return nil, nil, fmt.Errorf("unexpected certificate status: %v", status)
+		return nil, nil, errors.Errorf("unexpected certificate status: %v", status)
 	}
 
 	cert, err := x509.ParseCertificate(req.Status.Certificate)

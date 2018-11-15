@@ -24,7 +24,7 @@ import (
 )
 
 // TestOnlyStaticRESTMapper returns a union RESTMapper of all known types with priorities chosen in the following order:
-//  1. legacy kube group preferred version, extensions preferred version, metrics perferred version, legacy
+//  1. legacy kube group preferred version, extensions preferred version, metrics preferred version, legacy
 //     kube any version, extensions any version, metrics any version, all other groups alphabetical preferred version,
 //     all other groups alphabetical.
 // TODO callers of this method should be updated to build their own specific restmapper based on their scheme for their tests

@@ -25,9 +25,9 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
@@ -37,9 +37,9 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	}
 
 	cmd := &cobra.Command{
-		Use: "config SUBCOMMAND",
+		Use:                   "config SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Modify kubeconfig files"),
+		Short:                 i18n.T("Modify kubeconfig files"),
 		Long: templates.LongDesc(`
 			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
 

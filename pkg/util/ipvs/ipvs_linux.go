@@ -26,7 +26,7 @@ import (
 	"syscall"
 
 	libipvs "github.com/docker/libnetwork/ipvs"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -43,7 +43,7 @@ type Protocol uint16
 func New(exec utilexec.Interface) Interface {
 	handle, err := libipvs.New("")
 	if err != nil {
-		glog.Errorf("IPVS interface can't be initialized, error: %v", err)
+		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
 		return nil
 	}
 	return &runner{
@@ -144,6 +144,18 @@ func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error 
 	return runner.ipvsHandle.DelDestination(svc, dst)
 }
 
+func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error {
+	svc, err := toIPVSService(vs)
+	if err != nil {
+		return err
+	}
+	dst, err := toIPVSDestination(rs)
+	if err != nil {
+		return err
+	}
+	return runner.ipvsHandle.UpdateDestination(svc, dst)
+}
+
 // GetRealServers is part of ipvs.Interface.
 func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	svc, err := toIPVSService(vs)
@@ -203,9 +215,11 @@ func toRealServer(dst *libipvs.Destination) (*RealServer, error) {
 		return nil, errors.New("ipvs destination should not be empty")
 	}
 	return &RealServer{
-		Address: dst.Address,
-		Port:    dst.Port,
-		Weight:  dst.Weight,
+		Address:      dst.Address,
+		Port:         dst.Port,
+		Weight:       dst.Weight,
+		ActiveConn:   dst.ActiveConnections,
+		InactiveConn: dst.InactiveConnections,
 	}, nil
 }
 

@@ -27,10 +27,12 @@ import (
 	"time"
 
 	"gopkg.in/square/go-jose.v2/jwt"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -62,7 +64,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	pk := sk.(*ecdsa.PrivateKey).PublicKey
 
 	const iss = "https://foo.bar.example.com"
-	aud := []string{"api"}
+	aud := authenticator.Audiences{"api"}
 
 	maxExpirationSeconds := int64(60 * 60)
 	maxExpirationDuration, err := time.ParseDuration(fmt.Sprintf("%ds", maxExpirationSeconds))
@@ -75,11 +77,13 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
 		serviceaccount.JWTTokenAuthenticator(
 			iss,
 			[]interface{}{&pk},
-			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
+			aud,
+			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(gcs)),
 		),
 	)
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
@@ -87,8 +91,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		t.Fatalf("err: %v", err)
 	}
 	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
-	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()

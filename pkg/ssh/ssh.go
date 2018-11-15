@@ -37,9 +37,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -79,7 +79,7 @@ type SSHTunnel struct {
 
 func (s *SSHTunnel) copyBytes(out io.Writer, in io.Reader) {
 	if _, err := io.Copy(out, in); err != nil {
-		glog.Errorf("Error in SSH tunnel: %v", err)
+		klog.Errorf("Error in SSH tunnel: %v", err)
 	}
 }
 
@@ -353,8 +353,8 @@ func (l *SSHTunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration
 		defer runtime.HandleCrash()
 		time.Sleep(delay)
 		if err := l.healthCheck(e); err != nil {
-			glog.Errorf("Healthcheck failed for tunnel to %q: %v", e.Address, err)
-			glog.Infof("Attempting once to re-establish tunnel to %q", e.Address)
+			klog.Errorf("Healthcheck failed for tunnel to %q: %v", e.Address, err)
+			klog.Infof("Attempting once to re-establish tunnel to %q", e.Address)
 			l.removeAndReAdd(e)
 		}
 	}()
@@ -391,7 +391,7 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	}
 	l.tunnelsLock.Unlock()
 	if err := e.Tunnel.Close(); err != nil {
-		glog.Infof("Failed to close removed tunnel: %v", err)
+		klog.Infof("Failed to close removed tunnel: %v", err)
 	}
 	go l.createAndAddTunnel(e.Address)
 }
@@ -399,9 +399,9 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
 	start := time.Now()
 	id := mathrand.Int63() // So you can match begins/ends in the log.
-	glog.Infof("[%x: %v] Dialing...", id, addr)
+	klog.Infof("[%x: %v] Dialing...", id, addr)
 	defer func() {
-		glog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Since(start))
+		klog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Since(start))
 	}()
 	tunnel, err := l.pickTunnel(strings.Split(addr, ":")[0])
 	if err != nil {
@@ -423,7 +423,7 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 			return entry.Tunnel, nil
 		}
 	}
-	glog.Warningf("SSH tunnel not found for address %q, picking random node", addr)
+	klog.Warningf("SSH tunnel not found for address %q, picking random node", addr)
 	n := mathrand.Intn(len(l.entries))
 	return l.entries[n].Tunnel, nil
 }
@@ -464,11 +464,11 @@ func (l *SSHTunnelList) Update(addrs []string) {
 		for i := range l.entries {
 			if _, ok := wantAddrsMap[l.entries[i].Address]; !ok {
 				tunnelEntry := l.entries[i]
-				glog.Infof("Removing tunnel to deleted node at %q", tunnelEntry.Address)
+				klog.Infof("Removing tunnel to deleted node at %q", tunnelEntry.Address)
 				go func() {
 					defer runtime.HandleCrash()
 					if err := tunnelEntry.Tunnel.Close(); err != nil {
-						glog.Errorf("Failed to close tunnel to %q: %v", tunnelEntry.Address, err)
+						klog.Errorf("Failed to close tunnel to %q: %v", tunnelEntry.Address, err)
 					}
 				}()
 			} else {
@@ -480,14 +480,14 @@ func (l *SSHTunnelList) Update(addrs []string) {
 }
 
 func (l *SSHTunnelList) createAndAddTunnel(addr string) {
-	glog.Infof("Trying to add tunnel to %q", addr)
+	klog.Infof("Trying to add tunnel to %q", addr)
 	tunnel, err := l.tunnelCreator.NewSSHTunnel(l.user, l.keyfile, addr)
 	if err != nil {
-		glog.Errorf("Failed to create tunnel for %q: %v", addr, err)
+		klog.Errorf("Failed to create tunnel for %q: %v", addr, err)
 		return
 	}
 	if err := tunnel.Open(); err != nil {
-		glog.Errorf("Failed to open tunnel to %q: %v", addr, err)
+		klog.Errorf("Failed to open tunnel to %q: %v", addr, err)
 		l.tunnelsLock.Lock()
 		delete(l.adding, addr)
 		l.tunnelsLock.Unlock()
@@ -497,7 +497,7 @@ func (l *SSHTunnelList) createAndAddTunnel(addr string) {
 	l.entries = append(l.entries, sshTunnelEntry{addr, tunnel})
 	delete(l.adding, addr)
 	l.tunnelsLock.Unlock()
-	glog.Infof("Successfully added tunnel for %q", addr)
+	klog.Infof("Successfully added tunnel for %q", addr)
 }
 
 func EncodePrivateKey(private *rsa.PrivateKey) []byte {

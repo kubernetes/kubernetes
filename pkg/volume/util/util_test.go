@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-var nodeLabels map[string]string = map[string]string{
+var nodeLabels = map[string]string{
 	"test-key1": "test-value1",
 	"test-key2": "test-value2",
 }
@@ -2369,6 +2369,148 @@ func TestGetWindowsPath(t *testing.T) {
 		result := GetWindowsPath(test.path)
 		if result != test.expectedPath {
 			t.Errorf("GetWindowsPath(%v) returned (%v), want (%v)", test.path, result, test.expectedPath)
+		}
+	}
+}
+
+func TestIsWindowsUNCPath(t *testing.T) {
+	tests := []struct {
+		goos      string
+		path      string
+		isUNCPath bool
+	}{
+		{
+			goos:      "linux",
+			path:      `/usr/bin`,
+			isUNCPath: false,
+		},
+		{
+			goos:      "linux",
+			path:      `\\.\pipe\foo`,
+			isUNCPath: false,
+		},
+		{
+			goos:      "windows",
+			path:      `C:\foo`,
+			isUNCPath: false,
+		},
+		{
+			goos:      "windows",
+			path:      `\\server\share\foo`,
+			isUNCPath: true,
+		},
+		{
+			goos:      "windows",
+			path:      `\\?\server\share`,
+			isUNCPath: true,
+		},
+		{
+			goos:      "windows",
+			path:      `\\?\c:\`,
+			isUNCPath: true,
+		},
+		{
+			goos:      "windows",
+			path:      `\\.\pipe\valid_pipe`,
+			isUNCPath: true,
+		},
+	}
+
+	for _, test := range tests {
+		result := IsWindowsUNCPath(test.goos, test.path)
+		if result != test.isUNCPath {
+			t.Errorf("IsWindowsUNCPath(%v) returned (%v), expected (%v)", test.path, result, test.isUNCPath)
+		}
+	}
+}
+
+func TestIsWindowsLocalPath(t *testing.T) {
+	tests := []struct {
+		goos               string
+		path               string
+		isWindowsLocalPath bool
+	}{
+		{
+			goos:               "linux",
+			path:               `/usr/bin`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "linux",
+			path:               `\\.\pipe\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `C:\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `:\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `X:\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\server\share\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\?\server\share`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\?\c:\`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\.\pipe\valid_pipe`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `:foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\foo`,
+			isWindowsLocalPath: true,
+		},
+		{
+			goos:               "windows",
+			path:               `\foo\bar`,
+			isWindowsLocalPath: true,
+		},
+		{
+			goos:               "windows",
+			path:               `/foo`,
+			isWindowsLocalPath: true,
+		},
+		{
+			goos:               "windows",
+			path:               `/foo/bar`,
+			isWindowsLocalPath: true,
+		},
+	}
+
+	for _, test := range tests {
+		result := IsWindowsLocalPath(test.goos, test.path)
+		if result != test.isWindowsLocalPath {
+			t.Errorf("isWindowsLocalPath(%v) returned (%v), expected (%v)", test.path, result, test.isWindowsLocalPath)
 		}
 	}
 }

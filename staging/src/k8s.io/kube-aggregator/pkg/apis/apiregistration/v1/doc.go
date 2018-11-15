@@ -17,8 +17,9 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kube-aggregator/pkg/apis/apiregistration
 // +k8s:openapi-gen=true
+// +groupName=apiregistration.k8s.io
 
-// Package v1beta1 contains the API Registration API, which is responsible for
+// Package v1 contains the API Registration API, which is responsible for
 // registering an API `Group`/`Version` with another kubernetes like API server.
 // The `APIService` holds information about the other API server in
 // `APIServiceSpec` type as well as general `TypeMeta` and `ObjectMeta`. The
@@ -31,6 +32,4 @@ limitations under the License.
 // The return status is a set of conditions for this aggregation. Currently
 // there is only one condition named "Available", if true, it means the
 // api/server requests will be redirected to specified API server.
-//
-// +groupName=apiregistration.k8s.io
 package v1 // import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type accountWithLocation struct {
@@ -30,7 +30,7 @@ type accountWithLocation struct {
 }
 
 // getStorageAccounts gets name, type, location of all storage accounts in a resource group which matches matchingAccountType, matchingLocation
-func (az *Cloud) getStorageAccounts(matchingAccountType, resourceGroup, matchingLocation string) ([]accountWithLocation, error) {
+func (az *Cloud) getStorageAccounts(matchingAccountType, matchingAccountKind, resourceGroup, matchingLocation string) ([]accountWithLocation, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	result, err := az.StorageAccountClient.ListByResourceGroup(ctx, resourceGroup)
@@ -46,6 +46,10 @@ func (az *Cloud) getStorageAccounts(matchingAccountType, resourceGroup, matching
 		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
 			storageType := string((*acct.Sku).Name)
 			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {
+				continue
+			}
+
+			if matchingAccountKind != "" && !strings.EqualFold(matchingAccountKind, string(acct.Kind)) {
 				continue
 			}
 
@@ -86,17 +90,17 @@ func (az *Cloud) getStorageAccesskey(account, resourceGroup string) (string, err
 }
 
 // ensureStorageAccount search storage account, create one storage account(with genAccountNamePrefix) if not found, return accountName, accountKey
-func (az *Cloud) ensureStorageAccount(accountName, accountType, resourceGroup, location, genAccountNamePrefix string) (string, string, error) {
+func (az *Cloud) ensureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, genAccountNamePrefix string) (string, string, error) {
 	if len(accountName) == 0 {
 		// find a storage account that matches accountType
-		accounts, err := az.getStorageAccounts(accountType, resourceGroup, location)
+		accounts, err := az.getStorageAccounts(accountType, accountKind, resourceGroup, location)
 		if err != nil {
 			return "", "", fmt.Errorf("could not list storage accounts for account type %s: %v", accountType, err)
 		}
 
 		if len(accounts) > 0 {
 			accountName = accounts[0].Name
-			glog.V(4).Infof("found a matching account %s type %s location %s", accounts[0].Name, accounts[0].StorageType, accounts[0].Location)
+			klog.V(4).Infof("found a matching account %s type %s location %s", accounts[0].Name, accounts[0].StorageType, accounts[0].Location)
 		}
 
 		if len(accountName) == 0 {
@@ -109,15 +113,19 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, resourceGroup, l
 				accountType = defaultStorageAccountType
 			}
 
-			glog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s",
-				accountName, resourceGroup, location, accountType)
+			// use StorageV2 by default per https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
+			kind := defaultStorageAccountKind
+			if accountKind != "" {
+				kind = storage.Kind(accountKind)
+			}
+			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s",
+				accountName, resourceGroup, location, accountType, kind)
 			cp := storage.AccountCreateParameters{
-				Sku: &storage.Sku{Name: storage.SkuName(accountType)},
-				// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
-				Kind: storage.StorageV2,
+				Sku:                               &storage.Sku{Name: storage.SkuName(accountType)},
+				Kind:                              kind,
 				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: to.BoolPtr(true)},
-				Tags:     map[string]*string{"created-by": to.StringPtr("azure")},
-				Location: &location}
+				Tags:                              map[string]*string{"created-by": to.StringPtr("azure")},
+				Location:                          &location}
 
 			ctx, cancel := getContextWithCancel()
 			defer cancel()

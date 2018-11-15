@@ -81,7 +81,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
         # END_PROMETHEUS_TO_SD
-        - image: k8s.gcr.io/addon-resizer:1.8.3
+        - image: k8s.gcr.io/addon-resizer:1.8.4
           name: heapster-nanny
           resources:
             limits:

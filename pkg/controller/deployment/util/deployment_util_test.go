@@ -151,6 +151,7 @@ func randomUID() types.UID {
 func generateDeployment(image string) apps.Deployment {
 	podLabels := map[string]string{"name": image}
 	terminationSec := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        image,
@@ -176,6 +177,7 @@ func generateDeployment(image string) apps.Deployment {
 					TerminationGracePeriodSeconds: &terminationSec,
 					RestartPolicy:                 v1.RestartPolicyAlways,
 					SecurityContext:               &v1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
 				},
 			},
 		},
@@ -504,7 +506,6 @@ func TestFindOldReplicaSets(t *testing.T) {
 		Name            string
 		deployment      apps.Deployment
 		rsList          []*apps.ReplicaSet
-		podList         *v1.PodList
 		expected        []*apps.ReplicaSet
 		expectedRequire []*apps.ReplicaSet
 	}{

@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 )
 
 const (
@@ -70,11 +70,9 @@ func TestNewValidJoin(t *testing.T) {
 
 	testCases := []struct {
 		name                  string
-		args                  []string
 		skipPreFlight         bool
 		cfgPath               string
 		configToWrite         string
-		featureGatesString    string
 		ignorePreflightErrors []string
 		testJoinValidate      bool
 		testJoinRun           bool
@@ -111,11 +109,6 @@ func TestNewValidJoin(t *testing.T) {
 			expectedError:         true,
 		},
 		{
-			name:               "invalid: incorrect featureGatesString",
-			featureGatesString: "bad-feature-gate-string",
-			expectedError:      true,
-		},
-		{
 			name:             "invalid: fail Join.Validate() with wrong flags",
 			skipPreFlight:    true,
 			cfgPath:          configFilePath,
@@ -146,7 +139,7 @@ func TestNewValidJoin(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	cfg := &kubeadmapiv1alpha3.JoinConfiguration{}
+	cfg := &kubeadmapiv1beta1.JoinConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	errorFormat := "Test case %q: NewValidJoin expected error: %v, saw: %v, error: %v"
@@ -163,7 +156,7 @@ func TestNewValidJoin(t *testing.T) {
 			}
 		}
 
-		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.args, tc.cfgPath, tc.featureGatesString, tc.ignorePreflightErrors)
+		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.cfgPath, tc.ignorePreflightErrors)
 
 		if tc.nodeConfig != nil {
 			join.cfg = tc.nodeConfig

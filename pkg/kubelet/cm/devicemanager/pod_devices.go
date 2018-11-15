@@ -17,7 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
@@ -135,13 +135,13 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 			for resource, devices := range resources {
 				devIds := devices.deviceIds.UnsortedList()
 				if devices.allocResp == nil {
-					glog.Errorf("Can't marshal allocResp for %v %v %v: allocation response is missing", podUID, conName, resource)
+					klog.Errorf("Can't marshal allocResp for %v %v %v: allocation response is missing", podUID, conName, resource)
 					continue
 				}
 
 				allocResp, err := devices.allocResp.Marshal()
 				if err != nil {
-					glog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)
+					klog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)
 					continue
 				}
 				data = append(data, checkpoint.PodDevicesEntry{
@@ -159,7 +159,7 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 // Populates podDevices from the passed in checkpointData.
 func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {
-		glog.V(2).Infof("Get checkpoint entry: %v %v %v %v %v\n",
+		klog.V(2).Infof("Get checkpoint entry: %v %v %v %v %v\n",
 			entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, entry.AllocResp)
 		devIDs := sets.NewString()
 		for _, devID := range entry.DeviceIDs {
@@ -168,7 +168,7 @@ func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 		allocResp := &pluginapi.ContainerAllocateResponse{}
 		err := allocResp.Unmarshal(entry.AllocResp)
 		if err != nil {
-			glog.Errorf("Can't unmarshal allocResp for %v %v %v: %v", entry.PodUID, entry.ContainerName, entry.ResourceName, err)
+			klog.Errorf("Can't unmarshal allocResp for %v %v %v: %v", entry.PodUID, entry.ContainerName, entry.ResourceName, err)
 			continue
 		}
 		pdev.insert(entry.PodUID, entry.ContainerName, entry.ResourceName, devIDs, allocResp)
@@ -203,13 +203,13 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 		// Updates RunContainerOptions.Envs.
 		for k, v := range resp.Envs {
 			if e, ok := envsMap[k]; ok {
-				glog.V(4).Infof("Skip existing env %s %s", k, v)
+				klog.V(4).Infof("Skip existing env %s %s", k, v)
 				if e != v {
-					glog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
+					klog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
 				}
 				continue
 			}
-			glog.V(4).Infof("Add env %s %s", k, v)
+			klog.V(4).Infof("Add env %s %s", k, v)
 			envsMap[k] = v
 			opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
 		}
@@ -217,14 +217,14 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 		// Updates RunContainerOptions.Devices.
 		for _, dev := range resp.Devices {
 			if d, ok := devsMap[dev.ContainerPath]; ok {
-				glog.V(4).Infof("Skip existing device %s %s", dev.ContainerPath, dev.HostPath)
+				klog.V(4).Infof("Skip existing device %s %s", dev.ContainerPath, dev.HostPath)
 				if d != dev.HostPath {
-					glog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
+					klog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
 						dev.ContainerPath, d, dev.HostPath)
 				}
 				continue
 			}
-			glog.V(4).Infof("Add device %s %s", dev.ContainerPath, dev.HostPath)
+			klog.V(4).Infof("Add device %s %s", dev.ContainerPath, dev.HostPath)
 			devsMap[dev.ContainerPath] = dev.HostPath
 			opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
 				PathOnHost:      dev.HostPath,
@@ -236,14 +236,14 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 		// Updates RunContainerOptions.Mounts.
 		for _, mount := range resp.Mounts {
 			if m, ok := mountsMap[mount.ContainerPath]; ok {
-				glog.V(4).Infof("Skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
+				klog.V(4).Infof("Skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
 				if m != mount.HostPath {
-					glog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
+					klog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
 						mount.ContainerPath, m, mount.HostPath)
 				}
 				continue
 			}
-			glog.V(4).Infof("Add mount %s %s", mount.ContainerPath, mount.HostPath)
+			klog.V(4).Infof("Add mount %s %s", mount.ContainerPath, mount.HostPath)
 			mountsMap[mount.ContainerPath] = mount.HostPath
 			opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
 				Name:          mount.ContainerPath,
@@ -258,13 +258,13 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 		// Updates for Annotations
 		for k, v := range resp.Annotations {
 			if e, ok := annotationsMap[k]; ok {
-				glog.V(4).Infof("Skip existing annotation %s %s", k, v)
+				klog.V(4).Infof("Skip existing annotation %s %s", k, v)
 				if e != v {
-					glog.Errorf("Annotation %s has conflicting setting: %s and %s", k, e, v)
+					klog.Errorf("Annotation %s has conflicting setting: %s and %s", k, e, v)
 				}
 				continue
 			}
-			glog.V(4).Infof("Add annotation %s %s", k, v)
+			klog.V(4).Infof("Add annotation %s %s", k, v)
 			annotationsMap[k] = v
 			opts.Annotations = append(opts.Annotations, kubecontainer.Annotation{Name: k, Value: v})
 		}

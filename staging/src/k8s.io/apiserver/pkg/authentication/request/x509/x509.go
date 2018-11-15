@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -60,14 +59,14 @@ func init() {
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
 type UserConversion interface {
-	User(chain []*x509.Certificate) (user.Info, bool, error)
+	User(chain []*x509.Certificate) (*authenticator.Response, bool, error)
 }
 
 // UserConversionFunc is a function that implements the UserConversion interface.
-type UserConversionFunc func(chain []*x509.Certificate) (user.Info, bool, error)
+type UserConversionFunc func(chain []*x509.Certificate) (*authenticator.Response, bool, error)
 
 // User implements x509.UserConversion
-func (f UserConversionFunc) User(chain []*x509.Certificate) (user.Info, bool, error) {
+func (f UserConversionFunc) User(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
 	return f(chain)
 }
 
@@ -84,7 +83,7 @@ func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
 	}
@@ -136,7 +135,7 @@ func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCom
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
-func (a *Verifier) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
 	}
@@ -168,8 +167,7 @@ func (a *Verifier) verifySubject(subject pkix.Name) error {
 	if a.allowedCommonNames.Has(subject.CommonName) {
 		return nil
 	}
-	glog.Warningf("x509: subject with cn=%s is not in the allowed list: %v", subject.CommonName, a.allowedCommonNames.List())
-	return fmt.Errorf("x509: subject with cn=%s is not allowed", subject.CommonName)
+	return fmt.Errorf("x509: subject with cn=%s is not in the allowed list", subject.CommonName)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,
@@ -181,12 +179,14 @@ func DefaultVerifyOptions() x509.VerifyOptions {
 }
 
 // CommonNameUserConversion builds user info from a certificate chain using the subject's CommonName
-var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate) (user.Info, bool, error) {
+var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
 	if len(chain[0].Subject.CommonName) == 0 {
 		return nil, false, nil
 	}
-	return &user.DefaultInfo{
-		Name:   chain[0].Subject.CommonName,
-		Groups: chain[0].Subject.Organization,
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   chain[0].Subject.CommonName,
+			Groups: chain[0].Subject.Organization,
+		},
 	}, true, nil
 })

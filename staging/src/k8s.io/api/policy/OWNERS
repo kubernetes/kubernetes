@@ -1,8 +1,8 @@
-approvers:
-- sig-apps-api-approvers
+# approval on api packages bubbles to api-approvers
 reviewers:
 - sig-apps-reviewers
-- pweil-
-- liggitt
-- tallclair
-- php-coder
+- sig-auth-policy-approvers
+- sig-auth-policy-reviewers
+labels:
+- sig/auth
+

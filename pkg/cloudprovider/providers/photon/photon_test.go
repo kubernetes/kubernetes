@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func configFromEnv() (TestVM string, TestFlavor string, cfg PCConfig, ok bool) {

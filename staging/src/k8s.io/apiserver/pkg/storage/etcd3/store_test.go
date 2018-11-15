@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -678,7 +677,7 @@ func TestTransformationFailure(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	preset := []struct {
@@ -718,13 +717,10 @@ func TestTransformationFailure(t *testing.T) {
 	}
 	store.transformer = oldTransformer
 
-	// only the first item is returned, and no error
+	// List should fail
 	var got example.PodList
-	if err := store.List(ctx, "/", "", storage.Everything, &got); err != nil {
+	if err := store.List(ctx, "/", "", storage.Everything, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
-	}
-	if e, a := []example.Pod{*preset[0].storedObj}, got.Items; !reflect.DeepEqual(e, a) {
-		t.Errorf("Unexpected: %s", diff.ObjectReflectDiff(e, a))
 	}
 
 	// Get should fail
@@ -758,8 +754,8 @@ func TestList(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
-	disablePagingStore := newStore(cluster.RandClient(), false, false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	disablePagingStore := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1078,7 +1074,7 @@ func TestListContinuation(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1189,7 +1185,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1334,7 +1330,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 	// As 30s is the default timeout for testing in glboal configuration,
 	// we cannot wait longer than that in a single time: change it to 10
@@ -1370,7 +1366,7 @@ func TestPrefix(t *testing.T) {
 		"/registry":         "/registry",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
-		store := newStore(cluster.RandClient(), false, true, codec, configuredPrefix, transformer)
+		store := newStore(cluster.RandClient(), true, codec, configuredPrefix, transformer)
 		if store.pathPrefix != effectivePrefix {
 			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
 		}

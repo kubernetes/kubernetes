@@ -33,6 +33,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -349,9 +350,9 @@ func TestPodFitsResources(t *testing.T) {
 				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
-			fits: true,
+			fits:                     true,
 			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name: "skip checking ignored extended resource",
+			name:                     "skip checking ignored extended resource",
 		},
 	}
 
@@ -1417,7 +1418,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1443,7 +1444,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1469,7 +1470,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1505,7 +1506,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1539,7 +1540,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1573,7 +1574,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -2367,7 +2368,7 @@ func TestInterPodAffinity(t *testing.T) {
 			pods:                 []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node:                 &node1,
 			fits:                 false,
-			name:                 "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
+			name:                 "satisfies the PodAffinity but doesn't satisfy the PodAntiAffinity with the existing pod",
 			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
 		},
 		{
@@ -2440,7 +2441,7 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node:                 &node1,
 			fits:                 false,
-			name:                 "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
+			name:                 "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfy PodAntiAffinity symmetry with the existing pod",
 			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
 		},
 		{
@@ -2983,7 +2984,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"machine3": false,
 			},
 			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{nil, nil, {ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch}},
-			name: "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules",
+			name:                              "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that matches the affinity rules",
 		},
 		{
 			pod: &v1.Pod{
@@ -3036,7 +3037,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": true,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA does not satisfy node affinity rule, but has an existing pod that match the inter pod affinity rule. The pod can be scheduled onto nodeB.",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA does not satisfy node affinity rule, but has an existing pod that matches the inter pod affinity rule. The pod can be scheduled onto nodeB.",
 		},
 		{
 			pod: &v1.Pod{
@@ -3090,7 +3091,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeB": true,
 			},
 			name: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
-				"should not be blocked from being scheduled onto any node, even there's no existing pod that match the rule anywhere.",
+				"should not be blocked from being scheduled onto any node, even there's no existing pod that matches the rule anywhere.",
 		},
 		{
 			pod: &v1.Pod{
@@ -3127,7 +3128,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
 		},
 		{
 			pod: &v1.Pod{
@@ -3218,7 +3219,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeB": false,
 				"nodeC": true,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
 		},
 		{
 			pod: &v1.Pod{
@@ -3288,7 +3289,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeC": false,
 				"nodeD": true,
 			},
-			name:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
+			name:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
 			nometa: true,
 		},
 		{
@@ -3366,7 +3367,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeB": false,
 				"nodeC": true,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
 		},
 		{
 			pod: &v1.Pod{
@@ -3625,7 +3626,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": true,
 			},
-			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both matches, it's counted as a single term match - case when one term has invalid topologyKey",
+			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
 		},
 		{
 			pod: &v1.Pod{
@@ -3679,7 +3680,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": true,
 			},
-			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both matches, it's counted as a single term match - case when one term has invalid topologyKey",
+			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
 		},
 		{
 			pod: &v1.Pod{
@@ -3732,7 +3733,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both matches, it's counted as a single term match - case when all terms have valid topologyKey",
+			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
 		},
 		{
 			pod: &v1.Pod{
@@ -3787,7 +3788,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both matches, it's counted as a single term match - case when all terms have valid topologyKey",
+			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
 		},
 		{
 			pod: &v1.Pod{
@@ -3930,7 +3931,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": true,
 				"nodeB": true,
 			},
-			name: "Test incoming pod's affinity: firstly check if all affinityTerms matches, and then check if all topologyKeys match",
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match",
 		},
 		{
 			pod: &v1.Pod{
@@ -3991,7 +3992,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "Test incoming pod's affinity: firstly check if all affinityTerms matches, and then check if all topologyKeys match, and the match logic should be satified on the same pod",
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satified on the same pod",
 		},
 	}
 
@@ -4071,7 +4072,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			name: "a pod having no tolerations can't be scheduled onto a node with nonempty taints",
+			name: "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
 		},
 		{
 			pod: &v1.Pod{
@@ -4089,7 +4090,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			name: "a pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
+			name: "A pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
 		},
 		{
 			pod: &v1.Pod{
@@ -4107,7 +4108,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			name: "a pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
+			name: "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 		},
 		{
 			pod: &v1.Pod{
@@ -4125,7 +4126,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			name: "a pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
+			name: "A pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
 		},
 		{
 			pod: &v1.Pod{
@@ -4149,7 +4150,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			name: "a pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
+			name: "A pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
 		},
 		{
 			pod: &v1.Pod{
@@ -4169,7 +4170,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			name: "a pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
+			name: "A pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
 				"can't be scheduled onto the node",
 		},
 		{
@@ -4980,5 +4981,67 @@ func TestGetMaxVols(t *testing.T) {
 	os.Unsetenv(KubeMaxPDVols)
 	if previousValue != "" {
 		os.Setenv(KubeMaxPDVols, previousValue)
+	}
+}
+
+func TestCheckNodeUnschedulablePredicate(t *testing.T) {
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+		node *v1.Node
+		fit  bool
+	}{
+		{
+			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: false,
+		},
+		{
+			name: "Schedule pod to normal node",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			fit: true,
+		},
+		{
+			name: "Schedule pod with toleration to unschedulable node (node.Spec.Unschedulable==true)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    schedulerapi.TaintNodeUnschedulable,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: true,
+		},
+	}
+
+	for _, test := range testCases {
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(test.node)
+		fit, _, err := CheckNodeUnschedulablePredicate(test.pod, nil, nodeInfo)
+		if err != nil {
+			t.Fatalf("Failed to check node unschedulable: %v", err)
+		}
+
+		if fit != test.fit {
+			t.Errorf("Unexpected fit: expected %v, got %v", test.fit, fit)
+		}
 	}
 }

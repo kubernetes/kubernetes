@@ -30,10 +30,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -90,11 +90,11 @@ func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
-		Use: "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
-		Long:    subject_long,
-		Example: subject_example,
+		Short:                 i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
+		Long:                  subject_long,
+		Example:               subject_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

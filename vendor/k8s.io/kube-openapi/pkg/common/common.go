@@ -59,6 +59,12 @@ type Config struct {
 	// will show up as ... "responses" : {"default" : $DefaultResponse} in the spec.
 	DefaultResponse *spec.Response
 
+	// ResponseDefinitions will be added to "responses" under the top-level swagger object. This is an object
+	// that holds responses definitions that can be used across operations. This property does not define
+	// global responses for all operations. For more info please refer:
+	//     https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#fixed-fields
+	ResponseDefinitions map[string]spec.Response
+
 	// CommonResponses will be added as a response to all operation specs. This is a good place to add common
 	// responses such as authorization failed.
 	CommonResponses map[int]spec.Response

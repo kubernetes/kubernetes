@@ -21,21 +21,22 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -61,12 +62,13 @@ const (
 
 var _ admission.MutationInterface = &podTolerationsPlugin{}
 var _ admission.ValidationInterface = &podTolerationsPlugin{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podTolerationsPlugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&podTolerationsPlugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&podTolerationsPlugin{})
 
 type podTolerationsPlugin struct {
 	*admission.Handler
-	client          clientset.Interface
-	namespaceLister corelisters.NamespaceLister
+	client          kubernetes.Interface
+	namespaceLister corev1listers.NamespaceLister
 	pluginConfig    *pluginapi.Configuration
 }
 
@@ -129,7 +131,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
 		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
 			{
-				Key:      algorithm.TaintNodeMemoryPressure,
+				Key:      schedulerapi.TaintNodeMemoryPressure,
 				Operator: api.TolerationOpExists,
 				Effect:   api.TaintEffectNoSchedule,
 			},
@@ -186,7 +188,7 @@ func shouldIgnore(a admission.Attributes) bool {
 	obj := a.GetObject()
 	_, ok := obj.(*api.Pod)
 	if !ok {
-		glog.Errorf("expected pod but got %s", a.GetKind().Kind)
+		klog.Errorf("expected pod but got %s", a.GetKind().Kind)
 		return true
 	}
 
@@ -200,12 +202,12 @@ func NewPodTolerationsPlugin(pluginConfig *pluginapi.Configuration) *podTolerati
 	}
 }
 
-func (a *podTolerationsPlugin) SetInternalKubeClientSet(client clientset.Interface) {
+func (a *podTolerationsPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
 	a.client = client
 }
 
-func (p *podTolerationsPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().InternalVersion().Namespaces()
+func (p *podTolerationsPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	namespaceInformer := f.Core().V1().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 
@@ -222,11 +224,11 @@ func (p *podTolerationsPlugin) ValidateInitialization() error {
 }
 
 // in exceptional cases, this can result in two live calls, but once the cache catches up, that will stop.
-func (p *podTolerationsPlugin) getNamespace(nsName string) (*api.Namespace, error) {
+func (p *podTolerationsPlugin) getNamespace(nsName string) (*corev1.Namespace, error) {
 	namespace, err := p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = p.client.Core().Namespaces().Get(nsName, metav1.GetOptions{})
+		namespace, err = p.client.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, err
@@ -262,7 +264,7 @@ func (p *podTolerationsPlugin) getNamespaceTolerationsWhitelist(nsName string) (
 // unset (nil), extractNSTolerations returns nil. If the value to these
 // keys are set to empty, an empty toleration is returned, otherwise
 // configured tolerations are returned.
-func extractNSTolerations(ns *api.Namespace, key string) ([]api.Toleration, error) {
+func extractNSTolerations(ns *corev1.Namespace, key string) ([]api.Toleration, error) {
 	// if a namespace does not have any annotations
 	if len(ns.Annotations) == 0 {
 		return nil, nil

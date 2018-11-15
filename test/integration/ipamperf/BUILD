@@ -20,7 +20,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/integration/util:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -47,7 +47,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/ipamperf",
     deps = [
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
         "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
@@ -62,9 +61,10 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//test/integration/util:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )

@@ -28,18 +28,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -156,7 +159,7 @@ type Cloud struct {
 	DisksClient             DisksClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
-	metadata                *InstanceMetadata
+	metadata                *InstanceMetadataService
 	vmSet                   VMSet
 
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
@@ -182,6 +185,10 @@ type Cloud struct {
 
 	// client for vm sizes list
 	VirtualMachineSizesClient VirtualMachineSizesClient
+
+	kubeClient       clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	vmCache  *timedCache
 	lbCache  *timedCache
@@ -248,11 +255,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			config.CloudProviderRateLimitQPSWrite,
 			config.CloudProviderRateLimitBucketWrite)
 
-		glog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
+		klog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPS,
 			config.CloudProviderRateLimitBucket)
 
-		glog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
+		klog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPSWrite,
 			config.CloudProviderRateLimitBucketWrite)
 	}
@@ -314,14 +321,17 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			Duration: time.Duration(az.CloudProviderBackoffDuration) * time.Second,
 			Jitter:   az.CloudProviderBackoffJitter,
 		}
-		glog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
+		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
 			az.CloudProviderBackoffRetries,
 			az.CloudProviderBackoffExponent,
 			az.CloudProviderBackoffDuration,
 			az.CloudProviderBackoffJitter)
 	}
 
-	az.metadata = NewInstanceMetadata()
+	az.metadata, err = NewInstanceMetadataService(metadataURL)
+	if err != nil {
+		return nil, err
+	}
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
@@ -383,7 +393,12 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (az *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	az.kubeClient = clientBuilder.ClientOrDie("azure-cloud-provider")
+	az.eventBroadcaster = record.NewBroadcaster()
+	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.kubeClient.CoreV1().Events("")})
+	az.eventRecorder = az.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "azure-cloud-provider"})
+}
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
@@ -464,7 +479,7 @@ func initDiskControllers(az *Cloud) error {
 
 // SetInformers sets informers for Azure cloud provider.
 func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
-	glog.Infof("Setting up informers for Azure cloud provider")
+	klog.Infof("Setting up informers for Azure cloud provider")
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -487,12 +502,12 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			if !isNode {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.Errorf("Received unexpected object: %v", obj)
+					klog.Errorf("Received unexpected object: %v", obj)
 					return
 				}
 				node, ok = deletedState.Obj.(*v1.Node)
 				if !ok {
-					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					klog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
 					return
 				}
 			}

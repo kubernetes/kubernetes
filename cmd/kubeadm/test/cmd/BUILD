@@ -10,7 +10,10 @@ go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/test/cmd",
-    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
+    deps = [
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+    ],
 )
 
 go_test(
@@ -30,8 +33,8 @@ go_test(
         "skip",
     ],
     deps = [
-        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

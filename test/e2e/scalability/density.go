@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -222,6 +223,14 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	constraints["kube-scheduler"] = framework.ResourceConstraint{
 		CPUConstraint:    schedulerCPU,
 		MemoryConstraint: schedulerMem,
+	}
+	constraints["coredns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	constraints["kubedns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
 	}
 	return constraints
 }
@@ -475,6 +484,18 @@ var _ = SIGDescribe("Density", func() {
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
 
+		// This is used to mimic what new service account token volumes will
+		// eventually look like. We can remove this once the controller manager
+		// publishes the root CA certificate to each namespace.
+		c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "kube-root-ca-crt",
+			},
+			Data: map[string]string{
+				"ca.crt": "trust me, i'm a ca.crt",
+			},
+		})
+
 		_, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
@@ -524,11 +545,12 @@ var _ = SIGDescribe("Density", func() {
 		// Controls how often the apiserver is polled for pods
 		interval time.Duration
 		// What kind of resource we should be creating. Default: ReplicationController
-		kind             schema.GroupKind
-		secretsPerPod    int
-		configMapsPerPod int
-		daemonsPerNode   int
-		quotas           bool
+		kind                          schema.GroupKind
+		secretsPerPod                 int
+		configMapsPerPod              int
+		svcacctTokenProjectionsPerPod int
+		daemonsPerNode                int
+		quotas                        bool
 	}
 
 	densityTests := []Density{
@@ -547,6 +569,8 @@ var _ = SIGDescribe("Density", func() {
 		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Test with configmaps
 		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
+		// Test with service account projected volumes
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), svcacctTokenProjectionsPerPod: 2},
 		// Test with quotas
 		{podsPerNode: 30, runLatencyTest: true, kind: api.Kind("ReplicationController"), quotas: true},
 	}
@@ -566,12 +590,13 @@ var _ = SIGDescribe("Density", func() {
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets, %v configmaps and %v daemons",
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets, %v configmaps, %v token projections, and %v daemons",
 			feature,
 			testArg.podsPerNode,
 			testArg.kind,
 			testArg.secretsPerPod,
 			testArg.configMapsPerPod,
+			testArg.svcacctTokenProjectionsPerPod,
 			testArg.daemonsPerNode,
 		)
 		if testArg.quotas {
@@ -644,24 +669,25 @@ var _ = SIGDescribe("Density", func() {
 				}
 				name := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				baseConfig := &testutils.RCConfig{
-					Client:               clients[i],
-					InternalClient:       internalClients[i],
-					ScalesGetter:         scalesClients[i],
-					Image:                imageutils.GetPauseImageName(),
-					Name:                 name,
-					Namespace:            nsName,
-					Labels:               map[string]string{"type": "densityPod"},
-					PollInterval:         DensityPollInterval,
-					Timeout:              timeout,
-					PodStatusFile:        fileHndl,
-					Replicas:             (totalPods + numberOfCollections - 1) / numberOfCollections,
-					CpuRequest:           nodeCpuCapacity / 100,
-					MemRequest:           nodeMemCapacity / 100,
-					MaxContainerFailures: &MaxContainerFailures,
-					Silent:               true,
-					LogFunc:              framework.Logf,
-					SecretNames:          secretNames,
-					ConfigMapNames:       configMapNames,
+					Client:                         clients[i],
+					InternalClient:                 internalClients[i],
+					ScalesGetter:                   scalesClients[i],
+					Image:                          imageutils.GetPauseImageName(),
+					Name:                           name,
+					Namespace:                      nsName,
+					Labels:                         map[string]string{"type": "densityPod"},
+					PollInterval:                   DensityPollInterval,
+					Timeout:                        timeout,
+					PodStatusFile:                  fileHndl,
+					Replicas:                       (totalPods + numberOfCollections - 1) / numberOfCollections,
+					CpuRequest:                     nodeCpuCapacity / 100,
+					MemRequest:                     nodeMemCapacity / 100,
+					MaxContainerFailures:           &MaxContainerFailures,
+					Silent:                         true,
+					LogFunc:                        framework.Logf,
+					SecretNames:                    secretNames,
+					ConfigMapNames:                 configMapNames,
+					ServiceAccountTokenProjections: itArg.svcacctTokenProjectionsPerPod,
 				}
 				switch itArg.kind {
 				case api.Kind("ReplicationController"):
@@ -851,7 +877,7 @@ var _ = SIGDescribe("Density", func() {
 						name := additionalPodsPrefix + "-" + strconv.Itoa(podIndexOffset+i+1)
 						framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 					}
-					workqueue.Parallelize(25, nodeCount, deleteRC)
+					workqueue.ParallelizeUntil(context.TODO(), 25, nodeCount, deleteRC)
 					podDeletionPhase.End()
 				}
 				close(stopCh)

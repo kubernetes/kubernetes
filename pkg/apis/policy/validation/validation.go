@@ -27,9 +27,9 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -68,13 +68,13 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	}
 
 	if spec.MinAvailable != nil {
-		allErrs = append(allErrs, extensionsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
-		allErrs = append(allErrs, extensionsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
 	}
 
 	if spec.MaxUnavailable != nil {
-		allErrs = append(allErrs, extensionsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-		allErrs = append(allErrs, extensionsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
 	}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
@@ -109,6 +109,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
+	allErrs = append(allErrs, validatePSPRunAsGroup(fldPath.Child("runAsGroup"), spec.RunAsGroup)...)
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
@@ -233,12 +234,45 @@ func validatePSPRunAsUser(fldPath *field.Path, runAsUser *policy.RunAsUserStrate
 	return allErrs
 }
 
+// validatePSPRunAsGroup validates the RunAsGroup fields of PodSecurityPolicy.
+func validatePSPRunAsGroup(fldPath *field.Path, runAsGroup *policy.RunAsGroupStrategyOptions) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if runAsGroup == nil {
+		return allErrs
+	}
+
+	switch runAsGroup.Rule {
+	case policy.RunAsGroupStrategyRunAsAny:
+		if len(runAsGroup.Ranges) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ranges"), runAsGroup.Ranges, "Ranges must be empty"))
+		}
+	case policy.RunAsGroupStrategyMustRunAs, policy.RunAsGroupStrategyMayRunAs:
+		if len(runAsGroup.Ranges) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ranges"), runAsGroup.Ranges, "must provide at least one range"))
+		}
+		// validate range settings
+		for idx, rng := range runAsGroup.Ranges {
+			allErrs = append(allErrs, validateGroupIDRange(fldPath.Child("ranges").Index(idx), rng)...)
+		}
+	default:
+		supportedRunAsGroupRules := []string{
+			string(policy.RunAsGroupStrategyMustRunAs),
+			string(policy.RunAsGroupStrategyRunAsAny),
+			string(policy.RunAsGroupStrategyMayRunAs),
+		}
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), runAsGroup.Rule, supportedRunAsGroupRules))
+	}
+	return allErrs
+}
+
 // validatePSPFSGroup validates the FSGroupStrategyOptions fields of the PodSecurityPolicy.
 func validatePSPFSGroup(fldPath *field.Path, groupOptions *policy.FSGroupStrategyOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	supportedRules := sets.NewString(
 		string(policy.FSGroupStrategyMustRunAs),
+		string(policy.FSGroupStrategyMayRunAs),
 		string(policy.FSGroupStrategyRunAsAny),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {
@@ -257,6 +291,7 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 
 	supportedRules := sets.NewString(
 		string(policy.SupplementalGroupsStrategyRunAsAny),
+		string(policy.SupplementalGroupsStrategyMayRunAs),
 		string(policy.SupplementalGroupsStrategyMustRunAs),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {

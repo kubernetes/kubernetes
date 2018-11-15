@@ -19,16 +19,17 @@ package certs
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
 
+	"github.com/pkg/errors"
+
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
@@ -308,6 +309,8 @@ func TestSharedCertificateExists(t *testing.T) {
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
 				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 		},
 		{
@@ -318,6 +321,8 @@ func TestSharedCertificateExists(t *testing.T) {
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
 				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 			expectedError: true,
 		},
@@ -329,17 +334,34 @@ func TestSharedCertificateExists(t *testing.T) {
 				"front-proxy-ca.crt": caCert,
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 			expectedError: true,
 		},
 		{
-			name: "expected front-proxy.crt missing",
+			name: "missing front-proxy.crt",
 			files: pkiFiles{
 				"ca.crt":             caCert,
 				"ca.key":             caKey,
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
 				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
+			},
+			expectedError: true,
+		},
+		{
+			name: "missing etcd/ca.crt",
+			files: pkiFiles{
+				"ca.crt":             caCert,
+				"ca.key":             caKey,
+				"front-proxy-ca.key": caKey,
+				"sa.pub":             publicKey,
+				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 			expectedError: true,
 		},
@@ -348,6 +370,7 @@ func TestSharedCertificateExists(t *testing.T) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
+			os.MkdirAll(tmpdir+"/etcd", os.ModePerm)
 			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.InitConfiguration{
@@ -483,7 +506,7 @@ func TestUsingExternalCA(t *testing.T) {
 		defer os.RemoveAll(dir)
 
 		cfg := &kubeadmapi.InitConfiguration{
-			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				CertificatesDir: dir,
@@ -652,7 +675,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 
 		cfg := &kubeadmapi.InitConfiguration{
-			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 				Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
@@ -682,14 +705,14 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 
 func deleteCAKey(cfg *kubeadmapi.InitConfiguration) error {
 	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
-		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.CAKeyName)
 	}
 	return nil
 }
 
 func deleteFrontProxyCAKey(cfg *kubeadmapi.InitConfiguration) error {
 	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
-		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
+		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.FrontProxyCAKeyName)
 	}
 	return nil
 }

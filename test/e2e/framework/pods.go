@@ -78,6 +78,32 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	return p
 }
 
+// CreateEventually retries pod creation for a while before failing
+// the test with the most recent error. This mimicks the behavior
+// of a controller (like the one for DaemonSet) and is necessary
+// because pod creation can fail while its service account is still
+// getting provisioned
+// (https://github.com/kubernetes/kubernetes/issues/68776).
+//
+// Both the timeout and polling interval are configurable as optional
+// arguments:
+// - The first optional argument is the timeout.
+// - The second optional argument is the polling interval.
+//
+// Both intervals can either be specified as time.Duration, parsable
+// duration strings or as floats/integers. In the last case they are
+// interpreted as seconds.
+func (c *PodClient) CreateEventually(pod *v1.Pod, opts ...interface{}) *v1.Pod {
+	c.mungeSpec(pod)
+	var ret *v1.Pod
+	Eventually(func() error {
+		p, err := c.PodInterface.Create(pod)
+		ret = p
+		return err
+	}, opts...).ShouldNot(HaveOccurred(), "Failed to create %q pod", pod.GetName())
+	return ret
+}
+
 // CreateSync creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
 func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod {
 	p := c.Create(pod)

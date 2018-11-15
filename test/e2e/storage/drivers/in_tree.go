@@ -88,9 +88,11 @@ func InitNFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
+			RequiredMountOption:  sets.NewString("vers=4.1"),
+			IsPersistent:         true,
+			IsFsGroupSupported:   false,
+			IsBlockSupported:     false,
 		},
 	}
 }
@@ -272,7 +274,7 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 
 	name := gtr.prefix + "-server"
 	return &v1.PersistentVolumeSource{
-		Glusterfs: &v1.GlusterfsVolumeSource{
+		Glusterfs: &v1.GlusterfsPersistentVolumeSource{
 			EndpointsName: name,
 			// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 			Path:     "test_vol",
@@ -673,7 +675,7 @@ var _ TestDriver = &hostPathDriver{}
 var _ PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ InlineVolumeTestDriver = &hostPathDriver{}
 
-// InitHostpathDriver returns hostPathDriver that implements TestDriver interface
+// InitHostPathDriver returns hostPathDriver that implements TestDriver interface
 func InitHostPathDriver() TestDriver {
 	return &hostPathDriver{
 		driverInfo: DriverInfo{
@@ -1118,9 +1120,10 @@ func InitGcePdDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true,
+			SupportedMountOption: sets.NewString("debug", "nouid32"),
+			IsPersistent:         true,
+			IsFsGroupSupported:   true,
+			IsBlockSupported:     true,
 		},
 	}
 }
@@ -1460,9 +1463,10 @@ func InitAwsDriver() TestDriver {
 				"", // Default fsType
 				"ext3",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true,
+			SupportedMountOption: sets.NewString("debug", "nouid32"),
+			IsPersistent:         true,
+			IsFsGroupSupported:   true,
+			IsBlockSupported:     true,
 		},
 	}
 }

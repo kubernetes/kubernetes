@@ -32,6 +32,8 @@ const (
 )
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -244,6 +246,8 @@ type StatefulSetList struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -279,7 +283,8 @@ type DeploymentSpec struct {
 
 	// The deployment strategy to use to replace existing pods with new ones.
 	// +optional
-	Strategy DeploymentStrategy `json:"strategy,omitempty" protobuf:"bytes,4,opt,name=strategy"`
+	// +patchStrategy=retainKeys
+	Strategy DeploymentStrategy `json:"strategy,omitempty" patchStrategy:"retainKeys" protobuf:"bytes,4,opt,name=strategy"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
@@ -653,6 +658,8 @@ type DaemonSetList struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.

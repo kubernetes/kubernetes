@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	goruntime "runtime"
@@ -31,7 +30,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -67,7 +65,6 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/version"
@@ -75,10 +72,10 @@ import (
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 const (
@@ -116,6 +113,9 @@ type Options struct {
 
 	scheme *runtime.Scheme
 	codecs serializer.CodecFactory
+
+	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
+	hostnameOverride string
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -140,7 +140,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
-	fs.StringVar(&o.config.HostnameOverride, "hostname-override", o.config.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' (experimental). If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.DurationVar(&o.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
@@ -191,7 +191,7 @@ func NewOptions() *Options {
 // Complete completes all the required options.
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
+		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzPortToConfig()
 	}
 
@@ -204,9 +204,26 @@ func (o *Options) Complete() error {
 		}
 	}
 
-	err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates)
-	if err != nil {
+	if err := o.processHostnameOverrideFlag(); err != nil {
 		return err
+	}
+
+	if err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// processHostnameOverrideFlag processes hostname-override flag
+func (o *Options) processHostnameOverrideFlag() error {
+	// Check if hostname-override flag is set and use value since configFile always overrides
+	if len(o.hostnameOverride) > 0 {
+		hostName := strings.TrimSpace(o.hostnameOverride)
+		if len(hostName) == 0 {
+			return fmt.Errorf("empty hostname-override is invalid")
+		}
+		o.config.HostnameOverride = strings.ToLower(hostName)
 	}
 
 	return nil
@@ -263,7 +280,7 @@ func (o *Options) writeConfigFile() error {
 		return err
 	}
 
-	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
+	klog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
 
 	return nil
 }
@@ -348,23 +365,23 @@ with the apiserver API to configure the proxy.`,
 			utilflag.PrintFlags(cmd.Flags())
 
 			if err := initForOS(opts.WindowsService); err != nil {
-				glog.Fatalf("failed OS init: %v", err)
+				klog.Fatalf("failed OS init: %v", err)
 			}
 
 			if err := opts.Complete(); err != nil {
-				glog.Fatalf("failed complete: %v", err)
+				klog.Fatalf("failed complete: %v", err)
 			}
 			if err := opts.Validate(args); err != nil {
-				glog.Fatalf("failed validate: %v", err)
+				klog.Fatalf("failed validate: %v", err)
 			}
-			glog.Fatal(opts.Run())
+			klog.Fatal(opts.Run())
 		},
 	}
 
 	var err error
 	opts.config, err = opts.ApplyDefaults(opts.config)
 	if err != nil {
-		glog.Fatalf("unable to create flag defaults: %v", err)
+		klog.Fatalf("unable to create flag defaults: %v", err)
 	}
 
 	opts.AddFlags(cmd.Flags())
@@ -409,7 +426,7 @@ func createClients(config apimachineryconfig.ClientConnectionConfiguration, mast
 	var err error
 
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		glog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
+		klog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
 		// This creates a client, first loading any specified kubeconfig
@@ -444,7 +461,7 @@ func createClients(config apimachineryconfig.ClientConnectionConfiguration, mast
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 	// remove iptables rules and exit
 	if s.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
@@ -461,16 +478,16 @@ func (s *ProxyServer) Run() error {
 	if s.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
 		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
-			glog.V(2).Info(err)
+			klog.V(2).Info(err)
 		}
 	}
 
 	if len(s.ResourceContainer) != 0 {
 		// Run in its own container.
 		if err := resourcecontainer.RunInResourceContainer(s.ResourceContainer); err != nil {
-			glog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
+			klog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
 		} else {
-			glog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
+			klog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 		}
 	}
 
@@ -578,7 +595,7 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 			return -1, fmt.Errorf("invalid config: Conntrack Max and Conntrack MaxPerCore are mutually exclusive")
 		}
-		glog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
+		klog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
 		return int(*config.Max), nil
 	}
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
@@ -588,26 +605,11 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		}
 		scaled := int(*config.MaxPerCore) * goruntime.NumCPU()
 		if scaled > floor {
-			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
+			klog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
 		}
-		glog.V(3).Infof("getConntrackMax: using conntrack-min")
+		klog.V(3).Infof("getConntrackMax: using conntrack-min")
 		return floor, nil
 	}
 	return 0, nil
-}
-
-func getNodeIP(client clientset.Interface, hostname string) net.IP {
-	var nodeIP net.IP
-	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
-	if err != nil {
-		glog.Warningf("Failed to retrieve node info: %v", err)
-		return nil
-	}
-	nodeIP, err = utilnode.GetNodeHostIP(node)
-	if err != nil {
-		glog.Warningf("Failed to retrieve node IP: %v", err)
-		return nil
-	}
-	return nodeIP
 }

@@ -240,7 +240,7 @@ func (ObjectMeta) SwaggerDoc() map[string]string {
 }
 
 var map_OwnerReference = map[string]string{
-	"":                   "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+	"":                   "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
 	"apiVersion":         "API version of the referent.",
 	"kind":               "Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"name":               "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",

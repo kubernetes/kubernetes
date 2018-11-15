@@ -123,9 +123,9 @@ var map_CSIPersistentVolumeSource = map[string]string{
 	"readOnly":                   "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
 	"fsType":                     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\".",
 	"volumeAttributes":           "Attributes of the volume to publish.",
-	"controllerPublishSecretRef": "ControllerPublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerPublishVolume and ControllerUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
-	"nodeStageSecretRef":         "NodeStageSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeStageVolume and NodeStageVolume and NodeUnstageVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
-	"nodePublishSecretRef":       "NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
+	"controllerPublishSecretRef": "ControllerPublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerPublishVolume and ControllerUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
+	"nodeStageSecretRef":         "NodeStageSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeStageVolume and NodeStageVolume and NodeUnstageVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
+	"nodePublishSecretRef":       "NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
 }
 
 func (CSIPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -693,6 +693,18 @@ var map_GitRepoVolumeSource = map[string]string{
 
 func (GitRepoVolumeSource) SwaggerDoc() map[string]string {
 	return map_GitRepoVolumeSource
+}
+
+var map_GlusterfsPersistentVolumeSource = map[string]string{
+	"":                   "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
+	"endpoints":          "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+	"path":               "Path is the Glusterfs volume path. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+	"readOnly":           "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+	"endpointsNamespace": "EndpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+}
+
+func (GlusterfsPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_GlusterfsPersistentVolumeSource
 }
 
 var map_GlusterfsVolumeSource = map[string]string{
@@ -1528,6 +1540,7 @@ var map_PodSpec = map[string]string{
 	"dnsConfig":                     "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy.",
 	"readinessGates":                "If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md",
 	"runtimeClassName":              "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md This is an alpha feature and may change in the future.",
+	"enableServiceLinks":            "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1636,7 +1649,7 @@ func (PreferredSchedulingTerm) SwaggerDoc() map[string]string {
 }
 
 var map_Probe = map[string]string{
-	"": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
+	"":                    "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
 	"initialDelaySeconds": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"timeoutSeconds":      "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"periodSeconds":       "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
@@ -2201,7 +2214,7 @@ func (TopologySelectorLabelRequirement) SwaggerDoc() map[string]string {
 }
 
 var map_TopologySelectorTerm = map[string]string{
-	"": "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
+	"":                      "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
 	"matchLabelExpressions": "A list of topology selector requirements by labels.",
 }
 
@@ -2285,23 +2298,23 @@ var map_VolumeSource = map[string]string{
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-	"rbd":                  "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
-	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
-	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
-	"downwardAPI":          "DownwardAPI represents downward API about the pod that should populate this volume",
-	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
-	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"configMap":            "ConfigMap represents a configMap that should populate this volume",
-	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
-	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
-	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
-	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
-	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
-	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
-	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
-	"storageos":            "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
+	"rbd":                   "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+	"flexVolume":            "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
+	"cinder":                "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":                "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"flocker":               "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+	"downwardAPI":           "DownwardAPI represents downward API about the pod that should populate this volume",
+	"fc":                    "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"azureFile":             "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":             "ConfigMap represents a configMap that should populate this volume",
+	"vsphereVolume":         "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"quobyte":               "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+	"azureDisk":             "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"photonPersistentDisk":  "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"projected":             "Items for all in one resources secrets, configmaps, and downward API",
+	"portworxVolume":        "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+	"scaleIO":               "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"storageos":             "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

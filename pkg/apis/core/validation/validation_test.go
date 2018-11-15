@@ -1750,7 +1750,7 @@ func TestValidateGlusterfs(t *testing.T) {
 			errfield: "path",
 		},
 		{
-			name:     "missing endpintname and path",
+			name:     "missing endpointname and path",
 			gfs:      &core.GlusterfsVolumeSource{EndpointsName: "", Path: ""},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "endpoints",
@@ -1759,6 +1759,60 @@ func TestValidateGlusterfs(t *testing.T) {
 
 	for i, tc := range testCases {
 		errs := validateGlusterfsVolumeSource(tc.gfs, field.NewPath("field"))
+
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			}
+		}
+	}
+}
+
+func TestValidateGlusterfsPersistentVolumeSource(t *testing.T) {
+	var epNs *string
+	namespace := ""
+	epNs = &namespace
+
+	testCases := []struct {
+		name     string
+		gfs      *core.GlusterfsPersistentVolumeSource
+		errtype  field.ErrorType
+		errfield string
+	}{
+		{
+			name:     "missing endpointname",
+			gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "", Path: "/tmp"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "endpoints",
+		},
+		{
+			name:     "missing path",
+			gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "my-endpoint", Path: ""},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "path",
+		},
+		{
+			name:     "non null endpointnamespace with empty string",
+			gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "my-endpoint", Path: "/tmp", EndpointsNamespace: epNs},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "endpointsNamespace",
+		},
+		{
+			name:     "missing endpointname and path",
+			gfs:      &core.GlusterfsPersistentVolumeSource{EndpointsName: "", Path: ""},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "endpoints",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := validateGlusterfsPersistentVolumeSource(tc.gfs, field.NewPath("field"))
 
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
@@ -5036,26 +5090,6 @@ func TestValidateMountPropagation(t *testing.T) {
 			nil,
 			false,
 		},
-	}
-
-	// Enable MountPropagation for this test
-	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("MountPropagation")
-	defer func() {
-		var err error
-		// restoring the old value
-		if priorityEnabled {
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-		} else {
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
-		}
-		if err != nil {
-			t.Errorf("Failed to restore feature gate for MountPropagation: %v", err)
-		}
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-		return
 	}
 
 	volumes := []core.Volume{
@@ -10285,14 +10319,14 @@ func TestValidateNode(t *testing.T) {
 		for i := range errs {
 			field := errs[i].Field
 			expectedFields := map[string]bool{
-				"metadata.name":                                                                                               true,
-				"metadata.labels":                                                                                             true,
-				"metadata.annotations":                                                                                        true,
-				"metadata.namespace":                                                                                          true,
-				"spec.externalID":                                                                                             true,
-				"spec.taints[0].key":                                                                                          true,
-				"spec.taints[0].value":                                                                                        true,
-				"spec.taints[0].effect":                                                                                       true,
+				"metadata.name":         true,
+				"metadata.labels":       true,
+				"metadata.annotations":  true,
+				"metadata.namespace":    true,
+				"spec.externalID":       true,
+				"spec.taints[0].key":    true,
+				"spec.taints[0].value":  true,
+				"spec.taints[0].effect": true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
 			}
@@ -12235,7 +12269,7 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 		secret core.Secret
 		valid  bool
 	}{
-		"valid": {validBasicAuthSecret(), true},
+		"valid":                         {validBasicAuthSecret(), true},
 		"missing username and password": {missingBasicAuthUsernamePasswordKeys, false},
 	}
 
@@ -12965,11 +12999,12 @@ func newNodeNameEndpoint(nodeName string) *core.Endpoints {
 func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	oldEndpoint := newNodeNameEndpoint("kubernetes-node-setup-by-backend")
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
-	// Check that NodeName cannot be changed during update (if already set)
+	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
+	// The same ip will now have a different nodeName.
 	errList := ValidateEndpoints(updatedEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
-	if len(errList) == 0 {
-		t.Error("Endpoint should not allow changing of Subset.Addresses.NodeName on update")
+	if len(errList) != 0 {
+		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
 	}
 }
 

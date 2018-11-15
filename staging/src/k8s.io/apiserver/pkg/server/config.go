@@ -30,8 +30,8 @@ import (
 
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -227,6 +227,9 @@ type SecureServingInfo struct {
 }
 
 type AuthenticationInfo struct {
+	// APIAudiences is a list of identifier that the API identifies as. This is
+	// used by some authenticators to validate audience bound credentials.
+	APIAudiences authenticator.Audiences
 	// Authenticator determines which subject is making the request
 	Authenticator authenticator.Request
 	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
@@ -355,11 +358,11 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 	// if there is no port, and we listen on one securely, use that one
 	if _, _, err := net.SplitHostPort(c.ExternalAddress); err != nil {
 		if c.SecureServing == nil {
-			glog.Fatalf("cannot derive external address port without listening on a secure port.")
+			klog.Fatalf("cannot derive external address port without listening on a secure port.")
 		}
 		_, port, err := c.SecureServing.HostPort()
 		if err != nil {
-			glog.Fatalf("cannot derive external address from the secure port: %v", err)
+			klog.Fatalf("cannot derive external address from the secure port: %v", err)
 		}
 		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
@@ -534,7 +537,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	failedHandler := genericapifilters.Unauthorized(c.Serializer, c.Authentication.SupportsBasicAuth)
 	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
-	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)

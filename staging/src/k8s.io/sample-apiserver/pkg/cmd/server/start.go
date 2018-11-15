@@ -90,13 +90,16 @@ func (o WardleServerOptions) Validate(args []string) error {
 }
 
 func (o *WardleServerOptions) Complete() error {
+	// register admission plugins
+	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
+
+	// add admisison plugins to the RecommendedPluginOrder
+	o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
+
 	return nil
 }
 
 func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
-	// register admission plugins
-	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
-
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)

@@ -28,9 +28,9 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 type setOptions struct {
@@ -51,10 +51,10 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: "set PROPERTY_NAME PROPERTY_VALUE",
+		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Sets an individual value in a kubeconfig file"),
-		Long:  set_long,
+		Short:                 i18n.T("Sets an individual value in a kubeconfig file"),
+		Long:                  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())

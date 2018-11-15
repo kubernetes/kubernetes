@@ -85,8 +85,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/trace:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

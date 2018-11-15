@@ -19,6 +19,7 @@ package genericclioptions
 import (
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -49,6 +50,7 @@ func (f *JSONPathPrintFlags) AllowedFormats() []string {
 	for format := range jsonFormats {
 		formats = append(formats, format)
 	}
+	sort.Strings(formats)
 	return formats
 }
 

@@ -29,7 +29,6 @@ go_library(
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/github.com/jonboulle/clockwork:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

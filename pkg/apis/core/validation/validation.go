@@ -27,7 +27,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -903,6 +903,26 @@ func validateGlusterfsVolumeSource(glusterfs *core.GlusterfsVolumeSource, fldPat
 	}
 	return allErrs
 }
+func validateGlusterfsPersistentVolumeSource(glusterfs *core.GlusterfsPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(glusterfs.EndpointsName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("endpoints"), ""))
+	}
+	if len(glusterfs.Path) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	if glusterfs.EndpointsNamespace != nil {
+		endpointNs := glusterfs.EndpointsNamespace
+		if *endpointNs == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, "if the endpointnamespace is set, it must be a valid namespace name"))
+		} else {
+			for _, msg := range ValidateNamespaceName(*endpointNs, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, msg))
+			}
+		}
+	}
+	return allErrs
+}
 
 func validateFlockerVolumeSource(flocker *core.FlockerVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1113,10 +1133,6 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	allErrs := field.ErrorList{}
 
 	if mountPropagation == nil {
-		return allErrs
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "mount propagation is disabled by feature-gate"))
 		return allErrs
 	}
 
@@ -1427,24 +1443,27 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	return allErrs
 }
 
+func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(driverName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	if len(driverName) > 63 {
+		allErrs = append(allErrs, field.TooLong(fldPath, driverName, 63))
+	}
+
+	if !csiDriverNameRexp.MatchString(driverName) {
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+	}
+	return allErrs
+}
+
 func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "CSIPersistentVolume disabled by feature-gate"))
-	}
-
-	if len(csi.Driver) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
-	}
-
-	if len(csi.Driver) > 63 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("driver"), csi.Driver, 63))
-	}
-
-	if !csiDriverNameRexp.MatchString(csi.Driver) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), csi.Driver, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
-	}
+	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
 
 	if len(csi.VolumeHandle) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))
@@ -1571,7 +1590,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("glusterfs"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateGlusterfsVolumeSource(pv.Spec.Glusterfs, specPath.Child("glusterfs"))...)
+			allErrs = append(allErrs, validateGlusterfsPersistentVolumeSource(pv.Spec.Glusterfs, specPath.Child("glusterfs"))...)
 		}
 	}
 	if pv.Spec.Flocker != nil {
@@ -4285,7 +4304,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
-		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
+		klog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 
@@ -4912,7 +4931,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 		case core.ScopeSelectorOpIn, core.ScopeSelectorOpNotIn:
 			if len(req.Values) == 0 {
 				allErrs = append(allErrs, field.Required(fldPath.Child("values"),
-					"must be atleast one value when `operator` is 'In' or 'NotIn' for scope selector"))
+					"must be at least one value when `operator` is 'In' or 'NotIn' for scope selector"))
 			}
 		case core.ScopeSelectorOpExists, core.ScopeSelectorOpDoesNotExist:
 			if len(req.Values) != 0 {
@@ -5124,50 +5143,16 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 	return allErrs
 }
 
-// Construct lookup map of old subset IPs to NodeNames.
-func updateEpAddrToNodeNameMap(ipToNodeName map[string]string, addresses []core.EndpointAddress) {
-	for n := range addresses {
-		if addresses[n].NodeName == nil {
-			continue
-		}
-		ipToNodeName[addresses[n].IP] = *addresses[n].NodeName
-	}
-}
-
-// Build a map across all subsets of IP -> NodeName
-func buildEndpointAddressNodeNameMap(subsets []core.EndpointSubset) map[string]string {
-	ipToNodeName := make(map[string]string)
-	for i := range subsets {
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].Addresses)
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].NotReadyAddresses)
-	}
-	return ipToNodeName
-}
-
-func validateEpAddrNodeNameTransition(addr *core.EndpointAddress, ipToNodeName map[string]string, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-	existingNodeName, found := ipToNodeName[addr.IP]
-	if !found {
-		return errList
-	}
-	if addr.NodeName == nil || *addr.NodeName == existingNodeName {
-		return errList
-	}
-	// NodeName entry found for this endpoint IP, but user is attempting to change NodeName
-	return append(errList, field.Forbidden(fldPath, fmt.Sprintf("Cannot change NodeName for %s to %s", addr.IP, *addr.NodeName)))
-}
-
 // ValidateEndpoints tests if required fields are set.
 func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, []core.EndpointSubset{}, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
 	return allErrs
 }
 
-func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
+func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	ipToNodeName := buildEndpointAddressNodeNameMap(oldSubsets)
 	for i := range subsets {
 		ss := &subsets[i]
 		idxPath := fldPath.Index(i)
@@ -5178,10 +5163,10 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
 		}
 		for addr := range ss.Addresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr))...)
 		}
 		for addr := range ss.NotReadyAddresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
 		}
 		for port := range ss.Ports {
 			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
@@ -5191,7 +5176,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 	return allErrs
 }
 
-func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path, ipToNodeName map[string]string) field.ErrorList {
+func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsValidIP(address.IP) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
@@ -5204,10 +5189,6 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
 		}
-	}
-	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
-	if len(allErrs) > 0 {
-		return allErrs
 	}
 	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
@@ -5260,9 +5241,11 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 }
 
 // ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
+// NodeName changes are allowed during update to accommodate the case where nodeIP or PodCIDR is reused.
+// An existing endpoint ip will have a different nodeName if this happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, oldEndpoints.Subsets, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, field.NewPath("subsets"))...)
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(newEndpoints.Annotations, field.NewPath("annotations"))...)
 	return allErrs
 }

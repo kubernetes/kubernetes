@@ -27,6 +27,8 @@ type DoWorkPieceFunc func(piece int)
 
 // Parallelize is a very simple framework that allows for parallelizing
 // N independent pieces of work.
+//
+// Deprecated: Use ParallelizeUntil instead.
 func Parallelize(workers, pieces int, doWorkPiece DoWorkPieceFunc) {
 	ParallelizeUntil(nil, workers, pieces, doWorkPiece)
 }

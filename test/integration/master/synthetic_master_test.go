@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -175,7 +175,7 @@ func TestStatus(t *testing.T) {
 			statusCode:   http.StatusForbidden,
 			reqPath:      "/apis",
 			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis"`,
+			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
 			name:         "401",

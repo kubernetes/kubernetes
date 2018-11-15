@@ -34,7 +34,7 @@ type SecretUpgradeTest struct {
 	secret *v1.Secret
 }
 
-func (SecretUpgradeTest) Name() string { return "secret-upgrade [sig-storage] [sig-api-machinery]" }
+func (SecretUpgradeTest) Name() string { return "[sig-storage] [sig-api-machinery] secret-upgrade" }
 
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *SecretUpgradeTest) Setup(f *framework.Framework) {

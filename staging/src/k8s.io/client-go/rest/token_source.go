@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
+	"k8s.io/klog"
 )
 
 // TokenSourceWrapTransport returns a WrapTransport that injects bearer tokens
@@ -42,7 +42,9 @@ func TokenSourceWrapTransport(ts oauth2.TokenSource) func(http.RoundTripper) htt
 	}
 }
 
-func newCachedPathTokenSource(path string) oauth2.TokenSource {
+// NewCachedFileTokenSource returns a oauth2.TokenSource reads a token from a
+// file at a specified path and periodically reloads it.
+func NewCachedFileTokenSource(path string) oauth2.TokenSource {
 	return &cachingTokenSource{
 		now:    time.Now,
 		leeway: 1 * time.Minute,
@@ -129,7 +131,7 @@ func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
 		if ts.tok == nil {
 			return nil, err
 		}
-		glog.Errorf("Unable to rotate token: %v", err)
+		klog.Errorf("Unable to rotate token: %v", err)
 		return ts.tok, nil
 	}
 

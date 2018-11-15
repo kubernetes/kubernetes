@@ -30,7 +30,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"github.com/fatih/camelcase"
 
@@ -185,7 +185,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Desc
 func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.Describer, bool) {
 	describers, err := describerMap(clientConfig)
 	if err != nil {
-		glog.V(1).Info(err)
+		klog.V(1).Info(err)
 		return nil, false
 	}
 
@@ -195,8 +195,21 @@ func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.De
 
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
-func GenericDescriberFor(mapping *meta.RESTMapping, dynamic dynamic.Interface, events coreclient.EventsGetter) printers.Describer {
-	return &genericDescriber{mapping, dynamic, events}
+func GenericDescriberFor(mapping *meta.RESTMapping, clientConfig *rest.Config) (printers.Describer, bool) {
+	// used to fetch the resource
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, false
+	}
+
+	// used to get events for the resource
+	clientSet, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, false
+	}
+	eventsClient := clientSet.Core()
+
+	return &genericDescriber{mapping, dynamicClient, eventsClient}, true
 }
 
 type genericDescriber struct {
@@ -310,7 +323,7 @@ func init() {
 		describeNamespace,
 	)
 	if err != nil {
-		glog.Fatalf("Cannot register describers: %v", err)
+		klog.Fatalf("Cannot register describers: %v", err)
 	}
 	DefaultObjectDescriber = d
 }
@@ -613,7 +626,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings printe
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, pod); err != nil {
-			glog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
 		} else {
 			ref.Kind = ""
 			events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, ref)
@@ -666,6 +679,21 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
+		if len(pod.Spec.ReadinessGates) > 0 {
+			w.Write(LEVEL_0, "Readiness Gates:\n  Type\tStatus\n")
+			for _, g := range pod.Spec.ReadinessGates {
+				status := "<none>"
+				for _, c := range pod.Status.Conditions {
+					if c.Type == g.ConditionType {
+						status = fmt.Sprintf("%v", c.Status)
+						break
+					}
+				}
+				w.Write(LEVEL_1, "%v \t%v \n",
+					g.ConditionType,
+					status)
+			}
+		}
 		if len(pod.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -761,6 +789,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printFlexVolumeSource(volume.VolumeSource.FlexVolume, w)
 		case volume.VolumeSource.Flocker != nil:
 			printFlockerVolumeSource(volume.VolumeSource.Flocker, w)
+		case volume.VolumeSource.Projected != nil:
+			printProjectedVolumeSource(volume.VolumeSource.Projected, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -822,6 +852,26 @@ func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w PrefixWr
 		"    Name:\t%v\n"+
 		"    Optional:\t%v\n",
 		configMap.Name, optional)
+}
+
+func printProjectedVolumeSource(projected *api.ProjectedVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
+	for _, source := range projected.Sources {
+		if source.Secret != nil {
+			w.Write(LEVEL_2, "SecretName:\t%v\n"+
+				"    SecretOptionalName:\t%v\n",
+				source.Secret.Name, source.Secret.Optional)
+		} else if source.DownwardAPI != nil {
+			w.Write(LEVEL_2, "DownwardAPI:\ttrue\n")
+		} else if source.ConfigMap != nil {
+			w.Write(LEVEL_2, "ConfigMapName:\t%v\n"+
+				"    ConfigMapOptional:\t%v\n",
+				source.ConfigMap.Name, source.ConfigMap.Optional)
+		} else if source.ServiceAccountToken != nil {
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
+				source.ServiceAccountToken.ExpirationSeconds)
+		}
+	}
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, w PrefixWriter) {
@@ -892,6 +942,15 @@ func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWr
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
+}
+
+func printGlusterfsPersistentVolumeSource(glusterfs *api.GlusterfsPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
+		"    EndpointsName:\t%v\n"+
+		"    EndpointsNamespace:\t%v\n"+
+		"    Path:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		glusterfs.EndpointsName, glusterfs.EndpointsNamespace, glusterfs.Path, glusterfs.ReadOnly)
 }
 
 func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, w PrefixWriter) {
@@ -1276,7 +1335,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.ISCSI != nil:
 			printISCSIPersistentVolumeSource(pv.Spec.ISCSI, w)
 		case pv.Spec.Glusterfs != nil:
-			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
+			printGlusterfsPersistentVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:
 			printRBDPersistentVolumeSource(pv.Spec.RBD, w)
 		case pv.Spec.Quobyte != nil:
@@ -1859,7 +1918,7 @@ type ReplicaSetDescriber struct {
 }
 
 func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	rsc := d.Extensions().ReplicaSets(namespace)
+	rsc := d.Apps().ReplicaSets(namespace)
 	pc := d.Core().Pods(namespace)
 
 	rs, err := rsc.Get(name, metav1.GetOptions{})
@@ -1882,7 +1941,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
 }
 
-func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
+func describeReplicaSet(rs *apps.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
@@ -2072,7 +2131,7 @@ type DaemonSetDescriber struct {
 }
 
 func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	dc := d.Extensions().DaemonSets(namespace)
+	dc := d.Apps().DaemonSets(namespace)
 	pc := d.Core().Pods(namespace)
 
 	daemon, err := dc.Get(name, metav1.GetOptions{})
@@ -2097,7 +2156,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *apps.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
@@ -2751,7 +2810,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := ref.GetReference(legacyscheme.Scheme, node); err != nil {
-			glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
 			ref.UID = types.UID(ref.Name)
@@ -3093,8 +3152,8 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 
 func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
-	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\n")
+	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAGE\n")
+	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\t---\n")
 	allocatable := node.Status.Capacity
 	if len(node.Status.Allocatable) > 0 {
 		allocatable = node.Status.Allocatable
@@ -3107,16 +3166,17 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
-		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n", pod.Namespace, pod.Name,
+		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
 			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
+			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
 	w.Write(LEVEL_1, "Resource\tRequests\tLimits\n")
 	w.Write(LEVEL_1, "--------\t--------\t------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
-	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
+	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
+		reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory], reqs[api.ResourceEphemeralStorage], limits[api.ResourceEphemeralStorage]
 	fractionCpuReqs := float64(0)
 	fractionCpuLimits := float64(0)
 	if allocatable.Cpu().MilliValue() != 0 {
@@ -3129,10 +3189,18 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
 	}
+	fractionEphemeralStorageReqs := float64(0)
+	fractionEphemeralStorageLimits := float64(0)
+	if allocatable.StorageEphemeral().Value() != 0 {
+		fractionEphemeralStorageReqs = float64(ephemeralstorageReqs.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
+		fractionEphemeralStorageLimits = float64(ephemeralstorageLimits.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
+	}
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		api.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		api.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
+		api.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
 	extResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
 		if !helper.IsStandardContainerResourceName(string(resource)) && resource != api.ResourcePods {
@@ -3211,8 +3279,8 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	internalDeployment := &extensions.Deployment{}
-	if err := legacyscheme.Scheme.Convert(d, internalDeployment, extensions.SchemeGroupVersion); err != nil {
+	internalDeployment := &apps.Deployment{}
+	if err := legacyscheme.Scheme.Convert(d, internalDeployment, apps.SchemeGroupVersion); err != nil {
 		return "", err
 	}
 
@@ -3224,7 +3292,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	return describeDeployment(d, selector, internalDeployment, events, dd)
 }
 
-func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
+func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *apps.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)

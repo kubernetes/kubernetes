@@ -17,21 +17,20 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
+	"strconv"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"fmt"
-	"strconv"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -56,7 +55,12 @@ const (
 var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
-	It("should not conflict", func() {
+	/*
+		Release : v1.13
+		Testname: EmptyDir Wrapper Volume, Secret and ConfigMap volumes, no conflict
+		Description: Secret volume and ConfigMap volume is created with data. Pod MUST be able to start with Secret and ConfigMap volumes mounted into the container.
+	*/
+	framework.ConformanceIt("should not conflict", func() {
 		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -172,7 +176,13 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	// but these cases are harder because tmpfs-based emptyDir
 	// appears to be less prone to the race problem.
 
-	It("should not cause race condition when used for configmaps [Serial] [Slow]", func() {
+	/*
+		Release : v1.13
+		Testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
+		Description: Slow by design [~180 Seconds].
+		Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
+	*/
+	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial] [Slow]", func() {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
@@ -181,6 +191,10 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		}
 	})
 
+	// Slow by design [~150 Seconds].
+	// This test uses deprecated GitRepo VolumeSource so it MUST not be promoted to Conformance.
+	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod’s container.
+	// This projected volume maps approach can also be tested with secrets and downwardapi VolumeSource but are less prone to the race problem.
 	It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
 		defer cleanup()

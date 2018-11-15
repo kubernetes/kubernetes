@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	fakeapiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -394,7 +393,6 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	}
 	resyncPeriod := 12 * time.Hour
 	testClient := clientset.NewForConfigOrDie(&config)
-	fakeApiExtensionsClient := fakeapiextensionsclient.NewSimpleClientset()
 
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
@@ -415,7 +413,6 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
 		nil, /* csiClient */
-		fakeApiExtensionsClient, /* crdClient */
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),

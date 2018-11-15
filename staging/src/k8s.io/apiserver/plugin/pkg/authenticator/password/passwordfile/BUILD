@@ -19,8 +19,9 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
     deps = [
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

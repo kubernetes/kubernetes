@@ -112,7 +112,7 @@ func (c *FakeValidatingWebhookConfigurations) DeleteCollection(options *v1.Delet
 // Patch applies the patch and returns the patched validatingWebhookConfiguration.
 func (c *FakeValidatingWebhookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, data, subresources...), &v1beta1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, pt, data, subresources...), &v1beta1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

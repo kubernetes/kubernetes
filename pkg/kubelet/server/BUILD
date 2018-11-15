@@ -42,12 +42,12 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/flushwriter:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/metrics:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -77,6 +77,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",

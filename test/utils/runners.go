@@ -17,9 +17,11 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +47,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -161,7 +163,7 @@ type RCConfig struct {
 	// If set to false starting RC will print progress, otherwise only errors will be printed.
 	Silent bool
 
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 	// If set those functions will be used to gather data from Nodes - in integration tests where no
 	// kubelets are running those variables should be nil.
@@ -171,13 +173,15 @@ type RCConfig struct {
 	// Names of the secrets and configmaps to mount.
 	SecretNames    []string
 	ConfigMapNames []string
+
+	ServiceAccountTokenProjections int
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
 	if rc.LogFunc != nil {
 		rc.LogFunc(fmt, args...)
 	}
-	glog.Infof(fmt, args...)
+	klog.Infof(fmt, args...)
 }
 
 type DeploymentConfig struct {
@@ -237,6 +241,18 @@ func (p PodDiff) String(ignorePhases sets.String) string {
 		}
 	}
 	return ret
+}
+
+// DeletedPods returns a slice of pods that were present at the beginning
+// and then disappeared.
+func (p PodDiff) DeletedPods() []string {
+	var deletedPods []string
+	for podName, podInfo := range p {
+		if podInfo.hostname == nonExist {
+			deletedPods = append(deletedPods, podName)
+		}
+	}
+	return deletedPods
 }
 
 // Diff computes a PodDiff given 2 lists of pods.
@@ -319,6 +335,10 @@ func (config *DeploymentConfig) create() error {
 	}
 	if len(config.ConfigMapNames) > 0 {
 		attachConfigMaps(&deployment.Spec.Template, config.ConfigMapNames)
+	}
+
+	for i := 0; i < config.ServiceAccountTokenProjections; i++ {
+		attachServiceAccountTokenProjection(&deployment.Spec.Template, fmt.Sprintf("tok-%d", i))
 	}
 
 	config.applyTo(&deployment.Spec.Template)
@@ -758,9 +778,8 @@ func (config *RCConfig) start() error {
 		pods := ps.List()
 		startupStatus := ComputeRCStartupStatus(pods, config.Replicas)
 
-		pods = startupStatus.Created
 		if config.CreatedPods != nil {
-			*config.CreatedPods = pods
+			*config.CreatedPods = startupStatus.Created
 		}
 		if !config.Silent {
 			config.RCConfigLog(startupStatus.String(config.Name))
@@ -780,16 +799,15 @@ func (config *RCConfig) start() error {
 			}
 			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
-		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
-			// This failure mode includes:
-			// kubelet is dead, so node controller deleted pods and rc creates more
-			//	- diagnose by noting the pod diff below.
-			// pod is unhealthy, so replication controller creates another to take its place
-			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
-			errorStr := fmt.Sprintf("Number of reported pods for %s changed: %d vs %d", config.Name, len(pods), len(oldPods))
-			config.RCConfigLog("%v, pods that changed since the last iteration:", errorStr)
-			config.RCConfigLog(Diff(oldPods, pods).String(sets.NewString()))
-			return fmt.Errorf(errorStr)
+
+		diff := Diff(oldPods, pods)
+		deletedPods := diff.DeletedPods()
+		if len(deletedPods) != 0 {
+			// There are some pods that have disappeared.
+			err := fmt.Errorf("%d pods disappeared for %s: %v", len(deletedPods), config.Name, strings.Join(deletedPods, ", "))
+			config.RCConfigLog(err.Error())
+			config.RCConfigLog(diff.String(sets.NewString()))
+			return err
 		}
 
 		if len(pods) > len(oldPods) || startupStatus.Running > oldRunning {
@@ -1026,7 +1044,7 @@ func MakePodSpec() v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
 			Name:  "pause",
-			Image: "kubernetes/pause",
+			Image: "k8s.gcr.io/pause:3.1",
 			Ports: []v1.ContainerPort{{ContainerPort: 80}},
 			Resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -1061,9 +1079,9 @@ func CreatePod(client clientset.Interface, namespace string, podCount int, podTe
 	}
 
 	if podCount < 30 {
-		workqueue.Parallelize(podCount, podCount, createPodFunc)
+		workqueue.ParallelizeUntil(context.TODO(), podCount, podCount, createPodFunc)
 	} else {
-		workqueue.Parallelize(30, podCount, createPodFunc)
+		workqueue.ParallelizeUntil(context.TODO(), 30, podCount, createPodFunc)
 	}
 	return createError
 }
@@ -1127,7 +1145,7 @@ type SecretConfig struct {
 	Client    clientset.Interface
 	Name      string
 	Namespace string
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 }
 
@@ -1185,7 +1203,7 @@ type ConfigMapConfig struct {
 	Client    clientset.Interface
 	Name      string
 	Namespace string
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 }
 
@@ -1240,12 +1258,63 @@ func attachConfigMaps(template *v1.PodTemplateSpec, configMapNames []string) {
 	template.Spec.Containers[0].VolumeMounts = mounts
 }
 
+func attachServiceAccountTokenProjection(template *v1.PodTemplateSpec, name string) {
+	template.Spec.Containers[0].VolumeMounts = append(template.Spec.Containers[0].VolumeMounts,
+		v1.VolumeMount{
+			Name:      name,
+			MountPath: "/var/service-account-tokens/" + name,
+		})
+
+	template.Spec.Volumes = append(template.Spec.Volumes,
+		v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				Projected: &v1.ProjectedVolumeSource{
+					Sources: []v1.VolumeProjection{
+						{
+							ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+								Path:     "token",
+								Audience: name,
+							},
+						},
+						{
+							ConfigMap: &v1.ConfigMapProjection{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "kube-root-ca-crt",
+								},
+								Items: []v1.KeyToPath{
+									{
+										Key:  "ca.crt",
+										Path: "ca.crt",
+									},
+								},
+							},
+						},
+						{
+							DownwardAPI: &v1.DownwardAPIProjection{
+								Items: []v1.DownwardAPIVolumeFile{
+									{
+										Path: "namespace",
+										FieldRef: &v1.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.namespace",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+}
+
 type DaemonConfig struct {
 	Client    clientset.Interface
 	Name      string
 	Namespace string
 	Image     string
-	// If set this function will be used to print log lines instead of glog.
+	// If set this function will be used to print log lines instead of klog.
 	LogFunc func(fmt string, args ...interface{})
 	// How long we wait for DaemonSet to become running.
 	Timeout time.Duration
@@ -1253,7 +1322,7 @@ type DaemonConfig struct {
 
 func (config *DaemonConfig) Run() error {
 	if config.Image == "" {
-		config.Image = "kubernetes/pause"
+		config.Image = "k8s.gcr.io/pause:3.1"
 	}
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",

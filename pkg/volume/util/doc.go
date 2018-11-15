@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Contains utility code for use by volume plugins.
+// Package util contains utility code for use by volume plugins.
 package util // import "k8s.io/kubernetes/pkg/volume/util"

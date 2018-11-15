@@ -22,9 +22,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -76,7 +76,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 		return "", err
 	}
 
-	glog.V(4).Infof("vSphere: Attach disk called for node %s", nodeName)
+	klog.V(4).Infof("vSphere: Attach disk called for node %s", nodeName)
 
 	// Keeps concurrent attach operations to same host atomic
 	attachdetachMutex.LockKey(string(nodeName))
@@ -86,7 +86,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 	// succeeds in that case, so no need to do that separately.
 	diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, volumeSource.StoragePolicyName, nodeName)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.VolumePath, nodeName, err)
+		klog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.VolumePath, nodeName, err)
 		return "", err
 	}
 
@@ -94,14 +94,14 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 }
 
 func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
-	glog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for vSphere", nodeName)
+	klog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for vSphere", nodeName)
 	volumeNodeMap := map[types.NodeName][]*volume.Spec{
 		nodeName: specs,
 	}
 	nodeVolumesResult := make(map[*volume.Spec]bool)
 	nodesVerificationMap, err := attacher.BulkVerifyVolumes(volumeNodeMap)
 	if err != nil {
-		glog.Errorf("Attacher.VolumesAreAttached - error checking volumes for node %q with %v", nodeName, err)
+		klog.Errorf("Attacher.VolumesAreAttached - error checking volumes for node %q with %v", nodeName, err)
 		return nodeVolumesResult, err
 	}
 	if result, ok := nodesVerificationMap[nodeName]; ok {
@@ -119,7 +119,7 @@ func (attacher *vsphereVMDKAttacher) BulkVerifyVolumes(volumesByNode map[types.N
 		for _, volumeSpec := range volumeSpecs {
 			volumeSource, _, err := getVolumeSource(volumeSpec)
 			if err != nil {
-				glog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
+				klog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
 				continue
 			}
 			volPath := volumeSource.VolumePath
@@ -135,7 +135,7 @@ func (attacher *vsphereVMDKAttacher) BulkVerifyVolumes(volumesByNode map[types.N
 	}
 	attachedResult, err := attacher.vsphereVolumes.DisksAreAttached(volumePathsByNode)
 	if err != nil {
-		glog.Errorf("Error checking if volumes are attached to nodes: %+v. err: %v", volumePathsByNode, err)
+		klog.Errorf("Error checking if volumes are attached to nodes: %+v. err: %v", volumePathsByNode, err)
 		return volumesAttachedCheck, err
 	}
 
@@ -169,14 +169,14 @@ func (attacher *vsphereVMDKAttacher) WaitForAttach(spec *volume.Spec, devicePath
 	for {
 		select {
 		case <-ticker.C:
-			glog.V(5).Infof("Checking VMDK %q is attached", volumeSource.VolumePath)
+			klog.V(5).Infof("Checking VMDK %q is attached", volumeSource.VolumePath)
 			path, err := verifyDevicePath(devicePath)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
-				glog.Warningf("Error verifying VMDK (%q) is attached: %v", volumeSource.VolumePath, err)
+				klog.Warningf("Error verifying VMDK (%q) is attached: %v", volumeSource.VolumePath, err)
 			} else if path != "" {
 				// A device path has successfully been created for the VMDK
-				glog.Infof("Successfully found attached VMDK %q.", volumeSource.VolumePath)
+				klog.Infof("Successfully found attached VMDK %q.", volumeSource.VolumePath)
 				return path, nil
 			}
 		case <-timer.C:
@@ -210,7 +210,7 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				glog.Errorf("Failed to create directory at %#v. err: %s", deviceMountPath, err)
+				klog.Errorf("Failed to create directory at %#v. err: %s", deviceMountPath, err)
 				return err
 			}
 			notMnt = true
@@ -234,7 +234,7 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 			os.Remove(deviceMountPath)
 			return err
 		}
-		glog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
+		klog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
 	}
 	return nil
 }
@@ -271,21 +271,21 @@ func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.No
 	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
 	if err != nil {
 		// Log error and continue with detach
-		glog.Errorf(
+		klog.Errorf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
 			volPath, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volPath, nodeName)
+		klog.Infof("detach operation was successful. volume %q is already detached from node %q.", volPath, nodeName)
 		return nil
 	}
 
 	attachdetachMutex.LockKey(string(nodeName))
 	defer attachdetachMutex.UnlockKey(string(nodeName))
 	if err := detacher.vsphereVolumes.DetachDisk(volPath, nodeName); err != nil {
-		glog.Errorf("Error detaching volume %q: %v", volPath, err)
+		klog.Errorf("Error detaching volume %q: %v", volPath, err)
 		return err
 	}
 	return nil

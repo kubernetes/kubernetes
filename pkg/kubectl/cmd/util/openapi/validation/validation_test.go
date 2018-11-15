@@ -26,7 +26,6 @@ import (
 	"k8s.io/kube-openapi/pkg/util/proto/validation"
 	// This dependency is needed to register API types.
 	"k8s.io/kube-openapi/pkg/util/proto/testing"
-	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 

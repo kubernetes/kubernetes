@@ -30,7 +30,7 @@ items:
   spec:
     containers:
     - name: kubernetes-serve-hostname
-      image: k8s.gcr.io/serve_hostname
+      image: gcr.io/kubernetes-e2e-test-images/serve-hostname:1.1
       resources:
         limits:
           cpu: "1"

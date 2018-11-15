@@ -21,6 +21,7 @@ package serviceaccount
 // to work for any client of the HTTP interface.
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -365,15 +366,15 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
-	rootTokenAuth := authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	rootTokenAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		if token == rootToken {
-			return &user.DefaultInfo{Name: rootUserName}, true, nil
+			return &authenticator.Response{User: &user.DefaultInfo{Name: rootUserName}}, true, nil
 		}
 		return nil, false, nil
 	})
 	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClientset)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, []interface{}{&serviceAccountKey.PublicKey}, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
+	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),

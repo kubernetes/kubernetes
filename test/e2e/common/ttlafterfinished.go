@@ -17,13 +17,12 @@ limitations under the License.
 package common
 
 import (
+	"fmt"
 	"time"
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -36,10 +35,8 @@ const dummyFinalizer = "k8s.io/dummy-finalizer"
 var _ = framework.KubeDescribe("TTLAfterFinished", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
 
-	It("Job should be deleted once it finishes after TTL seconds [Feature:TTLAfterFinished]", func() {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-			framework.Skipf("Skip because %s feature is not enabled; run test with --feature-gates=%s=true", features.TTLAfterFinished, features.TTLAfterFinished)
-		}
+	alphaFeatureStr := "[Feature:TTLAfterFinished]"
+	It(fmt.Sprintf("Job should be deleted once it finishes after TTL seconds %s", alphaFeatureStr), func() {
 		testFinishedJob(f)
 	})
 })

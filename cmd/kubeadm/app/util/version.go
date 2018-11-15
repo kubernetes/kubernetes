@@ -25,9 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	pkgerrors "github.com/pkg/errors"
 	netutil "k8s.io/apimachinery/pkg/util/net"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
 	pkgversion "k8s.io/kubernetes/pkg/version"
 )
 
@@ -78,6 +79,10 @@ func KubernetesReleaseVersion(version string) (string, error) {
 
 	// kubeReleaseLabelRegex matches labels such as: latest, latest-1, latest-1.10
 	if kubeReleaseLabelRegex.MatchString(versionLabel) {
+		var clientVersion string
+		// Try to obtain a client version.
+		clientVersion, _ = kubeadmVersion(pkgversion.Get().String())
+		// Fetch version from the internet.
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetchFromURL(url, getReleaseVersionTimeout)
 		if err != nil {
@@ -86,17 +91,19 @@ func KubernetesReleaseVersion(version string) (string, error) {
 				return "", err
 			}
 			// Handle air-gapped environments by falling back to the client version.
-			glog.Infof("could not fetch a Kubernetes version from the internet: %v", err)
-			body, err = kubeadmVersion(pkgversion.Get().String())
-			if err != nil {
-				return "", err
-			}
-			glog.Infof("falling back to the local client version: %s", body)
+			klog.Infof("could not fetch a Kubernetes version from the internet: %v", err)
+			klog.Infof("falling back to the local client version: %s", clientVersion)
+			return KubernetesReleaseVersion(clientVersion)
+		}
+		// both the client and the remote version are obtained; validate them and pick a stable version
+		body, err = validateStableVersion(body, clientVersion)
+		if err != nil {
+			return "", err
 		}
 		// Re-validate received version and return.
 		return KubernetesReleaseVersion(body)
 	}
-	return "", fmt.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+	return "", pkgerrors.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
 }
 
 // KubernetesVersionToImageTag is helper function that replaces all
@@ -137,7 +144,7 @@ func splitVersion(version string) (string, string, error) {
 	var urlSuffix string
 	subs := kubeBucketPrefixes.FindAllStringSubmatch(version, 1)
 	if len(subs) != 1 || len(subs[0]) != 4 {
-		return "", "", fmt.Errorf("invalid version %q", version)
+		return "", "", pkgerrors.Errorf("invalid version %q", version)
 	}
 
 	switch {
@@ -153,16 +160,16 @@ func splitVersion(version string) (string, string, error) {
 
 // Internal helper: return content of URL
 func fetchFromURL(url string, timeout time.Duration) (string, error) {
-	glog.V(2).Infof("fetching Kubernetes version from URL: %s", url)
+	klog.V(2).Infof("fetching Kubernetes version from URL: %s", url)
 	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	resp, err := client.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("unable to get URL %q: %s", url, err.Error())
+		return "", pkgerrors.Errorf("unable to get URL %q: %s", url, err.Error())
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("unable to read content of URL %q: %s", url, err.Error())
+		return "", pkgerrors.Errorf("unable to read content of URL %q: %s", url, err.Error())
 	}
 	bodyString := strings.TrimSpace(string(body))
 
@@ -177,7 +184,7 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 func kubeadmVersion(info string) (string, error) {
 	v, err := versionutil.ParseSemantic(info)
 	if err != nil {
-		return "", fmt.Errorf("kubeadm version error: %v", err)
+		return "", pkgerrors.Wrap(err, "kubeadm version error")
 	}
 	// There is no utility in versionutil to get the version without the metadata,
 	// so this needs some manual formatting.
@@ -203,4 +210,32 @@ func kubeadmVersion(info string) (string, error) {
 	}
 	vStr := fmt.Sprintf("v%d.%d.%d%s", v.Major(), v.Minor(), patch, pre)
 	return vStr, nil
+}
+
+// Validate if the remote version is one Minor release newer than the client version.
+// This is done to conform with "stable-X" and only allow remote versions from
+// the same Patch level release.
+func validateStableVersion(remoteVersion, clientVersion string) (string, error) {
+	if clientVersion == "" {
+		klog.Infof("could not obtain client version; using remote version: %s", remoteVersion)
+		return remoteVersion, nil
+	}
+
+	verRemote, err := versionutil.ParseGeneric(remoteVersion)
+	if err != nil {
+		return "", pkgerrors.Wrap(err, "remote version error")
+	}
+	verClient, err := versionutil.ParseGeneric(clientVersion)
+	if err != nil {
+		return "", pkgerrors.Wrap(err, "client version error")
+	}
+	// If the remote Major version is bigger or if the Major versions are the same,
+	// but the remote Minor is bigger use the client version release. This handles Major bumps too.
+	if verClient.Major() < verRemote.Major() ||
+		(verClient.Major() == verRemote.Major()) && verClient.Minor() < verRemote.Minor() {
+		estimatedRelease := fmt.Sprintf("stable-%d.%d", verClient.Major(), verClient.Minor())
+		klog.Infof("remote version is much newer: %s; falling back to: %s", remoteVersion, estimatedRelease)
+		return estimatedRelease, nil
+	}
+	return remoteVersion, nil
 }

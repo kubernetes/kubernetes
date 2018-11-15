@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 // Instances encapsulates an implementation of Instances for OpenStack.
@@ -42,15 +42,15 @@ const (
 
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
-	glog.V(4).Info("openstack.Instances() called")
+	klog.V(4).Info("openstack.Instances() called")
 
 	compute, err := os.NewComputeV2()
 	if err != nil {
-		glog.Errorf("unable to access compute v2 API : %v", err)
+		klog.Errorf("unable to access compute v2 API : %v", err)
 		return nil, false
 	}
 
-	glog.V(4).Info("Claiming to support Instances")
+	klog.V(4).Info("Claiming to support Instances")
 
 	return &Instances{
 		compute: compute,
@@ -75,14 +75,14 @@ func (i *Instances) AddSSHKeyToAllInstances(ctx context.Context, user string, ke
 
 // NodeAddresses implements Instances.NodeAddresses
 func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
-	glog.V(4).Infof("NodeAddresses(%v) called", name)
+	klog.V(4).Infof("NodeAddresses(%v) called", name)
 
 	addrs, err := getAddressesByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+	klog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
 	return addrs, nil
 }
 

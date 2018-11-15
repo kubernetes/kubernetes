@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -111,6 +112,17 @@ leaderElection:
 		t.Fatal(err)
 	}
 
+	invalidconfigFile := filepath.Join(tmpDir, "scheduler_invalid.yaml")
+	if err := ioutil.WriteFile(invalidconfigFile, []byte(fmt.Sprintf(`
+apiVersion: componentconfig/v1alpha2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// flag-specified kubeconfig
 	flagKubeconfig := filepath.Join(tmpDir, "flag.kubeconfig")
 	if err := ioutil.WriteFile(flagKubeconfig, []byte(fmt.Sprintf(`
@@ -164,6 +176,29 @@ users:
 					}
 					return *cfg
 				}(),
+				SecureServing: (&apiserveroptions.SecureServingOptions{
+					ServerCert: apiserveroptions.GeneratableKeyCert{
+						CertDirectory: "/a/b/c",
+						PairName:      "kube-scheduler",
+					},
+					HTTP2MaxStreamsPerConnection: 47,
+				}).WithLoopback(),
+				Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+					CacheTTL:   10 * time.Second,
+					ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+					RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+						UsernameHeaders:     []string{"x-remote-user"},
+						GroupHeaders:        []string{"x-remote-group"},
+						ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+					},
+					RemoteKubeConfigFileOptional: true,
+				},
+				Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+					AllowCacheTTL:                10 * time.Second,
+					DenyCacheTTL:                 10 * time.Second,
+					RemoteKubeConfigFileOptional: true,
+					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
+				},
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -195,9 +230,24 @@ users:
 			},
 		},
 		{
-			name:          "config file in componentconfig/v1alpha1",
-			options:       &Options{ConfigFile: oldconfigFile},
-			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\" in scheme",
+			name: "config file in componentconfig/v1alpha1",
+			options: &Options{
+				ConfigFile: oldconfigFile,
+				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+					cfg, err := newDefaultComponentConfig()
+					if err != nil {
+						t.Fatal(err)
+					}
+					return *cfg
+				}(),
+			},
+			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\"",
+		},
+
+		{
+			name:          "invalid config file in componentconfig/v1alpha2",
+			options:       &Options{ConfigFile: invalidconfigFile},
+			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha2\"",
 		},
 		{
 			name: "kubeconfig flag",
@@ -207,6 +257,29 @@ users:
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
 					return *cfg
 				}(),
+				SecureServing: (&apiserveroptions.SecureServingOptions{
+					ServerCert: apiserveroptions.GeneratableKeyCert{
+						CertDirectory: "/a/b/c",
+						PairName:      "kube-scheduler",
+					},
+					HTTP2MaxStreamsPerConnection: 47,
+				}).WithLoopback(),
+				Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+					CacheTTL:   10 * time.Second,
+					ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+					RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+						UsernameHeaders:     []string{"x-remote-user"},
+						GroupHeaders:        []string{"x-remote-group"},
+						ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+					},
+					RemoteKubeConfigFileOptional: true,
+				},
+				Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+					AllowCacheTTL:                10 * time.Second,
+					DenyCacheTTL:                 10 * time.Second,
+					RemoteKubeConfigFileOptional: true,
+					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
+				},
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -238,8 +311,32 @@ users:
 			},
 		},
 		{
-			name:             "overridden master",
-			options:          &Options{Master: insecureserver.URL},
+			name: "overridden master",
+			options: &Options{
+				Master: insecureserver.URL,
+				SecureServing: (&apiserveroptions.SecureServingOptions{
+					ServerCert: apiserveroptions.GeneratableKeyCert{
+						CertDirectory: "/a/b/c",
+						PairName:      "kube-scheduler",
+					},
+					HTTP2MaxStreamsPerConnection: 47,
+				}).WithLoopback(),
+				Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+					CacheTTL: 10 * time.Second,
+					RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+						UsernameHeaders:     []string{"x-remote-user"},
+						GroupHeaders:        []string{"x-remote-group"},
+						ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+					},
+					RemoteKubeConfigFileOptional: true,
+				},
+				Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+					AllowCacheTTL:                10 * time.Second,
+					DenyCacheTTL:                 10 * time.Second,
+					RemoteKubeConfigFileOptional: true,
+					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
+				},
+			},
 			expectedUsername: "none, http",
 		},
 		{

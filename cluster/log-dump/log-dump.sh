@@ -41,15 +41,15 @@ readonly master_ssh_supported_providers="gce aws kubernetes-anywhere"
 readonly node_ssh_supported_providers="gce gke aws kubernetes-anywhere"
 readonly gcloud_supported_providers="gce gke kubernetes-anywhere"
 
-readonly master_logfiles="kube-apiserver kube-apiserver-audit kube-scheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
-readonly node_logfiles="kube-proxy fluentd node-problem-detector"
+readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log fluentd.log kubelet.cov"
+readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov"
 readonly node_systemd_services="node-problem-detector"
-readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-hollow-node-*"
-readonly aws_logfiles="cloud-init-output"
-readonly gce_logfiles="startupscript"
-readonly kern_logfile="kern"
-readonly initd_logfiles="docker"
-readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
+readonly hollow_node_logfiles="kubelet-hollow-node-*.log kubeproxy-hollow-node-*.log npd-hollow-node-*.log"
+readonly aws_logfiles="cloud-init-output.log"
+readonly gce_logfiles="startupscript.log"
+readonly kern_logfile="kern.log"
+readonly initd_logfiles="docker/log"
+readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
 readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
 
 # Limit the number of concurrent node connections so that we don't run out of
@@ -100,10 +100,10 @@ function copy-logs-from-node() {
     local -r node="${1}"
     local -r dir="${2}"
     local files=( ${3} )
-    # Append ".log*"
+    # Append "*"
     # The * at the end is needed to also copy rotated logs (which happens
     # in large clusters and long runs).
-    files=( "${files[@]/%/.log*}" )
+    files=( "${files[@]/%/*}" )
     # Prepend "/var/log/"
     files=( "${files[@]/#/\/var\/log\/}" )
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
@@ -168,11 +168,35 @@ function save-logs() {
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
 
+    # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
+    if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
+      if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
+        if [[ "${on_master}" == "true" ]]; then
+          run-in-docker-container "${node_name}" "kube-apiserver" "cat /tmp/k8s-kube-apiserver.cov" > "${dir}/kube-apiserver.cov" || true
+          run-in-docker-container "${node_name}" "kube-scheduler" "cat /tmp/k8s-kube-scheduler.cov" > "${dir}/kube-scheduler.cov" || true
+          run-in-docker-container "${node_name}" "kube-controller-manager" "cat /tmp/k8s-kube-controller-manager.cov" > "${dir}/kube-controller-manager.cov" || true
+        else
+          run-in-docker-container "${node_name}" "kube-proxy" "cat /tmp/k8s-kube-proxy.cov" > "${dir}/kube-proxy.cov" || true
+        fi
+      else
+        echo "Coverage profiles seem to exist, but cannot be retrieved from inside containers."
+      fi
+    fi
+
     echo "Changing logfiles to be world-readable for download"
     log-dump-ssh "${node_name}" "sudo chmod -R a+r /var/log" || true
 
     echo "Copying '${files}' from ${node_name}"
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
+}
+
+# Execute a command in container $2 on node $1.
+# Uses docker because the container may not ordinarily permit direct execution.
+function run-in-docker-container() {
+  local node_name="$1"
+  local container="$2"
+  shift 2
+  log-dump-ssh "${node_name}" "docker exec \"\$(docker ps -f label=io.kubernetes.container.name=${container} --format \"{{.ID}}\")\" $@"
 }
 
 function dump_masters() {

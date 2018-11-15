@@ -26,9 +26,9 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 type createContextOptions struct {
@@ -55,11 +55,11 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
+		Use:                   fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Sets a context entry in kubeconfig"),
-		Long:    create_context_long,
-		Example: create_context_example,
+		Short:                 i18n.T("Sets a context entry in kubeconfig"),
+		Long:                  create_context_long,
+		Example:               create_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			name, exists, err := options.run()
@@ -142,10 +142,10 @@ func (o *createContextOptions) complete(cmd *cobra.Command) error {
 
 func (o createContextOptions) validate() error {
 	if len(o.name) == 0 && !o.currContext {
-		return errors.New("you must specify a non-empty context name or --current-context")
+		return errors.New("you must specify a non-empty context name or --current")
 	}
 	if len(o.name) > 0 && o.currContext {
-		return errors.New("you cannot specify a context name and --current-context")
+		return errors.New("you cannot specify both a context name and --current")
 	}
 
 	return nil

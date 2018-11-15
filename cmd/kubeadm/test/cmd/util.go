@@ -18,7 +18,7 @@ package kubeadm
 
 import (
 	"bytes"
-	"fmt"
+	"github.com/pkg/errors"
 	"os/exec"
 	"testing"
 
@@ -37,8 +37,8 @@ func RunCmd(command string, args ...string) (string, string, error) {
 	err := cmd.Run()
 	stdout, stderr := bout.String(), berr.String()
 	if err != nil {
-		return "", "", fmt.Errorf("error running %s %v; \ngot error %v, \nstdout %q, \nstderr %q",
-			command, args, err, stdout, stderr)
+		return "", "", errors.Wrapf(err, "error running %s %v; \nstdout %q, \nstderr %q, \ngot error",
+			command, args, stdout, stderr)
 	}
 	return stdout, stderr, nil
 }

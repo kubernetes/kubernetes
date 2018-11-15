@@ -17,7 +17,7 @@ limitations under the License.
 package system
 
 import (
-	"github.com/golang/glog"
+	"fmt"
 	"k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -41,7 +41,7 @@ func Validate(spec SysSpec, validators []Validator) (error, error) {
 	var warns []error
 
 	for _, v := range validators {
-		glog.Infof("Validating %s...", v.Name())
+		fmt.Printf("Validating %s...\n", v.Name())
 		warn, err := v.Validate(spec)
 		errs = append(errs, err)
 		warns = append(warns, warn)

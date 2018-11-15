@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -192,9 +192,11 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 	}
 
 	// configure AuthenticationInfo config
+	cfg.ClientCAFile = s.ClientCert.ClientCA
 	if err = c.ApplyClientCert(s.ClientCert.ClientCA, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
+
 	cfg.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err = c.ApplyClientCert(s.RequestHeader.ClientCAFile, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
@@ -230,10 +232,10 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 	}
 	if client == nil {
 		if len(s.ClientCert.ClientCA) == 0 {
-			glog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 		if len(s.RequestHeader.ClientCAFile) == 0 {
-			glog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 		return nil
 	}
@@ -243,7 +245,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now
 	case errors.IsForbidden(err):
-		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
+		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
 			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
 		return err
@@ -262,7 +264,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 			}
 		}
 		if len(s.ClientCert.ClientCA) == 0 {
-			glog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 	}
 
@@ -277,7 +279,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 			}
 		}
 		if len(s.RequestHeader.ClientCAFile) == 0 {
-			glog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 	}
 
@@ -368,7 +370,7 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 		clientConfig, err = rest.InClusterConfig()
 		if err != nil && s.RemoteKubeConfigFileOptional {
 			if err != rest.ErrNotInCluster {
-				glog.Warningf("failed to read in-cluster kubeconfig for delegated authentication: %v", err)
+				klog.Warningf("failed to read in-cluster kubeconfig for delegated authentication: %v", err)
 			}
 			return nil, nil
 		}

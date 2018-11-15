@@ -22,10 +22,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // WriteConfigToDisk writes the kubelet config object down to a file
@@ -77,7 +78,7 @@ func CreateConfigMap(cfg *kubeadmapi.InitConfiguration, client clientset.Interfa
 	}
 
 	if err := createConfigMapRBACRules(client, k8sVersion); err != nil {
-		return fmt.Errorf("error creating kubelet configuration configmap RBAC rules: %v", err)
+		return errors.Wrap(err, "error creating kubelet configuration configmap RBAC rules")
 	}
 	return nil
 }
@@ -155,15 +156,15 @@ func getConfigBytes(kubeletConfig *kubeletconfig.KubeletConfiguration) ([]byte, 
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
 func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
-	fmt.Printf("[kubelet] Writing kubelet configuration to file %q\n", configFile)
+	fmt.Printf("[kubelet-start] Writing kubelet configuration to file %q\n", configFile)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", kubeletDir, err)
+		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
 	}
 
 	if err := ioutil.WriteFile(configFile, b, 0644); err != nil {
-		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", configFile, err)
+		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", configFile)
 	}
 	return nil
 }

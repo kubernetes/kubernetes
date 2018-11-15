@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/remotecommand"
@@ -51,6 +52,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -255,21 +257,25 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 	return map[string]volume.Volume{}, true
 }
 
-func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)     { return nil, nil }
-func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)  { return nil, nil }
-func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)    { return nil, nil }
-func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
+func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
+func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
+func (_ *fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
+func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
 func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
+func (_ *fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+	return nil, nil
+}
 
 type fakeAuth struct {
-	authenticateFunc func(*http.Request) (user.Info, bool, error)
+	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
 	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
 }
 
-func (f *fakeAuth) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	return f.authenticateFunc(req)
 }
 func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
@@ -312,8 +318,8 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 		streamingRuntime: streamingServer,
 	}
 	fw.fakeAuth = &fakeAuth{
-		authenticateFunc: func(req *http.Request) (user.Info, bool, error) {
-			return &user.DefaultInfo{Name: "test"}, true, nil
+		authenticateFunc: func(req *http.Request) (*authenticator.Response, bool, error) {
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "test"}}, true, nil
 		},
 		attributesFunc: func(u user.Info, req *http.Request) authorizer.Attributes {
 			return &authorizer.AttributesRecord{User: u}
@@ -763,9 +769,9 @@ Otherwise, add it to the expected list of paths that map to the "proxy" subresou
 			calledAttributes   = false
 		)
 
-		fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+		fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 			calledAuthenticate = true
-			return expectedUser, true, nil
+			return &authenticator.Response{User: expectedUser}, true, nil
 		}
 		fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
 			calledAttributes = true
@@ -825,9 +831,9 @@ func TestAuthenticationError(t *testing.T) {
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 		calledAuthenticate = true
-		return expectedUser, true, nil
+		return &authenticator.Response{User: expectedUser}, true, nil
 	}
 	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
 		calledAttributes = true
@@ -863,7 +869,7 @@ func TestAuthenticationFailure(t *testing.T) {
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 		calledAuthenticate = true
 		return nil, false, nil
 	}
@@ -901,9 +907,9 @@ func TestAuthorizationSuccess(t *testing.T) {
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 		calledAuthenticate = true
-		return expectedUser, true, nil
+		return &authenticator.Response{User: expectedUser}, true, nil
 	}
 	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
 		calledAttributes = true
@@ -1166,7 +1172,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true)
+	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1332,7 +1338,7 @@ func testExecAttach(t *testing.T, verb string) {
 					return http.ErrUseLastResponse
 				}
 			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 
@@ -1429,7 +1435,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1536,7 +1542,7 @@ func TestServePortForward(t *testing.T) {
 					return http.ErrUseLastResponse
 				}
 			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 

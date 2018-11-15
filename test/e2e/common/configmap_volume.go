@@ -540,6 +540,26 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		})
 
 	})
+
+	//The pod is in pending during volume creation until the configMap objects are available
+	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/configmap-volumes"
+		podName := "pod-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
+
+	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error unless it is marked optional, during the pod creation.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/configmap-volumes"
+		podName := "pod-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
 })
 
 func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
@@ -723,4 +743,116 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 		output = append(output, "mode of file \"/etc/configmap-volume/path/to/data-2\": "+modeString)
 	}
 	f.TestContainerOutput("consume configMaps", pod, 0, output)
+}
+
+func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podName string) error {
+	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+	falseValue := false
+
+	createName := "cm-test-opt-create-" + string(uuid.NewUUID())
+	createContainerName := "createcm-volume-test"
+	createVolumeName := "createcm-volume"
+
+	//creating a pod without configMap object created, by mentioning the configMap volume source's local reference name
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: createVolumeName,
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: createName,
+							},
+							Optional: &falseValue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    createContainerName,
+					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
+					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      createVolumeName,
+							MountPath: path.Join(volumeMountPath, "create"),
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By("Creating the pod")
+	pod = f.PodClient().Create(pod)
+	return f.WaitForPodRunning(pod.Name)
+}
+
+func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath, podName string) error {
+	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+	falseValue := false
+
+	createName := "cm-test-opt-create-" + string(uuid.NewUUID())
+	createContainerName := "createcm-volume-test"
+	createVolumeName := "createcm-volume"
+	configMap := newConfigMap(f, createName)
+
+	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+	var err error
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+	}
+	//creating a pod with configMap object, but with different key which is not present in configMap object.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: createVolumeName,
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: createName,
+							},
+							Items: []v1.KeyToPath{
+								{
+									Key:  "data-4",
+									Path: "path/to/data-4",
+								},
+							},
+							Optional: &falseValue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    createContainerName,
+					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
+					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      createVolumeName,
+							MountPath: path.Join(volumeMountPath, "create"),
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By("Creating the pod")
+	pod = f.PodClient().Create(pod)
+	return f.WaitForPodRunning(pod.Name)
 }

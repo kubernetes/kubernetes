@@ -19,8 +19,8 @@
 
 # Must ensure that the following ENV vars are set
 function detect-master {
-	echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
-	echo "KUBE_MASTER: $KUBE_MASTER" 1>&2
+	echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP:-}" 1>&2
+	echo "KUBE_MASTER: ${KUBE_MASTER:-}" 1>&2
 }
 
 # Get node names if they are not static.

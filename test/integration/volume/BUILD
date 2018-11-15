@@ -26,7 +26,6 @@ go_test(
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -38,7 +37,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

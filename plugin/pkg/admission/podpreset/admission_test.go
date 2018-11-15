@@ -20,44 +20,45 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	settingsv1alpha1listers "k8s.io/client-go/listers/settings/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/settings"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	settingslisters "k8s.io/kubernetes/pkg/client/listers/settings/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestMergeEnv(t *testing.T) {
 	tests := map[string]struct {
 		orig       []api.EnvVar
-		mod        []api.EnvVar
+		mod        []corev1.EnvVar
 		result     []api.EnvVar
 		shouldFail bool
 	}{
 		"empty original": {
-			mod:        []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
+			mod:        []corev1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
 			result:     []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
 			shouldFail: false,
 		},
 		"good merge": {
 			orig:       []api.EnvVar{{Name: "abcd", Value: "value2"}, {Name: "hello", Value: "value3"}},
-			mod:        []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
+			mod:        []corev1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
 			result:     []api.EnvVar{{Name: "abcd", Value: "value2"}, {Name: "hello", Value: "value3"}, {Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
 			shouldFail: false,
 		},
 		"conflict": {
 			orig:       []api.EnvVar{{Name: "abc", Value: "value3"}},
-			mod:        []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
+			mod:        []corev1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
 			shouldFail: true,
 		},
 		"one is exact same": {
 			orig:       []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "hello", Value: "value3"}},
-			mod:        []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
+			mod:        []corev1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value3"}},
 			result:     []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "hello", Value: "value3"}, {Name: "ABC", Value: "value3"}},
 			shouldFail: false,
 		},
@@ -66,7 +67,7 @@ func TestMergeEnv(t *testing.T) {
 	for name, test := range tests {
 		result, err := mergeEnv(
 			test.orig,
-			[]*settings.PodPreset{{Spec: settings.PodPresetSpec{Env: test.mod}}},
+			[]*settingsv1alpha1.PodPreset{{Spec: settingsv1alpha1.PodPresetSpec{Env: test.mod}}},
 		)
 		if test.shouldFail && err == nil {
 			t.Fatalf("expected test %q to fail but got nil", name)
@@ -83,21 +84,21 @@ func TestMergeEnv(t *testing.T) {
 func TestMergeEnvFrom(t *testing.T) {
 	tests := map[string]struct {
 		orig       []api.EnvFromSource
-		mod        []api.EnvFromSource
+		mod        []corev1.EnvFromSource
 		result     []api.EnvFromSource
 		shouldFail bool
 	}{
 		"empty original": {
-			mod: []api.EnvFromSource{
+			mod: []corev1.EnvFromSource{
 				{
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 				{
 					Prefix: "pre_",
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 			},
@@ -124,16 +125,16 @@ func TestMergeEnvFrom(t *testing.T) {
 					},
 				},
 			},
-			mod: []api.EnvFromSource{
+			mod: []corev1.EnvFromSource{
 				{
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 				{
 					Prefix: "pre_",
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 			},
@@ -162,7 +163,7 @@ func TestMergeEnvFrom(t *testing.T) {
 	for name, test := range tests {
 		result, err := mergeEnvFrom(
 			test.orig,
-			[]*settings.PodPreset{{Spec: settings.PodPresetSpec{EnvFrom: test.mod}}},
+			[]*settingsv1alpha1.PodPreset{{Spec: settingsv1alpha1.PodPresetSpec{EnvFrom: test.mod}}},
 		)
 		if test.shouldFail && err == nil {
 			t.Fatalf("expected test %q to fail but got nil", name)
@@ -179,12 +180,12 @@ func TestMergeEnvFrom(t *testing.T) {
 func TestMergeVolumeMounts(t *testing.T) {
 	tests := map[string]struct {
 		orig       []api.VolumeMount
-		mod        []api.VolumeMount
+		mod        []corev1.VolumeMount
 		result     []api.VolumeMount
 		shouldFail bool
 	}{
 		"empty original": {
-			mod: []api.VolumeMount{
+			mod: []corev1.VolumeMount{
 				{
 					Name:      "simply-mounted-volume",
 					MountPath: "/opt/",
@@ -199,7 +200,7 @@ func TestMergeVolumeMounts(t *testing.T) {
 			shouldFail: false,
 		},
 		"good merge": {
-			mod: []api.VolumeMount{
+			mod: []corev1.VolumeMount{
 				{
 					Name:      "simply-mounted-volume",
 					MountPath: "/opt/",
@@ -224,7 +225,7 @@ func TestMergeVolumeMounts(t *testing.T) {
 			shouldFail: false,
 		},
 		"conflict": {
-			mod: []api.VolumeMount{
+			mod: []corev1.VolumeMount{
 				{
 					Name:      "simply-mounted-volume",
 					MountPath: "/opt/",
@@ -243,7 +244,7 @@ func TestMergeVolumeMounts(t *testing.T) {
 			shouldFail: true,
 		},
 		"conflict on mount path": {
-			mod: []api.VolumeMount{
+			mod: []corev1.VolumeMount{
 				{
 					Name:      "simply-mounted-volume",
 					MountPath: "/opt/",
@@ -262,7 +263,7 @@ func TestMergeVolumeMounts(t *testing.T) {
 			shouldFail: true,
 		},
 		"one is exact same": {
-			mod: []api.VolumeMount{
+			mod: []corev1.VolumeMount{
 				{
 					Name:      "simply-mounted-volume",
 					MountPath: "/opt/",
@@ -295,7 +296,7 @@ func TestMergeVolumeMounts(t *testing.T) {
 	for name, test := range tests {
 		result, err := mergeVolumeMounts(
 			test.orig,
-			[]*settings.PodPreset{{Spec: settings.PodPresetSpec{VolumeMounts: test.mod}}},
+			[]*settingsv1alpha1.PodPreset{{Spec: settingsv1alpha1.PodPresetSpec{VolumeMounts: test.mod}}},
 		)
 		if test.shouldFail && err == nil {
 			t.Fatalf("expected test %q to fail but got nil", name)
@@ -312,14 +313,14 @@ func TestMergeVolumeMounts(t *testing.T) {
 func TestMergeVolumes(t *testing.T) {
 	tests := map[string]struct {
 		orig       []api.Volume
-		mod        []api.Volume
+		mod        []corev1.Volume
 		result     []api.Volume
 		shouldFail bool
 	}{
 		"empty original": {
-			mod: []api.Volume{
-				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-				{Name: "vol2", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			mod: []corev1.Volume{
+				{Name: "vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				{Name: "vol2", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 			},
 			result: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
@@ -332,9 +333,9 @@ func TestMergeVolumes(t *testing.T) {
 				{Name: "vol3", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				{Name: "vol4", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			mod: []api.Volume{
-				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-				{Name: "vol2", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			mod: []corev1.Volume{
+				{Name: "vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				{Name: "vol2", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 			},
 			result: []api.Volume{
 				{Name: "vol3", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
@@ -349,9 +350,9 @@ func TestMergeVolumes(t *testing.T) {
 				{Name: "vol3", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				{Name: "vol4", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			mod: []api.Volume{
-				{Name: "vol3", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/etc/apparmor.d"}}},
-				{Name: "vol2", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			mod: []corev1.Volume{
+				{Name: "vol3", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/etc/apparmor.d"}}},
+				{Name: "vol2", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 			},
 			shouldFail: true,
 		},
@@ -360,9 +361,9 @@ func TestMergeVolumes(t *testing.T) {
 				{Name: "vol3", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				{Name: "vol4", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			mod: []api.Volume{
-				{Name: "vol3", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-				{Name: "vol2", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			mod: []corev1.Volume{
+				{Name: "vol3", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				{Name: "vol2", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 			},
 			result: []api.Volume{
 				{Name: "vol3", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
@@ -376,7 +377,7 @@ func TestMergeVolumes(t *testing.T) {
 	for name, test := range tests {
 		result, err := mergeVolumes(
 			test.orig,
-			[]*settings.PodPreset{{Spec: settings.PodPresetSpec{Volumes: test.mod}}},
+			[]*settingsv1alpha1.PodPreset{{Spec: settingsv1alpha1.PodPresetSpec{Volumes: test.mod}}},
 		)
 		if test.shouldFail && err == nil {
 			t.Fatalf("expected test %q to fail but got nil", name)
@@ -392,7 +393,7 @@ func TestMergeVolumes(t *testing.T) {
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.MutationInterface {
+func NewTestAdmission(lister settingsv1alpha1listers.PodPresetLister, objects ...runtime.Object) kadmission.MutationInterface {
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(objects...)
 
@@ -424,12 +425,12 @@ func TestAdmitConflictWithDifferentNamespaceShouldDoNothing(t *testing.T) {
 		},
 	}
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "othernamespace",
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -439,7 +440,7 @@ func TestAdmitConflictWithDifferentNamespaceShouldDoNothing(t *testing.T) {
 					},
 				},
 			},
-			Env: []api.EnvVar{{Name: "abc", Value: "value"}, {Name: "ABC", Value: "value"}},
+			Env: []corev1.EnvVar{{Name: "abc", Value: "value"}, {Name: "ABC", Value: "value"}},
 		},
 	}
 
@@ -470,12 +471,12 @@ func TestAdmitConflictWithNonMatchingLabelsShouldNotError(t *testing.T) {
 		},
 	}
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -485,7 +486,7 @@ func TestAdmitConflictWithNonMatchingLabelsShouldNotError(t *testing.T) {
 					},
 				},
 			},
-			Env: []api.EnvVar{{Name: "abc", Value: "value"}, {Name: "ABC", Value: "value"}},
+			Env: []corev1.EnvVar{{Name: "abc", Value: "value"}, {Name: "ABC", Value: "value"}},
 		},
 	}
 
@@ -517,12 +518,12 @@ func TestAdmitConflictShouldNotModifyPod(t *testing.T) {
 	}
 	origPod := *pod
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -532,7 +533,7 @@ func TestAdmitConflictShouldNotModifyPod(t *testing.T) {
 					},
 				},
 			},
-			Env: []api.EnvVar{{Name: "abc", Value: "value"}, {Name: "ABC", Value: "value"}},
+			Env: []corev1.EnvVar{{Name: "abc", Value: "value"}, {Name: "ABC", Value: "value"}},
 		},
 	}
 
@@ -566,12 +567,12 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -581,18 +582,18 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
-			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
-			EnvFrom: []api.EnvFromSource{
+			Volumes: []corev1.Volume{{Name: "vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+			Env:     []corev1.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []corev1.EnvFromSource{
 				{
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 				{
 					Prefix: "pre_",
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 			},
@@ -626,12 +627,12 @@ func TestAdmitMirrorPod(t *testing.T) {
 		},
 	}
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -641,18 +642,18 @@ func TestAdmitMirrorPod(t *testing.T) {
 					},
 				},
 			},
-			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
-			EnvFrom: []api.EnvFromSource{
+			Volumes: []corev1.Volume{{Name: "vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+			Env:     []corev1.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []corev1.EnvFromSource{
 				{
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 				{
 					Prefix: "pre_",
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 			},
@@ -696,12 +697,12 @@ func TestExclusionNoAdmit(t *testing.T) {
 		},
 	}
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "namespace",
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -711,18 +712,18 @@ func TestExclusionNoAdmit(t *testing.T) {
 					},
 				},
 			},
-			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
-			EnvFrom: []api.EnvFromSource{
+			Volumes: []corev1.Volume{{Name: "vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+			Env:     []corev1.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []corev1.EnvFromSource{
 				{
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 				{
 					Prefix: "pre_",
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 			},
@@ -760,12 +761,12 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 		},
 	}
 
-	pip := &settings.PodPreset{
+	pip := &settingsv1alpha1.PodPreset{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hello",
 			Namespace: "different", // (pod will be submitted to namespace 'namespace')
 		},
-		Spec: settings.PodPresetSpec{
+		Spec: settingsv1alpha1.PodPresetSpec{
 			Selector: metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -775,18 +776,18 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 					},
 				},
 			},
-			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
-			EnvFrom: []api.EnvFromSource{
+			Volumes: []corev1.Volume{{Name: "vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+			Env:     []corev1.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []corev1.EnvFromSource{
 				{
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 				{
 					Prefix: "pre_",
-					ConfigMapRef: &api.ConfigMapEnvSource{
-						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "abc"},
 					},
 				},
 			},
@@ -804,11 +805,11 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 	}
 }
 
-func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
+func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Settings().InternalVersion().PodPresets().Informer().GetStore()
+	store := informerFactory.Settings().V1alpha1().PodPresets().Informer().GetStore()
 	store.Add(pip)
-	plugin := NewTestAdmission(informerFactory.Settings().InternalVersion().PodPresets().Lister())
+	plugin := NewTestAdmission(informerFactory.Settings().V1alpha1().PodPresets().Lister())
 	attrs := kadmission.NewAttributesRecord(
 		pod,
 		nil,

@@ -34,7 +34,7 @@ go_library(
         "//staging/src/k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller/v1alpha1:go_default_library",
         "//staging/src/k8s.io/sample-controller/pkg/client/listers/samplecontroller/v1alpha1:go_default_library",
         "//staging/src/k8s.io/sample-controller/pkg/signals:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

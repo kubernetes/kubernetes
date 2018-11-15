@@ -62,9 +62,10 @@ type TestContext struct {
 	ns                     *v1.Namespace
 	clientSet              *clientset.Clientset
 	informerFactory        informers.SharedInformerFactory
-	schedulerConfigFactory scheduler.Configurator
-	schedulerConfig        *scheduler.Config
+	schedulerConfigFactory factory.Configurator
+	schedulerConfig        *factory.Config
 	scheduler              *scheduler.Scheduler
+	stopCh                 chan struct{}
 }
 
 // createConfiguratorWithPodInformer creates a configurator for scheduler.
@@ -73,7 +74,8 @@ func createConfiguratorWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
-) scheduler.Configurator {
+	stopCh <-chan struct{},
+) factory.Configurator {
 	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  schedulerName,
 		Client:                         clientSet,
@@ -92,13 +94,16 @@ func createConfiguratorWithPodInformer(
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		BindTimeoutSeconds:             600,
+		StopCh:                         stopCh,
 	})
 }
 
 // initTestMasterAndScheduler initializes a test environment and creates a master with default
 // configuration.
 func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	var context TestContext
+	context := TestContext{
+		stopCh: make(chan struct{}),
+	}
 
 	// 1. Create master
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
@@ -138,13 +143,12 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 func initTestScheduler(
 	t *testing.T,
 	context *TestContext,
-	controllerCh chan struct{},
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, controllerCh, setPodInformer, policy, false, false, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, false, true, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -152,7 +156,6 @@ func initTestScheduler(
 func initTestSchedulerWithOptions(
 	t *testing.T,
 	context *TestContext,
-	controllerCh chan struct{},
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 	disablePreemption bool,
@@ -179,7 +182,7 @@ func initTestSchedulerWithOptions(
 	}
 
 	context.schedulerConfigFactory = createConfiguratorWithPodInformer(
-		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory)
+		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, context.stopCh)
 
 	var err error
 
@@ -191,11 +194,6 @@ func initTestSchedulerWithOptions(
 
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-
-	// set controllerCh if provided.
-	if controllerCh != nil {
-		context.schedulerConfig.StopEverything = controllerCh
 	}
 
 	// set DisablePreemption option
@@ -252,21 +250,21 @@ func initDisruptionController(context *TestContext) *disruption.DisruptionContro
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string) *TestContext {
-	return initTestScheduler(t, initTestMaster(t, nsPrefix, nil), nil, true, nil)
+	return initTestScheduler(t, initTestMaster(t, nsPrefix, nil), true, nil)
 }
 
 // initTestDisablePreemption initializes a test environment and creates master and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), nil, true, nil, true, false, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil, true, true, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
 // at the end of a test.
 func cleanupTest(t *testing.T, context *TestContext) {
 	// Kill the scheduler.
-	close(context.schedulerConfig.StopEverything)
+	close(context.stopCh)
 	// Cleanup nodes.
 	context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(context.ns, context.httpServer, t)
@@ -498,10 +496,10 @@ func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
-		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
+		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
+		return pod, fmt.Errorf("Error getting pod %v/%v info: %v", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
 }
@@ -631,20 +629,20 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
 }
 
-// waitCachedPDBsStable waits for PDBs in scheduler cache to have "CurrentHealthy" status equal to
+// waitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
-func waitCachedPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+func waitForPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
 	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		pdbList, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-		if len(cachedPDBs) != len(pdbs) {
+		if len(pdbList.Items) != len(pdbs) {
 			return false, nil
 		}
 		for i, pdb := range pdbs {
 			found := false
-			for _, cpdb := range cachedPDBs {
+			for _, cpdb := range pdbList.Items {
 				if pdb.Name == cpdb.Name && pdb.Namespace == cpdb.Namespace {
 					found = true
 					if cpdb.Status.CurrentHealthy != pdbPodNum[i] {

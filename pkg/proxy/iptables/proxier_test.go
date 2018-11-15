@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -281,7 +281,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	// Run the test cases
 	for _, tc := range testCases {
 		priorExecs := fexec.CommandCalls
-		priorGlogErrs := glog.Stats.Error.Lines()
+		priorGlogErrs := klog.Stats.Error.Lines()
 
 		input := []proxy.ServiceEndpoint{tc.epSvcPair}
 		fakeProxier.deleteEndpointConnections(input)
@@ -319,7 +319,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
 			expGlogErrs = 1
 		}
-		glogErrs := glog.Stats.Error.Lines() - priorGlogErrs
+		glogErrs := klog.Stats.Error.Lines() - priorGlogErrs
 		if glogErrs != expGlogErrs {
 			t.Errorf("%s: Expected %d glogged errors, but got %d", tc.description, expGlogErrs, glogErrs)
 		}

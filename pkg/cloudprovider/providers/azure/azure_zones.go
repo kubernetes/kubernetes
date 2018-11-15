@@ -21,20 +21,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
-
-const (
-	faultDomainURI     = "v1/InstanceInfo/FD"
-	computeMetadataURI = "instance/compute"
-)
-
-var faultMutex = &sync.Mutex{}
-var faultDomain *string
 
 // makeZone returns the zone value in format of <region>-<zone-id>.
 func (az *Cloud) makeZone(zoneID int) string {
@@ -58,45 +49,31 @@ func (az *Cloud) GetZoneID(zoneLabel string) string {
 // GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
 // If the node is not running with availability zones, then it will fall back to fault domain.
 func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
-	computeInfo := ComputeMetadata{}
-	err := az.metadata.Object(computeMetadataURI, &computeInfo)
+	metadata, err := az.metadata.GetMetadata()
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
 
-	if computeInfo.Zone == "" {
-		glog.V(3).Infof("Availability zone is not enabled for the node, falling back to fault domain")
-		return az.getZoneFromFaultDomain()
+	if metadata.Compute == nil {
+		return cloudprovider.Zone{}, fmt.Errorf("failure of getting compute information from instance metadata")
 	}
 
-	zoneID, err := strconv.Atoi(computeInfo.Zone)
-	if err != nil {
-		return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", computeInfo.Zone, err)
+	zone := ""
+	if metadata.Compute.Zone != "" {
+		zoneID, err := strconv.Atoi(metadata.Compute.Zone)
+		if err != nil {
+			return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", metadata.Compute.Zone, err)
+		}
+		zone = az.makeZone(zoneID)
+	} else {
+		klog.V(3).Infof("Availability zone is not enabled for the node, falling back to fault domain")
+		zone = metadata.Compute.FaultDomain
 	}
 
 	return cloudprovider.Zone{
-		FailureDomain: az.makeZone(zoneID),
+		FailureDomain: zone,
 		Region:        az.Location,
 	}, nil
-}
-
-// getZoneFromFaultDomain gets fault domain for the instance.
-// Fault domain is the fallback when availability zone is not enabled for the node.
-func (az *Cloud) getZoneFromFaultDomain() (cloudprovider.Zone, error) {
-	faultMutex.Lock()
-	defer faultMutex.Unlock()
-	if faultDomain == nil {
-		var err error
-		faultDomain, err = az.fetchFaultDomain()
-		if err != nil {
-			return cloudprovider.Zone{}, err
-		}
-	}
-	zone := cloudprovider.Zone{
-		FailureDomain: *faultDomain,
-		Region:        az.Location,
-	}
-	return zone, nil
 }
 
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
@@ -105,7 +82,7 @@ func (az *Cloud) getZoneFromFaultDomain() (cloudprovider.Zone, error) {
 func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	if az.IsNodeUnmanagedByProviderID(providerID) {
-		glog.V(2).Infof("GetZoneByProviderID: omitting unmanaged node %q", providerID)
+		klog.V(2).Infof("GetZoneByProviderID: omitting unmanaged node %q", providerID)
 		return cloudprovider.Zone{}, nil
 	}
 
@@ -127,18 +104,9 @@ func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName)
 		return cloudprovider.Zone{}, err
 	}
 	if unmanaged {
-		glog.V(2).Infof("GetZoneByNodeName: omitting unmanaged node %q", nodeName)
+		klog.V(2).Infof("GetZoneByNodeName: omitting unmanaged node %q", nodeName)
 		return cloudprovider.Zone{}, nil
 	}
 
 	return az.vmSet.GetZoneByNodeName(string(nodeName))
-}
-
-func (az *Cloud) fetchFaultDomain() (*string, error) {
-	faultDomain, err := az.metadata.Text(faultDomainURI)
-	if err != nil {
-		return nil, err
-	}
-
-	return &faultDomain, nil
 }

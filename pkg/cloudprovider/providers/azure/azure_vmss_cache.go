@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -50,7 +50,7 @@ func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
 func extractVmssVMName(name string) (string, string, error) {
 	split := strings.SplitAfter(name, vmssNameSeparator)
 	if len(split) < 2 {
-		glog.V(3).Infof("Failed to extract vmssVMName %q", name)
+		klog.V(3).Infof("Failed to extract vmssVMName %q", name)
 		return "", "", ErrorNotVmssInstance
 	}
 
@@ -74,7 +74,7 @@ func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 		}
 
 		if !exists {
-			glog.V(2).Infof("Virtual machine scale set %q not found with message: %q", key, message)
+			klog.V(2).Infof("Virtual machine scale set %q not found with message: %q", key, message)
 			return nil, nil
 		}
 
@@ -107,7 +107,7 @@ func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 
 				for _, vm := range vms {
 					if vm.OsProfile == nil || vm.OsProfile.ComputerName == nil {
-						glog.Warningf("failed to get computerName for vmssVM (%q)", ssName)
+						klog.Warningf("failed to get computerName for vmssVM (%q)", ssName)
 						continue
 					}
 
@@ -195,8 +195,26 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 		}
 
 		if !exists {
-			glog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
+			klog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
 			return nil, nil
+		}
+
+		// Get instanceView for vmssVM.
+		if result.InstanceView == nil {
+			viewCtx, viewCancel := getContextWithCancel()
+			defer viewCancel()
+			view, err := ss.VirtualMachineScaleSetVMsClient.GetInstanceView(viewCtx, resourceGroup, ssName, instanceID)
+			// It is possible that the vmssVM gets removed just before this call. So check whether the VM exist again.
+			exists, message, realErr = checkResourceExistsFromError(err)
+			if realErr != nil {
+				return nil, realErr
+			}
+			if !exists {
+				klog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
+				return nil, nil
+			}
+
+			result.InstanceView = &view
 		}
 
 		return &result, nil

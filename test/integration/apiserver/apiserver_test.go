@@ -26,7 +26,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -38,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master"
@@ -68,7 +68,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in sending req with verb: %s, URL: %s and body: %s", err, verb, URL, body)
 	}
 	transport := http.DefaultTransport
-	glog.Infof("Sending request: %v", req)
+	klog.Infof("Sending request: %v", req)
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v in req: %v", err, req)

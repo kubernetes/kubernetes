@@ -14,7 +14,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.2.24-0') }}",
+    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.2.24-1') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}

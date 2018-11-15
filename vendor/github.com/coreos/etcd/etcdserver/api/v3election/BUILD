@@ -13,7 +13,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3/concurrency:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

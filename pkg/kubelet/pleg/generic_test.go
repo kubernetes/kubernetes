@@ -346,9 +346,11 @@ func TestRemoveCacheEntry(t *testing.T) {
 
 func TestHealthy(t *testing.T) {
 	testPleg := newTestGenericPLEG()
+
+	// pleg should initially be unhealthy
 	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
 	ok, _ := pleg.Healthy()
-	assert.True(t, ok, "pleg should be healthy")
+	assert.False(t, ok, "pleg should be unhealthy")
 
 	// Advance the clock without any relisting.
 	clock.Step(time.Minute * 10)
@@ -361,6 +363,12 @@ func TestHealthy(t *testing.T) {
 	clock.Step(time.Minute * 1)
 	ok, _ = pleg.Healthy()
 	assert.True(t, ok, "pleg should be healthy")
+
+	// Advance by relistThreshold without any relisting. pleg should be unhealthy
+	// because it has been longer than relistThreshold since a relist occurred.
+	clock.Step(relistThreshold)
+	ok, _ = pleg.Healthy()
+	assert.False(t, ok, "pleg should be unhealthy")
 }
 
 func TestRelistWithReinspection(t *testing.T) {

@@ -18,6 +18,8 @@ package testsuites
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -33,7 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
-// TestSuite represents an interface for a set of tests whchi works with TestDriver
+// TestSuite represents an interface for a set of tests which works with TestDriver
 type TestSuite interface {
 	// getTestSuiteInfo returns the TestSuiteInfo for this TestSuite
 	getTestSuiteInfo() TestSuiteInfo
@@ -43,6 +45,7 @@ type TestSuite interface {
 	execTest(drivers.TestDriver, testpatterns.TestPattern)
 }
 
+// TestSuiteInfo represents a set of parameters for TestSuite
 type TestSuiteInfo struct {
 	name         string                     // name of the TestSuite
 	featureTag   string                     // featureTag for the TestSuite
@@ -64,12 +67,12 @@ func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
 }
 
 // RunTestSuite runs all testpatterns of all testSuites for a driver
-func RunTestSuite(f *framework.Framework, config framework.VolumeTestConfig, driver drivers.TestDriver, tsInits []func() TestSuite) {
+func RunTestSuite(f *framework.Framework, config framework.VolumeTestConfig, driver drivers.TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
 	for _, testSuiteInit := range tsInits {
 		suite := testSuiteInit()
-		tsInfo := suite.getTestSuiteInfo()
+		patterns := tunePatternFunc(suite.getTestSuiteInfo().testPatterns)
 
-		for _, pattern := range tsInfo.testPatterns {
+		for _, pattern := range patterns {
 			suite.execTest(driver, pattern)
 		}
 	}
@@ -131,7 +134,7 @@ type genericVolumeTestResource struct {
 
 var _ TestResource = &genericVolumeTestResource{}
 
-// SetupResource sets up genericVolumeTestResource
+// setupResource sets up genericVolumeTestResource
 func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
 	r.driver = driver
 	dInfo := driver.GetDriverInfo()
@@ -162,7 +165,7 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
-			claimSize := "2Gi"
+			claimSize := "5Gi"
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)
@@ -185,16 +188,32 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 	}
 }
 
-// CleanupResource clean up genericVolumeTestResource
+// cleanupResource cleans up genericVolumeTestResource
 func (r *genericVolumeTestResource) cleanupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Framework
 	volType := pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
-		By("Deleting pv and pvc")
-		if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
-			framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
+		switch volType {
+		case testpatterns.PreprovisionedPV:
+			By("Deleting pv and pvc")
+			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
+				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
+			}
+		case testpatterns.DynamicPV:
+			By("Deleting pvc")
+			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
+			if r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
+				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
+					r.pv.Name, v1.PersistentVolumeReclaimDelete)
+			}
+			err := framework.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed to delete PVC %v", r.pvc.Name)
+			err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.pv.Name, 5*time.Second, 5*time.Minute)
+			framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", r.pv.Name)
+		default:
+			framework.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
 		}
 	}
 
@@ -304,5 +323,17 @@ func deleteStorageClass(cs clientset.Interface, className string) {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
 		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
+func skipTestUntilBugfix(issueID string, driverName string, prefixes []string) {
+	var needSkip bool
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(driverName, prefix) {
+			needSkip = true
+		}
+	}
+	if needSkip {
+		framework.Skipf("Due to issue #%s, this test with %s doesn't pass, skipping until it fixes", issueID, driverName)
 	}
 }

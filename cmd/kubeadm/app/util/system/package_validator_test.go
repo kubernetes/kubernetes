@@ -17,10 +17,10 @@ limitations under the License.
 package system
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestExtractUpstreamVersion(t *testing.T) {
@@ -159,15 +159,15 @@ func (m testPackageManager) getPackageVersion(packageName string) (string, error
 	if v, ok := m.packageVersions[packageName]; ok {
 		return v, nil
 	}
-	return "", fmt.Errorf("package %q does not exist", packageName)
+	return "", errors.Errorf("package %q does not exist", packageName)
 }
 
 func TestValidatePackageVersion(t *testing.T) {
 	testKernelRelease := "test-kernel-release"
 	manager := testPackageManager{
 		packageVersions: map[string]string{
-			"foo": "1.0.0",
-			"bar": "2.1.0",
+			"foo":                      "1.0.0",
+			"bar":                      "2.1.0",
 			"bar-" + testKernelRelease: "3.0.0",
 		},
 	}

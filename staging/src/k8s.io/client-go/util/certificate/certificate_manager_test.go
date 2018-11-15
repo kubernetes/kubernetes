@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -207,6 +208,170 @@ func TestSetRotationDeadline(t *testing.T) {
 			}
 			if g.lastValue != float64(tc.notAfter.Unix()) {
 				t.Errorf("%f value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
+			}
+		})
+	}
+}
+
+func TestCertSatisfiesTemplate(t *testing.T) {
+	testCases := []struct {
+		name          string
+		cert          *x509.Certificate
+		template      *x509.CertificateRequest
+		shouldSatisfy bool
+	}{
+		{
+			name:          "No certificate, no template",
+			cert:          nil,
+			template:      nil,
+			shouldSatisfy: false,
+		},
+		{
+			name:          "No certificate",
+			cert:          nil,
+			template:      &x509.CertificateRequest{},
+			shouldSatisfy: false,
+		},
+		{
+			name: "No template",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "system:node:fake-node-name",
+				},
+			},
+			template:      nil,
+			shouldSatisfy: true,
+		},
+		{
+			name: "Mismatched common name",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "system:node:fake-node-name-2",
+				},
+			},
+			template: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "system:node:fake-node-name",
+				},
+			},
+			shouldSatisfy: false,
+		},
+		{
+			name: "Missing orgs in certificate",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					Organization: []string{"system:nodes"},
+				},
+			},
+			template: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Organization: []string{"system:nodes", "foobar"},
+				},
+			},
+			shouldSatisfy: false,
+		},
+		{
+			name: "Extra orgs in certificate",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					Organization: []string{"system:nodes", "foobar"},
+				},
+			},
+			template: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Organization: []string{"system:nodes"},
+				},
+			},
+			shouldSatisfy: true,
+		},
+		{
+			name: "Missing DNS names in certificate",
+			cert: &x509.Certificate{
+				Subject:  pkix.Name{},
+				DNSNames: []string{"foo.example.com"},
+			},
+			template: &x509.CertificateRequest{
+				Subject:  pkix.Name{},
+				DNSNames: []string{"foo.example.com", "bar.example.com"},
+			},
+			shouldSatisfy: false,
+		},
+		{
+			name: "Extra DNS names in certificate",
+			cert: &x509.Certificate{
+				Subject:  pkix.Name{},
+				DNSNames: []string{"foo.example.com", "bar.example.com"},
+			},
+			template: &x509.CertificateRequest{
+				Subject:  pkix.Name{},
+				DNSNames: []string{"foo.example.com"},
+			},
+			shouldSatisfy: true,
+		},
+		{
+			name: "Missing IP addresses in certificate",
+			cert: &x509.Certificate{
+				Subject:     pkix.Name{},
+				IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
+			},
+			template: &x509.CertificateRequest{
+				Subject:     pkix.Name{},
+				IPAddresses: []net.IP{net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.2")},
+			},
+			shouldSatisfy: false,
+		},
+		{
+			name: "Extra IP addresses in certificate",
+			cert: &x509.Certificate{
+				Subject:     pkix.Name{},
+				IPAddresses: []net.IP{net.ParseIP("192.168.1.1"), net.ParseIP("192.168.1.2")},
+			},
+			template: &x509.CertificateRequest{
+				Subject:     pkix.Name{},
+				IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
+			},
+			shouldSatisfy: true,
+		},
+		{
+			name: "Matching certificate",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName:   "system:node:fake-node-name",
+					Organization: []string{"system:nodes"},
+				},
+				DNSNames:    []string{"foo.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
+			},
+			template: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName:   "system:node:fake-node-name",
+					Organization: []string{"system:nodes"},
+				},
+				DNSNames:    []string{"foo.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.1.1")},
+			},
+			shouldSatisfy: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var tlsCert *tls.Certificate
+
+			if tc.cert != nil {
+				tlsCert = &tls.Certificate{
+					Leaf: tc.cert,
+				}
+			}
+
+			m := manager{
+				cert:        tlsCert,
+				getTemplate: func() *x509.CertificateRequest { return tc.template },
+			}
+
+			result := m.certSatisfiesTemplate()
+			if result != tc.shouldSatisfy {
+				t.Errorf("cert: %+v, template: %+v, certSatisfiesTemplate returned %v, want %v", m.cert, tc.template, result, tc.shouldSatisfy)
 			}
 		})
 	}

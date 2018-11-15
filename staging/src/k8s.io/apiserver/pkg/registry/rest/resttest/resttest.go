@@ -1166,7 +1166,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 // testGetDifferentNamespace ensures same-name objects in different namespaces do not clash
 func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	if t.clusterScope {
-		t.Fatalf("the test does not work in in cluster-scope")
+		t.Fatalf("the test does not work in cluster-scope")
 	}
 
 	objMeta := t.getObjectMetaOrFail(obj)

@@ -24,18 +24,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/logs"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -46,85 +44,17 @@ import (
 
 	// ensure auth plugins are loaded
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
+	// ensure that cloud providers are loaded
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/aws"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
 )
 
 var (
 	cloudConfig = &framework.TestContext.CloudConfig
 )
-
-// setupProviderConfig validates and sets up cloudConfig based on framework.TestContext.Provider.
-func setupProviderConfig() error {
-	switch framework.TestContext.Provider {
-	case "":
-		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-
-	case "gce", "gke":
-		framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
-		zone := framework.TestContext.CloudConfig.Zone
-		region := framework.TestContext.CloudConfig.Region
-
-		var err error
-		if region == "" {
-			region, err = gcecloud.GetGCERegion(zone)
-			if err != nil {
-				return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
-			}
-		}
-		managedZones := []string{} // Manage all zones in the region
-		if !framework.TestContext.CloudConfig.MultiZone {
-			managedZones = []string{zone}
-		}
-
-		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
-			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
-			ProjectID:          framework.TestContext.CloudConfig.ProjectID,
-			Region:             region,
-			Zone:               zone,
-			ManagedZones:       managedZones,
-			NetworkName:        "", // TODO: Change this to use framework.TestContext.CloudConfig.Network?
-			SubnetworkName:     "",
-			NodeTags:           nil,
-			NodeInstancePrefix: "",
-			TokenSource:        nil,
-			UseMetadataServer:  false,
-			AlphaFeatureGate:   gcecloud.NewAlphaFeatureGate([]string{}),
-		})
-
-		if err != nil {
-			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
-		}
-
-		cloudConfig.Provider = gceCloud
-
-		// Arbitrarily pick one of the zones we have nodes in
-		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
-			zones, err := gceCloud.GetAllZonesFromCloudProvider()
-			if err != nil {
-				return err
-			}
-
-			cloudConfig.Zone, _ = zones.PopAny()
-		}
-
-	case "aws":
-		if cloudConfig.Zone == "" {
-			return fmt.Errorf("gce-zone must be specified for AWS")
-		}
-	case "azure":
-		if cloudConfig.ConfigFile == "" {
-			return fmt.Errorf("config-file must be specified for Azure")
-		}
-		config, err := os.Open(cloudConfig.ConfigFile)
-		if err != nil {
-			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
-				cloudConfig.ConfigFile, err)
-		}
-		defer config.Close()
-		cloudConfig.Provider, err = azure.NewCloud(config)
-	}
-
-	return nil
-}
 
 // There are certain operations we only want to run once per overall test invocation
 // (such as deleting old namespaces, or verifying that all system pods are running.
@@ -137,10 +67,6 @@ func setupProviderConfig() error {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only on Ginkgo node 1
 
-	if err := setupProviderConfig(); err != nil {
-		framework.Failf("Failed to setup provider config: %v", err)
-	}
-
 	switch framework.TestContext.Provider {
 	case "gce", "gke":
 		framework.LogClusterImageSources()
@@ -148,7 +74,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	c, err := framework.LoadClientset()
 	if err != nil {
-		glog.Fatal("Error loading client: ", err)
+		klog.Fatal("Error loading client: ", err)
 	}
 
 	// Delete any namespaces except those created by the system. This ensures no
@@ -163,7 +89,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
-		glog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
+		klog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
 		if err := framework.WaitForNamespacesDeleted(c, deleted, framework.NamespaceCleanupTimeout); err != nil {
 			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
@@ -214,20 +140,14 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 }, func(data []byte) {
 	// Run on all Ginkgo nodes
-
-	if cloudConfig.Provider == nil {
-		if err := setupProviderConfig(); err != nil {
-			framework.Failf("Failed to setup provider config: %v", err)
-		}
-	}
 })
 
-// Similar to SynchornizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
+// Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
 // Here, the order of functions is reversed; first, the function which runs everywhere,
 // and then the function that only runs on the first Ginkgo node.
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	// Run on all Ginkgo nodes
-	framework.Logf("Running AfterSuite actions on all node")
+	framework.Logf("Running AfterSuite actions on all nodes")
 	framework.RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
@@ -296,12 +216,12 @@ func RunE2ETests(t *testing.T) {
 		// TODO: we should probably only be trying to create this directory once
 		// rather than once-per-Ginkgo-node.
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-			glog.Errorf("Failed creating report directory: %v", err)
+			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
-	glog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunId, config.GinkgoConfig.ParallelNode)
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunId, config.GinkgoConfig.ParallelNode)
 
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }

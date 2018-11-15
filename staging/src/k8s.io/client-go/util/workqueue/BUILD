@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "default_rate_limiters_test.go",
         "delaying_queue_test.go",
+        "metrics_test.go",
         "queue_test.go",
         "rate_limitting_queue_test.go",
     ],

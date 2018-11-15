@@ -55,9 +55,6 @@ NODE_LOCAL_SSDS_EXT=${NODE_LOCAL_SSDS_EXT:-}
 NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
-if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
-    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
-fi
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-} # default value calculated below
@@ -177,6 +174,12 @@ HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
 
+if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
+    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
+elif [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
+    NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
+fi
+
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
@@ -192,8 +195,11 @@ CUSTOM_TYPHA_DEPLOYMENT_YAML="${KUBE_CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
 # To avoid running netd on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${ENABLE_NETD:-} == "true" ]]; then
-	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}beta.kubernetes.io/kube-netd-ready=true"
+	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
+
+ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
+LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
 
 # Enable metadata concealment by firewalling pod traffic to the metadata server
 # and run a proxy daemonset on nodes.
@@ -253,13 +259,13 @@ FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
     FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
-        NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
+        NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
 fi
 
 # Optional: Install cluster DNS.
-# Set CLUSTER_DNS_CORE_DNS to 'true' to install CoreDNS instead of kube-dns.
-CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-false}"
+# Set CLUSTER_DNS_CORE_DNS to 'false' to install kube-dns instead of CoreDNS.
+CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
 DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
@@ -404,7 +410,7 @@ fi
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
 FLUENTD_GCP_YAML_VERSION="v3.1.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.2-1.5.30-1-k8s}"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.5-1.5.36-1-k8s}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
@@ -452,11 +458,7 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
 
-if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
-  FEATURE_GATES="${FEATURE_GATES},TokenRequest=true"
-  SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
-  SERVICEACCOUNT_API_AUDIENCES="https://kubernetes.default.svc"
-fi
+SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
 
 # Optional: Enable Node termination Handler for Preemptible and GPU VMs.
 # https://github.com/GoogleCloudPlatform/k8s-node-termination-handler

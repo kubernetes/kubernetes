@@ -27,6 +27,12 @@ rules:
   verbs:
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -108,7 +114,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.2.2
+        image: k8s.gcr.io/coredns:1.2.4
         imagePullPolicy: IfNotPresent
         resources:
           limits:

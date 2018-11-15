@@ -23,7 +23,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager/watcher"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const RktNamespace = "rkt"
@@ -86,7 +86,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, incl
 		return fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
-	glog.V(1).Infof("Registering Rkt factory")
+	klog.V(1).Infof("Registering Rkt factory")
 	factory := &rktFactory{
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,

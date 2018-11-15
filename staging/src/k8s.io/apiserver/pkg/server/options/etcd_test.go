@@ -36,11 +36,9 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when ServerList is not specified",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:       "etcd2",
-					ServerList: nil,
-					Prefix:     "/registry",
-					DeserializationCacheSize: 0,
-					Quorum:                false,
+					Type:                  "etcd3",
+					ServerList:            nil,
+					Prefix:                "/registry",
 					KeyFile:               "/var/run/kubernetes/etcd.key",
 					CAFile:                "/var/run/kubernetes/etcdca.crt",
 					CertFile:              "/var/run/kubernetes/etcdce.crt",
@@ -60,11 +58,9 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when storage-backend is invalid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:       "etcd4",
-					ServerList: []string{"http://127.0.0.1"},
-					Prefix:     "/registry",
-					DeserializationCacheSize: 0,
-					Quorum:                false,
+					Type:                  "etcd4",
+					ServerList:            []string{"http://127.0.0.1"},
+					Prefix:                "/registry",
 					KeyFile:               "/var/run/kubernetes/etcd.key",
 					CAFile:                "/var/run/kubernetes/etcdca.crt",
 					CertFile:              "/var/run/kubernetes/etcdce.crt",
@@ -78,17 +74,15 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
-			expectErr: "--storage-backend invalid, must be 'etcd3' or 'etcd2'. If not specified, it will default to 'etcd3'",
+			expectErr: "--storage-backend invalid, allowed values: etcd3. If not specified, it will default to 'etcd3'",
 		},
 		{
 			name: "test when etcd-servers-overrides is invalid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:       "etcd3",
-					ServerList: []string{"http://127.0.0.1"},
-					Prefix:     "/registry",
-					DeserializationCacheSize: 0,
-					Quorum:                false,
+					Type:                  "etcd3",
+					ServerList:            []string{"http://127.0.0.1"},
+					Prefix:                "/registry",
 					KeyFile:               "/var/run/kubernetes/etcd.key",
 					CAFile:                "/var/run/kubernetes/etcdca.crt",
 					CertFile:              "/var/run/kubernetes/etcdce.crt",
@@ -108,11 +102,9 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when EtcdOptions is valid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:       "etcd3",
-					ServerList: []string{"http://127.0.0.1"},
-					Prefix:     "/registry",
-					DeserializationCacheSize: 0,
-					Quorum:                false,
+					Type:                  "etcd3",
+					ServerList:            []string{"http://127.0.0.1"},
+					Prefix:                "/registry",
 					KeyFile:               "/var/run/kubernetes/etcd.key",
 					CAFile:                "/var/run/kubernetes/etcdca.crt",
 					CertFile:              "/var/run/kubernetes/etcdce.crt",

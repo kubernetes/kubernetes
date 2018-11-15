@@ -57,6 +57,7 @@ func init() {
 	prometheus.MustRegister(getTokenFailCounter)
 }
 
+// AltTokenSource is the structure holding the data for the functionality needed to generates tokens
 type AltTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
@@ -64,6 +65,7 @@ type AltTokenSource struct {
 	throttle    flowcontrol.RateLimiter
 }
 
+// Token returns a token which may be used for authentication
 func (a *AltTokenSource) Token() (*oauth2.Token, error) {
 	a.throttle.Accept()
 	getTokenCounter.Inc()
@@ -100,6 +102,7 @@ func (a *AltTokenSource) token() (*oauth2.Token, error) {
 	}, nil
 }
 
+// NewAltTokenSource constructs a new alternate token source for generating tokens.
 func NewAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
 	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
 	a := &AltTokenSource{

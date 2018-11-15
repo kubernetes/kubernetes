@@ -23,12 +23,44 @@ import (
 	"path/filepath"
 	"testing"
 
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"github.com/renstrom/dedent"
+
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+)
+
+const (
+	etcdPod = `apiVersion: v1
+kind: Pod
+metadata:
+spec:
+  volumes:
+  - hostPath:
+      path: /path/to/etcd
+      type: DirectoryOrCreate
+    name: etcd-data
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs`
+
+	etcdPodWithoutDataVolume = `apiVersion: v1
+kind: Pod
+metadata:
+spec:
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs`
+
+	etcdPodInvalid = `invalid pod`
 )
 
 func assertExists(t *testing.T, path string) {
@@ -55,8 +87,8 @@ func assertDirEmpty(t *testing.T, path string) {
 
 func TestNewReset(t *testing.T) {
 	var in io.Reader
-	certsDir := kubeadmapiv1alpha3.DefaultCertificatesDir
-	criSocketPath := kubeadmapiv1alpha3.DefaultCRISocket
+	certsDir := kubeadmapiv1beta1.DefaultCertificatesDir
+	criSocketPath := kubeadmapiv1beta1.DefaultCRISocket
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}
@@ -66,22 +98,6 @@ func TestNewReset(t *testing.T) {
 	ignorePreflightErrors = []string{}
 	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
-}
-
-func TestNewCmdReset(t *testing.T) {
-	var out io.Writer
-	var in io.Reader
-	cmd := NewCmdReset(in, out)
-
-	tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
-	if err != nil {
-		t.Errorf("Unable to create temporary directory: %v", err)
-	}
-	args := []string{"--ignore-preflight-errors=all", "--cert-dir=" + tmpDir, "--force"}
-	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
-		t.Errorf("Cannot execute reset command: %v", err)
-	}
 }
 
 func TestConfigDirCleaner(t *testing.T) {
@@ -249,4 +265,82 @@ func TestRemoveContainers(t *testing.T) {
 	}
 
 	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
+}
+
+func TestGetEtcdDataDir(t *testing.T) {
+	tests := map[string]struct {
+		dataDir       string
+		podYaml       string
+		expectErr     bool
+		writeManifest bool
+		validClient   bool
+	}{
+		"non-existent file returns error": {
+			expectErr:     true,
+			writeManifest: false,
+			validClient:   true,
+		},
+		"return etcd data dir": {
+			dataDir:       "/path/to/etcd",
+			podYaml:       etcdPod,
+			expectErr:     false,
+			writeManifest: true,
+			validClient:   true,
+		},
+		"invalid etcd pod": {
+			podYaml:       etcdPodInvalid,
+			expectErr:     true,
+			writeManifest: true,
+			validClient:   true,
+		},
+		"etcd pod spec without data volume": {
+			podYaml:       etcdPodWithoutDataVolume,
+			expectErr:     true,
+			writeManifest: true,
+			validClient:   true,
+		},
+		"kubeconfig file doesn't exist": {
+			dataDir:       "/path/to/etcd",
+			podYaml:       etcdPod,
+			expectErr:     false,
+			writeManifest: true,
+			validClient:   false,
+		},
+	}
+
+	for name, test := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		manifestPath := filepath.Join(tmpdir, "etcd.yaml")
+		if test.writeManifest {
+			err := ioutil.WriteFile(manifestPath, []byte(test.podYaml), 0644)
+			if err != nil {
+				t.Fatalf(dedent.Dedent("failed to write pod manifest\n%s\n\tfatal error: %v"), name, err)
+			}
+		}
+
+		var dataDir string
+		var err error
+		if test.validClient {
+			client := clientsetfake.NewSimpleClientset()
+			dataDir, err = getEtcdDataDir(manifestPath, client)
+		} else {
+			dataDir, err = getEtcdDataDir(manifestPath, nil)
+		}
+
+		if (err != nil) != test.expectErr {
+			t.Fatalf(dedent.Dedent(
+				"getEtcdDataDir failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+				name,
+				test.expectErr,
+				(err != nil),
+				err,
+			)
+		}
+
+		if dataDir != test.dataDir {
+			t.Fatalf(dedent.Dedent("getEtcdDataDir failed\n%s\n\texpected: %s\ngot: %s"), name, test.dataDir, dataDir)
+		}
+	}
 }

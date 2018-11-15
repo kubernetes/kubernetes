@@ -26,6 +26,8 @@ type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
 	// and will update some stats if updateStats is true
 	Get(updateStats bool) (*statsapi.Summary, error)
+	// GetCPUAndMemoryStats provides a new Summary with the CPU and memory stats from Kubelet,
+	GetCPUAndMemoryStats() (*statsapi.Summary, error)
 }
 
 // summaryProviderImpl implements the SummaryProvider interface.
@@ -80,6 +82,38 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
 		Rlimit:           rlimit,
 		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+	}
+	summary := statsapi.Summary{
+		Node: nodeStats,
+		Pods: podStats,
+	}
+	return &summary, nil
+}
+
+func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+	// TODO(timstclair): Consider returning a best-effort response if any of
+	// the following errors occur.
+	node, err := sp.provider.GetNode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node info: %v", err)
+	}
+	nodeConfig := sp.provider.GetNodeConfig()
+	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+	}
+
+	podStats, err := sp.provider.ListPodCPUAndMemoryStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pod stats: %v", err)
+	}
+
+	nodeStats := statsapi.NodeStats{
+		NodeName:         node.Name,
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		StartTime:        rootStats.StartTime,
+		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,

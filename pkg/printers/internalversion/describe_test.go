@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -56,12 +55,32 @@ type describeClient struct {
 func TestDescribePod(t *testing.T) {
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
 	gracePeriod := int64(1234)
+	condition1 := api.PodConditionType("condition1")
+	condition2 := api.PodConditionType("condition2")
 	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:                       "bar",
 			Namespace:                  "foo",
 			DeletionTimestamp:          &deletionTimestamp,
 			DeletionGracePeriodSeconds: &gracePeriod,
+		},
+		Spec: api.PodSpec{
+			ReadinessGates: []api.PodReadinessGate{
+				{
+					ConditionType: condition1,
+				},
+				{
+					ConditionType: condition2,
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Conditions: []api.PodCondition{
+				{
+					Type:   condition1,
+					Status: api.ConditionTrue,
+				},
+			},
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
@@ -983,7 +1002,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						Glusterfs: &api.GlusterfsVolumeSource{},
+						Glusterfs: &api.GlusterfsPersistentVolumeSource{},
 					},
 				},
 			},
@@ -1174,8 +1193,8 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					CreationTimestamp:          metav1.Time{Time: time.Now()},
 					DeletionTimestamp:          &metav1.Time{Time: time.Now()},
 					DeletionGracePeriodSeconds: new(int64),
-					Labels:      map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
-					Annotations: map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
+					Labels:                     map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
+					Annotations:                map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
@@ -1217,8 +1236,8 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					CreationTimestamp:          metav1.Time{Time: time.Now()},
 					DeletionTimestamp:          &metav1.Time{Time: time.Now()},
 					DeletionGracePeriodSeconds: new(int64),
-					Labels:      map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
-					Annotations: map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
+					Labels:                     map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
+					Annotations:                map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
@@ -2188,7 +2207,7 @@ func TestDescribeEvents(t *testing.T) {
 
 	m := map[string]printers.Describer{
 		"DaemonSetDescriber": &DaemonSetDescriber{
-			fake.NewSimpleClientset(&extensions.DaemonSet{
+			fake.NewSimpleClientset(&apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -2245,7 +2264,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ReplicaSetDescriber": &ReplicaSetDescriber{
-			fake.NewSimpleClientset(&extensions.ReplicaSet{
+			fake.NewSimpleClientset(&apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",

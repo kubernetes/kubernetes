@@ -35,10 +35,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/kubernetes"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/set/env"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -145,11 +145,11 @@ func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewEnvOptions(streams)
 	cmd := &cobra.Command{
-		Use: "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
+		Use:                   "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
-		Short:   "Update environment variables on a pod template",
-		Long:    envLong,
-		Example: fmt.Sprintf(envExample),
+		Short:                 "Update environment variables on a pod template",
+		Long:                  envLong,
+		Example:               fmt.Sprintf(envExample),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

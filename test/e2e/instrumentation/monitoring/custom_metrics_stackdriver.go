@@ -29,13 +29,13 @@ import (
 
 	gcm "google.golang.org/api/monitoring/v3"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/test/e2e/framework"
-	cmv1beta1 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
@@ -60,8 +60,10 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 			framework.Failf("Failed to load config: %s", err)
 		}
 		discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+		restMapper.Reset()
 		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
-		restMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{cmv1beta1.SchemeGroupVersion})
 		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
 		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
 	})
@@ -73,8 +75,10 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 			framework.Failf("Failed to load config: %s", err)
 		}
 		discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+		restMapper.Reset()
 		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
-		restMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{cmv1beta1.SchemeGroupVersion})
 		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
 		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
 	})

@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -86,11 +86,11 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd := &cobra.Command{
-		Use: "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
+		Use:                   "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
 		DisableFlagsInUseLine: true,
-		Short:   "Check whether an action is allowed",
-		Long:    canILong,
-		Example: canIExample,
+		Short:                 "Check whether an action is allowed",
+		Long:                  canILong,
+		Example:               canIExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())

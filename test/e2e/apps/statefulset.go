@@ -113,7 +113,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(sst.CheckServiceName(ss, headlessSvcName))
 
-			cmd := "echo $(hostname) > /data/hostname; sync;"
+			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(sst.ExecInStatefulPods(ss, cmd))
 
@@ -744,7 +744,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.StatefulPodTimeout)
 			defer cancel()
-			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
+			// we need to get UID from pod in any state and wait until stateful set controller will remove pod at least once
 			_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				switch event.Type {
@@ -983,7 +983,7 @@ func (m *mysqlGaleraTester) deploy(ns string) *apps.StatefulSet {
 func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
-		cmd := fmt.Sprintf("use  statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
+		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
 		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }

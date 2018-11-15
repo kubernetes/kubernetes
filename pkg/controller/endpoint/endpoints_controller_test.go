@@ -120,7 +120,7 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 	mux.Handle(testapi.Default.ResourcePath("endpoints/", namespace, ""), &fakeEndpointsHandler)
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
-		res.WriteHeader(http.StatusNotFound)
+		http.Error(res, "", http.StatusNotFound)
 	})
 	return httptest.NewServer(mux), &fakeEndpointsHandler
 }

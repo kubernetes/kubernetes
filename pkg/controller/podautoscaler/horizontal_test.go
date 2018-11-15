@@ -1112,6 +1112,32 @@ func TestScaleDown(t *testing.T) {
 		reportedLevels:          []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
+		recommendations:         []timestampedRecommendation{},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownStabilizeInitialSize(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         5,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               50,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		recommendations:         nil,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ScaleDownStabilized",
+		}),
 	}
 	tc.runTest(t)
 }
@@ -1139,6 +1165,7 @@ func TestScaleDownCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{12000, 12000, 12000, 12000, 12000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1171,6 +1198,7 @@ func TestScaleDownCMObject(t *testing.T) {
 		},
 		reportedLevels:      []uint64{12000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1195,7 +1223,8 @@ func TestScaleDownCMExternal(t *testing.T) {
 				},
 			},
 		},
-		reportedLevels: []uint64{8600},
+		reportedLevels:  []uint64{8600},
+		recommendations: []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1220,7 +1249,8 @@ func TestScaleDownPerPodCMExternal(t *testing.T) {
 				},
 			},
 		},
-		reportedLevels: []uint64{8600},
+		reportedLevels:  []uint64{8600},
+		recommendations: []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1238,6 +1268,7 @@ func TestScaleDownIncludeUnreadyPods(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		recommendations:         []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1255,6 +1286,7 @@ func TestScaleDownIgnoreHotCpuPods(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
+		recommendations:         []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1273,6 +1305,7 @@ func TestScaleDownIgnoresFailedPods(t *testing.T) {
 		useMetricsAPI:           true,
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		reportedPodPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		recommendations:         []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1292,6 +1325,7 @@ func TestScaleDownIgnoresDeletionPods(t *testing.T) {
 		reportedPodReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		reportedPodPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
 		reportedPodDeletionTimestamp: []bool{false, false, false, false, false, true, true},
+		recommendations:              []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1457,6 +1491,7 @@ func TestMinReplicas(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooFewReplicas",
 		}),
+		recommendations: []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1476,6 +1511,7 @@ func TestMinReplicasDesiredZero(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooFewReplicas",
 		}),
+		recommendations: []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1580,6 +1616,7 @@ func TestMissingMetrics(t *testing.T) {
 		reportedLevels:          []uint64{400, 95},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
+		recommendations:         []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -1665,6 +1702,7 @@ func TestMissingReports(t *testing.T) {
 		reportedLevels:          []uint64{200},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.2")},
 		useMetricsAPI:           true,
+		recommendations:         []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -2168,7 +2206,8 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 		},
-		useMetricsAPI: true,
+		useMetricsAPI:   true,
+		recommendations: []timestampedRecommendation{},
 	}
 
 	tc.runTest(t)
@@ -2241,6 +2280,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
 		useMetricsAPI:           true,
 		lastScaleTime:           &now,
+		recommendations:         []timestampedRecommendation{},
 	}
 	testClient, _, _, _, _ := tc.prepareTestClient(t)
 	tc.testClient = testClient

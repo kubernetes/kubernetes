@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +42,7 @@ func NewInitializerConfigurationManager(c InitializerConfigurationLister) *Initi
 		list, err := c.List(metav1.ListOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsForbidden(err) {
-				glog.V(5).Infof("Initializers are disabled due to an error: %v", err)
+				klog.V(5).Infof("Initializers are disabled due to an error: %v", err)
 				return nil, ErrDisabled
 			}
 			return nil, err

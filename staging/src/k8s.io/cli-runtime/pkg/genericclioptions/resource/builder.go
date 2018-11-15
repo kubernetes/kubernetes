@@ -1056,7 +1056,7 @@ func (b *Builder) visitByPaths() *Result {
 	if b.labelSelector != nil {
 		selector, err := labels.Parse(*b.labelSelector)
 		if err != nil {
-			return result.withError(fmt.Errorf("the provided selector %q is not valid: %v", b.labelSelector, err))
+			return result.withError(fmt.Errorf("the provided selector %q is not valid: %v", *b.labelSelector, err))
 		}
 		visitors = NewFilteredVisitor(visitors, FilterByLabelSelector(selector))
 	}
@@ -1089,9 +1089,10 @@ func (b *Builder) Do() *Result {
 	if b.requireObject {
 		helpers = append(helpers, RetrieveLazy)
 	}
-	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	if b.continueOnError {
-		r.visitor = ContinueOnErrorVisitor{r.visitor}
+		r.visitor = NewDecoratedVisitor(ContinueOnErrorVisitor{r.visitor}, helpers...)
+	} else {
+		r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	}
 	return r
 }

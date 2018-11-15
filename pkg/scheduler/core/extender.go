@@ -107,6 +107,11 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 	}, nil
 }
 
+// Name returns extenderURL to identifies the extender.
+func (h *HTTPExtender) Name() string {
+	return h.extenderURL
+}
+
 // IsIgnorable returns true indicates scheduling should not fail when this extender
 // is unavailable
 func (h *HTTPExtender) IsIgnorable() bool {
@@ -138,7 +143,7 @@ func (h *HTTPExtender) ProcessPreemption(
 		// If extender has cached node info, pass NodeNameToMetaVictims in args.
 		nodeNameToMetaVictims := convertToNodeNameToMetaVictims(nodeToVictims)
 		args = &schedulerapi.ExtenderPreemptionArgs{
-			Pod: pod,
+			Pod:                   pod,
 			NodeNameToMetaVictims: nodeNameToMetaVictims,
 		}
 	} else {
