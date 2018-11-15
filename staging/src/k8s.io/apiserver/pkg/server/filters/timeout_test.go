@@ -50,6 +50,18 @@ func (r *recorder) Count() int {
 	return r.count
 }
 
+func newHandler(responseCh <-chan string, panicCh <-chan struct{}, writeErrCh chan<- error) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case resp := <-responseCh:
+			_, err := w.Write([]byte(resp))
+			writeErrCh <- err
+		case <-panicCh:
+			panic("inner handler panics")
+		}
+	})
+}
+
 func TestTimeout(t *testing.T) {
 	origReallyCrash := runtime.ReallyCrash
 	runtime.ReallyCrash = false
@@ -57,7 +69,7 @@ func TestTimeout(t *testing.T) {
 		runtime.ReallyCrash = origReallyCrash
 	}()
 
-	sendResponse := make(chan struct{}, 1)
+	sendResponse := make(chan string, 1)
 	doPanic := make(chan struct{}, 1)
 	writeErrors := make(chan error, 1)
 	timeout := make(chan time.Time, 1)
@@ -65,23 +77,15 @@ func TestTimeout(t *testing.T) {
 	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 	record := &recorder{}
 
-	ts := httptest.NewServer(WithPanicRecovery(WithTimeout(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			select {
-			case <-sendResponse:
-				_, err := w.Write([]byte(resp))
-				writeErrors <- err
-			case <-doPanic:
-				panic("inner handler panics")
-			}
-		}),
-		func(*http.Request) (<-chan time.Time, func(), *apierrors.StatusError) {
+	handler := newHandler(sendResponse, doPanic, writeErrors)
+	ts := httptest.NewServer(WithPanicRecovery(WithTimeout(handler,
+		func(req *http.Request) (<-chan time.Time, func(), *apierrors.StatusError) {
 			return timeout, record.Record, timeoutErr
 		})))
 	defer ts.Close()
 
 	// No timeouts
-	sendResponse <- struct{}{}
+	sendResponse <- resp
 	res, err := http.Get(ts.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +126,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Now try to send a response
-	sendResponse <- struct{}{}
+	sendResponse <- resp
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
 	}
