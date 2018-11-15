@@ -125,7 +125,6 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 
 	return addressGetter(name)
 }
-
 import unittest 
 
 class SimpleTest(unittest.TestCase): 
