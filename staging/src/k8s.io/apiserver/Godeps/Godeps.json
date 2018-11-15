@@ -1943,11 +1943,19 @@
 			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
 		},
 		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/schemaconv",
+			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
 			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
+			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/testing",
 			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
 		},
 		{
@@ -2040,11 +2048,19 @@
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "261cd9791e59cf384903eff0e7281c6522f5cec7"
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "261cd9791e59cf384903eff0e7281c6522f5cec7"
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
