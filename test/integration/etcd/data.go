@@ -457,6 +457,13 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 			ExpectedGVK:      gvkP("awesome.bears.com", "v1", "Panda"),
 		},
 		// --
+
+		// k8s.io/kubernetes/pkg/apis/auditregistration/v1alpha1
+		gvr("auditregistration.k8s.io", "v1alpha1", "auditsinks"): {
+			Stub:             `{"metadata":{"name":"sink1"},"spec":{"policy":{"level":"Metadata","stages":["ResponseStarted"]},"webhook":{"clientConfig":{"url":"http://localhost:4444","service":null,"caBundle":null}}}}`,
+			ExpectedEtcdPath: "/registry/auditsinks/sink1",
+		},
+		// --
 	}
 }
 
