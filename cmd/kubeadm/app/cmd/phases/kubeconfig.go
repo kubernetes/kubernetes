@@ -83,19 +83,19 @@ func NewKubeConfigPhase() workflow.Phase {
 			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.SchedulerKubeConfigFileName),
 		},
-		Run:      runKubeConfig,
-		CmdFlags: getKubeConfigPhaseFlags("all"),
+		Run:          runKubeConfig,
+		InheritFlags: getKubeConfigPhaseFlags("all"),
 	}
 }
 
 // NewKubeConfigFilePhase creates a kubeadm workflow phase that creates a kubeconfig file.
 func NewKubeConfigFilePhase(kubeConfigFileName string) workflow.Phase {
 	return workflow.Phase{
-		Name:     kubeconfigFilePhaseProperties[kubeConfigFileName].name,
-		Short:    kubeconfigFilePhaseProperties[kubeConfigFileName].short,
-		Long:     fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
-		Run:      runKubeConfigFile(kubeConfigFileName),
-		CmdFlags: getKubeConfigPhaseFlags(kubeConfigFileName),
+		Name:         kubeconfigFilePhaseProperties[kubeConfigFileName].name,
+		Short:        kubeconfigFilePhaseProperties[kubeConfigFileName].short,
+		Long:         fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
+		Run:          runKubeConfigFile(kubeConfigFileName),
+		InheritFlags: getKubeConfigPhaseFlags(kubeConfigFileName),
 	}
 }
 

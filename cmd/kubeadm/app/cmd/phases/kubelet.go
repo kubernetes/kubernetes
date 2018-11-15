@@ -50,7 +50,7 @@ func NewKubeletStartPhase() workflow.Phase {
 		Long:    "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
-		CmdFlags: []string{
+		InheritFlags: []string{
 			options.CfgPath,
 			options.NodeCRISocket,
 			options.NodeName,

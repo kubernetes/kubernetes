@@ -17,8 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -77,7 +75,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
-		Context(fmt.Sprintf(drivers.GetDriverNameWithFeatureTags(curDriver)), func() {
+		Context(drivers.GetDriverNameWithFeatureTags(curDriver), func() {
 			driver := curDriver
 
 			BeforeEach(func() {

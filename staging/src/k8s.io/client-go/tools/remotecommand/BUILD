@@ -25,6 +25,7 @@ go_library(
     srcs = [
         "doc.go",
         "errorstream.go",
+        "reader.go",
         "remotecommand.go",
         "resize.go",
         "v1.go",

@@ -11,15 +11,22 @@ go_test(
     srcs = ["projected_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/authentication/v1:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//staging/src/k8s.io/api/authentication/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

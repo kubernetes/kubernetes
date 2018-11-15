@@ -85,7 +85,7 @@ func TestConfigMapCreation(t *testing.T) {
 	}{
 		"create new namesapce": {
 			AddedNamespace: newNs,
-			ExpectActions:  []action{{verb: "create", name: RootCACertCofigMapName}},
+			ExpectActions:  []action{{verb: "create", name: RootCACertConfigMapName}},
 		},
 		"delete other configmap": {
 			ExistingConfigMaps: []*v1.ConfigMap{otherConfigMap, caConfigMap},
@@ -94,17 +94,17 @@ func TestConfigMapCreation(t *testing.T) {
 		"delete ca configmap": {
 			ExistingConfigMaps: []*v1.ConfigMap{otherConfigMap, caConfigMap},
 			DeletedConfigMap:   caConfigMap,
-			ExpectActions:      []action{{verb: "create", name: RootCACertCofigMapName}},
+			ExpectActions:      []action{{verb: "create", name: RootCACertConfigMapName}},
 		},
 		"update ca configmap with adding field": {
 			ExistingConfigMaps: []*v1.ConfigMap{caConfigMap},
 			UpdatedConfigMap:   addFieldCM,
-			ExpectActions:      []action{{verb: "update", name: RootCACertCofigMapName}},
+			ExpectActions:      []action{{verb: "update", name: RootCACertConfigMapName}},
 		},
 		"update ca configmap with modifying field": {
 			ExistingConfigMaps: []*v1.ConfigMap{caConfigMap},
 			UpdatedConfigMap:   modifyFieldCM,
-			ExpectActions:      []action{{verb: "update", name: RootCACertCofigMapName}},
+			ExpectActions:      []action{{verb: "update", name: RootCACertConfigMapName}},
 		},
 		"update with other configmap": {
 			ExistingConfigMaps: []*v1.ConfigMap{caConfigMap, otherConfigMap},
@@ -120,7 +120,8 @@ func TestConfigMapCreation(t *testing.T) {
 			client := fake.NewSimpleClientset(caConfigMap, existNS)
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
-			controller, err := NewPublisher(cmInformer, client, fakeRootCA)
+			nsInformer := informers.Core().V1().Namespaces()
+			controller, err := NewPublisher(cmInformer, nsInformer, client, fakeRootCA)
 			if err != nil {
 				t.Fatalf("error creating ServiceAccounts controller: %v", err)
 			}
@@ -165,7 +166,7 @@ func TestConfigMapCreation(t *testing.T) {
 func defaultCrtConfigMapPtr(rootCA []byte) *v1.ConfigMap {
 	tmp := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: RootCACertCofigMapName,
+			Name: RootCACertConfigMapName,
 		},
 		Data: map[string]string{
 			"ca.crt": string(rootCA),

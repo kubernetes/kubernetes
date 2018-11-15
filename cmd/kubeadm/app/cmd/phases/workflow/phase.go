@@ -16,6 +16,8 @@ limitations under the License.
 
 package workflow
 
+import "github.com/spf13/pflag"
+
 // Phase provides an implementation of a workflow phase that allows
 // creation of new phases by simply instantiating a variable of this type.
 type Phase struct {
@@ -53,11 +55,17 @@ type Phase struct {
 	// If this function return nil, the phase action is always executed.
 	RunIf func(data RunData) (bool, error)
 
-	// CmdFlags defines the list of flags that should be assigned to the cobra command generated
-	// for this phase; flags are inherited from the parent command or defined as additional flags
-	// in the phase runner. If the values is not set or empty, no flags will be assigned to the command
+	// InheritFlags defines the list of flags that the cobra command generated for this phase should Inherit
+	// from local flags defined in the parent command / or additional flags defined in the phase runner.
+	// If the values is not set or empty, no flags will be assigned to the command
 	// Nb. global flags are automatically inherited by nested cobra command
-	CmdFlags []string
+	InheritFlags []string
+
+	// LocalFlags defines the list of flags that should be assigned to the cobra command generated
+	// for this phase.
+	// Nb. if two or phases have the same local flags, please consider using local flags in the parent command
+	// or additional flags defined in the phase runner.
+	LocalFlags *pflag.FlagSet
 }
 
 // AppendPhase adds the given phase to the nested, ordered sequence of phases.

@@ -23,6 +23,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -95,7 +96,7 @@ func (c *totalVolumesCollector) Collect(ch chan<- prometheus.Metric) {
 func (c *totalVolumesCollector) getVolumeCount() volumeCount {
 	counter := make(volumeCount)
 	for _, mountedVolume := range c.asw.GetMountedVolumes() {
-		pluginName := mountedVolume.PluginName
+		pluginName := volumeutil.GetFullQualifiedPluginNameForVolume(mountedVolume.PluginName, mountedVolume.VolumeSpec)
 		if pluginName == "" {
 			pluginName = pluginNameNotAvailable
 		}
@@ -105,7 +106,7 @@ func (c *totalVolumesCollector) getVolumeCount() volumeCount {
 	for _, volumeToMount := range c.dsw.GetVolumesToMount() {
 		pluginName := pluginNameNotAvailable
 		if plugin, err := c.pluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec); err == nil {
-			pluginName = plugin.GetPluginName()
+			pluginName = volumeutil.GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), volumeToMount.VolumeSpec)
 		}
 		counter.add("desired_state_of_world", pluginName)
 	}
