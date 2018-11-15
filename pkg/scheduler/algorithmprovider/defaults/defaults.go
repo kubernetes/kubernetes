@@ -142,7 +142,7 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxCSIVolumeBytesPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewCSIMaxVolumeBytesChecker(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
+				return predicates.NewCSIMaxVolumeBytesChecker(args.PVInfo, args.PVCInfo, args.VolumeBinder)
 			},
 		),
 		// Fit is determined by inter-pod affinity.
