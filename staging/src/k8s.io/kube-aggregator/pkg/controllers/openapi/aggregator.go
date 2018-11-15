@@ -53,12 +53,19 @@ type specAggregator struct {
 	// provided for dynamic OpenAPI spec
 	openAPIService          *handler.OpenAPIService
 	openAPIVersionedService *handler.OpenAPIService
+
+	// initialized is set to be true at the end of startup. All local specs
+	// must be registered before initialized is set, we panic otherwise.
+	initialized bool
 }
 
 var _ AggregationManager = &specAggregator{}
 
 // This function is not thread safe as it only being called on startup.
 func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Handler, name, etag string) {
+	if s.initialized {
+		panic("Local spec must not be added after startup")
+	}
 	localAPIService := apiregistration.APIService{}
 	localAPIService.Name = name
 	s.openAPISpecs[name] = &openAPISpecInfo{
@@ -67,6 +74,17 @@ func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Hand
 		handler:    localHandler,
 		spec:       spec,
 	}
+}
+
+// GetAPIServicesName returns the names of APIServices recorded in specAggregator.openAPISpecs.
+// We use this function to pass the names of local APIServices to the controller in this package,
+// so that the controller can periodically sync the OpenAPI spec from delegation API servers.
+func (s *specAggregator) GetAPIServiceNames() []string {
+	names := make([]string, len(s.openAPISpecs))
+	for key := range s.openAPISpecs {
+		names = append(names, key)
+	}
+	return names
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
@@ -123,6 +141,9 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	if err != nil {
 		return nil, err
 	}
+
+	// We set initialized to be true to forbid any future local spec addition
+	s.initialized = true
 
 	return s, nil
 }
