@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -47,6 +48,11 @@ var (
 		` + cmdutil.AlphaDisclaimer)
 )
 
+var (
+	csrOnly bool
+	csrDir  string
+)
+
 // certsData defines the behavior that a runtime data struct passed to the certs phase should
 // have. Please note that we are using an interface in order to make this phase reusable in different workflows
 // (and thus with different runtime data struct, all of them requested to be compliant to this interface)
@@ -65,7 +71,15 @@ func NewCertsPhase() workflow.Phase {
 		Phases:       newCertSubPhases(),
 		Run:          runCerts,
 		InheritFlags: getCertPhaseFlags("all"),
+		LocalFlags:   localFlags(),
 	}
+}
+
+func localFlags() *pflag.FlagSet {
+	set := pflag.NewFlagSet("csr", pflag.ExitOnError)
+	options.AddCSRFlag(set, &csrOnly)
+	options.AddCSRDirFlag(set, &csrDir)
+	return set
 }
 
 // newCertSubPhases returns sub phases for certs phase
@@ -109,6 +123,7 @@ func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunDa
 		),
 		Run:          run,
 		InheritFlags: getCertPhaseFlags(certSpec.Name),
+		LocalFlags:   localFlags(),
 	}
 	return phase
 }
@@ -117,6 +132,8 @@ func getCertPhaseFlags(name string) []string {
 	flags := []string{
 		options.CertificatesDir,
 		options.CfgPath,
+		options.CSROnly,
+		options.CSRDir,
 	}
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,
@@ -140,7 +157,8 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(defaultConfig)
-	kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
+	err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
+	kubeadmutil.CheckErr(err)
 
 	certConfig, err := certSpec.GetConfig(defaultInternalConfig)
 	kubeadmutil.CheckErr(err)
@@ -234,6 +252,15 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 		if data.ExternalCA() {
 			fmt.Printf("[certs] External CA mode: Using existing %s certificate\n", cert.BaseName)
 			return nil
+		}
+
+		if csrOnly {
+			fmt.Printf("[certs] Generating CSR for %s instead of certificate\n", cert.BaseName)
+			if csrDir == "" {
+				csrDir = data.CertificateWriteDir()
+			}
+
+			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
 		}
 
 		// if using external etcd, skips etcd certificates generation

@@ -52,6 +52,7 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
@@ -59,10 +60,18 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "certs_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
+        "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
+        "//cmd/kubeadm/app/phases/certs:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
+        "//cmd/kubeadm/test:go_default_library",
         "//pkg/version:go_default_library",
     ],
 )

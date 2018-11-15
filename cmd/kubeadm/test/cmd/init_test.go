@@ -20,6 +20,9 @@ import (
 	"testing"
 
 	"github.com/renstrom/dedent"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func runKubeadmInit(args ...string) (string, string, error) {
@@ -188,6 +191,33 @@ func TestCmdInitConfig(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestCmdInitCertPhaseCSR(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	csrDir := testutil.SetupTempDir(t)
+
+	cert := &certs.KubeadmCertKubeletClient
+	kubeadmPath := getKubeadmPath()
+	_, _, err := RunCmd(kubeadmPath,
+		"init",
+		"phase",
+		"certs",
+		cert.BaseName,
+		"--csr-only",
+		"--csr-dir="+csrDir,
+	)
+	if err != nil {
+		t.Fatalf("couldn't run kubeadm: %v", err)
+	}
+
+	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, cert.BaseName); err != nil {
+		t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
 	}
 }
 
