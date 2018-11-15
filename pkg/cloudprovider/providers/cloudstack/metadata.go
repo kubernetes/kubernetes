@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"regexp"
 
 	"github.com/d2g/dhcp4"
 	"k8s.io/api/core/v1"
@@ -97,7 +98,11 @@ func (m *metadata) InstanceID(ctx context.Context, name types.NodeName) (string,
 
 // InstanceType returns the type of the specified instance.
 func (m *metadata) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
-	instanceType, err := m.get(metadataTypeInstanceType)
+	instanceTypeCS, err := m.get(metadataTypeInstanceType)
+	// Replace everything that doesn't match the metadata.labels regex
+	re := regexp.MustCompile(`([^A-Za-z0-9][^-A-Za-z0-9_.]*)?[^A-Za-z0-9]`)
+	instanceType := re.ReplaceAllString(instanceTypeCS, ``)
+
 	if err != nil {
 		return "", fmt.Errorf("could not get instance type: %v", err)
 	}
