@@ -42,6 +42,7 @@ filegroup(
         "//pkg/kubelet/apis/pluginregistration/v1:all-srcs",
         "//pkg/kubelet/apis/pluginregistration/v1alpha1:all-srcs",
         "//pkg/kubelet/apis/pluginregistration/v1beta1:all-srcs",
+        "//pkg/kubelet/apis/podresources:all-srcs",
         "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
