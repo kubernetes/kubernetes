@@ -49,6 +49,9 @@ type AggregationManager interface {
 	UpdateAPIServiceSpec(apiServiceName string, spec *spec.Swagger, etag string) error
 	RemoveAPIServiceSpec(apiServiceName string) error
 	GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool)
+
+	// GetAPIServicesName returns the names of APIServices recorded in AggregationManager.
+	GetAPIServiceNames() []string
 }
 
 // AggregationController periodically check for changes in OpenAPI specs of APIServices and update/remove
@@ -72,6 +75,18 @@ func NewAggregationController(downloader *Downloader, openAPIAggregationManager 
 	}
 
 	c.syncHandler = c.sync
+	// During initialization, openAPIAggregationManager only has record of local APIServices. There must be
+	// no aggregated APIService recorded, because aggregated APIServices only get added to openAPIAggregationManager
+	// by calling AggregationController.AddAPIService or AggregationController.UpdateAPIService after the
+	// controller is initialized.
+	// Here we add delegation target API services to queue, to periodically sync dynamic OpenAPI spec from
+	// delegation target.
+	// NOTE: openAPIAggregationManager.GetAPIServiceNames() will also return the APIService of non-name spec
+	// for aggregator, which has no http.Handler. The first time sync (when popping off from queue) for
+	// this APIService will be a no-op, and the controller will drop the APIService from queue.
+	for _, name := range openAPIAggregationManager.GetAPIServiceNames() {
+		c.queue.AddAfter(name, time.Second)
+	}
 
 	return c
 }
