@@ -178,20 +178,10 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	}
 	klog.V(4).Info(log("blockMapper.publishVolumeForBlock created directory for publishPath successfully [%s]", publishDir))
 
-	// Create an empty file on publishPath.
-	publishPathFile, err := os.OpenFile(publishPath, os.O_CREATE|os.O_RDWR, 0750)
-	if err != nil {
-		klog.Error(log("blockMapper.publishVolumeForBlock failed to create file %s: %v", publishPathFile, err))
-		return "", err
-	}
-	if err := publishPathFile.Close(); err != nil {
-		klog.Error(log("blockMapper.publishVolumeForBlock failed to close file %s: %v", publishPathFile, err))
-		return "", err
-	}
-	klog.V(4).Info(log("blockMapper.publishVolumeForBlock created an empty file on publish path successfully [%s]", publishPathFile))
-
 	// Request to publish a block volume to publishPath.
-	// Expected implementation for driver is bind-mounting the block device to the publishPath.
+	// Expectation for driver is to place a block volume on the publishPath, by bind-mounting the device file on the publishPath or
+	// creating device file on the publishPath.
+	// Parent directory for publishPath is created by k8s, but driver is responsible for creating publishPath itself.
 	// If driver doesn't implement NodeStageVolume, attaching the block volume to the node may be done, here.
 	err = csi.NodePublishVolume(
 		ctx,
@@ -281,19 +271,15 @@ var _ volume.BlockVolumeUnmapper = &csiBlockMapper{}
 // unpublishVolumeForBlock unpublishes a block volume from publishPath
 func (m *csiBlockMapper) unpublishVolumeForBlock(ctx context.Context, csi csiClient, publishPath string) error {
 	// Request to unpublish a block volume from publishPath.
-	// Expected implementation for driver is unmounting the bind-mounted block volume from the publishPath.
+	// Expectation for driver is to remove block volume from the publishPath, by unmounting bind-mounted device file
+	// or deleting device file.
+	// Driver is responsible for deleting publishPath itself.
 	// If driver doesn't implement NodeUnstageVolume, detaching the block volume from the node may be done, here.
 	if err := csi.NodeUnpublishVolume(ctx, m.volumeID, publishPath); err != nil {
 		klog.Error(log("blockMapper.unpublishVolumeForBlock failed: %v", err))
 		return err
 	}
 	klog.V(4).Infof(log("blockMapper.unpublishVolumeForBlock NodeUnpublished successfully [%s]", publishPath))
-
-	// Remove publishPath file
-	if err := os.Remove(publishPath); err != nil {
-		klog.Error(log("blockMapper.unpublishVolumeForBlock failed to remove staging path after NodeUnpublishVolume() error [%s]: %v", publishPath, err))
-		return err
-	}
 
 	return nil
 }
