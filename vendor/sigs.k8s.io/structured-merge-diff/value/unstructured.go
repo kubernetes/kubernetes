@@ -183,9 +183,9 @@ func (v *Value) ToUnstructured(preserveOrder bool) interface{} {
 		i := int64(*v.IntValue)
 		return i
 	case v.StringValue != nil:
-		return *v.StringValue
+		return string(*v.StringValue)
 	case v.BooleanValue != nil:
-		return *v.BooleanValue
+		return bool(*v.BooleanValue)
 	case v.ListValue != nil:
 		out := []interface{}{}
 		for _, item := range v.ListValue.Items {
