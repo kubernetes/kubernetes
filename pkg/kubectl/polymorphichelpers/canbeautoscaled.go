@@ -31,6 +31,7 @@ func canBeAutoscaled(kind schema.GroupKind) error {
 		corev1.SchemeGroupVersion.WithKind("ReplicationController").GroupKind(),
 		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
 		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(),
+		appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind(),
 		extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
 		extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind():
 		// nothing to do here
