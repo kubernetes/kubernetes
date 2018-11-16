@@ -356,6 +356,9 @@ func (o *RollingUpdateOptions) Run() error {
 
 	if o.Rollback {
 		newName := o.FindNewName(oldRc)
+		if len(newName) == 0 {
+			return fmt.Errorf("Could not rollback a succeed rolling-update or a non-rolling-update RC")
+		}
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err
 		}
