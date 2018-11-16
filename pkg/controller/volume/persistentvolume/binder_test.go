@@ -639,9 +639,6 @@ func TestSync(t *testing.T) {
 		},
 	}
 
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-
 	runSyncTests(t, tests, []*storage.StorageClass{
 		{
 			ObjectMeta:        metav1.ObjectMeta{Name: classWait},

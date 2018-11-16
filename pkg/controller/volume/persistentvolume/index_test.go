@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -1207,7 +1209,7 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	toggleFeature(false, "BlockVolume", t)
 }
 
-func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
+func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "pv1",
@@ -1271,17 +1273,19 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 
 	for name, testCase := range satisfyingTestCases {
-		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
-		err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
-		// expected to match but got an error
-		if err != nil && testCase.isExpectedMatch {
-			t.Errorf("%s: expected to match but got an error: %v", name, err)
-		}
-		// not expected to match but did
-		if err == nil && !testCase.isExpectedMatch {
-			t.Errorf("%s: not expected to match but did", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
 
+			err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
+			// expected to match but got an error
+			if err != nil && testCase.isExpectedMatch {
+				t.Errorf("%s: expected to match but got an error: %v", name, err)
+			}
+			// not expected to match but did
+			if err == nil && !testCase.isExpectedMatch {
+				t.Errorf("%s: not expected to match but did", name)
+			}
+		})
 	}
 
 	filteringTestCases := map[string]struct {
@@ -1316,26 +1320,26 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 		},
 	}
 	for name, testCase := range filteringTestCases {
-		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
-		pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
-		// expected to match but either got an error or no returned pvmatch
-		if pvmatch == nil && testCase.isExpectedMatch {
-			t.Errorf("Unexpected failure for testcase, no matching volume: %s", name)
-		}
-		if err != nil && testCase.isExpectedMatch {
-			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
-		}
-		// expected to not match but either got an error or a returned pvmatch
-		if pvmatch != nil && !testCase.isExpectedMatch {
-			t.Errorf("Unexpected failure for testcase, expected no matching volume: %s", name)
-		}
-		if err != nil && !testCase.isExpectedMatch {
-			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
-		}
-	}
+		t.Run(name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
 
-	// make sure feature gate is turned off
-	toggleFeature(false, "StorageObjectInUseProtection", t)
+			pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
+			// expected to match but either got an error or no returned pvmatch
+			if pvmatch == nil && testCase.isExpectedMatch {
+				t.Errorf("Unexpected failure for testcase, no matching volume: %s", name)
+			}
+			if err != nil && testCase.isExpectedMatch {
+				t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
+			}
+			// expected to not match but either got an error or a returned pvmatch
+			if pvmatch != nil && !testCase.isExpectedMatch {
+				t.Errorf("Unexpected failure for testcase, expected no matching volume: %s", name)
+			}
+			if err != nil && !testCase.isExpectedMatch {
+				t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
+			}
+		})
+	}
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {

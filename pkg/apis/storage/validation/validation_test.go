@@ -23,8 +23,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -151,21 +153,13 @@ func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
 		VolumeBindingMode:    &immediateMode1,
 	}
 
-	// Enable alpha feature ExpandPersistentVolumes
-	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
-		return
-	}
+	// Enable feature ExpandPersistentVolumes
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 	if errs := ValidateStorageClass(testSC); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	// Disable alpha feature ExpandPersistentVolumes
-	err = utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
-		return
-	}
+	// Disable feature ExpandPersistentVolumes
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
 	if errs := ValidateStorageClass(testSC); len(errs) == 0 {
 		t.Errorf("expected failure, but got no error")
 	}

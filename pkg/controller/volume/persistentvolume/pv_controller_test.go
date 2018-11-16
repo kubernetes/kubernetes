@@ -20,18 +20,26 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+var (
+	classNotHere       = "not-here"
+	classNoMode        = "no-mode"
+	classImmediateMode = "immediate-mode"
+	classWaitMode      = "wait-mode"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -264,16 +272,6 @@ func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storage
 }
 
 func TestDelayBinding(t *testing.T) {
-	var (
-		classNotHere       = "not-here"
-		classNoMode        = "no-mode"
-		classImmediateMode = "immediate-mode"
-		classWaitMode      = "wait-mode"
-
-		modeImmediate = storagev1.VolumeBindingImmediate
-		modeWait      = storagev1.VolumeBindingWaitForFirstConsumer
-	)
-
 	tests := map[string]struct {
 		pvc         *v1.PersistentVolumeClaim
 		shouldDelay bool
@@ -325,22 +323,8 @@ func TestDelayBinding(t *testing.T) {
 		}
 	}
 
-	// When volumeScheduling feature gate is disabled, should always be delayed
-	name := "volumeScheduling-feature-disabled"
-	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode, false))
-	if err != nil {
-		t.Errorf("Test %q returned error: %v", name, err)
-	}
-	if shouldDelay {
-		t.Errorf("Test %q returned true, expected false", name)
-	}
-
-	// Enable volumeScheduling feature gate
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-
 	for name, test := range tests {
-		shouldDelay, err = ctrl.shouldDelayBinding(test.pvc)
+		shouldDelay, err := ctrl.shouldDelayBinding(test.pvc)
 		if err != nil && !test.shouldFail {
 			t.Errorf("Test %q returned error: %v", name, err)
 		}
@@ -350,5 +334,26 @@ func TestDelayBinding(t *testing.T) {
 		if shouldDelay != test.shouldDelay {
 			t.Errorf("Test %q returned unexpected %v", name, test.shouldDelay)
 		}
+	}
+}
+
+func TestDelayBindingDisabled(t *testing.T) {
+	// When volumeScheduling feature gate is disabled, should always be immediate
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
+
+	client := &fake.Clientset{}
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	classInformer := informerFactory.Storage().V1().StorageClasses()
+	ctrl := &PersistentVolumeController{
+		classLister: classInformer.Lister(),
+	}
+
+	name := "volumeScheduling-feature-disabled"
+	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode, false))
+	if err != nil {
+		t.Errorf("Test %q returned error: %v", name, err)
+	}
+	if shouldDelay {
+		t.Errorf("Test %q returned true, expected false", name)
 	}
 }
