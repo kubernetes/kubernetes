@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -140,6 +140,9 @@ type Config struct {
 
 	// Disable pod preemption or not.
 	DisablePreemption bool
+
+	// SchedulingQueue holds pods to be scheduled
+	SchedulingQueue core.SchedulingQueue
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -393,6 +396,10 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 			Message: err.Error(),
 		})
 		return err
+	}
+	// if "assumed" is a nominated pod, we should remove it from internal cache
+	if sched.config.SchedulingQueue != nil {
+		sched.config.SchedulingQueue.DeleteNominatedPodIfExists(assumed)
 	}
 
 	// Optimistically assume that the binding will succeed, so we need to invalidate affected

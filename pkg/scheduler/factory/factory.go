@@ -1109,9 +1109,10 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NextPod: func() *v1.Pod {
 			return c.getNextPod()
 		},
-		Error:          c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
-		StopEverything: c.StopEverything,
-		VolumeBinder:   c.volumeBinder,
+		Error:           c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
+		StopEverything:  c.StopEverything,
+		VolumeBinder:    c.volumeBinder,
+		SchedulingQueue: c.podQueue,
 	}, nil
 }
 
