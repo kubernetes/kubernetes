@@ -174,7 +174,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	initRunner.AppendPhase(phases.NewAddonPhase())
-	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
