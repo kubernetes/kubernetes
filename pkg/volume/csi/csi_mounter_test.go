@@ -98,47 +98,46 @@ func TestMounterGetPath(t *testing.T) {
 func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, podInfoEnabled)()
 	tests := []struct {
-		name       string
-		driver     string
-		attributes map[string]string
-
-		expectedAttributes map[string]string
+		name                  string
+		driver                string
+		volumeContext         map[string]string
+		expectedVolumeContext map[string]string
 	}{
 		{
-			name:               "no pod info",
-			driver:             "no-info",
-			attributes:         nil,
-			expectedAttributes: nil,
+			name:                  "no pod info",
+			driver:                "no-info",
+			volumeContext:         nil,
+			expectedVolumeContext: nil,
 		},
 		{
-			name:               "no CSIDriver -> no pod info",
-			driver:             "unknown-driver",
-			attributes:         nil,
-			expectedAttributes: nil,
+			name:                  "no CSIDriver -> no pod info",
+			driver:                "unknown-driver",
+			volumeContext:         nil,
+			expectedVolumeContext: nil,
 		},
 		{
-			name:               "CSIDriver with PodInfoRequiredOnMount=nil -> no pod info",
-			driver:             "nil",
-			attributes:         nil,
-			expectedAttributes: nil,
+			name:                  "CSIDriver with PodInfoRequiredOnMount=nil -> no pod info",
+			driver:                "nil",
+			volumeContext:         nil,
+			expectedVolumeContext: nil,
 		},
 		{
-			name:               "no pod info -> keep existing attributes",
-			driver:             "no-info",
-			attributes:         map[string]string{"foo": "bar"},
-			expectedAttributes: map[string]string{"foo": "bar"},
+			name:                  "no pod info -> keep existing volumeContext",
+			driver:                "no-info",
+			volumeContext:         map[string]string{"foo": "bar"},
+			expectedVolumeContext: map[string]string{"foo": "bar"},
 		},
 		{
-			name:               "add pod info",
-			driver:             "info",
-			attributes:         nil,
-			expectedAttributes: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			name:                  "add pod info",
+			driver:                "info",
+			volumeContext:         nil,
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
 		},
 		{
-			name:               "add pod info -> keep existing attributes",
-			driver:             "info",
-			attributes:         map[string]string{"foo": "bar"},
-			expectedAttributes: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			name:                  "add pod info -> keep existing volumeContext",
+			driver:                "info",
+			volumeContext:         map[string]string{"foo": "bar"},
+			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
 		},
 	}
 
@@ -163,7 +162,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			}
 
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
-			pv.Spec.CSI.VolumeAttributes = test.attributes
+			pv.Spec.CSI.VolumeAttributes = test.volumeContext
 			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
 			pvName := pv.GetName()
 
@@ -245,13 +244,13 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				t.Errorf("csi server expected mount options %v, got %v", pv.Spec.MountOptions, vol.MountFlags)
 			}
 			if podInfoEnabled {
-				if !reflect.DeepEqual(vol.Attributes, test.expectedAttributes) {
-					t.Errorf("csi server expected attributes %+v, got %+v", test.expectedAttributes, vol.Attributes)
+				if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
+					t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)
 				}
 			} else {
-				// CSIPodInfo feature is disabled, we expect no modifications to attributes.
-				if !reflect.DeepEqual(vol.Attributes, test.attributes) {
-					t.Errorf("csi server expected attributes %+v, got %+v", test.attributes, vol.Attributes)
+				// CSIPodInfo feature is disabled, we expect no modifications to volumeContext.
+				if !reflect.DeepEqual(vol.VolumeContext, test.volumeContext) {
+					t.Errorf("csi server expected volumeContext %+v, got %+v", test.volumeContext, vol.VolumeContext)
 				}
 			}
 		})

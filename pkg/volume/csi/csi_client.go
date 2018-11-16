@@ -24,7 +24,7 @@ import (
 	"net"
 	"time"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,8 +46,8 @@ type csiClient interface {
 		targetPath string,
 		accessMode api.PersistentVolumeAccessMode,
 		volumeInfo map[string]string,
-		volumeAttribs map[string]string,
-		nodePublishSecrets map[string]string,
+		volumeContext map[string]string,
+		secrets map[string]string,
 		fsType string,
 		mountOptions []string,
 	) error
@@ -62,8 +62,8 @@ type csiClient interface {
 		stagingTargetPath string,
 		fsType string,
 		accessMode api.PersistentVolumeAccessMode,
-		nodeStageSecrets map[string]string,
-		volumeAttribs map[string]string,
+		secrets map[string]string,
+		volumeContext map[string]string,
 	) error
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error)
@@ -136,8 +136,8 @@ func (c *csiDriverClient) NodePublishVolume(
 	targetPath string,
 	accessMode api.PersistentVolumeAccessMode,
 	volumeInfo map[string]string,
-	volumeAttribs map[string]string,
-	nodePublishSecrets map[string]string,
+	volumeContext map[string]string,
+	secrets map[string]string,
 	fsType string,
 	mountOptions []string,
 ) error {
@@ -156,12 +156,12 @@ func (c *csiDriverClient) NodePublishVolume(
 	defer closer.Close()
 
 	req := &csipb.NodePublishVolumeRequest{
-		VolumeId:           volID,
-		TargetPath:         targetPath,
-		Readonly:           readOnly,
-		PublishInfo:        volumeInfo,
-		VolumeAttributes:   volumeAttribs,
-		NodePublishSecrets: nodePublishSecrets,
+		VolumeId:       volID,
+		TargetPath:     targetPath,
+		Readonly:       readOnly,
+		PublishContext: volumeInfo,
+		VolumeContext:  volumeContext,
+		Secrets:        secrets,
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
@@ -215,12 +215,12 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 
 func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	volID string,
-	publishInfo map[string]string,
+	publishContext map[string]string,
 	stagingTargetPath string,
 	fsType string,
 	accessMode api.PersistentVolumeAccessMode,
-	nodeStageSecrets map[string]string,
-	volumeAttribs map[string]string,
+	secrets map[string]string,
+	volumeContext map[string]string,
 ) error {
 	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
@@ -238,15 +238,15 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 
 	req := &csipb.NodeStageVolumeRequest{
 		VolumeId:          volID,
-		PublishInfo:       publishInfo,
+		PublishContext:    publishContext,
 		StagingTargetPath: stagingTargetPath,
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
 		},
-		NodeStageSecrets: nodeStageSecrets,
-		VolumeAttributes: volumeAttribs,
+		Secrets:       secrets,
+		VolumeContext: volumeContext,
 	}
 
 	if fsType == fsTypeBlockName {

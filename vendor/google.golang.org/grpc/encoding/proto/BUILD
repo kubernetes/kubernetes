@@ -2,15 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["csi.pb.go"],
-    importmap = "k8s.io/kubernetes/vendor/github.com/container-storage-interface/spec/lib/go/csi/v0",
-    importpath = "github.com/container-storage-interface/spec/lib/go/csi/v0",
+    srcs = ["proto.go"],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/encoding/proto",
+    importpath = "google.golang.org/grpc/encoding/proto",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
-        "//vendor/github.com/golang/protobuf/ptypes/wrappers:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/encoding:go_default_library",
     ],
 )
 
