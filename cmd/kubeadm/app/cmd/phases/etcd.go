@@ -74,6 +74,7 @@ func getEtcdPhaseFlags() []string {
 	flags := []string{
 		options.CertificatesDir,
 		options.CfgPath,
+		options.ImageRepository,
 	}
 	return flags
 }
