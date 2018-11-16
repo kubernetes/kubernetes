@@ -152,11 +152,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	AddInitOtherFlags(cmd.Flags(), &initOptions.cfgPath, &initOptions.skipTokenPrint, &initOptions.dryRun, &initOptions.ignorePreflightErrors)
 	initOptions.bto.AddTokenFlag(cmd.Flags())
 	initOptions.bto.AddTTLFlag(cmd.Flags())
+	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalcfg.ImageRepository)
 
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
 	initRunner.SetAdditionalFlags(func(flags *flag.FlagSet) {
-		options.AddImageMetaFlags(flags, &initOptions.externalcfg.ImageRepository)
 		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
 		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
 		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalcfg.APIServer.ExtraArgs, &initOptions.externalcfg.ControllerManager.ExtraArgs, &initOptions.externalcfg.Scheduler.ExtraArgs)
