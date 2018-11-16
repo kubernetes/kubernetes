@@ -177,7 +177,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
-	initRunner.SetDataInitializer(func() (workflow.RunData, error) {
+	initRunner.SetDataInitializer(func(cmd *cobra.Command) (workflow.RunData, error) {
 		return newInitData(cmd, initOptions, out)
 	})
 

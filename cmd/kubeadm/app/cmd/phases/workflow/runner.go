@@ -53,12 +53,16 @@ type Runner struct {
 
 	// runDataInitializer defines a function that creates the runtime data shared
 	// among all the phases included in the workflow
-	runDataInitializer func() (RunData, error)
+	runDataInitializer func(*cobra.Command) (RunData, error)
 
 	// runData is part of the internal state of the runner and it is used for implementing
 	// a singleton in the InitData methods (thus avoiding to initialize data
 	// more than one time)
 	runData RunData
+
+	// runCmd is part of the internal state of the runner and it is used to track the
+	// command that will trigger the runner (only if the runner is BindToCommand).
+	runCmd *cobra.Command
 
 	// cmdAdditionalFlags holds additional, shared flags that could be added to the subcommands generated
 	// for phases. Flags could be inherited from the parent command too or added directly to each phase
@@ -166,7 +170,8 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 
 // SetDataInitializer allows to setup a function that initialize the runtime data shared
 // among all the phases included in the workflow.
-func (e *Runner) SetDataInitializer(builder func() (RunData, error)) {
+// The method will receive in input the cmd that triggers the Runner (only if the runner is BindToCommand)
+func (e *Runner) SetDataInitializer(builder func(cmd *cobra.Command) (RunData, error)) {
 	e.runDataInitializer = builder
 }
 
@@ -176,7 +181,7 @@ func (e *Runner) SetDataInitializer(builder func() (RunData, error)) {
 func (e *Runner) InitData() (RunData, error) {
 	if e.runData == nil && e.runDataInitializer != nil {
 		var err error
-		if e.runData, err = e.runDataInitializer(); err != nil {
+		if e.runData, err = e.runDataInitializer(e.runCmd); err != nil {
 			return nil, err
 		}
 	}
@@ -315,6 +320,8 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			Example: p.Example,
 			Aliases: p.Aliases,
 			Run: func(cmd *cobra.Command, args []string) {
+				// overrides the command triggering the Runner using the phaseCmd
+				e.runCmd = cmd
 				e.Options.FilterPhases = []string{p.generatedName}
 				if err := e.Run(); err != nil {
 					fmt.Fprintln(os.Stderr, err)
@@ -360,6 +367,9 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 
 	// adds phase related flags to the main command
 	cmd.Flags().StringSliceVar(&e.Options.SkipPhases, "skip-phases", nil, "List of phases to be skipped")
+
+	// keep tracks of the command triggering the runner
+	e.runCmd = cmd
 }
 
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags []string) {
