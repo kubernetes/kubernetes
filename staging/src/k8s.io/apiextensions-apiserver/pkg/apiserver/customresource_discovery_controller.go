@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
@@ -131,18 +130,10 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			if err != nil {
 				return err
 			}
-			// Convert internal CustomResourceValidation to versioned CustomResourceValidation
-			versionedSchema := new(v1beta1.CustomResourceValidation)
-			if validationSchema == nil {
-				versionedSchema = nil
-			} else {
-				if err := v1beta1.Convert_apiextensions_CustomResourceValidation_To_v1beta1_CustomResourceValidation(validationSchema, versionedSchema, nil); err != nil {
-					return err
-				}
-			}
+
 			// We aggregate the schema even if it's nil as it maybe a removal of the schema for this CRD,
 			// and the aggreated OpenAPI spec should reflect this change.
-			crdspec, etag, err := apiextensionsopenapi.CustomResourceDefinitionOpenAPISpec(&crd.Spec, version.Version, versionedSchema)
+			crdspec, etag, err := apiextensionsopenapi.CustomResourceDefinitionOpenAPISpec(&crd.Spec, version.Version, validationSchema)
 			if err != nil {
 				return err
 			}

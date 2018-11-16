@@ -24,7 +24,6 @@ import (
 	"github.com/go-openapi/spec"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -206,7 +205,7 @@ func scaleStatusSchema() *spec.Schema {
 // NOTE: in apiserver we general operates on internal types. We are using versioned (v1beta1)
 // validation schema here because we need the json tags to properly marshal the object to
 // JSON.
-func CustomResourceDefinitionOpenAPISpec(crdSpec *apiextensions.CustomResourceDefinitionSpec, version string, validationSchema *v1beta1.CustomResourceValidation) (*spec.Swagger, string, error) {
+func CustomResourceDefinitionOpenAPISpec(crdSpec *apiextensions.CustomResourceDefinitionSpec, version string, validationSchema *apiextensions.CustomResourceValidation) (*spec.Swagger, string, error) {
 	schema := &spec.Schema{}
 	if validationSchema != nil && validationSchema.OpenAPIV3Schema != nil {
 		var err error
