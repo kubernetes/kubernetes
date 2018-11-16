@@ -1038,6 +1038,29 @@ func createVolumeModeFilesystemTestVolume() *v1.PersistentVolume {
 	}
 }
 
+func createVolumeModeNilTestVolume() *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  "local-1",
+			Name: "nil-mode",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				Local: &v1.LocalVolumeSource{},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
+		},
+	}
+}
+
 func createTestVolOrderedIndex(pv *v1.PersistentVolume) persistentVolumeOrderedIndex {
 	volFile := newPersistentVolumeOrderedIndex()
 	volFile.store.Add(pv)
@@ -1079,6 +1102,36 @@ func TestVolumeModeCheck(t *testing.T) {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc filesystem and pv nil": {
+			isExpectedMismatch: false,
+			vol:                createVolumeModeNilTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc nil and pv filesytem": {
+			isExpectedMismatch: false,
+			vol:                createVolumeModeFilesystemTestVolume(),
+			pvc:                makeVolumeModePVC("8G", nil, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc nil and pv nil": {
+			isExpectedMismatch: false,
+			vol:                createVolumeModeNilTestVolume(),
+			pvc:                makeVolumeModePVC("8G", nil, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc nil and pv block": {
+			isExpectedMismatch: true,
+			vol:                createVolumeModeBlockTestVolume(),
+			pvc:                makeVolumeModePVC("8G", nil, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc block and pv nil": {
+			isExpectedMismatch: true,
+			vol:                createVolumeModeNilTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:        true,
 		},
 		"feature disabled - pvc block and pv filesystem": {

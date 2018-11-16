@@ -259,22 +259,23 @@ func findMatchingVolume(
 }
 
 // checkVolumeModeMismatches is a convenience method that checks volumeMode for PersistentVolume
-// and PersistentVolumeClaims along with making sure that the feature gate BlockVolume is enabled.
+// and PersistentVolumeClaims
 func checkVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if pvSpec.VolumeMode != nil && pvcSpec.VolumeMode != nil {
-			requestedVolumeMode := *pvcSpec.VolumeMode
-			pvVolumeMode := *pvSpec.VolumeMode
-			return requestedVolumeMode != pvVolumeMode, nil
-		} else {
-			// This also should return an error, this means that
-			// the defaulting has failed.
-			return true, fmt.Errorf("api defaulting for volumeMode failed")
-		}
-	} else {
-		// feature gate is disabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		return false, nil
 	}
+
+	// In HA upgrades, we cannot guarantee that the apiserver is on a version >= controller-manager.
+	// So we default a nil volumeMode to filesystem
+	requestedVolumeMode := v1.PersistentVolumeFilesystem
+	if pvcSpec.VolumeMode != nil {
+		requestedVolumeMode = *pvcSpec.VolumeMode
+	}
+	pvVolumeMode := v1.PersistentVolumeFilesystem
+	if pvSpec.VolumeMode != nil {
+		pvVolumeMode = *pvSpec.VolumeMode
+	}
+	return requestedVolumeMode != pvVolumeMode, nil
 }
 
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
