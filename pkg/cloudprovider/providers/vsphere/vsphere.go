@@ -678,6 +678,7 @@ func (vs *VSphere) AddSSHKeyToAllInstances(ctx context.Context, user string, key
 
 // CurrentNodeName gives the current node name
 func (vs *VSphere) CurrentNodeName(ctx context.Context, hostname string) (k8stypes.NodeName, error) {
+	vs.hostName = hostname
 	return convertToK8sType(vs.hostName), nil
 }
 
