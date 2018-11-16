@@ -150,10 +150,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 	if err != nil {
 		return nil, err
 	}
-	externalclient, err := clientset.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
 
 	m := map[schema.GroupKind]describe.Describer{
 		{Group: corev1.GroupName, Kind: "Pod"}:                                    &PodDescriber{c},
@@ -175,21 +171,21 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: extensionsv1beta1.GroupName, Kind: "PodSecurityPolicy"}:           &PodSecurityPolicyDescriber{c},
 		{Group: autoscalingv2beta2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "DaemonSet"}:                   &DaemonSetDescriber{c},
-		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c, externalclient},
+		{Group: extensionsv1beta1.GroupName, Kind: "Deployment"}:                  &DeploymentDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
-		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c, externalclient},
+		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: appsv1.GroupName, Kind: "StatefulSet"}:                            &StatefulSetDescriber{c},
-		{Group: appsv1.GroupName, Kind: "Deployment"}:                             &DeploymentDescriber{c, externalclient},
+		{Group: appsv1.GroupName, Kind: "Deployment"}:                             &DeploymentDescriber{c},
 		{Group: appsv1.GroupName, Kind: "DaemonSet"}:                              &DaemonSetDescriber{c},
 		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                             &ReplicaSetDescriber{c},
 		{Group: certificatesv1beta1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
 		{Group: storagev1.GroupName, Kind: "StorageClass"}:                        &StorageClassDescriber{c},
 		{Group: policyv1beta1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
-		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{externalclient},
-		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                            &ClusterRoleDescriber{externalclient},
-		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                            &RoleBindingDescriber{externalclient},
-		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                     &ClusterRoleBindingDescriber{externalclient},
+		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                            &ClusterRoleDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                            &RoleBindingDescriber{c},
+		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                     &ClusterRoleBindingDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:                    &NetworkPolicyDescriber{c},
 		{Group: schedulingv1beta1.GroupName, Kind: "PriorityClass"}:               &PriorityClassDescriber{c},
 	}
@@ -2051,19 +2047,18 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 
 // CronJobDescriber generates information about a cron job and the jobs it has created.
 type CronJobDescriber struct {
-	clientset.Interface
-	external clientset.Interface
+	client clientset.Interface
 }
 
 func (d *CronJobDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	cronJob, err := d.external.BatchV1beta1().CronJobs(namespace).Get(name, metav1.GetOptions{})
+	cronJob, err := d.client.BatchV1beta1().CronJobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = d.Core().Events(namespace).Search(scheme.Scheme, cronJob)
+		events, _ = d.client.CoreV1().Events(namespace).Search(scheme.Scheme, cronJob)
 	}
 	return describeCronJob(cronJob, events)
 }
@@ -3277,12 +3272,11 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 
 // DeploymentDescriber generates information about a deployment.
 type DeploymentDescriber struct {
-	clientset.Interface
-	external clientset.Interface
+	client clientset.Interface
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	d, err := dd.external.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	d, err := dd.client.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3292,7 +3286,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	}
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = dd.Core().Events(namespace).Search(scheme.Scheme, d)
+		events, _ = dd.client.CoreV1().Events(namespace).Search(scheme.Scheme, d)
 	}
 
 	return describeDeployment(d, selector, d, events, dd)
@@ -3322,7 +3316,7 @@ func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internal
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
-		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.external.AppsV1())
+		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.client.AppsV1())
 		if err == nil {
 			w.Write(LEVEL_0, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
 			var newRSs []*appsv1.ReplicaSet
