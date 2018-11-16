@@ -43,7 +43,7 @@ func runCmdNoWrap(command string, args ...string) (string, string, error) {
 func RunCmd(command string, args ...string) (string, string, error) {
 	stdout, stderr, err := runCmdNoWrap(command, args...)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "error running %s %v; \nstdout %q, \nstderr %q, \ngot error",
+		return stdout, stderr, errors.Wrapf(err, "error running %s %v; \nstdout %q, \nstderr %q, \ngot error",
 			command, args, stdout, stderr)
 	}
 	return stdout, stderr, nil
