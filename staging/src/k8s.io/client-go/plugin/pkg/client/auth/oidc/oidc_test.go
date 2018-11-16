@@ -119,19 +119,27 @@ func TestExpired(t *testing.T) {
 func TestClientCache(t *testing.T) {
 	cache := newClientCache()
 
-	if _, ok := cache.getClient("issuer1", "id1"); ok {
+	config1 := &config{
+		issueURL:     "issuer1",
+		clientID:     "id1",
+		clientSecret: "fakesecret",
+		idToken:      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+		refreshToken: "fdb8fdbecf1d03ce5e6125c067733c0d51de209c",
+	}
+
+	if _, ok := cache.getClient(config1); ok {
 		t.Fatalf("got client before putting one in the cache")
 	}
 
 	cli1 := new(oidcAuthProvider)
 	cli2 := new(oidcAuthProvider)
 
-	gotcli := cache.setClient("issuer1", "id1", cli1)
+	gotcli := cache.setClient(config1, cli1)
 	if cli1 != gotcli {
 		t.Fatalf("set first client and got a different one")
 	}
 
-	gotcli = cache.setClient("issuer1", "id1", cli2)
+	gotcli = cache.setClient(config1, cli2)
 	if cli1 != gotcli {
 		t.Fatalf("set a second client and didn't get the first")
 	}

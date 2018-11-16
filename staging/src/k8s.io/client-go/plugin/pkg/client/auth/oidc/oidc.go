@@ -62,6 +62,14 @@ const expiryDelta = 10 * time.Second
 
 var cache = newClientCache()
 
+type config struct {
+	issueURL     string
+	clientID     string
+	clientSecret string
+	idToken      string
+	refreshToken string
+}
+
 // Like TLS transports, keep a cache of OIDC clients indexed by issuer URL. This ensures
 // current requests from different clients don't concurrently attempt to refresh the same
 // set of credentials.
@@ -77,23 +85,28 @@ func newClientCache() *clientCache {
 
 type cacheKey struct {
 	// Canonical issuer URL string of the provider.
-	issuerURL string
-	clientID  string
+	issuerURL    string
+	clientID     string
+	clientSecret string
+	idToken      string
+	refreshToken string
 }
 
-func (c *clientCache) getClient(issuer, clientID string) (*oidcAuthProvider, bool) {
+func (c *clientCache) getClient(config *config) (*oidcAuthProvider, bool) {
+	key := configKey(config)
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	client, ok := c.cache[cacheKey{issuer, clientID}]
+	client, ok := c.cache[key]
 	return client, ok
 }
 
 // setClient attempts to put the client in the cache but may return any clients
 // with the same keys set before. This is so there's only ever one client for a provider.
-func (c *clientCache) setClient(issuer, clientID string, client *oidcAuthProvider) *oidcAuthProvider {
+func (c *clientCache) setClient(config *config, client *oidcAuthProvider) *oidcAuthProvider {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	key := cacheKey{issuer, clientID}
+	key := configKey(config)
 
 	// If another client has already initialized a client for the given provider we want
 	// to use that client instead of the one we're trying to set. This is so all transports
@@ -118,8 +131,16 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		return nil, fmt.Errorf("Must provide %s", cfgClientID)
 	}
 
+	oidcConfig := &config{
+		issueURL:     issuer,
+		clientID:     clientID,
+		clientSecret: cfg[cfgClientSecret],
+		idToken:      cfg[cfgIDToken],
+		refreshToken: cfg[cfgRefreshToken],
+	}
+
 	// Check cache for existing provider.
-	if provider, ok := cache.getClient(issuer, clientID); ok {
+	if provider, ok := cache.getClient(oidcConfig); ok {
 		return provider, nil
 	}
 
@@ -157,7 +178,7 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		persister: persister,
 	}
 
-	return cache.setClient(issuer, clientID, provider), nil
+	return cache.setClient(oidcConfig, provider), nil
 }
 
 type oidcAuthProvider struct {
@@ -376,4 +397,14 @@ func (j *jsonTime) UnmarshalJSON(b []byte) error {
 
 func (j jsonTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Time(j).Unix())
+}
+
+func configKey(c *config) cacheKey {
+	return cacheKey{
+		issuerURL:    c.issueURL,
+		clientID:     c.clientID,
+		clientSecret: c.clientSecret,
+		idToken:      c.idToken,
+		refreshToken: c.refreshToken,
+	}
 }
