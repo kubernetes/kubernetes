@@ -37,6 +37,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -44,6 +45,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
     ],
 )
 

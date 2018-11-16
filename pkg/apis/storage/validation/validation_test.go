@@ -514,10 +514,7 @@ func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
 		"invalid mode":   makeClass(&invalidMode, nil),
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
 	for testName, storageClass := range errorCases {
 		if errs := ValidateStorageClass(storageClass); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %v", testName)
@@ -551,11 +548,7 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 	}
 
 	// TODO: remove when feature gate not required
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
-
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	for testName, testCase := range cases {
 		errs := ValidateStorageClass(testCase.class)
 		if testCase.shouldSucceed && len(errs) != 0 {
@@ -564,11 +557,6 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 		if !testCase.shouldSucceed && len(errs) == 0 {
 			t.Errorf("Expected failure for test %q, got success", testName)
 		}
-	}
-
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 }
 
@@ -618,11 +606,7 @@ func TestValidateUpdateVolumeBindingMode(t *testing.T) {
 	}
 
 	// TODO: remove when feature gate not required
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
-
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	for testName, testCase := range cases {
 		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
 		if testCase.shouldSucceed && len(errs) != 0 {
@@ -631,11 +615,6 @@ func TestValidateUpdateVolumeBindingMode(t *testing.T) {
 		if !testCase.shouldSucceed && len(errs) == 0 {
 			t.Errorf("Expected failure for %v, got success", testName)
 		}
-	}
-
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 }
 
@@ -930,12 +909,7 @@ func TestValidateAllowedTopologies(t *testing.T) {
 		},
 	}
 
-	// TODO: remove when feature gate not required
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
-
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	for testName, testCase := range cases {
 		errs := ValidateStorageClass(testCase.class)
 		if testCase.shouldSucceed && len(errs) != 0 {
@@ -946,11 +920,7 @@ func TestValidateAllowedTopologies(t *testing.T) {
 		}
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
-	}
-
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
 	for testName, testCase := range cases {
 		errs := ValidateStorageClass(testCase.class)
 		if len(errs) == 0 && testCase.class.AllowedTopologies != nil {
