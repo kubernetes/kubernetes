@@ -104,6 +104,7 @@ func newCertSubPhases() []workflow.Phase {
 
 		for _, cert := range certList {
 			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
+			certPhase.LocalFlags = localFlags()
 			subPhases = append(subPhases, certPhase)
 		}
 	}
@@ -133,7 +134,6 @@ func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunDa
 		),
 		Run:          run,
 		InheritFlags: getCertPhaseFlags(certSpec.Name),
-		LocalFlags:   localFlags(),
 	}
 	return phase
 }
