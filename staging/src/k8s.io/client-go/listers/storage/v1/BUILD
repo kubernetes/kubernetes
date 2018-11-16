@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "expansion_generated.go",
         "storageclass.go",
+        "volumeattachment.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/storage/v1",
     importpath = "k8s.io/client-go/listers/storage/v1",

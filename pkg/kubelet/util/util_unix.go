@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -98,4 +99,13 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	default:
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
+}
+
+// LocalEndpoint returns the full path to a unix socket at the given endpoint
+func LocalEndpoint(path, file string) string {
+	u := url.URL{
+		Scheme: unixProtocol,
+		Path:   path,
+	}
+	return filepath.Join(u.String(), file+".sock")
 }

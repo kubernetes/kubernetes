@@ -1443,24 +1443,27 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	return allErrs
 }
 
+func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(driverName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	if len(driverName) > 63 {
+		allErrs = append(allErrs, field.TooLong(fldPath, driverName, 63))
+	}
+
+	if !csiDriverNameRexp.MatchString(driverName) {
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+	}
+	return allErrs
+}
+
 func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "CSIPersistentVolume disabled by feature-gate"))
-	}
-
-	if len(csi.Driver) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
-	}
-
-	if len(csi.Driver) > 63 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("driver"), csi.Driver, 63))
-	}
-
-	if !csiDriverNameRexp.MatchString(csi.Driver) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), csi.Driver, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
-	}
+	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
 
 	if len(csi.VolumeHandle) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))

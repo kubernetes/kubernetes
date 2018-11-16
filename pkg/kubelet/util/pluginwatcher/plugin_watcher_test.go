@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/klog"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
+	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 )
 
 var (

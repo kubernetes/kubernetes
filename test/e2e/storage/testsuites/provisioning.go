@@ -173,7 +173,7 @@ type provisioningTestInput struct {
 }
 
 func testProvisioning(input *provisioningTestInput) {
-	It("should provision storage", func() {
+	It("should provision storage with defaults", func() {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 

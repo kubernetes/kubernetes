@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package describe
+package pluginregistration
 
-import (
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/printers"
+const (
+	// CSIPlugin identifier for registered CSI plugins
+	CSIPlugin = "CSIPlugin"
+	// DevicePlugin identifier for registered device plugins
+	DevicePlugin = "DevicePlugin"
 )
-
-// DescriberFunc gives a way to display the specified RESTMapping type
-type DescriberFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error)

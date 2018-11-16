@@ -391,9 +391,6 @@ func buildGenericConfig(
 	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.Audit.ApplyTo(genericConfig); lastErr != nil {
-		return
-	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -463,6 +460,22 @@ func buildGenericConfig(
 		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+
+	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.LoopbackClientConfig)
+
+	lastErr = s.Audit.ApplyTo(
+		genericConfig,
+		genericConfig.LoopbackClientConfig,
+		versionedInformers,
+		serveroptions.NewProcessInfo("kube-apiserver", "kube-system"),
+		&serveroptions.WebhookOptions{
+			AuthInfoResolverWrapper: authInfoResolverWrapper,
+			ServiceResolver:         serviceResolver,
+		},
+	)
+	if lastErr != nil {
+		return
+	}
 
 	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)
 	if err != nil {

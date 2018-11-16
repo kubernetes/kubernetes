@@ -14,43 +14,43 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package events
+package event
 
 import (
 	"sort"
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestSortableEvents(t *testing.T) {
 	// Arrange
-	list := SortableEvents([]api.Event{
+	list := SortableEvents([]corev1.Event{
 		{
-			Source:         api.EventSource{Component: "kubelet"},
+			Source:         corev1.EventSource{Component: "kubelet"},
 			Message:        "Item 1",
 			FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 			LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 			Count:          1,
-			Type:           api.EventTypeNormal,
+			Type:           corev1.EventTypeNormal,
 		},
 		{
-			Source:         api.EventSource{Component: "scheduler"},
+			Source:         corev1.EventSource{Component: "scheduler"},
 			Message:        "Item 2",
 			FirstTimestamp: metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 			LastTimestamp:  metav1.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
 			Count:          1,
-			Type:           api.EventTypeNormal,
+			Type:           corev1.EventTypeNormal,
 		},
 		{
-			Source:         api.EventSource{Component: "kubelet"},
+			Source:         corev1.EventSource{Component: "kubelet"},
 			Message:        "Item 3",
 			FirstTimestamp: metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 			LastTimestamp:  metav1.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
 			Count:          1,
-			Type:           api.EventTypeNormal,
+			Type:           corev1.EventTypeNormal,
 		},
 	})
 

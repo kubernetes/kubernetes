@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package events
+package podresources
 
-import (
-	api "k8s.io/kubernetes/pkg/apis/core"
+const (
+	// Socket is the name of the podresources server socket
+	Socket = "kubelet"
 )
-
-// SortableEvents implements sort.Interface for []api.Event based on the Timestamp field
-type SortableEvents []api.Event
-
-func (list SortableEvents) Len() int {
-	return len(list)
-}
-
-func (list SortableEvents) Swap(i, j int) {
-	list[i], list[j] = list[j], list[i]
-}
-
-func (list SortableEvents) Less(i, j int) bool {
-	return list[i].LastTimestamp.Time.Before(list[j].LastTimestamp.Time)
-}

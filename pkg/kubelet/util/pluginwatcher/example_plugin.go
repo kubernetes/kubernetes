@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
+	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1"
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
 )

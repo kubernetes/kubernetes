@@ -22,10 +22,22 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// DropDisabledAlphaFields removes disabled fields from the pv spec.
+// DropDisabledFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
-func DropDisabledAlphaFields(pvSpec *api.PersistentVolumeSpec) {
+func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		// TODO(liggitt): change this to only drop pvSpec.VolumeMode if (oldPVSpec == nil || oldPVSpec.VolumeMode == nil)
+		// Requires more coordinated changes to validation
 		pvSpec.VolumeMode = nil
+		if oldPVSpec != nil {
+			oldPVSpec.VolumeMode = nil
+		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		// if this is a new PV, or the old PV didn't already have the CSI field, clear it
+		if oldPVSpec == nil || oldPVSpec.PersistentVolumeSource.CSI == nil {
+			pvSpec.PersistentVolumeSource.CSI = nil
+		}
 	}
 }

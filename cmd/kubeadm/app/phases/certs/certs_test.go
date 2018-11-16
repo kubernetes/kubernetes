@@ -18,13 +18,16 @@ package certs
 
 import (
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -53,6 +56,18 @@ func createTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKe
 		t.Fatalf("couldn't create test cert: %v", err)
 	}
 	return cert, key
+}
+
+func createTestCSR(t *testing.T) (*x509.CertificateRequest, *rsa.PrivateKey) {
+	csr, key, err := pkiutil.NewCSRAndKey(
+		&certutil.Config{
+			CommonName: "testCert",
+		})
+	if err != nil {
+		t.Fatalf("couldn't create test cert: %v", err)
+	}
+
+	return csr, key
 }
 
 func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
@@ -207,6 +222,75 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 			t.Error("created cert does not match expected cert")
 		}
 	}
+}
+
+func TestWriteCSRFilesIfNotExist(t *testing.T) {
+	csr, key := createTestCSR(t)
+	csr2, key2 := createTestCSR(t)
+
+	var tests = []struct {
+		name          string
+		setupFunc     func(csrPath string) error
+		expectedError bool
+		expectedCSR   *x509.CertificateRequest
+	}{
+		{
+			name:        "no files exist",
+			expectedCSR: csr,
+		},
+		{
+			name: "other key exists",
+			setupFunc: func(csrPath string) error {
+				if err := pkiutil.WriteCSR(csrPath, "dummy", csr2); err != nil {
+					return err
+				}
+				return pkiutil.WriteKey(csrPath, "dummy", key2)
+			},
+			expectedCSR: csr2,
+		},
+		{
+			name: "existing CSR is garbage",
+			setupFunc: func(csrPath string) error {
+				return ioutil.WriteFile(path.Join(csrPath, "dummy.csr"), []byte("a--bunch--of-garbage"), os.ModePerm)
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+
+			if test.setupFunc != nil {
+				if err := test.setupFunc(tmpdir); err != nil {
+					t.Fatalf("couldn't set up test: %v", err)
+				}
+			}
+
+			if err := writeCSRFilesIfNotExist(tmpdir, "dummy", csr, key); err != nil {
+				if test.expectedError {
+					return
+				}
+				t.Fatalf("unexpected error %v: ", err)
+			}
+
+			if test.expectedError {
+				t.Fatal("Expected error, but got none")
+			}
+
+			parsedCSR, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpdir, "dummy")
+			if err != nil {
+				t.Fatalf("couldn't load csr and key: %v", err)
+			}
+
+			if sha256.Sum256(test.expectedCSR.Raw) != sha256.Sum256(parsedCSR.Raw) {
+				t.Error("expected csr's fingerprint does not match ")
+			}
+
+		})
+	}
+
 }
 
 func TestWriteKeyFilesIfNotExist(t *testing.T) {
@@ -602,6 +686,38 @@ func TestValidateMethods(t *testing.T) {
 			t.Errorf("expected success, error executing validateFunc: %v, %v", test.name, err)
 		} else if !test.expectedSuccess && err == nil {
 			t.Errorf("expected failure, no error executing validateFunc: %v", test.name)
+		}
+	}
+}
+
+func TestNewCSR(t *testing.T) {
+	kubeadmCert := KubeadmCertAPIServer
+	cfg := testutil.GetDefaultInternalConfig(t)
+
+	certConfig, err := kubeadmCert.GetConfig(cfg)
+	if err != nil {
+		t.Fatalf("couldn't get cert config: %v", err)
+	}
+
+	csr, _, err := NewCSR(&kubeadmCert, cfg)
+
+	if err != nil {
+		t.Errorf("invalid signature on CSR: %v", err)
+	}
+
+	assert.ElementsMatch(t, certConfig.Organization, csr.Subject.Organization, "organizations not equal")
+
+	if csr.Subject.CommonName != certConfig.CommonName {
+		t.Errorf("expected common name %q, got %q", certConfig.CommonName, csr.Subject.CommonName)
+	}
+
+	assert.ElementsMatch(t, certConfig.AltNames.DNSNames, csr.DNSNames, "dns names not equal")
+
+	assert.Len(t, csr.IPAddresses, len(certConfig.AltNames.IPs))
+
+	for i, ip := range csr.IPAddresses {
+		if !ip.Equal(certConfig.AltNames.IPs[i]) {
+			t.Errorf("[%d]: %v != %v", i, ip, certConfig.AltNames.IPs[i])
 		}
 	}
 }
