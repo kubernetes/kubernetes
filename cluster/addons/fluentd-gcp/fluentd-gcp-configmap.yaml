@@ -266,7 +266,7 @@ data:
 
     <source>
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      filters [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
       pos_file /var/log/gcp-journald-container-runtime.pos
       read_from_head true
       tag container-runtime
@@ -302,7 +302,7 @@ data:
       @type grep
       <exclude>
         key _SYSTEMD_UNIT
-        pattern ^(docker|{{ container_runtime }}|kubelet|node-problem-detector)\.service$
+        pattern ^(docker|{{ fluentd_container_runtime_service }}|kubelet|node-problem-detector)\.service$
       </exclude>
     </filter>
     # END_NODE_JOURNAL
