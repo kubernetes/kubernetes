@@ -17,12 +17,12 @@ limitations under the License.
 package openapi
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/go-openapi/spec"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
@@ -30,16 +30,18 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 	testStr2 := "test2"
 	testFloat64 := float64(6.4)
 	testInt64 := int64(64)
-	testApiextensionsJSON := apiextensions.JSON(testStr)
+	raw, _ := json.Marshal(testStr)
+	raw2, _ := json.Marshal(testStr2)
+	testApiextensionsJSON := v1beta1.JSON{Raw: raw}
 
 	tests := []struct {
 		name     string
-		in       *apiextensions.JSONSchemaProps
+		in       *v1beta1.JSONSchemaProps
 		expected *spec.Schema
 	}{
 		{
 			name: "id",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				ID: testStr,
 			},
 			expected: new(spec.Schema).
@@ -47,7 +49,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "$schema",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Schema: "test",
 			},
 			expected: &spec.Schema{
@@ -58,14 +60,14 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "$ref",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Ref: &testStr,
 			},
 			expected: spec.RefSchema(testStr),
 		},
 		{
 			name: "description",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Description: testStr,
 			},
 			expected: new(spec.Schema).
@@ -73,7 +75,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "type and format",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Type:   testStr,
 				Format: testStr2,
 			},
@@ -82,7 +84,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "title",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Title: testStr,
 			},
 			expected: new(spec.Schema).
@@ -90,7 +92,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "default",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Default: &testApiextensionsJSON,
 			},
 			expected: new(spec.Schema).
@@ -98,7 +100,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "maximum and exclusiveMaximum",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Maximum:          &testFloat64,
 				ExclusiveMaximum: true,
 			},
@@ -107,7 +109,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "minimum and exclusiveMinimum",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Minimum:          &testFloat64,
 				ExclusiveMinimum: true,
 			},
@@ -116,7 +118,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "maxLength",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MaxLength: &testInt64,
 			},
 			expected: new(spec.Schema).
@@ -124,7 +126,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "minLength",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MinLength: &testInt64,
 			},
 			expected: new(spec.Schema).
@@ -132,7 +134,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "pattern",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Pattern: testStr,
 			},
 			expected: new(spec.Schema).
@@ -140,7 +142,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "maxItems",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MaxItems: &testInt64,
 			},
 			expected: new(spec.Schema).
@@ -148,7 +150,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "minItems",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MinItems: &testInt64,
 			},
 			expected: new(spec.Schema).
@@ -156,7 +158,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "uniqueItems",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				UniqueItems: true,
 			},
 			expected: new(spec.Schema).
@@ -164,7 +166,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "multipleOf",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MultipleOf: &testFloat64,
 			},
 			expected: new(spec.Schema).
@@ -172,15 +174,15 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "enum",
-			in: &apiextensions.JSONSchemaProps{
-				Enum: []apiextensions.JSON{apiextensions.JSON(testStr), apiextensions.JSON(testStr2)},
+			in: &v1beta1.JSONSchemaProps{
+				Enum: []v1beta1.JSON{{Raw: raw}, {Raw: raw2}},
 			},
 			expected: new(spec.Schema).
 				WithEnum(testStr, testStr2),
 		},
 		{
 			name: "maxProperties",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MaxProperties: &testInt64,
 			},
 			expected: new(spec.Schema).
@@ -188,7 +190,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "minProperties",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				MinProperties: &testInt64,
 			},
 			expected: new(spec.Schema).
@@ -196,7 +198,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "required",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Required: []string{testStr, testStr2},
 			},
 			expected: new(spec.Schema).
@@ -204,9 +206,9 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "items single props",
-			in: &apiextensions.JSONSchemaProps{
-				Items: &apiextensions.JSONSchemaPropsOrArray{
-					Schema: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				Items: &v1beta1.JSONSchemaPropsOrArray{
+					Schema: &v1beta1.JSONSchemaProps{
 						Type: "boolean",
 					},
 				},
@@ -221,9 +223,9 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "items array props",
-			in: &apiextensions.JSONSchemaProps{
-				Items: &apiextensions.JSONSchemaPropsOrArray{
-					JSONSchemas: []apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				Items: &v1beta1.JSONSchemaPropsOrArray{
+					JSONSchemas: []v1beta1.JSONSchemaProps{
 						{Type: "boolean"},
 						{Type: "string"},
 					},
@@ -242,8 +244,8 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "allOf",
-			in: &apiextensions.JSONSchemaProps{
-				AllOf: []apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				AllOf: []v1beta1.JSONSchemaProps{
 					{Type: "boolean"},
 					{Type: "string"},
 				},
@@ -253,8 +255,8 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "oneOf",
-			in: &apiextensions.JSONSchemaProps{
-				OneOf: []apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				OneOf: []v1beta1.JSONSchemaProps{
 					{Type: "boolean"},
 					{Type: "string"},
 				},
@@ -271,8 +273,8 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "anyOf",
-			in: &apiextensions.JSONSchemaProps{
-				AnyOf: []apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				AnyOf: []v1beta1.JSONSchemaProps{
 					{Type: "boolean"},
 					{Type: "string"},
 				},
@@ -289,8 +291,8 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "not",
-			in: &apiextensions.JSONSchemaProps{
-				Not: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				Not: &v1beta1.JSONSchemaProps{
 					Type: "boolean",
 				},
 			},
@@ -302,89 +304,9 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 			// },
 		},
 		{
-			name: "nested logic",
-			in: &apiextensions.JSONSchemaProps{
-				AllOf: []apiextensions.JSONSchemaProps{
-					{
-						Not: &apiextensions.JSONSchemaProps{
-							Type: "boolean",
-						},
-					},
-					{
-						AnyOf: []apiextensions.JSONSchemaProps{
-							{Type: "boolean"},
-							{Type: "string"},
-						},
-					},
-					{
-						OneOf: []apiextensions.JSONSchemaProps{
-							{Type: "boolean"},
-							{Type: "string"},
-						},
-					},
-					{Type: "string"},
-				},
-				AnyOf: []apiextensions.JSONSchemaProps{
-					{
-						Not: &apiextensions.JSONSchemaProps{
-							Type: "boolean",
-						},
-					},
-					{
-						AnyOf: []apiextensions.JSONSchemaProps{
-							{Type: "boolean"},
-							{Type: "string"},
-						},
-					},
-					{
-						OneOf: []apiextensions.JSONSchemaProps{
-							{Type: "boolean"},
-							{Type: "string"},
-						},
-					},
-					{Type: "string"},
-				},
-				OneOf: []apiextensions.JSONSchemaProps{
-					{
-						Not: &apiextensions.JSONSchemaProps{
-							Type: "boolean",
-						},
-					},
-					{
-						AnyOf: []apiextensions.JSONSchemaProps{
-							{Type: "boolean"},
-							{Type: "string"},
-						},
-					},
-					{
-						OneOf: []apiextensions.JSONSchemaProps{
-							{Type: "boolean"},
-							{Type: "string"},
-						},
-					},
-					{Type: "string"},
-				},
-				Not: &apiextensions.JSONSchemaProps{
-					Not: &apiextensions.JSONSchemaProps{
-						Type: "boolean",
-					},
-					AnyOf: []apiextensions.JSONSchemaProps{
-						{Type: "boolean"},
-						{Type: "string"},
-					},
-					OneOf: []apiextensions.JSONSchemaProps{
-						{Type: "boolean"},
-						{Type: "string"},
-					},
-				},
-			},
-			expected: new(spec.Schema).
-				WithAllOf(spec.Schema{}, spec.Schema{}, spec.Schema{}, *spec.StringProperty()),
-		},
-		{
 			name: "properties",
-			in: &apiextensions.JSONSchemaProps{
-				Properties: map[string]apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				Properties: map[string]v1beta1.JSONSchemaProps{
 					testStr: {Type: "boolean"},
 				},
 			},
@@ -393,10 +315,10 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "additionalProperties",
-			in: &apiextensions.JSONSchemaProps{
-				AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+			in: &v1beta1.JSONSchemaProps{
+				AdditionalProperties: &v1beta1.JSONSchemaPropsOrBool{
 					Allows: true,
-					Schema: &apiextensions.JSONSchemaProps{Type: "boolean"},
+					Schema: &v1beta1.JSONSchemaProps{Type: "boolean"},
 				},
 			},
 			expected: &spec.Schema{
@@ -410,8 +332,8 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "patternProperties",
-			in: &apiextensions.JSONSchemaProps{
-				PatternProperties: map[string]apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
+				PatternProperties: map[string]v1beta1.JSONSchemaProps{
 					testStr: {Type: "boolean"},
 				},
 			},
@@ -425,10 +347,10 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "dependencies schema",
-			in: &apiextensions.JSONSchemaProps{
-				Dependencies: apiextensions.JSONSchemaDependencies{
-					testStr: apiextensions.JSONSchemaPropsOrStringArray{
-						Schema: &apiextensions.JSONSchemaProps{Type: "boolean"},
+			in: &v1beta1.JSONSchemaProps{
+				Dependencies: v1beta1.JSONSchemaDependencies{
+					testStr: v1beta1.JSONSchemaPropsOrStringArray{
+						Schema: &v1beta1.JSONSchemaProps{Type: "boolean"},
 					},
 				},
 			},
@@ -444,9 +366,9 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "dependencies string array",
-			in: &apiextensions.JSONSchemaProps{
-				Dependencies: apiextensions.JSONSchemaDependencies{
-					testStr: apiextensions.JSONSchemaPropsOrStringArray{
+			in: &v1beta1.JSONSchemaProps{
+				Dependencies: v1beta1.JSONSchemaDependencies{
+					testStr: v1beta1.JSONSchemaPropsOrStringArray{
 						Property: []string{testStr2},
 					},
 				},
@@ -463,10 +385,10 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "additionalItems",
-			in: &apiextensions.JSONSchemaProps{
-				AdditionalItems: &apiextensions.JSONSchemaPropsOrBool{
+			in: &v1beta1.JSONSchemaProps{
+				AdditionalItems: &v1beta1.JSONSchemaPropsOrBool{
 					Allows: true,
-					Schema: &apiextensions.JSONSchemaProps{Type: "boolean"},
+					Schema: &v1beta1.JSONSchemaProps{Type: "boolean"},
 				},
 			},
 			expected: &spec.Schema{
@@ -480,9 +402,9 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "definitions",
-			in: &apiextensions.JSONSchemaProps{
-				Definitions: apiextensions.JSONSchemaDefinitions{
-					testStr: apiextensions.JSONSchemaProps{Type: "boolean"},
+			in: &v1beta1.JSONSchemaProps{
+				Definitions: v1beta1.JSONSchemaDefinitions{
+					testStr: v1beta1.JSONSchemaProps{Type: "boolean"},
 				},
 			},
 			expected: &spec.Schema{
@@ -495,8 +417,8 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "externalDocs",
-			in: &apiextensions.JSONSchemaProps{
-				ExternalDocs: &apiextensions.ExternalDocumentation{
+			in: &v1beta1.JSONSchemaProps{
+				ExternalDocs: &v1beta1.ExternalDocumentation{
 					Description: testStr,
 					URL:         testStr2,
 				},
@@ -506,7 +428,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 		},
 		{
 			name: "example",
-			in: &apiextensions.JSONSchemaProps{
+			in: &v1beta1.JSONSchemaProps{
 				Example: &testApiextensionsJSON,
 			},
 			expected: new(spec.Schema).
@@ -515,14 +437,12 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			out, err := ConvertJSONSchemaPropsToOpenAPIv2Schema(test.in)
-			if err != nil {
-				t.Fatalf("unexpected error in converting openapi schema: %v", err)
-			}
-			if !reflect.DeepEqual(*out, *test.expected) {
-				t.Errorf("unexpected result:\n  want=%v\n   got=%v\n\n%s", *test.expected, *out, diff.ObjectDiff(*test.expected, *out))
-			}
-		})
+		out, err := ConvertJSONSchemaPropsToOpenAPIv2Schema(test.in)
+		if err != nil {
+			t.Errorf("unexpected error in converting openapi schema: %v", test.name)
+		}
+		if !reflect.DeepEqual(out, test.expected) {
+			t.Errorf("result of conversion test '%v' didn't match, want: %v; got: %v", test.name, *test.expected, *out)
+		}
 	}
 }
