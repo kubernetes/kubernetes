@@ -17,33 +17,29 @@ limitations under the License.
 package openapi
 
 import (
-	"encoding/json"
-
 	"github.com/go-openapi/spec"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 // ConvertJSONSchemaPropsToOpenAPIv2Schema converts our internal OpenAPI v3 schema
 // (*apiextensions.JSONSchemaProps) to an OpenAPI v2 schema (*spec.Schema).
 // NOTE: we use versioned type (v1beta1) here so that we can properly marshal the object
 // using the JSON tags
-func ConvertJSONSchemaPropsToOpenAPIv2Schema(in *v1beta1.JSONSchemaProps) (*spec.Schema, error) {
+func ConvertJSONSchemaPropsToOpenAPIv2Schema(in *apiextensions.JSONSchemaProps) (*spec.Schema, error) {
 	if in == nil {
 		return nil, nil
 	}
 
-	// Marshal JSONSchemaProps into JSON and unmarshal the data into spec.Schema
-	data, err := json.Marshal(*in)
-	if err != nil {
-		return nil, err
-	}
 	out := new(spec.Schema)
-	if err := out.UnmarshalJSON(data); err != nil {
-		return nil, err
-	}
-	// Remove unsupported fields in OpenAPI v2
-	out.OneOf = nil
-	out.AnyOf = nil
-	out.Not = nil
+	validation.ConvertJSONSchemaPropsWithPostProcess(in, out, func(p *spec.Schema) error {
+		// Remove unsupported fields in OpenAPI v2
+		p.OneOf = nil
+		p.AnyOf = nil
+		p.Not = nil
+
+		return nil
+	})
+
 	return out, nil
 }
