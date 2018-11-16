@@ -18,9 +18,11 @@ package routes
 
 import (
 	restful "github.com/emicklei/go-restful"
+	"github.com/go-openapi/spec"
 	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
 )
@@ -30,17 +32,27 @@ type OpenAPI struct {
 	Config *common.Config
 }
 
-// Install adds the SwaggerUI webservice to the given mux.
-func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) {
+// Install adds the SwaggerUI webservice to the given mux. This function returns
+// the built static OpenAPI spec and the registered OpenAPI services to allow
+// further OpenAPI spec aggregation.
+func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) (openAPIService, openAPIVersionedService *handler.OpenAPIService, spec *spec.Swagger) {
+	var err error
+	// Record the static OpenAPI spec to allow further OpenAPI spec aggregation
+	// with this static spec on the registered OpenAPI services
+	spec, err = builder.BuildOpenAPISpec(c.RegisteredWebServices(), oa.Config)
+	if err != nil {
+		klog.Fatalf("Failed to build open api spec for root: %v", err)
+	}
 	// NOTE: [DEPRECATION] We will announce deprecation for format-separated endpoints for OpenAPI spec,
 	// and switch to a single /openapi/v2 endpoint in Kubernetes 1.10. The design doc and deprecation process
 	// are tracked at: https://docs.google.com/document/d/19lEqE9lc4yHJ3WJAJxS_G7TcORIJXGHyq3wpwcH28nU.
-	_, err := handler.BuildAndRegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, mux)
+	openAPIService, err = handler.RegisterOpenAPIService(spec, "/swagger.json", mux)
 	if err != nil {
 		klog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
-	_, err = handler.BuildAndRegisterOpenAPIVersionedService("/openapi/v2", c.RegisteredWebServices(), oa.Config, mux)
+	openAPIVersionedService, err = handler.RegisterOpenAPIVersionedService(spec, "/openapi/v2", mux)
 	if err != nil {
 		klog.Fatalf("Failed to register versioned open api spec for root: %v", err)
 	}
+	return openAPIService, openAPIVersionedService, spec
 }
