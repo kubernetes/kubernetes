@@ -87,11 +87,11 @@ func newCertSubPhases() []workflow.Phase {
 
 	// All subphase
 	allPhase := workflow.Phase{
-		Name:           "all",
-		Short:          "Generates all certificates",
-		InheritFlags:   getCertPhaseFlags("all"),
-		RunAllSiblings: true,
-		LocalFlags:     localFlags(),
+		Name:         "all",
+		Short:        "Generates all certificates",
+		InheritFlags: getCertPhaseFlags("all"),
+		Run:          runAll,
+		LocalFlags:   localFlags(),
 	}
 
 	subPhases = append(subPhases, allPhase)
@@ -287,4 +287,21 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 		// create the new certificate (or use existing)
 		return certsphase.CreateCertAndKeyFilesWithCA(cert, caCert, cfg)
 	}
+}
+
+func runAll(c workflow.RunData) error {
+	data, ok := c.(certsData)
+	if !ok {
+		return errors.New("certs phase invoked with an invalid data struct")
+	}
+
+	// if external CA mode, skip certificate generation
+	if data.ExternalCA() {
+		fmt.Println("[certs] External CA mode: Using existing certificates")
+		return nil
+	}
+
+	cfg := data.Cfg()
+	cfg.CertificatesDir = data.CertificateWriteDir()
+	return errors.Wrap(certsphase.CreatePKIAssets(cfg), "couldn't create PKI assets")
 }
