@@ -90515,6 +90515,10 @@
       "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
+     "nonPreempting": {
+      "description": "nonPreempting specifies whether a pod with this PriorityClass could trigger a preemption process. If this field is unset, the PriorityClass is considered a preempting class by default.",
+      "type": "boolean"
+     },
      "value": {
       "description": "The value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
       "type": "integer",

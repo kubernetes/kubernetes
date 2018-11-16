@@ -64,6 +64,7 @@ func autoConvert_v1beta1_PriorityClass_To_scheduling_PriorityClass(in *v1beta1.P
 	out.Value = in.Value
 	out.GlobalDefault = in.GlobalDefault
 	out.Description = in.Description
+	out.NonPreempting = in.NonPreempting
 	return nil
 }
 
@@ -77,6 +78,7 @@ func autoConvert_scheduling_PriorityClass_To_v1beta1_PriorityClass(in *schedulin
 	out.Value = in.Value
 	out.GlobalDefault = in.GlobalDefault
 	out.Description = in.Description
+	out.NonPreempting = in.NonPreempting
 	return nil
 }
 
