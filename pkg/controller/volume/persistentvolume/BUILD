@@ -70,6 +70,7 @@ go_test(
         "delete_test.go",
         "framework_test.go",
         "index_test.go",
+        "main_test.go",
         "provision_test.go",
         "pv_controller_test.go",
         "recycle_test.go",

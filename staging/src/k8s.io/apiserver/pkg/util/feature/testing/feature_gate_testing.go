@@ -18,13 +18,57 @@ package testing
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"k8s.io/apiserver/pkg/util/feature"
 )
 
+// VerifyFeatureGatesUnchanged ensures the provided gate does not change any values when tests() are completed.
+// Intended to be placed into unit test packages that mess with feature gates.
+//
+// Example use:
+//
+// import (
+//   "testing"
+//
+//   utilfeature "k8s.io/apiserver/pkg/util/feature"
+//   utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+//   _ "k8s.io/kubernetes/pkg/features"
+// )
+//
+// func TestMain(m *testing.M) {
+//   utilfeaturetesting.VerifyFeatureGatesUnchanged(utilfeature.DefaultFeatureGate, m.Run)
+// }
+func VerifyFeatureGatesUnchanged(gate feature.FeatureGate, tests func() int) {
+	originalGates := gate.DeepCopy()
+	originalSet := fmt.Sprint(gate)
+
+	rc := tests()
+
+	finalSet := fmt.Sprint(gate)
+	if finalSet != originalSet {
+		for _, kv := range strings.Split(finalSet, ",") {
+			k := strings.Split(kv, "=")[0]
+			if originalGates.Enabled(feature.Feature(k)) != gate.Enabled(feature.Feature(k)) {
+				fmt.Println(fmt.Sprintf("VerifyFeatureGatesUnchanged: mutated %s feature gate from %v to %v", k, originalGates.Enabled(feature.Feature(k)), gate.Enabled(feature.Feature(k))))
+				rc = 1
+			}
+		}
+	}
+
+	if rc != 0 {
+		os.Exit(rc)
+	}
+}
+
 // SetFeatureGateDuringTest sets the specified gate to the specified value, and returns a function that restores the original value.
 // Failures to set or restore cause the test to fail.
+//
+// Example use:
+//
+// defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
 func SetFeatureGateDuringTest(t *testing.T, gate feature.FeatureGate, feature feature.Feature, value bool) func() {
 	originalValue := gate.Enabled(feature)
 
