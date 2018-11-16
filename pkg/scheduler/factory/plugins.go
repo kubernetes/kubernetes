@@ -48,6 +48,7 @@ type PluginFactoryArgs struct {
 	StorageClassInfo               predicates.StorageClassInfo
 	VolumeBinder                   *volumebinder.VolumeBinder
 	HardPodAffinitySymmetricWeight int32
+	PriorityLister                 algorithm.PriorityClassLister
 }
 
 // PriorityMetadataProducerFactory produces PriorityMetadataProducer from the given args.

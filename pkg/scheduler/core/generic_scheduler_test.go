@@ -479,6 +479,7 @@ func TestGenericScheduler(t *testing.T) {
 				nil,
 				pvcLister,
 				schedulertesting.FakePDBLister{},
+				schedulertesting.FakePriorityClassLister{},
 				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
@@ -511,7 +512,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		prioritizers,
 		priorities.EmptyPriorityMetadataProducer,
 		emptyPluginSet,
-		nil, nil, nil, nil, false, false,
+		nil, nil, nil, nil, nil,false, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateNodeNameToInfoMap(s.(*genericScheduler).cachedNodeInfoMap)
 	return s.(*genericScheduler)
@@ -1441,6 +1442,7 @@ func TestPreempt(t *testing.T) {
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
 				schedulertesting.FakePDBLister{},
+				schedulertesting.FakePriorityClassLister{},
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
@@ -1528,6 +1530,107 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			numAllNodes:              6000,
 			wantNumNodes:             2400,
 		},
+// syncingMockCache delegates method calls to an actual Cache,
+// but calls to UpdateNodeNameToInfoMap synchronize with the test.
+type syncingMockCache struct {
+	schedulerinternalcache.Cache
+	cycleStart, cacheInvalidated chan struct{}
+	once                         sync.Once
+}
+
+// UpdateNodeNameToInfoMap delegates to the real implementation, but on the first call, it
+// synchronizes with the test.
+//
+// Since UpdateNodeNameToInfoMap is one of the first steps of (*genericScheduler).Schedule, we use
+// this point to signal to the test that a scheduling cycle has started.
+func (c *syncingMockCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulernodeinfo.NodeInfo) error {
+	err := c.Cache.UpdateNodeNameToInfoMap(infoMap)
+	c.once.Do(func() {
+		c.cycleStart <- struct{}{}
+		<-c.cacheInvalidated
+	})
+	return err
+}
+
+// TestCacheInvalidationRace tests that equivalence cache invalidation is correctly
+// handled when an invalidation event happens early in a scheduling cycle. Specifically, the event
+// occurs after schedulernodeinfo is snapshotted and before equivalence cache lock is acquired.
+func TestCacheInvalidationRace(t *testing.T) {
+	// Create a predicate that returns false the first time and true on subsequent calls.
+	podWillFit := false
+	var callCount int
+	testPredicate := func(pod *v1.Pod,
+		meta algorithm.PredicateMetadata,
+		nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+		callCount++
+		if !podWillFit {
+			podWillFit = true
+			return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
+		}
+		return true, nil, nil
+	}
+
+	// Set up the mock cache.
+	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
+	testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
+	cache.AddNode(testNode)
+	mockCache := &syncingMockCache{
+		Cache:            cache,
+		cycleStart:       make(chan struct{}),
+		cacheInvalidated: make(chan struct{}),
+	}
+
+	ps := map[string]algorithm.FitPredicate{"testPredicate": testPredicate}
+	algorithmpredicates.SetPredicatesOrdering([]string{"testPredicate"})
+	eCache := equivalence.NewCache(algorithmpredicates.Ordering())
+	eCache.GetNodeCache(testNode.Name)
+	// Ensure that equivalence cache invalidation happens after the scheduling cycle starts, but before
+	// the equivalence cache would be updated.
+	go func() {
+		<-mockCache.cycleStart
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "new-pod", UID: "new-pod"},
+			Spec:       v1.PodSpec{NodeName: "machine1"}}
+		if err := cache.AddPod(pod); err != nil {
+			t.Errorf("Could not add pod to cache: %v", err)
+		}
+		eCache.InvalidateAllPredicatesOnNode("machine1")
+		mockCache.cacheInvalidated <- struct{}{}
+	}()
+
+	// Set up the scheduler.
+	prioritizers := []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
+	pvcLister := schedulertesting.FakePersistentVolumeClaimLister([]*v1.PersistentVolumeClaim{})
+	pdbLister := schedulertesting.FakePDBLister{}
+	priorityClassLister := schedulertesting.FakePriorityClassLister{}
+	scheduler := NewGenericScheduler(
+		mockCache,
+		eCache,
+		internalqueue.NewSchedulingQueue(nil),
+		ps,
+		algorithm.EmptyPredicateMetadataProducer,
+		prioritizers,
+		algorithm.EmptyPriorityMetadataProducer,
+		emptyPluginSet,
+		nil, nil, pvcLister, pdbLister,priorityClassLister
+		true, false,
+		schedulerapi.DefaultPercentageOfNodesToScore)
+
+	// First scheduling attempt should fail.
+	nodeLister := schedulertesting.FakeNodeLister(makeNodeList([]string{"machine1"}))
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+	machine, err := scheduler.Schedule(pod, nodeLister)
+	if machine != "" || err == nil {
+		t.Error("First scheduling attempt did not fail")
+	}
+
+	// Second scheduling attempt should succeed because cache was invalidated.
+	_, err = scheduler.Schedule(pod, nodeLister)
+	if err != nil {
+		t.Errorf("Second scheduling attempt failed: %v", err)
+	}
+	if callCount != 2 {
+		t.Errorf("Predicate should have been called twice. Was called %d times.", callCount)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1538,5 +1641,68 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
+		if !podWillFit {
+			podWillFit = true
+			return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
+		}
+		return true, nil, nil
+	}
+
+	// Set up the mock cache.
+	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
+	testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
+	cache.AddNode(testNode)
+
+	ps := map[string]algorithm.FitPredicate{"testPredicate": testPredicate}
+	algorithmpredicates.SetPredicatesOrdering([]string{"testPredicate"})
+	eCache := equivalence.NewCache(algorithmpredicates.Ordering())
+	eCache.GetNodeCache(testNode.Name)
+	// Ensure that equivalence cache invalidation happens after the scheduling cycle starts, but before
+	// the equivalence cache would be updated.
+	go func() {
+		<-cycleStart
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "new-pod", UID: "new-pod"},
+			Spec:       v1.PodSpec{NodeName: "machine1"}}
+		if err := cache.AddPod(pod); err != nil {
+			t.Errorf("Could not add pod to cache: %v", err)
+		}
+		eCache.InvalidateAllPredicatesOnNode("machine1")
+		cacheInvalidated <- struct{}{}
+	}()
+
+	// Set up the scheduler.
+	prioritizers := []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
+	pvcLister := schedulertesting.FakePersistentVolumeClaimLister([]*v1.PersistentVolumeClaim{})
+	pdbLister := schedulertesting.FakePDBLister{}
+	priorityClassLister := schedulertesting.FakePriorityClassLister{}
+	scheduler := NewGenericScheduler(
+		cache,
+		eCache,
+		internalqueue.NewSchedulingQueue(nil),
+		ps,
+		algorithm.EmptyPredicateMetadataProducer,
+		prioritizers,
+		algorithm.EmptyPriorityMetadataProducer,
+		emptyPluginSet,
+		nil, nil, pvcLister, pdbLister, priorityClassLister,true, false,
+		schedulerapi.DefaultPercentageOfNodesToScore)
+
+	// First scheduling attempt should fail.
+	nodeLister := schedulertesting.FakeNodeLister(makeNodeList([]string{"machine1"}))
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+	machine, err := scheduler.Schedule(pod, nodeLister)
+	if machine != "" || err == nil {
+		t.Error("First scheduling attempt did not fail")
+	}
+
+	// Second scheduling attempt should succeed because cache was invalidated.
+	_, err = scheduler.Schedule(pod, nodeLister)
+	if err != nil {
+		t.Errorf("Second scheduling attempt failed: %v", err)
+	}
+	if callCount != 2 {
+		t.Errorf("Predicate should have been called twice. Was called %d times.", callCount)
+>>>>>>> implement NonPreempting
 	}
 }

@@ -188,6 +188,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Scheduling().V1beta1().PriorityClasses(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
@@ -643,6 +644,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
+		informerFactory.Scheduling().V1beta1().PriorityClasses().Lister(),
 		false,
 		false,
 		api.DefaultPercentageOfNodesToScore)
@@ -694,6 +696,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
+		informerFactory.Scheduling().V1beta1().PriorityClasses().Lister(),
 		false,
 		false,
 		api.DefaultPercentageOfNodesToScore)

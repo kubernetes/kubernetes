@@ -38,6 +38,7 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				"value":          int32(1000),
 				"global-default": false,
 				"description":    "high priority class",
+				"non-preempting": false,
 			},
 			expected: &scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
@@ -46,6 +47,27 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				Value:         int32(1000),
 				GlobalDefault: false,
 				Description:   "high priority class",
+				NonPreempting: false,
+			},
+			expectErr: false,
+		},
+		{
+			name: "test valid case that field non-preempting is set",
+			params: map[string]interface{}{
+				"name":           "foo",
+				"value":          int32(1000),
+				"global-default": false,
+				"description":    "high priority class",
+				"non-preempting": true,
+			},
+			expected: &scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Value:         int32(1000),
+				GlobalDefault: false,
+				Description:   "high priority class",
+				NonPreempting: true,
 			},
 			expectErr: false,
 		},
@@ -56,6 +78,7 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				"value":          int32(1000),
 				"global-default": true,
 				"description":    "high priority class",
+				"non-preempting": false,
 			},
 			expected: &scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
@@ -64,6 +87,7 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				Value:         int32(1000),
 				GlobalDefault: true,
 				Description:   "high priority class",
+				NonPreempting: false,
 			},
 			expectErr: false,
 		},
@@ -73,6 +97,7 @@ func TestPriorityClassV1Generator(t *testing.T) {
 				"name":           "foo",
 				"global-default": true,
 				"description":    "high priority class",
+				"non-preempting": false,
 			},
 			expectErr: true,
 		},
