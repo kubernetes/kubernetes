@@ -124,6 +124,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/examples/workqueue:all-srcs",
         "//staging/src/k8s.io/client-go/informers:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes:all-srcs",
+        "//staging/src/k8s.io/client-go/kubernetes_test:all-srcs",
         "//staging/src/k8s.io/client-go/listers/admissionregistration/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/admissionregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/apps/v1:all-srcs",
