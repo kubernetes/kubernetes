@@ -116,7 +116,6 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/builder:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/handler:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
