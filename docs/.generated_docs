@@ -42,10 +42,12 @@ docs/admin/kubeadm_config_view.md
 docs/admin/kubeadm_init.md
 docs/admin/kubeadm_init_phase.md
 docs/admin/kubeadm_init_phase_addon.md
+docs/admin/kubeadm_init_phase_addon_all.md
 docs/admin/kubeadm_init_phase_addon_coredns.md
 docs/admin/kubeadm_init_phase_addon_kube-proxy.md
 docs/admin/kubeadm_init_phase_bootstrap-token.md
 docs/admin/kubeadm_init_phase_certs.md
+docs/admin/kubeadm_init_phase_certs_all.md
 docs/admin/kubeadm_init_phase_certs_apiserver-etcd-client.md
 docs/admin/kubeadm_init_phase_certs_apiserver-kubelet-client.md
 docs/admin/kubeadm_init_phase_certs_apiserver.md
@@ -58,6 +60,7 @@ docs/admin/kubeadm_init_phase_certs_front-proxy-ca.md
 docs/admin/kubeadm_init_phase_certs_front-proxy-client.md
 docs/admin/kubeadm_init_phase_certs_sa.md
 docs/admin/kubeadm_init_phase_control-plane.md
+docs/admin/kubeadm_init_phase_control-plane_all.md
 docs/admin/kubeadm_init_phase_control-plane_apiserver.md
 docs/admin/kubeadm_init_phase_control-plane_controller-manager.md
 docs/admin/kubeadm_init_phase_control-plane_scheduler.md
@@ -65,6 +68,7 @@ docs/admin/kubeadm_init_phase_etcd.md
 docs/admin/kubeadm_init_phase_etcd_local.md
 docs/admin/kubeadm_init_phase_kubeconfig.md
 docs/admin/kubeadm_init_phase_kubeconfig_admin.md
+docs/admin/kubeadm_init_phase_kubeconfig_all.md
 docs/admin/kubeadm_init_phase_kubeconfig_controller-manager.md
 docs/admin/kubeadm_init_phase_kubeconfig_kubelet.md
 docs/admin/kubeadm_init_phase_kubeconfig_scheduler.md
@@ -72,6 +76,7 @@ docs/admin/kubeadm_init_phase_kubelet-start.md
 docs/admin/kubeadm_init_phase_mark-control-plane.md
 docs/admin/kubeadm_init_phase_preflight.md
 docs/admin/kubeadm_init_phase_upload-config.md
+docs/admin/kubeadm_init_phase_upload-config_all.md
 docs/admin/kubeadm_init_phase_upload-config_kubeadm.md
 docs/admin/kubeadm_init_phase_upload-config_kubelet.md
 docs/admin/kubeadm_join.md
@@ -131,10 +136,12 @@ docs/man/man1/kubeadm-config-upload-from-flags.1
 docs/man/man1/kubeadm-config-upload.1
 docs/man/man1/kubeadm-config-view.1
 docs/man/man1/kubeadm-config.1
+docs/man/man1/kubeadm-init-phase-addon-all.1
 docs/man/man1/kubeadm-init-phase-addon-coredns.1
 docs/man/man1/kubeadm-init-phase-addon-kube-proxy.1
 docs/man/man1/kubeadm-init-phase-addon.1
 docs/man/man1/kubeadm-init-phase-bootstrap-token.1
+docs/man/man1/kubeadm-init-phase-certs-all.1
 docs/man/man1/kubeadm-init-phase-certs-apiserver-etcd-client.1
 docs/man/man1/kubeadm-init-phase-certs-apiserver-kubelet-client.1
 docs/man/man1/kubeadm-init-phase-certs-apiserver.1
@@ -147,6 +154,7 @@ docs/man/man1/kubeadm-init-phase-certs-front-proxy-ca.1
 docs/man/man1/kubeadm-init-phase-certs-front-proxy-client.1
 docs/man/man1/kubeadm-init-phase-certs-sa.1
 docs/man/man1/kubeadm-init-phase-certs.1
+docs/man/man1/kubeadm-init-phase-control-plane-all.1
 docs/man/man1/kubeadm-init-phase-control-plane-apiserver.1
 docs/man/man1/kubeadm-init-phase-control-plane-controller-manager.1
 docs/man/man1/kubeadm-init-phase-control-plane-scheduler.1
@@ -154,6 +162,7 @@ docs/man/man1/kubeadm-init-phase-control-plane.1
 docs/man/man1/kubeadm-init-phase-etcd-local.1
 docs/man/man1/kubeadm-init-phase-etcd.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-admin.1
+docs/man/man1/kubeadm-init-phase-kubeconfig-all.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-controller-manager.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-init-phase-kubeconfig-scheduler.1
@@ -161,6 +170,7 @@ docs/man/man1/kubeadm-init-phase-kubeconfig.1
 docs/man/man1/kubeadm-init-phase-kubelet-start.1
 docs/man/man1/kubeadm-init-phase-mark-control-plane.1
 docs/man/man1/kubeadm-init-phase-preflight.1
+docs/man/man1/kubeadm-init-phase-upload-config-all.1
 docs/man/man1/kubeadm-init-phase-upload-config-kubeadm.1
 docs/man/man1/kubeadm-init-phase-upload-config-kubelet.1
 docs/man/man1/kubeadm-init-phase-upload-config.1

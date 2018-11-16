@@ -66,12 +66,11 @@ type certsData interface {
 // NewCertsPhase returns the phase for the certs
 func NewCertsPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "certs",
-		Short:        "Certificate generation",
-		Phases:       newCertSubPhases(),
-		Run:          runCerts,
-		InheritFlags: getCertPhaseFlags("all"),
-		LocalFlags:   localFlags(),
+		Name:   "certs",
+		Short:  "Certificate generation",
+		Phases: newCertSubPhases(),
+		Run:    runCerts,
+		Long:   cmdutil.MacroCommandLongDescription,
 	}
 }
 
@@ -85,6 +84,17 @@ func localFlags() *pflag.FlagSet {
 // newCertSubPhases returns sub phases for certs phase
 func newCertSubPhases() []workflow.Phase {
 	subPhases := []workflow.Phase{}
+
+	// All subphase
+	allPhase := workflow.Phase{
+		Name:           "all",
+		Short:          "Generates all certificates",
+		InheritFlags:   getCertPhaseFlags("all"),
+		RunAllSiblings: true,
+		LocalFlags:     localFlags(),
+	}
+
+	subPhases = append(subPhases, allPhase)
 
 	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
 
