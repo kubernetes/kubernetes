@@ -6,7 +6,6 @@ go_library(
         "quota_linux_common.go",
         "quota_linux_common_impl.go",
     ],
-    cgo = True,
     importpath = "k8s.io/kubernetes/pkg/volume/util/quota/common",
     visibility = ["//visibility:public"],
     deps = select({

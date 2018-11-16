@@ -18,29 +18,6 @@ limitations under the License.
 
 package xfs
 
-/*
-#include <stdlib.h>
-#include <dirent.h>
-#include <linux/fs.h>
-#include <linux/quota.h>
-#include <linux/dqblk_xfs.h>
-#include <errno.h>
-
-#ifndef PRJQUOTA
-#define PRJQUOTA	2
-#endif
-#ifndef XFS_PROJ_QUOTA
-#define XFS_PROJ_QUOTA	2
-#endif
-#ifndef Q_XSETPQLIM
-#define Q_XSETPQLIM QCMD(Q_XSETQLIM, PRJQUOTA)
-#endif
-#ifndef Q_XGETPQUOTA
-#define Q_XGETPQUOTA QCMD(Q_XGETQUOTA, PRJQUOTA)
-#endif
-*/
-import "C"
-
 import (
 	"fmt"
 	"syscall"
@@ -59,6 +36,32 @@ const (
 	bitsPerWord       = 32 << (^uint(0) >> 63) // either 32 or 64
 	maxQuota    int64 = 1<<(bitsPerWord-1) - 1 // either 1<<31 - 1 or 1<<63 - 1
 )
+
+// DiskQuota -- shadowing fs_disk_quota_t from <linux/dqblk_xfs.h>
+type diskQuota struct {
+	version      int8
+	flags        int8
+	fieldmask    uint16
+	id           uint32
+	blkhardlimit uint64
+	blksoftlimit uint64
+	inohardlimit uint64
+	inosoftlimit uint64
+	bcount       uint64
+	icount       uint64
+	itimer       int32
+	btimer       int32
+	iwarns       uint16
+	bwarns       uint16
+	padding2     int32
+	rtbhardlimit uint64
+	rtbsoftlimit uint64
+	rtbcount     uint64
+	rtbtimer     int32
+	rtbwarns     uint16
+	padding3     int16
+	padding4     [4]byte
+}
 
 // VolumeProvider supplies a quota applier to the generic code.
 type VolumeProvider struct {
@@ -92,20 +95,19 @@ func (v xfsVolumeQuota) SetQuotaOnDir(path string, id common.QuotaID, bytes int6
 		bytes = maxQuota
 	}
 
-	var d C.fs_disk_quota_t
-	d.d_version = C.FS_DQUOT_VERSION
-	d.d_id = C.__u32(id)
-	d.d_flags = C.XFS_PROJ_QUOTA
+	var d diskQuota
+	d.version = common.FSDQuotVersion
+	d.id = uint32(id)
+	d.flags = common.XFSProjQuota
 
-	d.d_fieldmask = C.FS_DQ_BHARD
-	d.d_blk_hardlimit = C.__u64(bytes / quotaBsize)
-	d.d_blk_softlimit = d.d_blk_hardlimit
+	d.fieldmask = common.FSDQBHard
+	d.blkhardlimit = uint64(bytes / quotaBsize)
+	d.blksoftlimit = d.blkhardlimit
 
-	var cs = C.CString(v.backingDev)
-	defer C.free(unsafe.Pointer(cs))
+	cs := append([]byte(v.backingDev), 0)
 
-	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, C.Q_XSETPQLIM,
-		uintptr(unsafe.Pointer(cs)), uintptr(d.d_id),
+	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, common.QXSetPQLim,
+		uintptr(unsafe.Pointer(&cs[0])), uintptr(d.id),
 		uintptr(unsafe.Pointer(&d)), 0, 0)
 	if errno != 0 {
 		return fmt.Errorf("Failed to set quota limit for ID %d on %s: %v",
@@ -114,14 +116,13 @@ func (v xfsVolumeQuota) SetQuotaOnDir(path string, id common.QuotaID, bytes int6
 	return common.ApplyProjectToDir(path, id)
 }
 
-func (v xfsVolumeQuota) getQuotaInfo(path string, id common.QuotaID) (C.fs_disk_quota_t, syscall.Errno) {
-	var d C.fs_disk_quota_t
+func (v xfsVolumeQuota) getQuotaInfo(path string, id common.QuotaID) (diskQuota, syscall.Errno) {
+	var d diskQuota
 
-	var cs = C.CString(v.backingDev)
-	defer C.free(unsafe.Pointer(cs))
+	cs := append([]byte(v.backingDev), 0)
 
-	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, C.Q_XGETPQUOTA,
-		uintptr(unsafe.Pointer(cs)), uintptr(C.__u32(id)),
+	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, common.QXGetPQuota,
+		uintptr(unsafe.Pointer(&cs[0])), uintptr(uint32(id)),
 		uintptr(unsafe.Pointer(&d)), 0, 0)
 	return d, errno
 }
@@ -138,8 +139,8 @@ func (v xfsVolumeQuota) GetConsumption(path string, id common.QuotaID) (int64, e
 	if errno != 0 {
 		return 0, fmt.Errorf("Failed to get quota for %s: %s", path, errno.Error())
 	}
-	klog.V(3).Infof("Consumption for %s is %v", path, d.d_bcount*quotaBsize)
-	return int64(d.d_bcount) * quotaBsize, nil
+	klog.V(3).Infof("Consumption for %s is %v", path, d.bcount*quotaBsize)
+	return int64(d.bcount) * quotaBsize, nil
 }
 
 // GetInodes -- retrieve the number of inodes in use under the directory
@@ -148,6 +149,6 @@ func (v xfsVolumeQuota) GetInodes(path string, id common.QuotaID) (int64, error)
 	if errno != 0 {
 		return 0, fmt.Errorf("Failed to get quota for %s: %s", path, errno.Error())
 	}
-	klog.V(3).Infof("Inode consumption for %s is %v", path, d.d_icount)
-	return int64(d.d_icount), nil
+	klog.V(3).Infof("Inode consumption for %s is %v", path, d.icount)
+	return int64(d.icount), nil
 }

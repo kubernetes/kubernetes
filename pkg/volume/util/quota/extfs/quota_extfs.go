@@ -18,25 +18,6 @@ limitations under the License.
 
 package extfs
 
-/*
-#include <stdlib.h>
-#include <dirent.h>
-#include <linux/fs.h>
-#include <linux/quota.h>
-#include <errno.h>
-
-#ifndef PRJQUOTA
-#define PRJQUOTA	2
-#endif
-#ifndef Q_SETPQUOTA
-#define Q_SETPQUOTA (unsigned) QCMD(Q_SETQUOTA, PRJQUOTA)
-#endif
-#ifndef Q_GETPQUOTA
-#define Q_GETPQUOTA (unsigned) QCMD(Q_GETQUOTA, PRJQUOTA)
-#endif
-*/
-import "C"
-
 import (
 	"fmt"
 	"syscall"
@@ -54,6 +35,19 @@ const (
 	bitsPerWord           = 32 << (^uint(0) >> 63)                 // either 32 or 64
 	maxQuota        int64 = (1<<(bitsPerWord-1) - 1) & (1<<58 - 1) // either 1<<31 - 1 or 1<<58 - 1
 )
+
+// dqblk -- shadowing if_dqblk from <linux/quota.h>
+type dqblk struct {
+	bhardlimit uint64
+	bsoftlimit uint64
+	curspace   uint64
+	ihardlimit uint64
+	isoftlimit uint64
+	curinodes  uint64
+	btime      uint64
+	itime      uint64
+	valid      uint32
+}
 
 // VolumeProvider supplies a quota applier to the generic code.
 type VolumeProvider struct {
@@ -88,19 +82,18 @@ func (v extfsVolumeQuota) SetQuotaOnDir(path string, id common.QuotaID, bytes in
 		bytes = maxQuota
 	}
 
-	var d C.struct_if_dqblk
+	var d dqblk
 
-	d.dqb_bhardlimit = C.__u64(bytes / quotaBsize)
-	d.dqb_bsoftlimit = d.dqb_bhardlimit
-	d.dqb_ihardlimit = 0
-	d.dqb_isoftlimit = 0
-	d.dqb_valid = C.QIF_LIMITS
+	d.bhardlimit = uint64(bytes / quotaBsize)
+	d.bsoftlimit = d.bhardlimit
+	d.ihardlimit = 0
+	d.isoftlimit = 0
+	d.valid = common.QIfLimits
 
-	var cs = C.CString(v.backingDev)
-	defer C.free(unsafe.Pointer(cs))
+	cs := append([]byte(v.backingDev), 0)
 
-	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, C.Q_SETPQUOTA,
-		uintptr(unsafe.Pointer(cs)), uintptr(id),
+	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, common.QSetPQuota,
+		uintptr(unsafe.Pointer(&cs[0])), uintptr(id),
 		uintptr(unsafe.Pointer(&d)), 0, 0)
 	if errno != 0 {
 		return fmt.Errorf("Failed to set quota limit for ID %d on %s: %v",
@@ -109,14 +102,13 @@ func (v extfsVolumeQuota) SetQuotaOnDir(path string, id common.QuotaID, bytes in
 	return common.ApplyProjectToDir(path, id)
 }
 
-func (v extfsVolumeQuota) getQuotaInfo(path string, id common.QuotaID) (C.struct_if_dqblk, syscall.Errno) {
-	var d C.struct_if_dqblk
+func (v extfsVolumeQuota) getQuotaInfo(path string, id common.QuotaID) (dqblk, syscall.Errno) {
+	var d dqblk
 
-	var cs = C.CString(v.backingDev)
-	defer C.free(unsafe.Pointer(cs))
+	cs := append([]byte(v.backingDev), 0)
 
-	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, C.Q_GETPQUOTA,
-		uintptr(unsafe.Pointer(cs)), uintptr(C.__u32(id)),
+	_, _, errno := unix.Syscall6(unix.SYS_QUOTACTL, common.QGetPQuota,
+		uintptr(unsafe.Pointer(&cs[0])), uintptr(uint32(id)),
 		uintptr(unsafe.Pointer(&d)), 0, 0)
 	return d, errno
 }
@@ -124,9 +116,9 @@ func (v extfsVolumeQuota) getQuotaInfo(path string, id common.QuotaID) (C.struct
 // QuotaIDIsInUse -- determine whether the quota ID is already in use.
 func (v extfsVolumeQuota) QuotaIDIsInUse(path string, id common.QuotaID) (bool, error) {
 	d, errno := v.getQuotaInfo(path, id)
-	isInUse := !(d.dqb_bhardlimit == 0 && d.dqb_bsoftlimit == 0 && d.dqb_curspace == 0 &&
-		d.dqb_ihardlimit == 0 && d.dqb_isoftlimit == 0 && d.dqb_curinodes == 0 &&
-		d.dqb_btime == 0 && d.dqb_itime == 0)
+	isInUse := !(d.bhardlimit == 0 && d.bsoftlimit == 0 && d.curspace == 0 &&
+		d.ihardlimit == 0 && d.isoftlimit == 0 && d.curinodes == 0 &&
+		d.btime == 0 && d.itime == 0)
 	return errno == 0 && isInUse, nil
 }
 
@@ -138,8 +130,8 @@ func (v extfsVolumeQuota) GetConsumption(path string, id common.QuotaID) (int64,
 	if errno != 0 {
 		return 0, fmt.Errorf("Failed to get quota for %s: %s", path, errno.Error())
 	}
-	klog.V(3).Infof("Consumption for %s is %v", path, d.dqb_curspace)
-	return int64(d.dqb_curspace), nil
+	klog.V(3).Infof("Consumption for %s is %v", path, d.curspace)
+	return int64(d.curspace), nil
 }
 
 // GetInodes -- retrieve the number of inodes in use under the directory
@@ -148,6 +140,6 @@ func (v extfsVolumeQuota) GetInodes(path string, id common.QuotaID) (int64, erro
 	if errno != 0 {
 		return 0, fmt.Errorf("Failed to get quota for %s: %s", path, errno.Error())
 	}
-	klog.V(3).Infof("Inode consumption for %s is %v", path, d.dqb_curinodes)
-	return int64(d.dqb_curinodes), nil
+	klog.V(3).Infof("Inode consumption for %s is %v", path, d.curinodes)
+	return int64(d.curinodes), nil
 }
