@@ -193,6 +193,9 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	processNode := func(i int) {
 		nodeInfo := nodeNameToInfo[allNodeNames[i]]
 		if nodeInfo.Node() != nil {
+			if !nodeInfilteredNodes(nodeInfo, nodes) {
+				return
+			}
 			if hasAffinityConstraints || hasAntiAffinityConstraints {
 				// We need to process all the nodes.
 				for _, existingPod := range nodeInfo.Pods() {
@@ -238,4 +241,13 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 		}
 	}
 	return result, nil
+}
+
+func nodeInfilteredNodes(info *schedulercache.NodeInfo, nodes []*v1.Node) bool {
+	for _, node := range nodes {
+		if node.Name == info.Node().Name {
+			return true
+		}
+	}
+	return false
 }
