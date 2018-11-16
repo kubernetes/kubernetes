@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 
 var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
-	testDevicePlugin(f, true, "/var/lib/kubelet/plugins/")
+	testDevicePlugin(f, true, "/var/lib/kubelet/plugins_registry")
 })
 
 func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSockDir string) {
