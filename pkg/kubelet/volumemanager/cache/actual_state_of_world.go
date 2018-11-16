@@ -25,7 +25,6 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -568,7 +567,9 @@ func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
 
 	volumeObj.globallyMounted = globallyMounted
 	volumeObj.deviceMountPath = deviceMountPath
-	volumeObj.devicePath = devicePath
+	if devicePath != "" {
+		volumeObj.devicePath = devicePath
+	}
 	asw.attachedVolumes[volumeName] = volumeObj
 	return nil
 }
