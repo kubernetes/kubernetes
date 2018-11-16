@@ -81,10 +81,10 @@ func NewKubeConfigPhase() workflow.Phase {
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
-				Name:           "all",
-				Short:          "Generates all kubeconfig files",
-				InheritFlags:   getKubeConfigPhaseFlags("all"),
-				RunAllSiblings: true,
+				Name:         "all",
+				Short:        "Generates all kubeconfig files",
+				InheritFlags: getKubeConfigPhaseFlags("all"),
+				RunAll:       true,
 			},
 			NewKubeConfigFilePhase(kubeadmconstants.AdminKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.KubeletKubeConfigFileName),

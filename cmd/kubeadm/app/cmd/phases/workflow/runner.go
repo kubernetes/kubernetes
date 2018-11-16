@@ -68,6 +68,9 @@ type Runner struct {
 	// for phases. Flags could be inherited from the parent command too or added directly to each phase
 	cmdAdditionalFlags *pflag.FlagSet
 
+	// runFunc will be run instead of all of the Phases if it's specified
+	runFunc PhaseFunc
+
 	// phaseRunners is part of the internal state of the runner and provides
 	// a list of wrappers to phases composing the workflow with contextual
 	// information supporting phase execution.
@@ -205,6 +208,10 @@ func (e *Runner) Run() error {
 		return err
 	}
 
+	if e.runFunc != nil {
+		return errors.Wrap(e.runFunc(data), "failed to execute phase")
+	}
+
 	err = e.visitAll(func(p *phaseRunner) error {
 		// if the phase should not be run, skip the phase.
 		if run, ok := phaseRunFlags[p.generatedName]; !run || !ok {
@@ -213,8 +220,8 @@ func (e *Runner) Run() error {
 
 		// Errors if phases that are meant to create special subcommands only
 		// are wrongly assigned Run Methods
-		if p.RunAllSiblings && (p.RunIf != nil || p.Run != nil) {
-			return errors.Wrapf(err, "phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
+		if p.RunAll && (p.RunIf != nil || p.Run != nil) {
+			return errors.Wrapf(err, "phase marked as RunAll can not have Run functions %s", p.generatedName)
 		}
 
 		// If the phase defines a condition to be checked before executing the phase action.
@@ -250,7 +257,7 @@ func (e *Runner) Help(cmdUse string) string {
 	// computes the max length of for each phase use line
 	maxLength := 0
 	e.visitAll(func(p *phaseRunner) error {
-		if !p.Hidden && !p.RunAllSiblings {
+		if !p.Hidden && !p.RunAll {
 			length := len(p.use)
 			if maxLength < length {
 				maxLength = length
@@ -265,7 +272,7 @@ func (e *Runner) Help(cmdUse string) string {
 	line += "```\n"
 	offset := 2
 	e.visitAll(func(p *phaseRunner) error {
-		if !p.Hidden && !p.RunAllSiblings {
+		if !p.Hidden && !p.RunAll {
 			padding := maxLength - len(p.use) + offset
 			line += strings.Repeat(" ", offset*p.level) // indentation
 			line += p.use                               // name + aliases
@@ -322,8 +329,9 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 		phaseSelector := p.generatedName
 
 		// if requested, set the phase to run all the sibling phases
-		if p.RunAllSiblings {
+		if p.RunAll {
 			phaseSelector = p.parent.generatedName
+			e.runFunc = p.RunAllFunc
 		}
 
 		// creates phase subcommand
@@ -338,6 +346,9 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 				if len(p.Phases) > 0 {
 					cmd.Help()
 					return
+				}
+
+				if p.RunAll && p.RunAllFunc != nil {
 				}
 
 				// overrides the command triggering the Runner using the phaseCmd
@@ -426,7 +437,7 @@ func (e *Runner) prepareForExecution() {
 	var parentRunner *phaseRunner
 	for _, phase := range e.Phases {
 		// skips phases that are meant to create special subcommands only
-		if phase.RunAllSiblings {
+		if phase.RunAll {
 			continue
 		}
 

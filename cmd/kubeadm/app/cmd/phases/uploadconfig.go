@@ -72,10 +72,10 @@ func NewUploadConfigPhase() workflow.Phase {
 		Long:    cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
-				Name:           "all",
-				Short:          "Uploads all configuration to a config map",
-				RunAllSiblings: true,
-				InheritFlags:   getUploadConfigPhaseFlags(),
+				Name:         "all",
+				Short:        "Uploads all configuration to a config map",
+				RunAll:       true,
+				InheritFlags: getUploadConfigPhaseFlags(),
 			},
 			{
 				Name:         "kubeadm",

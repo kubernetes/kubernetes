@@ -53,10 +53,10 @@ func NewAddonPhase() workflow.Phase {
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
-				Name:           "all",
-				Short:          "Installs all the addons",
-				InheritFlags:   getAddonPhaseFlags("all"),
-				RunAllSiblings: true,
+				Name:         "all",
+				Short:        "Installs all the addons",
+				InheritFlags: getAddonPhaseFlags("all"),
+				RunAll:       true,
 			},
 			{
 				Name:         "coredns",

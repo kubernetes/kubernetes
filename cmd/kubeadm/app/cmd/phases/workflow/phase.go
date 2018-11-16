@@ -18,6 +18,9 @@ package workflow
 
 import "github.com/spf13/pflag"
 
+// PhaseFunc is the type signature all phase execution functions should have
+type PhaseFunc func(data RunData) error
+
 // Phase provides an implementation of a workflow phase that allows
 // creation of new phases by simply instantiating a variable of this type.
 type Phase struct {
@@ -45,15 +48,21 @@ type Phase struct {
 	// Phases defines a nested, ordered sequence of phases.
 	Phases []Phase
 
-	// RunAllSiblings allows to assign to a phase the responsibility to
-	// run all the sibling phases
-	// Nb. phase marked as RunAllSiblings can not have Run functions
-	RunAllSiblings bool
+	// RunAll marks this phase as an `all` phase: It is intended to run all subphases.
+	// The default implementation of this is to run all subphases in sequence, but
+	// this can be overriden by RunAllFunc
+	// Nb. phase marked as RunAll can not have Run functions
+	RunAll bool
+
+	// RunAllFunc allows the behaviour for `all` phases to be something other than simply running
+	// all phases in sequence. Use this when some phases should be executed conditionally based on
+	// information only available at runtime.
+	RunAllFunc PhaseFunc
 
 	// Run defines a function implementing the phase action.
 	// It is recommended to implent type assertion, e.g. using golang type switch,
 	// for validating the RunData type.
-	Run func(data RunData) error
+	Run PhaseFunc
 
 	// RunIf define a function that implements a condition that should be checked
 	// before executing the phase action.

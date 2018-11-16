@@ -76,10 +76,10 @@ func NewControlPlanePhase() workflow.Phase {
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
-				Name:           "all",
-				Short:          "Generates all static Pod manifest files",
-				InheritFlags:   getControlPlanePhaseFlags("all"),
-				RunAllSiblings: true,
+				Name:         "all",
+				Short:        "Generates all static Pod manifest files",
+				InheritFlags: getControlPlanePhaseFlags("all"),
+				RunAll:       true,
 			},
 			newControlPlaneSubPhase(kubeadmconstants.KubeAPIServer),
 			newControlPlaneSubPhase(kubeadmconstants.KubeControllerManager),
