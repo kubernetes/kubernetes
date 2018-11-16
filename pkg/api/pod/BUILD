@@ -33,7 +33,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "main_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
