@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -728,10 +727,6 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		},
 	}
 
-	// Set feature gate
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
@@ -843,10 +838,6 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedBound:   true,
 		},
 	}
-
-	// Set VolumeScheduling feature gate
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1426,10 +1417,6 @@ func TestBindPodVolumes(t *testing.T) {
 }
 
 func TestFindAssumeVolumes(t *testing.T) {
-	// Set feature gate
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-
 	// Test case
 	podPVCs := []*v1.PersistentVolumeClaim{unboundPVC}
 	pvs := []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1c}

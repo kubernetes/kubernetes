@@ -550,29 +550,31 @@ func TestValidateLocalVolumesDisabled(t *testing.T) {
 		},
 	}
 
-	utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=false")
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolume(scenario.volume)
-		if len(errs) == 0 && scenario.isExpectedFailure {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.isExpectedFailure {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-		}
+		t.Run(name+" PersistentLocalVolumes disabled", func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, false)()
+			errs := ValidatePersistentVolume(scenario.volume)
+			if len(errs) == 0 && scenario.isExpectedFailure {
+				t.Errorf("Unexpected success for scenario: %s", name)
+			}
+			if len(errs) > 0 && !scenario.isExpectedFailure {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+		})
 	}
-	utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
 
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 	for name, scenario := range scenarios {
-		errs := ValidatePersistentVolume(scenario.volume)
-		if len(errs) == 0 && scenario.isExpectedFailure {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.isExpectedFailure {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-		}
+		t.Run(name+" VolumeScheduling disabled", func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
+			errs := ValidatePersistentVolume(scenario.volume)
+			if len(errs) == 0 && scenario.isExpectedFailure {
+				t.Errorf("Unexpected success for scenario: %s", name)
+			}
+			if len(errs) > 0 && !scenario.isExpectedFailure {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+		})
 	}
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 }
 
 func testVolumeWithNodeAffinity(affinity *core.VolumeNodeAffinity) *core.PersistentVolume {
@@ -1553,18 +1555,21 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		// ensure we have a resource version specified for updates
-		togglePVExpandFeature(scenario.enableResize, t)
-		toggleBlockVolumeFeature(scenario.enableBlock, t)
-		scenario.oldClaim.ResourceVersion = "1"
-		scenario.newClaim.ResourceVersion = "1"
-		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
-		if len(errs) == 0 && scenario.isExpectedFailure {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.isExpectedFailure {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-		}
+		t.Run(name, func(t *testing.T) {
+			// ensure we have a resource version specified for updates
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+
+			toggleBlockVolumeFeature(scenario.enableBlock, t)
+			scenario.oldClaim.ResourceVersion = "1"
+			scenario.newClaim.ResourceVersion = "1"
+			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+			if len(errs) == 0 && scenario.isExpectedFailure {
+				t.Errorf("Unexpected success for scenario: %s", name)
+			}
+			if len(errs) > 0 && !scenario.isExpectedFailure {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+		})
 	}
 }
 
@@ -1580,23 +1585,6 @@ func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
 		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 		if err != nil {
 			t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
-			return
-		}
-	}
-}
-
-func togglePVExpandFeature(toggleFlag bool, t *testing.T) {
-	if toggleFlag {
-		// Enable alpha feature LocalStorageCapacityIsolation
-		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
-		if err != nil {
-			t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
-			return
-		}
-	} else {
-		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
-		if err != nil {
-			t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
 			return
 		}
 	}
@@ -1925,11 +1913,7 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for CSIPersistentVolumes: %v", err)
-		return
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 
 	for i, tc := range testCases {
 		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"))
@@ -1945,11 +1929,6 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
 			}
 		}
-	}
-	err = utilfeature.DefaultFeatureGate.Set("CSIPersistentVolume=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for CSIPersistentVolumes: %v", err)
-		return
 	}
 }
 
@@ -3764,20 +3743,14 @@ func TestValidateVolumes(t *testing.T) {
 	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
-	// Enable alpha feature HugePages
-	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
-	}
+	// Enable HugePages
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, true)()
 	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
 
-	// Disable alpha feature HugePages
-	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
-	}
+	// Disable feature HugePages
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, false)()
 	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
 		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
 	}
@@ -3882,12 +3855,8 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 			},
 		},
 	}
-	// Enable alpha feature HugePages
-	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
-		return
-	}
+	// Enable feature HugePages
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, true)()
 	for i := range successCases {
 		pod := &successCases[i]
 		if errs := ValidatePod(pod); len(errs) != 0 {
@@ -3900,13 +3869,9 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
 	}
-	// Disable alpha feature HugePages
-	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
-		return
-	}
-	// Disable alpha feature HugePages and ensure all success cases fail
+	// Disable feature HugePages
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, false)()
+	// Disable feature HugePages and ensure all success cases fail
 	for i := range successCases {
 		pod := &successCases[i]
 		if errs := ValidatePod(pod); len(errs) == 0 {
@@ -4067,23 +4032,15 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 	testCases := []core.VolumeSource{
 		{EmptyDir: &core.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(int64(5), resource.BinarySI)}},
 	}
-	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Enable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	for _, tc := range testCases {
 		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
-	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Disable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
 	for _, tc := range testCases {
 		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
@@ -4097,21 +4054,13 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 				resource.BinarySI),
 		},
 	}
-	// Enable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Enable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Disable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
 	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) == 0 {
 		t.Errorf("expected failure: %v", errs)
 	}
@@ -4146,22 +4095,14 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 		Spec: spec,
 	}
 
-	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Enable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Disable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
 	errs := ValidateResourceQuota(resourceQuota)
 	if len(errs) == 0 {
 		t.Errorf("expected failure for %s", resourceQuota.Name)
@@ -4294,24 +4235,16 @@ func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
 			},
 		},
 	}
-	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Enable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	for _, testCase := range testCases {
 		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success, got: %v", errs)
 		}
 	}
 
-	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Disable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
 	for _, testCase := range testCases {
 		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %v", testCase.Name)
@@ -11201,13 +11134,8 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 		},
 	}
 
-	// Enable alpha feature LocalStorageCapacityIsolation
-	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
-
+	// Enable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	for _, testCase := range testCases {
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
 		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
@@ -11215,12 +11143,8 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 		}
 	}
 
-	// Disable alpha feature LocalStorageCapacityIsolation
-	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
-	if err != nil {
-		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
-		return
-	}
+	// Disable feature LocalStorageCapacityIsolation
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
 	for _, testCase := range testCases {
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
 		if errs := ValidateLimitRange(limitRange); len(errs) == 0 {
@@ -11577,17 +11501,20 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}
 	for name, scenario := range scenarios {
-		// ensure we have a resource version specified for updates
-		togglePVExpandFeature(scenario.enableResize, t)
-		scenario.oldClaim.ResourceVersion = "1"
-		scenario.newClaim.ResourceVersion = "1"
-		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
-		if len(errs) == 0 && scenario.isExpectedFailure {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.isExpectedFailure {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-		}
+		t.Run(name, func(t *testing.T) {
+			// ensure we have a resource version specified for updates
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+
+			scenario.oldClaim.ResourceVersion = "1"
+			scenario.newClaim.ResourceVersion = "1"
+			errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+			if len(errs) == 0 && scenario.isExpectedFailure {
+				t.Errorf("Unexpected success for scenario: %s", name)
+			}
+			if len(errs) > 0 && !scenario.isExpectedFailure {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+		})
 	}
 }
 
@@ -11757,13 +11684,13 @@ func TestValidateResourceQuota(t *testing.T) {
 			Spec: nonBestEffortSpec,
 		},
 	}
-	utilfeature.DefaultFeatureGate.Set("ResourceQuotaScopeSelectors=true")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, true)()
 	for _, successCase := range successCases {
 		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
-	utilfeature.DefaultFeatureGate.Set("ResourceQuotaScopeSelectors=false")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, false)()
 
 	errorCases := map[string]struct {
 		R core.ResourceQuota

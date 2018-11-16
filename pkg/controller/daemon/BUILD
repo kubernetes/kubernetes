@@ -61,6 +61,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "daemon_controller_test.go",
+        "main_test.go",
         "update_test.go",
     ],
     embed = [":go_default_library"],
@@ -84,6 +85,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",

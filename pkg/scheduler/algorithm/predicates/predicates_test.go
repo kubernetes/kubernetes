@@ -30,7 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -4913,10 +4915,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -4937,10 +4936,6 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		})
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
-	}
 }
 
 func TestGetMaxVols(t *testing.T) {

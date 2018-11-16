@@ -49,6 +49,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "csi_volume_predicate_test.go",
+        "main_test.go",
         "max_attachable_volume_predicate_test.go",
         "metadata_test.go",
         "predicates_test.go",
