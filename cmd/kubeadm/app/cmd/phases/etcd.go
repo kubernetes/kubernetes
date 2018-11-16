@@ -24,6 +24,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
@@ -48,13 +49,12 @@ type etcdData interface {
 // NewEtcdPhase creates a kubeadm workflow phase that implements handling of etcd.
 func NewEtcdPhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:    "etcd",
-		Short:   "Generates static Pod manifest file for local etcd.",
-		Example: etcdLocalExample,
+		Name:  "etcd",
+		Short: "Generates static Pod manifest file for local etcd.",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			newEtcdLocalSubPhase(),
 		},
-		InheritFlags: getEtcdPhaseFlags(),
 	}
 	return phase
 }

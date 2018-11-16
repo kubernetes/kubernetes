@@ -211,6 +211,12 @@ func (e *Runner) Run() error {
 			return nil
 		}
 
+		// Errors if phases that are meant to create special subcommands only
+		// are wrongly assigned Run Methods
+		if p.RunAllSiblings && (p.RunIf != nil || p.Run != nil) {
+			return errors.Wrapf(err, "phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
+		}
+
 		// If the phase defines a condition to be checked before executing the phase action.
 		if p.RunIf != nil {
 			// Check the condition and returns if the condition isn't satisfied (or fails)
@@ -244,7 +250,7 @@ func (e *Runner) Help(cmdUse string) string {
 	// computes the max length of for each phase use line
 	maxLength := 0
 	e.visitAll(func(p *phaseRunner) error {
-		if !p.Hidden {
+		if !p.Hidden && !p.RunAllSiblings {
 			length := len(p.use)
 			if maxLength < length {
 				maxLength = length
@@ -259,7 +265,7 @@ func (e *Runner) Help(cmdUse string) string {
 	line += "```\n"
 	offset := 2
 	e.visitAll(func(p *phaseRunner) error {
-		if !p.Hidden {
+		if !p.Hidden && !p.RunAllSiblings {
 			padding := maxLength - len(p.use) + offset
 			line += strings.Repeat(" ", offset*p.level) // indentation
 			line += p.use                               // name + aliases
@@ -312,17 +318,31 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			return nil
 		}
 
-		// creates nested phase subcommand
-		var phaseCmd = &cobra.Command{
+		// initialize phase selector
+		phaseSelector := p.generatedName
+
+		// if requested, set the phase to run all the sibling phases
+		if p.RunAllSiblings {
+			phaseSelector = p.parent.generatedName
+		}
+
+		// creates phase subcommand
+		phaseCmd := &cobra.Command{
 			Use:     strings.ToLower(p.Name),
 			Short:   p.Short,
 			Long:    p.Long,
 			Example: p.Example,
 			Aliases: p.Aliases,
 			Run: func(cmd *cobra.Command, args []string) {
+				// if the phase has subphases, print the help and exits
+				if len(p.Phases) > 0 {
+					cmd.Help()
+					return
+				}
+
 				// overrides the command triggering the Runner using the phaseCmd
 				e.runCmd = cmd
-				e.Options.FilterPhases = []string{p.generatedName}
+				e.Options.FilterPhases = []string{phaseSelector}
 				if err := e.Run(); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 					os.Exit(1)
@@ -405,6 +425,12 @@ func (e *Runner) prepareForExecution() {
 	e.phaseRunners = []*phaseRunner{}
 	var parentRunner *phaseRunner
 	for _, phase := range e.Phases {
+		// skips phases that are meant to create special subcommands only
+		if phase.RunAllSiblings {
+			continue
+		}
+
+		// add phases to the execution list
 		addPhaseRunner(e, parentRunner, phase)
 	}
 }

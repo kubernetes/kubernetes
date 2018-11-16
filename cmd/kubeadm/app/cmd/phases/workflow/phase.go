@@ -45,6 +45,11 @@ type Phase struct {
 	// Phases defines a nested, ordered sequence of phases.
 	Phases []Phase
 
+	// RunAllSiblings allows to assign to a phase the responsibility to
+	// run all the sibling phases
+	// Nb. phase marked as RunAllSiblings can not have Run functions
+	RunAllSiblings bool
+
 	// Run defines a function implementing the phase action.
 	// It is recommended to implent type assertion, e.g. using golang type switch,
 	// for validating the RunData type.

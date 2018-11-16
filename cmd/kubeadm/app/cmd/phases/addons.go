@@ -23,6 +23,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -47,10 +48,16 @@ type addonData interface {
 // NewAddonPhase returns the addon Cobra command
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "addon",
-		Short:        "Installs required addons for passing Conformance tests",
-		InheritFlags: getAddonPhaseFlags("all"),
+		Name:  "addon",
+		Short: "Installs required addons for passing Conformance tests",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Installs all the addons",
+				InheritFlags:   getAddonPhaseFlags("all"),
+				RunAllSiblings: true,
+			},
 			{
 				Name:         "coredns",
 				Short:        "Installs the CoreDNS addon to a Kubernetes cluster",
