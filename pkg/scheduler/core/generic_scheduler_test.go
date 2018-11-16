@@ -960,6 +960,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
 			}
 			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
+			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
+			// doesn't have it yet.
+			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
+			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
+			nodes = append(nodes, newnode)
 			nodeToPods, err := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
 			if err != nil {
 				t.Error(err)
