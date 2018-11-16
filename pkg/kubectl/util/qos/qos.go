@@ -17,15 +17,14 @@ limitations under the License.
 package qos
 
 import (
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
+var supportedQoSComputeResources = sets.NewString(string(corev1.ResourceCPU), string(corev1.ResourceMemory))
 
-func isSupportedQoSComputeResource(name v1.ResourceName) bool {
+func isSupportedQoSComputeResource(name corev1.ResourceName) bool {
 	return supportedQoSComputeResources.Has(string(name))
 }
 
@@ -33,9 +32,9 @@ func isSupportedQoSComputeResource(name v1.ResourceName) bool {
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
-	requests := v1.ResourceList{}
-	limits := v1.ResourceList{}
+func GetPodQOS(pod *corev1.Pod) corev1.PodQOSClass {
+	requests := corev1.ResourceList{}
+	limits := corev1.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
 	for _, container := range pod.Spec.Containers {
@@ -72,12 +71,12 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 			}
 		}
 
-		if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
+		if !qosLimitsFound.HasAll(string(corev1.ResourceMemory), string(corev1.ResourceCPU)) {
 			isGuaranteed = false
 		}
 	}
 	if len(requests) == 0 && len(limits) == 0 {
-		return v1.PodQOSBestEffort
+		return corev1.PodQOSBestEffort
 	}
 	// Check is requests match limits for all resources.
 	if isGuaranteed {
@@ -90,7 +89,7 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 	}
 	if isGuaranteed &&
 		len(requests) == len(limits) {
-		return v1.PodQOSGuaranteed
+		return corev1.PodQOSGuaranteed
 	}
-	return v1.PodQOSBurstable
+	return corev1.PodQOSBurstable
 }
