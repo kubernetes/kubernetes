@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/secret"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -188,7 +188,7 @@ func (s *projectedVolumeMounter) SetUp(fsGroup *int64) error {
 }
 
 func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
+	klog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
 	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod, *s.opts)
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	data, err := s.collectData()
 	if err != nil {
-		glog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
+		klog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
 	}
 
@@ -215,12 +215,12 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		if !setupSuccess {
 			unmounter, unmountCreateErr := s.plugin.NewUnmounter(s.volName, s.podUID)
 			if unmountCreateErr != nil {
-				glog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", s.volName, unmountCreateErr)
+				klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", s.volName, unmountCreateErr)
 				return
 			}
 			tearDownErr := unmounter.TearDown()
 			if tearDownErr != nil {
-				glog.Errorf("error tearing down volume %s with : %v", s.volName, tearDownErr)
+				klog.Errorf("error tearing down volume %s with : %v", s.volName, tearDownErr)
 			}
 		}
 	}()
@@ -228,19 +228,19 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", s.pod.Namespace, s.pod.Name, s.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
 	if err != nil {
-		glog.Errorf("Error creating atomic writer: %v", err)
+		klog.Errorf("Error creating atomic writer: %v", err)
 		return err
 	}
 
 	err = writer.Write(data)
 	if err != nil {
-		glog.Errorf("Error writing payload to dir: %v", err)
+		klog.Errorf("Error writing payload to dir: %v", err)
 		return err
 	}
 
 	err = volume.SetVolumeOwnership(s, fsGroup)
 	if err != nil {
-		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
 	setupSuccess = true
@@ -266,7 +266,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			secretapi, err := s.plugin.getSecret(s.pod.Namespace, source.Secret.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
-					glog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
+					klog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 					errlist = append(errlist, err)
 					continue
 				}
@@ -279,7 +279,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, optional)
 			if err != nil {
-				glog.Errorf("Couldn't get secret payload %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
+				klog.Errorf("Couldn't get secret payload %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 				errlist = append(errlist, err)
 				continue
 			}
@@ -291,7 +291,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			configMap, err := s.plugin.getConfigMap(s.pod.Namespace, source.ConfigMap.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
-					glog.Errorf("Couldn't get configMap %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
+					klog.Errorf("Couldn't get configMap %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
 					errlist = append(errlist, err)
 					continue
 				}
@@ -304,7 +304,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional)
 			if err != nil {
-				glog.Errorf("Couldn't get configMap payload %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
+				klog.Errorf("Couldn't get configMap payload %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
 				errlist = append(errlist, err)
 				continue
 			}
@@ -326,11 +326,14 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				continue
 			}
 			tp := source.ServiceAccountToken
+
+			var auds []string
+			if len(tp.Audience) != 0 {
+				auds = []string{tp.Audience}
+			}
 			tr, err := s.plugin.getServiceAccountToken(s.pod.Namespace, s.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
 				Spec: authenticationv1.TokenRequestSpec{
-					Audiences: []string{
-						tp.Audience,
-					},
+					Audiences:         auds,
 					ExpirationSeconds: tp.ExpirationSeconds,
 					BoundObjectRef: &authenticationv1.BoundObjectReference{
 						APIVersion: "v1",
@@ -364,7 +367,7 @@ func (c *projectedVolumeUnmounter) TearDown() error {
 }
 
 func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
-	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
+	klog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec(), c.podUID)
 	if err != nil {

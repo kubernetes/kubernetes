@@ -27,7 +27,6 @@ import (
 
 	"reflect"
 
-	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +37,7 @@ import (
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	csiapi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -145,7 +145,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 	emptyPodMountInfoVersion := ""
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			glog.Infof("Starting test %s", test.name)
+			klog.Infof("Starting test %s", test.name)
 			fakeClient := fakeclient.NewSimpleClientset()
 			fakeCSIClient := fakecsi.NewSimpleClientset(
 				getCSIDriver("no-info", &emptyPodMountInfoVersion, nil),

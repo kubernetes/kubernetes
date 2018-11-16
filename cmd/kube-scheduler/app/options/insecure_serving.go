@@ -31,8 +31,8 @@ import (
 // CombinedInsecureServingOptions sets up to two insecure listeners for healthz and metrics. The flags
 // override the ComponentConfig and DeprecatedInsecureServingOptions values for both.
 type CombinedInsecureServingOptions struct {
-	Healthz *apiserveroptions.DeprecatedInsecureServingOptions
-	Metrics *apiserveroptions.DeprecatedInsecureServingOptions
+	Healthz *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
+	Metrics *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
 
 	BindPort    int    // overrides the structs above on ApplyTo, ignored on ApplyToFromLoadedConfig
 	BindAddress string // overrides the structs above on ApplyTo, ignored on ApplyToFromLoadedConfig
@@ -60,11 +60,11 @@ func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, c
 		return err
 	}
 
-	if err := o.Healthz.ApplyTo(&c.InsecureServing); err != nil {
+	if err := o.Healthz.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.Metrics != nil && (c.ComponentConfig.MetricsBindAddress != c.ComponentConfig.HealthzBindAddress || o.Healthz == nil) {
-		if err := o.Metrics.ApplyTo(&c.InsecureMetricsServing); err != nil {
+		if err := o.Metrics.ApplyTo(&c.InsecureMetricsServing, &c.LoopbackClientConfig); err != nil {
 			return err
 		}
 	}
@@ -108,7 +108,7 @@ func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerapp
 	return o.applyTo(c, componentConfig)
 }
 
-func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptions) error {
+func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback) error {
 	if is == nil {
 		*addr = ""
 	} else {
@@ -124,7 +124,7 @@ func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserv
 	return nil
 }
 
-func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptions, addr string) error {
+func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback, addr string) error {
 	if is == nil {
 		return nil
 	}

@@ -57,7 +57,6 @@ fi
 REQUIRED_BINS=(
   "github.com/onsi/ginkgo/ginkgo"
   "github.com/jteeuwen/go-bindata/go-bindata"
-  "github.com/tools/godep"
   "github.com/client9/misspell/cmd/misspell"
   "github.com/cloudflare/cfssl/cmd/cfssl"
   "github.com/cloudflare/cfssl/cmd/cfssljson"
@@ -71,7 +70,7 @@ kube::log::status "Running godep save - this might take a while"
 # This uses $(pwd) rather than ${KUBE_ROOT} because KUBE_ROOT will be
 # realpath'ed, and godep barfs ("... is not using a known version control
 # system") on our staging dirs.
-GOPATH="${GOPATH}:$(pwd)/staging" godep save "${REQUIRED_BINS[@]}"
+GOPATH="${GOPATH}:$(pwd)/staging" ${KUBE_GODEP:?} save "${REQUIRED_BINS[@]}"
 
 # create a symlink in vendor directory pointing to the staging client. This
 # let other packages use the staging client as if it were vendored.

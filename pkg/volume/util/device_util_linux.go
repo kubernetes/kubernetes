@@ -21,7 +21,7 @@ package util
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"path"
 	"strconv"
 	"strings"
@@ -109,7 +109,7 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 		}
 		hostNumber, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 		if err != nil {
-			glog.Errorf("Could not get number from iSCSI host: %s", hostName)
+			klog.Errorf("Could not get number from iSCSI host: %s", hostName)
 			continue
 		}
 
@@ -222,7 +222,7 @@ func (handler *deviceHandler) FindDevicesForISCSILun(targetIqn string, lun int) 
 		}
 		hostNumber, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 		if err != nil {
-			glog.Errorf("Could not get number from iSCSI host: %s", hostName)
+			klog.Errorf("Could not get number from iSCSI host: %s", hostName)
 			continue
 		}
 

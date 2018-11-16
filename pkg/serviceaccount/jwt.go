@@ -111,18 +111,20 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(iss string, keys []interface{}, validator Validator) authenticator.Token {
+func JWTTokenAuthenticator(iss string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator) authenticator.Token {
 	return &jwtTokenAuthenticator{
-		iss:       iss,
-		keys:      keys,
-		validator: validator,
+		iss:          iss,
+		keys:         keys,
+		implicitAuds: implicitAuds,
+		validator:    validator,
 	}
 }
 
 type jwtTokenAuthenticator struct {
-	iss       string
-	keys      []interface{}
-	validator Validator
+	iss          string
+	keys         []interface{}
+	validator    Validator
+	implicitAuds authenticator.Audiences
 }
 
 // Validator is called by the JWT token authenticator to apply domain specific
@@ -170,6 +172,23 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 		return nil, false, utilerrors.NewAggregate(errlist)
 	}
 
+	tokenAudiences := authenticator.Audiences(public.Audience)
+	if len(tokenAudiences) == 0 {
+		// only apiserver audiences are allowed for legacy tokens
+		tokenAudiences = j.implicitAuds
+	}
+
+	requestedAudiences, ok := authenticator.AudiencesFrom(ctx)
+	if !ok {
+		// default to apiserver audiences
+		requestedAudiences = j.implicitAuds
+	}
+
+	auds := authenticator.Audiences(tokenAudiences).Intersect(requestedAudiences)
+	if len(auds) == 0 && len(j.implicitAuds) != 0 {
+		return nil, false, fmt.Errorf("token audiences %q is invalid for the target audiences %q", tokenAudiences, requestedAudiences)
+	}
+
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
 	sa, err := j.validator.Validate(tokenData, public, private)
@@ -177,7 +196,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 		return nil, false, err
 	}
 
-	return &authenticator.Response{User: sa.UserInfo()}, true, nil
+	return &authenticator.Response{
+		User:      sa.UserInfo(),
+		Audiences: auds,
+	}, true, nil
 }
 
 // hasCorrectIssuer returns true if tokenData is a valid JWT in compact

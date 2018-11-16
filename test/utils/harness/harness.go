@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // Harness adds some functionality to testing.T, in particular resource cleanup.
@@ -51,7 +51,7 @@ func For(t *testing.T) *Harness {
 func (h *Harness) Close() {
 	for _, d := range h.defers {
 		if err := d(); err != nil {
-			glog.Warningf("error closing harness: %v", err)
+			klog.Warningf("error closing harness: %v", err)
 		}
 	}
 }

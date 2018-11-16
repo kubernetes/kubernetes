@@ -35,7 +35,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1855,6 +1855,10 @@ func buildString(length int) string {
 	return string(s)
 }
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 func TestTruncateBody(t *testing.T) {
 	tests := []struct {
 		body  string
@@ -1904,7 +1908,7 @@ func TestTruncateBody(t *testing.T) {
 		},
 	}
 
-	l := flag.Lookup("v").Value.(flag.Getter).Get().(glog.Level)
+	l := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
 	for _, test := range tests {
 		flag.Set("v", test.level)
 		got := truncateBody(test.body)

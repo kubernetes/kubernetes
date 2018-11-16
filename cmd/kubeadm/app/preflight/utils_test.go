@@ -17,8 +17,9 @@ limitations under the License.
 package preflight
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	utilsexec "k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -34,7 +35,7 @@ func TestGetKubeletVersion(t *testing.T) {
 		{"Kubernetes v1.7.0", "1.7.0", nil, true},
 		{"Kubernetes v1.8.0-alpha.2.1231+afabd012389d53a", "1.8.0-alpha.2.1231+afabd012389d53a", nil, true},
 		{"something-invalid", "", nil, false},
-		{"command not found", "", fmt.Errorf("kubelet not found"), false},
+		{"command not found", "", errors.New("kubelet not found"), false},
 		{"", "", nil, false},
 	}
 

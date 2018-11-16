@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,7 +65,7 @@ func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
 	config := newSourceFile(path, nodeName, period, updates)
-	glog.V(1).Infof("Watching path %q", path)
+	klog.V(1).Infof("Watching path %q", path)
 	config.run()
 }
 
@@ -95,17 +95,17 @@ func (s *sourceFile) run() {
 	go func() {
 		// Read path immediately to speed up startup.
 		if err := s.listConfig(); err != nil {
-			glog.Errorf("Unable to read config path %q: %v", s.path, err)
+			klog.Errorf("Unable to read config path %q: %v", s.path, err)
 		}
 		for {
 			select {
 			case <-listTicker.C:
 				if err := s.listConfig(); err != nil {
-					glog.Errorf("Unable to read config path %q: %v", s.path, err)
+					klog.Errorf("Unable to read config path %q: %v", s.path, err)
 				}
 			case e := <-s.watchEvents:
 				if err := s.consumeWatchEvent(e); err != nil {
-					glog.Errorf("Unable to process watch event: %v", err)
+					klog.Errorf("Unable to process watch event: %v", err)
 				}
 			}
 		}
@@ -173,31 +173,31 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
-			glog.Errorf("Can't get metadata for %q: %v", path, err)
+			klog.Errorf("Can't get metadata for %q: %v", path, err)
 			continue
 		}
 
 		switch {
 		case statInfo.Mode().IsDir():
-			glog.Errorf("Not recursing into manifest path %q", path)
+			klog.Errorf("Not recursing into manifest path %q", path)
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					glog.Errorf("Can't process manifest file %q: %v", path, err)
+					klog.Errorf("Can't process manifest file %q: %v", path, err)
 				}
 			} else {
 				pods = append(pods, pod)
 			}
 		default:
-			glog.Errorf("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
+			klog.Errorf("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
 		}
 	}
 	return pods, nil
 }
 
 func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
-	glog.V(3).Infof("Reading config file %q", filename)
+	klog.V(3).Infof("Reading config file %q", filename)
 	defer func() {
 		if err == nil && pod != nil {
 			objKey, keyErr := cache.MetaNamespaceKeyFunc(pod)

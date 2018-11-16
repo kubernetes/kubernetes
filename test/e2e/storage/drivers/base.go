@@ -176,3 +176,8 @@ func getStorageClass(
 		VolumeBindingMode: bindingMode,
 	}
 }
+
+// GetUniqueDriverName returns unique driver name that can be used parallelly in tests
+func GetUniqueDriverName(driver TestDriver) string {
+	return fmt.Sprintf("%s-%s", driver.GetDriverInfo().Name, driver.GetDriverInfo().Framework.UniqueName)
+}

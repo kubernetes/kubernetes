@@ -59,7 +59,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-        - image: k8s.gcr.io/addon-resizer:1.8.3
+        - image: k8s.gcr.io/addon-resizer:1.8.4
           name: heapster-nanny
           resources:
             limits:

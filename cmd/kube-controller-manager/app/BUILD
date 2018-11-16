@@ -43,6 +43,7 @@ go_library(
         "//pkg/controller/bootstrap:go_default_library",
         "//pkg/controller/certificates/approver:go_default_library",
         "//pkg/controller/certificates/cleaner:go_default_library",
+        "//pkg/controller/certificates/rootcacertpublisher:go_default_library",
         "//pkg/controller/certificates/signer:go_default_library",
         "//pkg/controller/clusterroleaggregation:go_default_library",
         "//pkg/controller/cronjob:go_default_library",
@@ -131,8 +132,8 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

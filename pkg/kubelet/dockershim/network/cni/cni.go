@@ -27,7 +27,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -146,34 +146,34 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 		if strings.HasSuffix(confFile, ".conflist") {
 			confList, err = libcni.ConfListFromFile(confFile)
 			if err != nil {
-				glog.Warningf("Error loading CNI config list file %s: %v", confFile, err)
+				klog.Warningf("Error loading CNI config list file %s: %v", confFile, err)
 				continue
 			}
 		} else {
 			conf, err := libcni.ConfFromFile(confFile)
 			if err != nil {
-				glog.Warningf("Error loading CNI config file %s: %v", confFile, err)
+				klog.Warningf("Error loading CNI config file %s: %v", confFile, err)
 				continue
 			}
 			// Ensure the config has a "type" so we know what plugin to run.
 			// Also catches the case where somebody put a conflist into a conf file.
 			if conf.Network.Type == "" {
-				glog.Warningf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+				klog.Warningf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
 				continue
 			}
 
 			confList, err = libcni.ConfListFromConf(conf)
 			if err != nil {
-				glog.Warningf("Error converting CNI config file %s to list: %v", confFile, err)
+				klog.Warningf("Error converting CNI config file %s to list: %v", confFile, err)
 				continue
 			}
 		}
 		if len(confList.Plugins) == 0 {
-			glog.Warningf("CNI config list %s has no networks, skipping", confFile)
+			klog.Warningf("CNI config list %s has no networks, skipping", confFile)
 			continue
 		}
 
-		glog.V(4).Infof("Using CNI configuration file %s", confFile)
+		klog.V(4).Infof("Using CNI configuration file %s", confFile)
 
 		network := &cniNetwork{
 			name:          confList.Name,
@@ -200,7 +200,7 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfi
 func (plugin *cniNetworkPlugin) syncNetworkConfig() {
 	network, err := getDefaultCNINetwork(plugin.confDir, plugin.binDirs)
 	if err != nil {
-		glog.Warningf("Unable to update cni config: %s", err)
+		klog.Warningf("Unable to update cni config: %s", err)
 		return
 	}
 	plugin.setDefaultNetwork(network)
@@ -247,12 +247,12 @@ func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{
 
 	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
 	if !ok {
-		glog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		klog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
 		return
 	}
 
 	if plugin.podCidr != "" {
-		glog.Warningf("Ignoring subsequent pod CIDR update to %s", podCIDR)
+		klog.Warningf("Ignoring subsequent pod CIDR update to %s", podCIDR)
 		return
 	}
 
@@ -299,7 +299,7 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	// Lack of namespace should not be fatal on teardown
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
-		glog.Warningf("CNI failed to retrieve network namespace path: %v", err)
+		klog.Warningf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
@@ -312,40 +312,40 @@ func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
 func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, options)
 	if err != nil {
-		glog.Errorf("Error adding network when building cni runtime conf: %v", err)
+		klog.Errorf("Error adding network when building cni runtime conf: %v", err)
 		return nil, err
 	}
 
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
+	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	res, err := cniNet.AddNetworkList(netConf, rt)
 	if err != nil {
-		glog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
+		klog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return nil, err
 	}
-	glog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
+	klog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
 	return res, nil
 }
 
 func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, nil)
 	if err != nil {
-		glog.Errorf("Error deleting network when building cni runtime conf: %v", err)
+		klog.Errorf("Error deleting network when building cni runtime conf: %v", err)
 		return err
 	}
 
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
+	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	err = cniNet.DelNetworkList(netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
-		glog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
+		klog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return err
 	}
-	glog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
+	klog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
 	return nil
 }
 

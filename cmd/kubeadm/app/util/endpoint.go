@@ -34,15 +34,15 @@ import (
 // - Otherwise, in case the ControlPlaneEndpoint is not defined, use the api.AdvertiseAddress + the api.BindPort.
 func GetMasterEndpoint(cfg *kubeadmapi.InitConfiguration) (string, error) {
 	// parse the bind port
-	bindPortString := strconv.Itoa(int(cfg.APIEndpoint.BindPort))
+	bindPortString := strconv.Itoa(int(cfg.LocalAPIEndpoint.BindPort))
 	if _, err := ParsePort(bindPortString); err != nil {
-		return "", errors.Wrapf(err, "invalid value %q given for api.bindPort", cfg.APIEndpoint.BindPort)
+		return "", errors.Wrapf(err, "invalid value %q given for api.bindPort", cfg.LocalAPIEndpoint.BindPort)
 	}
 
 	// parse the AdvertiseAddress
-	var ip = net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
+	var ip = net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if ip == nil {
-		return "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", cfg.APIEndpoint.AdvertiseAddress)
+		return "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
 	// set the master url using cfg.API.AdvertiseAddress + the cfg.API.BindPort

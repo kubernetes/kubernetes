@@ -19,8 +19,8 @@ package autoscale
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -234,7 +234,7 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		if err := o.Recorder.Record(hpa); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if o.dryRun {

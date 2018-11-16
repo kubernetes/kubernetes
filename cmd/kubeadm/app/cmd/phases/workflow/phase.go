@@ -24,6 +24,9 @@ type Phase struct {
 	// the same workflow or phases belonging to the same parent phase).
 	Name string
 
+	// Aliases returns the aliases for the phase.
+	Aliases []string
+
 	// Short description of the phase.
 	Short string
 

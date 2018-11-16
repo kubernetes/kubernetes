@@ -18,7 +18,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -54,7 +54,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/scheduler/internal/cache/comparer:all-srcs",
+        "//pkg/scheduler/internal/cache/debugger:all-srcs",
         "//pkg/scheduler/internal/cache/fake:all-srcs",
     ],
     tags = ["automanaged"],

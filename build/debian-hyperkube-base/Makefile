@@ -33,6 +33,8 @@ CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
+
 .PHONY: all build push clean all-build all-push-images all-push push-manifest
 
 all: all-push
@@ -74,7 +76,7 @@ endif
 
 ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
 	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)

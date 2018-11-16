@@ -30,7 +30,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // InterPodAffinity contains information to calculate inter pod affinity.
@@ -92,13 +92,15 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 	}
 	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
 	if match {
-		for _, node := range p.nodes {
-			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
-				p.Lock()
-				p.counts[node.Name] += weight
-				p.Unlock()
+		func() {
+			p.Lock()
+			defer p.Unlock()
+			for _, node := range p.nodes {
+				if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
+					p.counts[node.Name] += weight
+				}
 			}
-		}
+		}()
 	}
 }
 
@@ -135,7 +137,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				glog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+				klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
 				return nil
 			}
 			return err
@@ -231,8 +233,8 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			fScore = float64(schedulerapi.MaxPriority) * ((pm.counts[node.Name] - minCount) / (maxCount - minCount))
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
-		if glog.V(10) {
-			glog.Infof("%v -> %v: InterPodAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		if klog.V(10) {
+			klog.Infof("%v -> %v: InterPodAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
 		}
 	}
 	return result, nil

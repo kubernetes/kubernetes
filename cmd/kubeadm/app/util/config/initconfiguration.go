@@ -25,8 +25,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,10 +50,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true); err != nil {
 		return err
 	}
-	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.APIEndpoint.AdvertiseAddress, cfg.APIEndpoint.BindPort); err != nil {
+	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.LocalAPIEndpoint.AdvertiseAddress, cfg.LocalAPIEndpoint.BindPort); err != nil {
 		return err
 	}
 	return nil
@@ -165,7 +165,7 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags
-		glog.V(1).Infoln("loading configuration from the given file")
+		klog.V(1).Infoln("loading configuration from the given file")
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {

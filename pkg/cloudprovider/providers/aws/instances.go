@@ -26,7 +26,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 )
@@ -110,12 +110,12 @@ func mapToAWSInstanceIDsTolerant(nodes []*v1.Node) []awsInstanceID {
 	var instanceIDs []awsInstanceID
 	for _, node := range nodes {
 		if node.Spec.ProviderID == "" {
-			glog.Warningf("node %q did not have ProviderID set", node.Name)
+			klog.Warningf("node %q did not have ProviderID set", node.Name)
 			continue
 		}
 		instanceID, err := kubernetesInstanceID(node.Spec.ProviderID).mapToAWSInstanceID()
 		if err != nil {
-			glog.Warningf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
+			klog.Warningf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
 			continue
 		}
 		instanceIDs = append(instanceIDs, instanceID)
@@ -156,7 +156,7 @@ type instanceCache struct {
 func (c *instanceCache) describeAllInstancesUncached() (*allInstancesSnapshot, error) {
 	now := time.Now()
 
-	glog.V(4).Infof("EC2 DescribeInstances - fetching all instances")
+	klog.V(4).Infof("EC2 DescribeInstances - fetching all instances")
 
 	filters := []*ec2.Filter{}
 	instances, err := c.cloud.describeInstances(filters)
@@ -177,7 +177,7 @@ func (c *instanceCache) describeAllInstancesUncached() (*allInstancesSnapshot, e
 
 	if c.snapshot != nil && snapshot.olderThan(c.snapshot) {
 		// If this happens a lot, we could run this function in a mutex and only return one result
-		glog.Infof("Not caching concurrent AWS DescribeInstances results")
+		klog.Infof("Not caching concurrent AWS DescribeInstances results")
 	} else {
 		c.snapshot = snapshot
 	}
@@ -210,7 +210,7 @@ func (c *instanceCache) describeAllInstancesCached(criteria cacheCriteria) (*all
 			return nil, err
 		}
 	} else {
-		glog.V(6).Infof("EC2 DescribeInstances - using cached results")
+		klog.V(6).Infof("EC2 DescribeInstances - using cached results")
 	}
 
 	return snapshot, nil
@@ -236,7 +236,7 @@ func (s *allInstancesSnapshot) MeetsCriteria(criteria cacheCriteria) bool {
 		// Sub() is technically broken by time changes until we have monotonic time
 		now := time.Now()
 		if now.Sub(s.timestamp) > criteria.MaxAge {
-			glog.V(6).Infof("instanceCache snapshot cannot be used as is older than MaxAge=%s", criteria.MaxAge)
+			klog.V(6).Infof("instanceCache snapshot cannot be used as is older than MaxAge=%s", criteria.MaxAge)
 			return false
 		}
 	}
@@ -244,7 +244,7 @@ func (s *allInstancesSnapshot) MeetsCriteria(criteria cacheCriteria) bool {
 	if len(criteria.HasInstances) != 0 {
 		for _, id := range criteria.HasInstances {
 			if nil == s.instances[id] {
-				glog.V(6).Infof("instanceCache snapshot cannot be used as does not contain instance %s", id)
+				klog.V(6).Infof("instanceCache snapshot cannot be used as does not contain instance %s", id)
 				return false
 			}
 		}

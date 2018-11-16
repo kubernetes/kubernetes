@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -54,7 +54,7 @@ func (c *Config) New(proxyTransport *http.Transport, serviceResolver webhook.Ser
 		var err error
 		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
 		if err != nil {
-			glog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
+			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
 	}
 	internalClient, err := internalclientset.NewForConfig(c.LoopbackClientConfig)

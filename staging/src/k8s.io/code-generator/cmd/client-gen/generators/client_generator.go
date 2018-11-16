@@ -32,7 +32,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -318,12 +318,12 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	customArgs, ok := arguments.CustomArgs.(*clientgenargs.CustomArgs)
 	if !ok {
-		glog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.CustomArgs")
+		klog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.CustomArgs")
 	}
 	includedTypesOverrides := customArgs.IncludedTypesOverrides
 

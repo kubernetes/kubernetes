@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
@@ -514,7 +514,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	}
 	if err := pm.prober.Init(); err != nil {
 		// Prober init failure should not affect the initialization of other plugins.
-		glog.Errorf("Error initializing dynamic plugin prober: %s", err)
+		klog.Errorf("Error initializing dynamic plugin prober: %s", err)
 		pm.prober = &dummyPluginProber{}
 	}
 
@@ -539,12 +539,12 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 		}
 		err := plugin.Init(host)
 		if err != nil {
-			glog.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
+			klog.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
 			allErrs = append(allErrs, err)
 			continue
 		}
 		pm.plugins[name] = plugin
-		glog.V(1).Infof("Loaded volume plugin %q", name)
+		klog.V(1).Infof("Loaded volume plugin %q", name)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -560,7 +560,7 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 		return fmt.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
 	}
 
-	glog.V(1).Infof("Loaded volume plugin %q", name)
+	klog.V(1).Infof("Loaded volume plugin %q", name)
 	return nil
 }
 
@@ -639,14 +639,14 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	events, err := pm.prober.Probe()
 	if err != nil {
-		glog.Errorf("Error dynamically probing plugins: %s", err)
+		klog.Errorf("Error dynamically probing plugins: %s", err)
 		return // Use cached plugins upon failure.
 	}
 
 	for _, event := range events {
 		if event.Op == ProbeAddOrUpdate {
 			if err := pm.initProbedPlugin(event.Plugin); err != nil {
-				glog.Errorf("Error initializing dynamically probed plugin %s; error: %s",
+				klog.Errorf("Error initializing dynamically probed plugin %s; error: %s",
 					event.Plugin.GetPluginName(), err)
 				continue
 			}
@@ -655,7 +655,7 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 			// Plugin is not available on ProbeRemove event, only PluginName
 			delete(pm.probedPlugins, event.PluginName)
 		} else {
-			glog.Errorf("Unknown Operation on PluginName: %s.",
+			klog.Errorf("Unknown Operation on PluginName: %s.",
 				event.Plugin.GetPluginName())
 		}
 	}
@@ -839,10 +839,10 @@ func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVol
 		if spec.IsKubeletExpandable() {
 			// for kubelet expandable volumes, return a noop plugin that
 			// returns success for expand on the controller
-			glog.Warningf("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
+			klog.Warningf("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
 			return &noopExpandableVolumePluginInstance{spec}, nil
 		}
-		glog.Warningf("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
+		klog.Warningf("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
 		return nil, err
 	}
 

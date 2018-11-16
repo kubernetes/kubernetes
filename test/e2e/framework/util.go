@@ -41,9 +41,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
+	"k8s.io/klog"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -1016,22 +1016,40 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 
 // WaitForPersistentVolumeClaimPhase waits for a PersistentVolumeClaim to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
-	Logf("Waiting up to %v for PersistentVolumeClaim %s to have phase %s", timeout, pvcName, phase)
+	return WaitForPersistentVolumeClaimsPhase(phase, c, ns, []string{pvcName}, Poll, timeout, true)
+}
+
+// WaitForPersistentVolumeClaimPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
+// to be in a specific phase or until timeout occurs, whichever comes first.
+func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, Poll, timeout time.Duration, matchAny bool) error {
+	if len(pvcNames) == 0 {
+		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0.")
+	}
+	Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-		if err != nil {
-			Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
-			continue
-		} else {
-			if pvc.Status.Phase == phase {
-				Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
-				return nil
+		phaseFoundInAllClaims := true
+		for _, pvcName := range pvcNames {
+			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
+			if err != nil {
+				Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
+				continue
 			} else {
-				Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
+				if pvc.Status.Phase == phase {
+					Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
+					if matchAny {
+						return nil
+					}
+				} else {
+					Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
+					phaseFoundInAllClaims = false
+				}
 			}
 		}
+		if phaseFoundInAllClaims {
+			return nil
+		}
 	}
-	return fmt.Errorf("PersistentVolumeClaim %s not in phase %s within %v", pvcName, phase, timeout)
+	return fmt.Errorf("PersistentVolumeClaims %v not all in phase %s within %v", pvcNames, phase, timeout)
 }
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -3161,7 +3179,10 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	terminatePodTime := time.Since(startTime) - deleteTime
 	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
 
-	err = waitForPodsGone(ps, interval, 10*time.Minute)
+	// In gce, at any point, small percentage of nodes can disappear for
+	// ~10 minutes due to hostError. 20 minutes should be long enough to
+	// restart VM in that case and delete the pod.
+	err = waitForPodsGone(ps, interval, 20*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 	}
@@ -3191,21 +3212,30 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 
 	if err == wait.ErrWaitTimeout {
 		for _, pod := range activePods {
-			Logf("Pod %q running on %q is still active", pod.ObjectMeta.Name, pod.Spec.NodeName)
+			Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
 		}
-		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].ObjectMeta.Name, activePods[0].Spec.NodeName)
+		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
 	}
 	return err
 }
 
 // waitForPodsGone waits until there are no pods left in the PodStore.
 func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if pods := ps.List(); len(pods) == 0 {
+	var pods []*v1.Pod
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		if pods = ps.List(); len(pods) == 0 {
 			return true, nil
 		}
 		return false, nil
 	})
+
+	if err == wait.ErrWaitTimeout {
+		for _, pod := range pods {
+			Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
+		}
+		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
+	}
+	return err
 }
 
 func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
@@ -3407,8 +3437,8 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	LogSSHResult(result)
 
 	if result.Code != 0 || err != nil {
-		return nil, fmt.Errorf("failed running %q: %v (exit code %d)",
-			cmd, err, result.Code)
+		return nil, fmt.Errorf("failed running %q: %v (exit code %d, stderr %v)",
+			cmd, err, result.Code, result.Stderr)
 	}
 
 	return &result, nil
@@ -4290,13 +4320,13 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // headersForConfig extracts any http client logic necessary for the provided
 // config.
-func headersForConfig(c *restclient.Config) (http.Header, error) {
+func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 	extract := &extractRT{}
 	rt, err := restclient.HTTPWrappersForConfig(c, extract)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := rt.RoundTrip(&http.Request{}); err != nil {
+	if _, err := rt.RoundTrip(&http.Request{URL: url}); err != nil {
 		return nil, err
 	}
 	return extract.Header, nil
@@ -4320,7 +4350,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 			url.Host += ":80"
 		}
 	}
-	headers, err := headersForConfig(config)
+	headers, err := headersForConfig(config, url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load http headers: %v", err)
 	}
@@ -4853,7 +4883,7 @@ func ListNamespaceEvents(c clientset.Interface, ns string) error {
 		return err
 	}
 	for _, event := range ls.Items {
-		glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+		klog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
 	}
 	return nil
 }
@@ -4892,7 +4922,7 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 		sum += v.Count
 		for ; index < sum; index++ {
 			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
-				glog.Errorf("Aborting node preparation: %v", err)
+				klog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
 			p.nodeToAppliedStrategy[nodes.Items[index].Name] = v.Strategy
@@ -4910,7 +4940,7 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 		strategy, found := p.nodeToAppliedStrategy[name]
 		if found {
 			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
-				glog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
+				klog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
 				encounteredError = err
 			}
 		}
@@ -4948,19 +4978,28 @@ func getMaster(c clientset.Interface) Address {
 	return master
 }
 
-// GetMasterAddress returns the hostname/external IP/internal IP as appropriate for e2e tests on a particular provider
-// which is the address of the interface used for communication with the kubelet.
-func GetMasterAddress(c clientset.Interface) string {
+// GetAllMasterAddresses returns all IP addresses on which the kubelet can reach the master.
+// It may return internal and external IPs, even if we expect for
+// e.g. internal IPs to be used (issue #56787), so that we can be
+// sure to block the master fully during tests.
+func GetAllMasterAddresses(c clientset.Interface) []string {
 	master := getMaster(c)
+
+	ips := sets.NewString()
 	switch TestContext.Provider {
 	case "gce", "gke":
-		return master.externalIP
+		if master.externalIP != "" {
+			ips.Insert(master.externalIP)
+		}
+		if master.internalIP != "" {
+			ips.Insert(master.internalIP)
+		}
 	case "aws":
-		return awsMasterIP
+		ips.Insert(awsMasterIP)
 	default:
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
-	return ""
+	return ips.List()
 }
 
 // GetNodeExternalIP returns node external IP concatenated with port 22 for ssh

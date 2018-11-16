@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -119,7 +119,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	if apiservice.NeedsHealthCheck(service) {
 		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
-			glog.Errorf("Service %s/%s has no healthcheck nodeport", service.Namespace, service.Name)
+			klog.Errorf("Service %s/%s has no healthcheck nodeport", service.Namespace, service.Name)
 		} else {
 			info.HealthCheckNodePort = int(p)
 		}
@@ -306,9 +306,9 @@ func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 		existingPorts.Insert(svcPortName.String())
 		_, exists := (*sm)[svcPortName]
 		if !exists {
-			glog.V(1).Infof("Adding new service port %q at %s", svcPortName, info.String())
+			klog.V(1).Infof("Adding new service port %q at %s", svcPortName, info.String())
 		} else {
-			glog.V(1).Infof("Updating existing service port %q at %s", svcPortName, info.String())
+			klog.V(1).Infof("Updating existing service port %q at %s", svcPortName, info.String())
 		}
 		(*sm)[svcPortName] = info
 	}
@@ -331,13 +331,13 @@ func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
-			glog.V(1).Infof("Removing service port %q", svcPortName)
+			klog.V(1).Infof("Removing service port %q", svcPortName)
 			if info.GetProtocol() == v1.ProtocolUDP {
 				UDPStaleClusterIP.Insert(info.ClusterIPString())
 			}
 			delete(*sm, svcPortName)
 		} else {
-			glog.Errorf("Service port %q doesn't exists", svcPortName)
+			klog.Errorf("Service port %q doesn't exists", svcPortName)
 		}
 	}
 }

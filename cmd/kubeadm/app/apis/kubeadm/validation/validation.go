@@ -27,7 +27,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -49,7 +48,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
 	return allErrs
 }
 
@@ -78,10 +77,19 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
+	allErrs = append(allErrs, ValidateJoinControlPlane(c.ControlPlane, field.NewPath("controlPlane"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
+	}
+	return allErrs
+}
+
+// ValidateJoinControlPlane validates joining control plane configuration and collects all encountered errors
+func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c != nil {
+		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
 	}
 	return allErrs
 }
@@ -407,13 +415,12 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 // ValidateFeatureGates validates provided feature gates
 func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	validFeatures := features.Keys(features.InitFeatureGates)
 
 	// check valid feature names are provided
 	for k := range featureGates {
 		if !features.Supports(features.InitFeatureGates, k) {
 			allErrs = append(allErrs, field.Invalid(fldPath, featureGates,
-				fmt.Sprintf("%s is not a valid feature name. Valid features are: %s", k, validFeatures)))
+				fmt.Sprintf("%s is not a valid feature name.", k)))
 		}
 	}
 

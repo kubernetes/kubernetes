@@ -29,8 +29,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -64,6 +64,8 @@ import (
 const (
 	// Jitter used when starting controller managers
 	ControllerStartJitter = 1.0
+	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
+	ConfigzName = "kubecontrollermanager.config.k8s.io"
 )
 
 type ControllerLoopMode int
@@ -77,7 +79,7 @@ const (
 func NewControllerManagerCommand() *cobra.Command {
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
-		glog.Fatalf("unable to initialize command options: %v", err)
+		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
 	cmd := &cobra.Command{
@@ -140,12 +142,12 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 // Run runs the KubeControllerManagerOptions.  This should never exit.
 func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
-	if cfgz, err := configz.New("componentconfig"); err == nil {
+	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
-		glog.Errorf("unable to register configz: %c", err)
+		klog.Errorf("unable to register configz: %c", err)
 	}
 
 	// Start the controller manager HTTP server
@@ -176,7 +178,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 				// It'c possible another controller process is creating the tokens for us.
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
-				glog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
+				klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 			}
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
@@ -189,12 +191,12 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
-			glog.Fatalf("error building controller context: %v", err)
+			klog.Fatalf("error building controller context: %v", err)
 		}
 		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
-			glog.Fatalf("error starting controllers: %v", err)
+			klog.Fatalf("error starting controllers: %v", err)
 		}
 
 		controllerContext.InformerFactory.Start(controllerContext.Stop)
@@ -224,7 +226,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			EventRecorder: c.EventRecorder,
 		})
 	if err != nil {
-		glog.Fatalf("error creating lock: %v", err)
+		klog.Fatalf("error creating lock: %v", err)
 	}
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
@@ -235,7 +237,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
-				glog.Fatalf("leaderelection lost")
+				klog.Fatalf("leaderelection lost")
 			},
 		},
 	})
@@ -379,6 +381,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["pvc-protection"] = startPVCProtectionController
 	controllers["pv-protection"] = startPVProtectionController
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController
+	controllers["root-ca-cert-publisher"] = startRootCACertPublisher
 
 	return controllers
 }
@@ -473,20 +476,20 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 
 	for controllerName, initFn := range controllers {
 		if !ctx.IsControllerEnabled(controllerName) {
-			glog.Warningf("%q is disabled", controllerName)
+			klog.Warningf("%q is disabled", controllerName)
 			continue
 		}
 
 		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
-		glog.V(1).Infof("Starting %q", controllerName)
+		klog.V(1).Infof("Starting %q", controllerName)
 		debugHandler, started, err := initFn(ctx)
 		if err != nil {
-			glog.Errorf("Error starting %q", controllerName)
+			klog.Errorf("Error starting %q", controllerName)
 			return err
 		}
 		if !started {
-			glog.Warningf("Skipping %q", controllerName)
+			klog.Warningf("Skipping %q", controllerName)
 			continue
 		}
 		if debugHandler != nil && unsecuredMux != nil {
@@ -494,7 +497,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
 			unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
 		}
-		glog.Infof("Started %q", controllerName)
+		klog.Infof("Started %q", controllerName)
 	}
 
 	return nil
@@ -509,12 +512,12 @@ type serviceAccountTokenControllerStarter struct {
 
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.IsControllerEnabled(saTokenControllerName) {
-		glog.Warningf("%q is disabled", saTokenControllerName)
+		klog.Warningf("%q is disabled", saTokenControllerName)
 		return nil, false, nil
 	}
 
 	if len(ctx.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-		glog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
+		klog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return nil, false, nil
 	}
 	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.SAController.ServiceAccountKeyFile)
@@ -524,11 +527,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 
 	var rootCA []byte
 	if ctx.ComponentConfig.SAController.RootCAFile != "" {
-		rootCA, err = ioutil.ReadFile(ctx.ComponentConfig.SAController.RootCAFile)
-		if err != nil {
-			return nil, true, fmt.Errorf("error reading root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
-		}
-		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
+		if rootCA, err = readCA(ctx.ComponentConfig.SAController.RootCAFile); err != nil {
 			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
@@ -557,4 +556,16 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	ctx.InformerFactory.Start(ctx.Stop)
 
 	return nil, true, nil
+}
+
+func readCA(file string) ([]byte, error) {
+	rootCA, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
+		return nil, err
+	}
+
+	return rootCA, err
 }

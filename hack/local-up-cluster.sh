@@ -63,7 +63,9 @@ EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 # Note also that you need API_HOST (defined above) for correct DNS.
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-""}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
+ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
+LOCAL_DNS_IP=${KUBE_LOCAL_DNS_IP:-169.254.20.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
@@ -704,7 +706,11 @@ function start_kubelet {
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
     # Enable dns
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-      dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
+      if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+        dns_args="--cluster-dns=${LOCAL_DNS_IP} --cluster-domain=${DNS_DOMAIN}"
+      else
+        dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
+      fi
     else
       # To start a private DNS server set ENABLE_CLUSTER_DNS and
       # DNS_SERVER_IP/DOMAIN. This will at least provide a working
@@ -908,6 +914,17 @@ function start_kubedns {
     fi
 }
 
+function start_nodelocaldns {
+  cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
+  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
+  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
+  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+  # use kubectl to create nodelocaldns addon
+  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
+  echo "NodeLocalDNS addon successfully deployed."
+  rm nodelocaldns.yaml
+}
+
 function start_kubedashboard {
     if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
         echo "Creating kubernetes-dashboard"
@@ -1056,6 +1073,9 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   fi
   start_kubeproxy
   start_kubedns
+  if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+    start_nodelocaldns
+  fi
   start_kubedashboard
 fi
 

@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager/watcher"
+	"k8s.io/klog"
 )
 
 var MesosAgentAddress = flag.String("mesos_agent", "127.0.0.1:5051", "Mesos agent address")
@@ -135,7 +135,7 @@ func Register(
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	glog.V(1).Infof("Registering mesos factory")
+	klog.V(1).Infof("Registering mesos factory")
 	factory := &mesosFactory{
 		machineInfoFactory: machineInfoFactory,
 		cgroupSubsystems:   cgroupSubsystems,

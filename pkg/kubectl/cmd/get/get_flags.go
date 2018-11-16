@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // PrintFlags composes common printer flag structs
@@ -33,7 +33,7 @@ import (
 type PrintFlags struct {
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	NamePrintFlags     *genericclioptions.NamePrintFlags
-	CustomColumnsFlags *printers.CustomColumnsPrintFlags
+	CustomColumnsFlags *CustomColumnsPrintFlags
 	HumanReadableFlags *HumanPrintFlags
 	TemplateFlags      *genericclioptions.KubeTemplatePrintFlags
 
@@ -185,6 +185,6 @@ func NewGetPrintFlags() *PrintFlags {
 		TemplateFlags:      genericclioptions.NewKubeTemplatePrintFlags(),
 
 		HumanReadableFlags: NewHumanPrintFlags(),
-		CustomColumnsFlags: printers.NewCustomColumnsPrintFlags(),
+		CustomColumnsFlags: NewCustomColumnsPrintFlags(),
 	}
 }

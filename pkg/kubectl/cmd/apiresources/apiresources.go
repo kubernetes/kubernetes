@@ -113,7 +113,7 @@ func (o *ApiResourcesOptions) Validate() error {
 
 func (o *ApiResourcesOptions) Complete(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "unexpected args: %v", args)
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
 	return nil
 }

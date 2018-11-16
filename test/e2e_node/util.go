@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -195,7 +195,7 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		if !apiequality.Semantic.DeepEqual(*kubeCfg, *newKubeCfg) {
 			return fmt.Errorf("still waiting for new configuration to take effect, will continue to watch /configz")
 		}
-		glog.Infof("new configuration has taken effect")
+		klog.Infof("new configuration has taken effect")
 		return nil
 	}, restartGap, pollInterval).Should(BeNil())
 
@@ -238,11 +238,11 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 	Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
-			glog.Errorf("Failed to get /configz, retrying. Error: %v", err)
+			klog.Errorf("Failed to get /configz, retrying. Error: %v", err)
 			return false
 		}
 		if resp.StatusCode != 200 {
-			glog.Errorf("/configz response status not 200, retrying. Response was: %+v", resp)
+			klog.Errorf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false
 		}
 		return true

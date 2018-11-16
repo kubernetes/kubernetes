@@ -23,9 +23,9 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/golang/glog"
 	"k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	// TODO: try this library to see if it generates correct json patch
 	// https://github.com/mattbaird/jsonpatch
 )
@@ -56,11 +56,11 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	// verify the content type is accurate
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		glog.Errorf("contentType=%s, expect application/json", contentType)
+		klog.Errorf("contentType=%s, expect application/json", contentType)
 		return
 	}
 
-	glog.V(2).Info(fmt.Sprintf("handling request: %s", body))
+	klog.V(2).Info(fmt.Sprintf("handling request: %s", body))
 
 	// The AdmissionReview that was sent to the webhook
 	requestedAdmissionReview := v1beta1.AdmissionReview{}
@@ -70,7 +70,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &requestedAdmissionReview); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 		responseAdmissionReview.Response = toAdmissionResponse(err)
 	} else {
 		// pass to admitFunc
@@ -80,14 +80,14 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	// Return the same UID
 	responseAdmissionReview.Response.UID = requestedAdmissionReview.Request.UID
 
-	glog.V(2).Info(fmt.Sprintf("sending response: %v", responseAdmissionReview.Response))
+	klog.V(2).Info(fmt.Sprintf("sending response: %v", responseAdmissionReview.Response))
 
 	respBytes, err := json.Marshal(responseAdmissionReview)
 	if err != nil {
-		glog.Error(err)
+		klog.Error(err)
 	}
 	if _, err := w.Write(respBytes); err != nil {
-		glog.Error(err)
+		klog.Error(err)
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var (
@@ -63,7 +63,7 @@ func HandleCrash(additionalHandlers ...func(interface{})) {
 // logPanic logs the caller tree when a panic occurs.
 func logPanic(r interface{}) {
 	callers := getCallers(r)
-	glog.Errorf("Observed a panic: %#v (%v)\n%v", r, r, callers)
+	klog.Errorf("Observed a panic: %#v (%v)\n%v", r, r, callers)
 }
 
 func getCallers(r interface{}) string {
@@ -111,7 +111,7 @@ func HandleError(err error) {
 
 // logError prints an error with the call stack of the location it was reported
 func logError(err error) {
-	glog.ErrorDepth(2, err)
+	klog.ErrorDepth(2, err)
 }
 
 type rudimentaryErrorBackoff struct {

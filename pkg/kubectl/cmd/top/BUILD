@@ -23,9 +23,9 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

@@ -421,8 +421,11 @@ func TestConvertToTableList(t *testing.T) {
 		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
 		{Name: "Nominated Node", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
+		{Name: "Readiness Gates", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["readinessGates"]},
 	}
 
+	condition1 := "condition1"
+	condition2 := "condition2"
 	pod1 := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
 		Spec: api.PodSpec{
@@ -431,8 +434,26 @@ func TestConvertToTableList(t *testing.T) {
 				{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 			},
 			NodeName: "test-node",
+			ReadinessGates: []api.PodReadinessGate{
+				{
+					ConditionType: api.PodConditionType(condition1),
+				},
+				{
+					ConditionType: api.PodConditionType(condition2),
+				},
+			},
 		},
 		Status: api.PodStatus{
+			Conditions: []api.PodCondition{
+				{
+					Type:   api.PodConditionType(condition1),
+					Status: api.ConditionFalse,
+				},
+				{
+					Type:   api.PodConditionType(condition2),
+					Status: api.ConditionTrue,
+				},
+			},
 			PodIP: "10.1.2.3",
 			Phase: api.PodPending,
 			ContainerStatuses: []api.ContainerStatus{
@@ -457,7 +478,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -466,7 +487,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node", "1/2"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},

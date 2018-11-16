@@ -24,7 +24,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -140,7 +140,7 @@ func validateConfigs(config map[string]string) error {
 func applyConfigDefaults(config map[string]string) {
 	b, err := strconv.ParseBool(config[confKey.sslEnabled])
 	if err != nil {
-		glog.Warning(log("failed to parse param sslEnabled, setting it to false"))
+		klog.Warning(log("failed to parse param sslEnabled, setting it to false"))
 		b = false
 	}
 	config[confKey.sslEnabled] = strconv.FormatBool(b)
@@ -148,7 +148,7 @@ func applyConfigDefaults(config map[string]string) {
 	config[confKey.fsType] = defaultString(config[confKey.fsType], "xfs")
 	b, err = strconv.ParseBool(config[confKey.readOnly])
 	if err != nil {
-		glog.Warning(log("failed to parse param readOnly, setting it to false"))
+		klog.Warning(log("failed to parse param readOnly, setting it to false"))
 		b = false
 	}
 	config[confKey.readOnly] = strconv.FormatBool(b)
@@ -163,21 +163,21 @@ func defaultString(val, defVal string) string {
 
 // loadConfig loads configuration data from a file on disk
 func loadConfig(configName string) (map[string]string, error) {
-	glog.V(4).Info(log("loading config file %s", configName))
+	klog.V(4).Info(log("loading config file %s", configName))
 	file, err := os.Open(configName)
 	if err != nil {
-		glog.Error(log("failed to open config file %s: %v", configName, err))
+		klog.Error(log("failed to open config file %s: %v", configName, err))
 		return nil, err
 	}
 	defer file.Close()
 	data := map[string]string{}
 	if err := gob.NewDecoder(file).Decode(&data); err != nil {
-		glog.Error(log("failed to parse config data %s: %v", configName, err))
+		klog.Error(log("failed to parse config data %s: %v", configName, err))
 		return nil, err
 	}
 	applyConfigDefaults(data)
 	if err := validateConfigs(data); err != nil {
-		glog.Error(log("failed to load ConfigMap %s: %v", err))
+		klog.Error(log("failed to load ConfigMap %s: %v", err))
 		return nil, err
 	}
 
@@ -186,31 +186,31 @@ func loadConfig(configName string) (map[string]string, error) {
 
 // saveConfig saves the configuration data to local disk
 func saveConfig(configName string, data map[string]string) error {
-	glog.V(4).Info(log("saving config file %s", configName))
+	klog.V(4).Info(log("saving config file %s", configName))
 
 	dir := path.Dir(configName)
 	if _, err := os.Stat(dir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		glog.V(4).Info(log("creating config dir for config data: %s", dir))
+		klog.V(4).Info(log("creating config dir for config data: %s", dir))
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			glog.Error(log("failed to create config data dir %v", err))
+			klog.Error(log("failed to create config data dir %v", err))
 			return err
 		}
 	}
 
 	file, err := os.Create(configName)
 	if err != nil {
-		glog.V(4).Info(log("failed to save config data file %s: %v", configName, err))
+		klog.V(4).Info(log("failed to save config data file %s: %v", configName, err))
 		return err
 	}
 	defer file.Close()
 	if err := gob.NewEncoder(file).Encode(data); err != nil {
-		glog.Error(log("failed to save config %s: %v", configName, err))
+		klog.Error(log("failed to save config %s: %v", configName, err))
 		return err
 	}
-	glog.V(4).Info(log("config data file saved successfully as %s", configName))
+	klog.V(4).Info(log("config data file saved successfully as %s", configName))
 	return nil
 }
 
@@ -221,7 +221,7 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	kubeClient := plug.host.GetKubeClient()
 	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
 	if err != nil {
-		glog.Error(log("failed to get secret: %v", err))
+		klog.Error(log("failed to get secret: %v", err))
 		return secretNotFoundErr
 	}
 	// merge secret data
@@ -251,11 +251,11 @@ func getSdcGUIDLabel(plug *sioPlugin) (string, error) {
 	}
 	label, ok := nodeLabels[sdcGUIDLabelName]
 	if !ok {
-		glog.V(4).Info(log("node label %s not found", sdcGUIDLabelName))
+		klog.V(4).Info(log("node label %s not found", sdcGUIDLabelName))
 		return "", nil
 	}
 
-	glog.V(4).Info(log("found node label %s=%s", sdcGUIDLabelName, label))
+	klog.V(4).Info(log("found node label %s=%s", sdcGUIDLabelName, label))
 	return label, nil
 }
 
@@ -284,7 +284,7 @@ func getVolumeSourceAttribs(spec *volume.Spec) (*volSourceAttribs, error) {
 		attribs.readOnly = pSource.ReadOnly
 	} else {
 		msg := log("failed to get ScaleIOVolumeSource or ScaleIOPersistentVolumeSource from spec")
-		glog.Error(msg)
+		klog.Error(msg)
 		return nil, errors.New(msg)
 	}
 	return attribs, nil

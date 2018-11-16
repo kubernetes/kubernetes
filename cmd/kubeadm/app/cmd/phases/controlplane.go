@@ -19,16 +19,11 @@ package phases
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
-	auditutil "k8s.io/kubernetes/cmd/kubeadm/app/util/audit"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -144,22 +139,6 @@ func runControlPlaneSubPhase(component string) func(c workflow.RunData) error {
 			return errors.New("control-plane phase invoked with an invalid data struct")
 		}
 		cfg := data.Cfg()
-
-		// special case to handle audit policy for the API server
-		if component == kubeadmconstants.KubeAPIServer && features.Enabled(cfg.FeatureGates, features.Auditing) {
-			// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
-			if cfg.AuditPolicyConfiguration.Path != "" {
-				// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
-				if _, err := os.Stat(cfg.AuditPolicyConfiguration.Path); err != nil {
-					return fmt.Errorf("error getting file info for audit policy file %q [%v]", cfg.AuditPolicyConfiguration.Path, err)
-				}
-			} else {
-				cfg.AuditPolicyConfiguration.Path = filepath.Join(data.KubeConfigDir(), kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
-				if err := auditutil.CreateDefaultAuditLogPolicy(cfg.AuditPolicyConfiguration.Path); err != nil {
-					return fmt.Errorf("error creating default audit policy %q [%v]", cfg.AuditPolicyConfiguration.Path, err)
-				}
-			}
-		}
 
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
 		if err := controlplane.CreateStaticPodFiles(data.ManifestDir(), cfg, component); err != nil {

@@ -19,7 +19,7 @@ package api
 import (
 	"fmt"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 func Example_emptyConfig() {

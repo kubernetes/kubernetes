@@ -51,7 +51,7 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -170,7 +170,7 @@ func (r *ControllerExpectations) GetExpectations(controllerKey string) (*Control
 func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
 		if err := r.Delete(exp); err != nil {
-			glog.V(2).Infof("Error deleting expectations for controller %v: %v", controllerKey, err)
+			klog.V(2).Infof("Error deleting expectations for controller %v: %v", controllerKey, err)
 		}
 	}
 }
@@ -181,24 +181,24 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
-			glog.V(4).Infof("Controller expectations fulfilled %#v", exp)
+			klog.V(4).Infof("Controller expectations fulfilled %#v", exp)
 			return true
 		} else if exp.isExpired() {
-			glog.V(4).Infof("Controller expectations expired %#v", exp)
+			klog.V(4).Infof("Controller expectations expired %#v", exp)
 			return true
 		} else {
-			glog.V(4).Infof("Controller still waiting on expectations %#v", exp)
+			klog.V(4).Infof("Controller still waiting on expectations %#v", exp)
 			return false
 		}
 	} else if err != nil {
-		glog.V(2).Infof("Error encountered while checking expectations %#v, forcing sync", err)
+		klog.V(2).Infof("Error encountered while checking expectations %#v, forcing sync", err)
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
 		//	- In this case it wakes up, creates/deletes controllees, and sets expectations again.
 		// When it has satisfied expectations and no controllees need to be created/destroyed > TTL, the expectations expire.
 		//	- In this case it continues without setting expectations till it needs to create/delete controllees.
-		glog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
+		klog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
 	// getting from local store) or this controller hasn't established expectations.
@@ -215,7 +215,7 @@ func (exp *ControlleeExpectations) isExpired() bool {
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
 	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
-	glog.V(4).Infof("Setting expectations %#v", exp)
+	klog.V(4).Infof("Setting expectations %#v", exp)
 	return r.Add(exp)
 }
 
@@ -232,7 +232,7 @@ func (r *ControllerExpectations) LowerExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(-add), int64(-del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Lowered expectations %#v", exp)
+		klog.V(4).Infof("Lowered expectations %#v", exp)
 	}
 }
 
@@ -241,7 +241,7 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Raised expectations %#v", exp)
+		klog.V(4).Infof("Raised expectations %#v", exp)
 	}
 }
 
@@ -340,13 +340,13 @@ func (u *UIDTrackingControllerExpectations) ExpectDeletions(rcKey string, delete
 	defer u.uidStoreLock.Unlock()
 
 	if existing := u.GetUIDs(rcKey); existing != nil && existing.Len() != 0 {
-		glog.Errorf("Clobbering existing delete keys: %+v", existing)
+		klog.Errorf("Clobbering existing delete keys: %+v", existing)
 	}
 	expectedUIDs := sets.NewString()
 	for _, k := range deletedKeys {
 		expectedUIDs.Insert(k)
 	}
-	glog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
+	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	if err := u.uidStore.Add(&UIDSet{expectedUIDs, rcKey}); err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (u *UIDTrackingControllerExpectations) DeletionObserved(rcKey, deleteKey st
 
 	uids := u.GetUIDs(rcKey)
 	if uids != nil && uids.Has(deleteKey) {
-		glog.V(4).Infof("Controller %v received delete for pod %v", rcKey, deleteKey)
+		klog.V(4).Infof("Controller %v received delete for pod %v", rcKey, deleteKey)
 		u.ControllerExpectationsInterface.DeletionObserved(rcKey)
 		uids.Delete(deleteKey)
 	}
@@ -375,7 +375,7 @@ func (u *UIDTrackingControllerExpectations) DeleteExpectations(rcKey string) {
 	u.ControllerExpectationsInterface.DeleteExpectations(rcKey)
 	if uidExp, exists, err := u.uidStore.GetByKey(rcKey); err == nil && exists {
 		if err := u.uidStore.Delete(uidExp); err != nil {
-			glog.V(2).Infof("Error deleting uid expectations for controller %v: %v", rcKey, err)
+			klog.V(2).Infof("Error deleting uid expectations for controller %v: %v", rcKey, err)
 		}
 	}
 }
@@ -581,10 +581,10 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	} else {
 		accessor, err := meta.Accessor(object)
 		if err != nil {
-			glog.Errorf("parentObject does not have ObjectMeta, %v", err)
+			klog.Errorf("parentObject does not have ObjectMeta, %v", err)
 			return nil
 		}
-		glog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
+		klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
 		r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
 	}
 	return nil
@@ -595,7 +595,7 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
-	glog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
+	klog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
 	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil && !apierrors.IsNotFound(err) {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
@@ -806,7 +806,7 @@ func FilterActivePods(pods []*v1.Pod) []*v1.Pod {
 		if IsPodActive(p) {
 			result = append(result, p)
 		} else {
-			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
+			klog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
 		}
 	}
@@ -1024,14 +1024,14 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 // indicating that the controller identified by controllerName is waiting for syncs, followed by
 // either a successful or failed sync.
 func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...cache.InformerSynced) bool {
-	glog.Infof("Waiting for caches to sync for %s controller", controllerName)
+	klog.Infof("Waiting for caches to sync for %s controller", controllerName)
 
 	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
 		utilruntime.HandleError(fmt.Errorf("Unable to sync caches for %s controller", controllerName))
 		return false
 	}
 
-	glog.Infof("Caches are synced for %s controller", controllerName)
+	klog.Infof("Caches are synced for %s controller", controllerName)
 	return true
 }
 

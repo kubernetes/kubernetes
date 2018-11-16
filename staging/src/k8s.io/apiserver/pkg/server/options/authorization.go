@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -72,6 +72,12 @@ func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
 // WithAlwaysAllowGroups appends the list of paths to AlwaysAllowGroups
 func (s *DelegatingAuthorizationOptions) WithAlwaysAllowGroups(groups ...string) *DelegatingAuthorizationOptions {
 	s.AlwaysAllowGroups = append(s.AlwaysAllowGroups, groups...)
+	return s
+}
+
+// WithAlwaysAllowPaths appends the list of paths to AlwaysAllowPaths
+func (s *DelegatingAuthorizationOptions) WithAlwaysAllowPaths(paths ...string) *DelegatingAuthorizationOptions {
+	s.AlwaysAllowPaths = append(s.AlwaysAllowPaths, paths...)
 	return s
 }
 
@@ -137,7 +143,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 	}
 
 	if client == nil {
-		glog.Warningf("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
+		klog.Warningf("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
 			SubjectAccessReviewClient: client.AuthorizationV1beta1().SubjectAccessReviews(),
@@ -168,7 +174,7 @@ func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, erro
 		clientConfig, err = rest.InClusterConfig()
 		if err != nil && s.RemoteKubeConfigFileOptional {
 			if err != rest.ErrNotInCluster {
-				glog.Warningf("failed to read in-cluster kubeconfig for delegated authorization: %v", err)
+				klog.Warningf("failed to read in-cluster kubeconfig for delegated authorization: %v", err)
 			}
 			return nil, nil
 		}

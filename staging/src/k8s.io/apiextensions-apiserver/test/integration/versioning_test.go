@@ -64,7 +64,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 
 	// update validation via update because the cache priming in CreateNewCustomResourceDefinition will fail otherwise
 	t.Logf("Updating CRD to validate apiVersion")
-	noxuDefinition, err = updateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+	noxuDefinition, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
 		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
 			OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{

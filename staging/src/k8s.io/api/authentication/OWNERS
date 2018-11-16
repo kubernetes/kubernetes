@@ -1,9 +1,6 @@
 reviewers:
-- liggitt
-- lavalamp
-- wojtek-t
-- deads2k
-- sttts
-- mbohlool
-- jianhuiz
-- enj
+- sig-auth-authenticators-approvers
+- sig-auth-authenticators-reviewers
+labels:
+- sig/auth
+

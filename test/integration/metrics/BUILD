@@ -40,8 +40,8 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )

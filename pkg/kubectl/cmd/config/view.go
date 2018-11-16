@@ -82,7 +82,7 @@ func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, Co
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd))
+			cmdutil.CheckErr(o.Complete(cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
@@ -99,7 +99,10 @@ func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, Co
 	return cmd
 }
 
-func (o *ViewOptions) Complete(cmd *cobra.Command) error {
+func (o *ViewOptions) Complete(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+	}
 	if o.ConfigAccess.IsExplicitFile() {
 		if !o.Merge.Provided() {
 			o.Merge.Set("false")

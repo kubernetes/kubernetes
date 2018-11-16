@@ -269,6 +269,14 @@ const (
 	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
 	TokenRequestProjection utilfeature.Feature = "TokenRequestProjection"
 
+	// owner: @mikedanese
+	// alpha: v1.13
+	//
+	// Migrate ServiceAccount volumes to use a projected volume consisting of a
+	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
+	// to the API server.
+	BoundServiceAccountTokenVolume utilfeature.Feature = "BoundServiceAccountTokenVolume"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -276,7 +284,7 @@ const (
 	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
 
 	// owner: @verult
-	// beta: v1.10
+	// GA: v1.13
 	//
 	// Enables the regional PD feature on GCE.
 	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
@@ -421,15 +429,16 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
-	ResourceLimitsPriorityFunction:              {Default: true, PreRelease: utilfeature.Beta},
+	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
+	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
+	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},

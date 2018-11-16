@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -243,15 +243,15 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	defer runtime.HandleCrash()
 
 	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
-	glog.V(2).Infof("The desired_state_of_world populator starts")
+	klog.V(2).Infof("The desired_state_of_world populator starts")
 
-	glog.Infof("Starting Kubelet Volume Manager")
+	klog.Infof("Starting Kubelet Volume Manager")
 	go vm.reconciler.Run(stopCh)
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
 	<-stopCh
-	glog.Infof("Shutting down Kubelet Volume Manager")
+	klog.Infof("Shutting down Kubelet Volume Manager")
 }
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
@@ -347,7 +347,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		return nil
 	}
 
-	glog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
+	klog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
 	// Some pods expect to have Setup called over and over again to update.
@@ -380,7 +380,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			unattachedVolumes)
 	}
 
-	glog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
+	klog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
 	return nil
 }
 

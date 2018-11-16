@@ -273,30 +273,38 @@ func TestGetEtcdDataDir(t *testing.T) {
 		podYaml       string
 		expectErr     bool
 		writeManifest bool
+		validClient   bool
 	}{
 		"non-existent file returns error": {
-			dataDir:       "",
-			podYaml:       "",
 			expectErr:     true,
 			writeManifest: false,
+			validClient:   true,
 		},
 		"return etcd data dir": {
 			dataDir:       "/path/to/etcd",
 			podYaml:       etcdPod,
 			expectErr:     false,
 			writeManifest: true,
+			validClient:   true,
 		},
 		"invalid etcd pod": {
-			dataDir:       "",
 			podYaml:       etcdPodInvalid,
 			expectErr:     true,
 			writeManifest: true,
+			validClient:   true,
 		},
 		"etcd pod spec without data volume": {
-			dataDir:       "",
 			podYaml:       etcdPodWithoutDataVolume,
 			expectErr:     true,
 			writeManifest: true,
+			validClient:   true,
+		},
+		"kubeconfig file doesn't exist": {
+			dataDir:       "/path/to/etcd",
+			podYaml:       etcdPod,
+			expectErr:     false,
+			writeManifest: true,
+			validClient:   false,
 		},
 	}
 
@@ -312,8 +320,15 @@ func TestGetEtcdDataDir(t *testing.T) {
 			}
 		}
 
-		client := clientsetfake.NewSimpleClientset()
-		dataDir, err := getEtcdDataDir(manifestPath, client)
+		var dataDir string
+		var err error
+		if test.validClient {
+			client := clientsetfake.NewSimpleClientset()
+			dataDir, err = getEtcdDataDir(manifestPath, client)
+		} else {
+			dataDir, err = getEtcdDataDir(manifestPath, nil)
+		}
+
 		if (err != nil) != test.expectErr {
 			t.Fatalf(dedent.Dedent(
 				"getEtcdDataDir failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),

@@ -58,8 +58,8 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: InitConfiguration
 		apiEndpoint:
-		  advertiseAddress: {{.APIEndpoint.AdvertiseAddress}}
-		  bindPort: {{.APIEndpoint.BindPort}}
+		  advertiseAddress: {{.LocalAPIEndpoint.AdvertiseAddress}}
+		  bindPort: {{.LocalAPIEndpoint.BindPort}}
 		nodeRegistration:
 		  name: {{.NodeRegistration.Name}}
 		---

@@ -30,7 +30,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -66,7 +66,7 @@ func DefaultNameSystem() string {
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	var packageList generator.Packages
@@ -75,7 +75,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {
-			glog.Fatal(err)
+			klog.Fatal(err)
 		}
 		if objectMeta == nil {
 			// no types in this package had genclient
@@ -88,7 +88,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		if internal {
 			lastSlash := strings.LastIndex(p.Path, "/")
 			if lastSlash == -1 {
-				glog.Fatalf("error constructing internal group version for package %q", p.Path)
+				klog.Fatalf("error constructing internal group version for package %q", p.Path)
 			}
 			gv.Group = clientgentypes.Group(p.Path[lastSlash+1:])
 			internalGVPkg = p.Path
@@ -223,7 +223,7 @@ func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	glog.V(5).Infof("processing type %v", t)
+	klog.V(5).Infof("processing type %v", t)
 	m := map[string]interface{}{
 		"Resource":   c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
 		"type":       t,

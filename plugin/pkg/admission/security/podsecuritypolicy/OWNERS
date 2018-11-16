@@ -1,5 +1,7 @@
 approvers:
-- tallclair
-- liggitt
+- sig-auth-policy-approvers
 reviewers:
-- pweil-
+- sig-auth-policy-reviewers
+labels:
+- sig/auth
+

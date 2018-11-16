@@ -256,10 +256,10 @@ func pathForPublicKey(pkiPath, name string) string {
 // GetAPIServerAltNames builds an AltNames object for to be used when generating apiserver certificate
 func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
+	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, errors.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
-			cfg.APIEndpoint.AdvertiseAddress)
+		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
+			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
 	// internal IP address for the API server
@@ -311,9 +311,9 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.ServerCertSANs`.
 func GetEtcdAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
+	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, errors.Errorf("error parsing APIEndpoint AdvertiseAddress %q: is not a valid textual representation of an IP address", cfg.APIEndpoint.AdvertiseAddress)
+		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %q: is not a valid textual representation of an IP address", cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
 	// create AltNames with defaults DNSNames/IPs
@@ -334,10 +334,10 @@ func GetEtcdAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, err
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.PeerCertSANs`.
 func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
+	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, errors.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
-			cfg.APIEndpoint.AdvertiseAddress)
+		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
+			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
 	// create AltNames with defaults DNSNames/IPs
