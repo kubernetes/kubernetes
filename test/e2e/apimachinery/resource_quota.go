@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package apimachinery
 
 import (
 	"fmt"
@@ -40,6 +40,7 @@ import (
 const (
 	// how long to wait for a resource quota update to occur
 	resourceQuotaTimeout = 30 * time.Second
+	podName              = "pfpod"
 )
 
 var classGold string = "gold"
