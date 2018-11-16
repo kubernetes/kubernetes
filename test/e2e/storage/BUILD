@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "csi_objects.go",
         "csi_volumes.go",
+        "detach_mounted.go",
         "empty_dir_wrapper.go",
         "ephemeral_volume.go",
         "flexvolume.go",
