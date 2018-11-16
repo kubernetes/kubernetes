@@ -494,7 +494,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
 // any pod was found, 2) augmented meta data, 3) augmented nodeInfo.
-func addNominatedPods(podPriority int32, meta algorithm.PredicateMetadata,
+func addNominatedPods(pod *v1.Pod, meta algorithm.PredicateMetadata,
 	nodeInfo *schedulercache.NodeInfo, queue internalqueue.SchedulingQueue) (bool, algorithm.PredicateMetadata,
 	*schedulercache.NodeInfo) {
 	if queue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
@@ -511,7 +511,7 @@ func addNominatedPods(podPriority int32, meta algorithm.PredicateMetadata,
 	}
 	nodeInfoOut := nodeInfo.Clone()
 	for _, p := range nominatedPods {
-		if util.GetPodPriority(p) >= podPriority {
+		if util.GetPodPriority(p) >= util.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
 				metaOut.AddPod(p, nodeInfoOut)
@@ -569,7 +569,7 @@ func podFitsOnNode(
 		metaToUse := meta
 		nodeInfoToUse := info
 		if i == 0 {
-			podsAdded, metaToUse, nodeInfoToUse = addNominatedPods(util.GetPodPriority(pod), meta, info, queue)
+			podsAdded, metaToUse, nodeInfoToUse = addNominatedPods(pod, meta, info, queue)
 		} else if !podsAdded || len(failedPredicates) != 0 {
 			break
 		}
