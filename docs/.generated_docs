@@ -265,7 +265,6 @@ docs/man/man1/kubectl-rollout-resume.1
 docs/man/man1/kubectl-rollout-status.1
 docs/man/man1/kubectl-rollout-undo.1
 docs/man/man1/kubectl-rollout.1
-docs/man/man1/kubectl-run-container.1
 docs/man/man1/kubectl-run.1
 docs/man/man1/kubectl-scale.1
 docs/man/man1/kubectl-set-env.1
@@ -418,7 +417,6 @@ docs/yaml/kubectl/kubectl_proxy.yaml
 docs/yaml/kubectl/kubectl_replace.yaml
 docs/yaml/kubectl/kubectl_rolling-update.yaml
 docs/yaml/kubectl/kubectl_rollout.yaml
-docs/yaml/kubectl/kubectl_run-container.yaml
 docs/yaml/kubectl/kubectl_run.yaml
 docs/yaml/kubectl/kubectl_scale.yaml
 docs/yaml/kubectl/kubectl_set.yaml
