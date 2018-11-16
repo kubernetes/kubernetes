@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -151,7 +152,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -256,9 +257,6 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 				expectedVolumeName)
 		}
 	}
-
-	// Rollback feature gate to false.
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
@@ -309,7 +307,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 
 func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -354,14 +352,11 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	if volumeSpec == nil || err != nil {
 		t.Fatalf("Failed to create volumeSpec with combination of block mode and volumeDevices. err: %v", err)
 	}
-
-	// Rollback feature gate to false.
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
@@ -406,14 +401,11 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	if volumeSpec != nil || err == nil {
 		t.Fatalf("Unexpected volumeMode and volumeMounts/volumeDevices combination is accepted")
 	}
-
-	// Rollback feature gate to false.
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	// Enable BlockVolume feature gate
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -458,9 +450,6 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	if volumeSpec != nil || err == nil {
 		t.Fatalf("Unexpected volumeMode and volumeMounts/volumeDevices combination is accepted")
 	}
-
-	// Rollback feature gate to false.
-	utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 }
 
 func TestCheckVolumeFSResize(t *testing.T) {
@@ -510,7 +499,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 	reconcileASW(fakeASW, fakeDSW, t)
 
 	// No resize request for volume, volumes in ASW shouldn't be marked as fsResizeRequired.
-	setExpandOnlinePersistentVolumesFeatureGate("true", t)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 	resizeRequiredVolumes := reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
 		t.Fatalf("No resize request for any volumes, but found resize required volumes in ASW: %v", resizeRequiredVolumes)
@@ -521,14 +510,14 @@ func TestCheckVolumeFSResize(t *testing.T) {
 	pvc.Spec.Resources.Requests = volumeCapacity(2)
 
 	// Disable the feature gate, so volume shouldn't be marked as fsResizeRequired.
-	setExpandOnlinePersistentVolumesFeatureGate("false", t)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, false)()
 	resizeRequiredVolumes = reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
 		t.Fatalf("Feature gate disabled, but found resize required volumes in ASW: %v", resizeRequiredVolumes)
 	}
 
 	// Make volume used as ReadOnly, so volume shouldn't be marked as fsResizeRequired.
-	setExpandOnlinePersistentVolumesFeatureGate("true", t)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 	pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = true
 	resizeRequiredVolumes = reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
@@ -559,13 +548,6 @@ func TestCheckVolumeFSResize(t *testing.T) {
 
 func volumeCapacity(size int) v1.ResourceList {
 	return v1.ResourceList{v1.ResourceStorage: resource.MustParse(fmt.Sprintf("%dGi", size))}
-}
-
-func setExpandOnlinePersistentVolumesFeatureGate(value string, t *testing.T) {
-	err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%s", features.ExpandInUsePersistentVolumes, value))
-	if err != nil {
-		t.Fatalf("Set ExpandInUsePersistentVolumes feature gate to %s failed: %v", value, err)
-	}
 }
 
 func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *testing.T) {
