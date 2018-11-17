@@ -31,15 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
-	apiextensionsopenapi "k8s.io/apiextensions-apiserver/pkg/openapi"
 )
 
 type DiscoveryController struct {
@@ -53,8 +50,6 @@ type DiscoveryController struct {
 	syncFn func(version schema.GroupVersion) error
 
 	queue workqueue.RateLimitingInterface
-
-	openAPIAggregationManager apiextensionsopenapi.AggregationManager
 }
 
 func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
@@ -88,7 +83,6 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if err != nil {
 		return err
 	}
-	apiServiceName := version.Group + "." + version.Version
 	foundVersion := false
 	foundGroup := false
 	for _, crd := range crds {
@@ -125,25 +119,6 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			continue
 		}
 		foundVersion = true
-		if c.openAPIAggregationManager != nil && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
-			validationSchema, err := getSchemaForVersion(crd, version.Version)
-			if err != nil {
-				return err
-			}
-
-			// We aggregate the schema even if it's nil as it maybe a removal of the schema for this CRD,
-			// and the aggreated OpenAPI spec should reflect this change.
-			crdspec, etag, err := apiextensionsopenapi.CustomResourceDefinitionOpenAPISpec(&crd.Spec, version.Version, validationSchema)
-			if err != nil {
-				return err
-			}
-
-			// Add/update the local API service's spec for the CRD in apiExtensionsServer's
-			// openAPIAggregationManager
-			if err := c.openAPIAggregationManager.AddUpdateLocalAPIServiceSpec(apiServiceName, crdspec, etag); err != nil {
-				return err
-			}
-		}
 
 		verbs := metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"})
 		// if we're terminating we don't allow some verbs
@@ -189,14 +164,6 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if !foundGroup {
 		c.groupHandler.unsetDiscovery(version.Group)
 		c.versionHandler.unsetDiscovery(version)
-		if c.openAPIAggregationManager != nil && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
-			// Remove the local API service for the CRD in apiExtensionsServer's
-			// openAPIAggregationManager.
-			// Note that we don't check if apiServiceName exists in openAPIAggregationManager
-			// because RemoveAPIServiceSpec properly handles non-existing API service by
-			// returning no error.
-			return c.openAPIAggregationManager.RemoveAPIServiceSpec(apiServiceName)
-		}
 		return nil
 	}
 
@@ -213,14 +180,6 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
-		if c.openAPIAggregationManager != nil && utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
-			// Remove the local API service for the CRD in apiExtensionsServer's
-			// openAPIAggregationManager.
-			// Note that we don't check if apiServiceName exists in openAPIAggregationManager
-			// because RemoveAPIServiceSpec properly handles non-existing API service by
-			// returning no error.
-			return c.openAPIAggregationManager.RemoveAPIServiceSpec(apiServiceName)
-		}
 		return nil
 	}
 	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, discovery.APIResourceListerFunc(func() []metav1.APIResource {
@@ -236,14 +195,12 @@ func sortGroupDiscoveryByKubeAwareVersion(gd []metav1.GroupVersionForDiscovery) 
 	})
 }
 
-func (c *DiscoveryController) Run(stopCh <-chan struct{}, crdOpenAPIAggregationManager apiextensionsopenapi.AggregationManager) {
+func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down DiscoveryController")
 
 	klog.Infof("Starting DiscoveryController")
-
-	c.openAPIAggregationManager = crdOpenAPIAggregationManager
 
 	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))

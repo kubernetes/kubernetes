@@ -50,17 +50,8 @@ func ValidateCustomResource(customResource interface{}, validator *validate.Sche
 	return nil
 }
 
-// ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema.
+// ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
 func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema) error {
-	return ConvertJSONSchemaPropsWithPostProcess(in, out, nil)
-}
-
-// PostProcessFunc post-processes one node of a spec.Schema.
-type PostProcessFunc func(*spec.Schema) error
-
-// ConvertJSONSchemaPropsWithPostProcess converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
-// and run a post process step on each JSONSchemaProps node.
-func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, out *spec.Schema, postProcess PostProcessFunc) error {
 	if in == nil {
 		return nil
 	}
@@ -95,43 +86,41 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.Example = *(in.Example)
 	}
 
-	if in.Enum != nil {
-		out.Enum = make([]interface{}, len(in.Enum))
-		for k, v := range in.Enum {
-			out.Enum[k] = v
-		}
+	out.Enum = make([]interface{}, len(in.Enum))
+	for k, v := range in.Enum {
+		out.Enum[k] = v
 	}
 
-	if err := convertSliceOfJSONSchemaProps(&in.AllOf, &out.AllOf, postProcess); err != nil {
+	if err := convertSliceOfJSONSchemaProps(&in.AllOf, &out.AllOf); err != nil {
 		return err
 	}
-	if err := convertSliceOfJSONSchemaProps(&in.OneOf, &out.OneOf, postProcess); err != nil {
+	if err := convertSliceOfJSONSchemaProps(&in.OneOf, &out.OneOf); err != nil {
 		return err
 	}
-	if err := convertSliceOfJSONSchemaProps(&in.AnyOf, &out.AnyOf, postProcess); err != nil {
+	if err := convertSliceOfJSONSchemaProps(&in.AnyOf, &out.AnyOf); err != nil {
 		return err
 	}
 
 	if in.Not != nil {
 		in, out := &in.Not, &out.Not
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
 
 	var err error
-	out.Properties, err = convertMapOfJSONSchemaProps(in.Properties, postProcess)
+	out.Properties, err = convertMapOfJSONSchemaProps(in.Properties)
 	if err != nil {
 		return err
 	}
 
-	out.PatternProperties, err = convertMapOfJSONSchemaProps(in.PatternProperties, postProcess)
+	out.PatternProperties, err = convertMapOfJSONSchemaProps(in.PatternProperties)
 	if err != nil {
 		return err
 	}
 
-	out.Definitions, err = convertMapOfJSONSchemaProps(in.Definitions, postProcess)
+	out.Definitions, err = convertMapOfJSONSchemaProps(in.Definitions)
 	if err != nil {
 		return err
 	}
@@ -146,7 +135,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.AdditionalProperties != nil {
 		in, out := &in.AdditionalProperties, &out.AdditionalProperties
 		*out = new(spec.SchemaOrBool)
-		if err := convertJSONSchemaPropsorBool(*in, *out, postProcess); err != nil {
+		if err := convertJSONSchemaPropsorBool(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -154,7 +143,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.AdditionalItems != nil {
 		in, out := &in.AdditionalItems, &out.AdditionalItems
 		*out = new(spec.SchemaOrBool)
-		if err := convertJSONSchemaPropsorBool(*in, *out, postProcess); err != nil {
+		if err := convertJSONSchemaPropsorBool(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -162,7 +151,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = new(spec.SchemaOrArray)
-		if err := convertJSONSchemaPropsOrArray(*in, *out, postProcess); err != nil {
+		if err := convertJSONSchemaPropsOrArray(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -172,7 +161,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		*out = make(spec.Dependencies, len(*in))
 		for key, val := range *in {
 			newVal := new(spec.SchemaOrStringArray)
-			if err := convertJSONSchemaPropsOrStringArray(&val, newVal, postProcess); err != nil {
+			if err := convertJSONSchemaPropsOrStringArray(&val, newVal); err != nil {
 				return err
 			}
 			(*out)[key] = *newVal
@@ -185,20 +174,14 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.ExternalDocs.URL = in.ExternalDocs.URL
 	}
 
-	if postProcess != nil {
-		if err := postProcess(out); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]spec.Schema, postProcess PostProcessFunc) error {
+func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]spec.Schema) error {
 	if in != nil {
 		for _, jsonSchemaProps := range *in {
 			schema := spec.Schema{}
-			if err := ConvertJSONSchemaPropsWithPostProcess(&jsonSchemaProps, &schema, postProcess); err != nil {
+			if err := ConvertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
 				return err
 			}
 			*out = append(*out, schema)
@@ -207,27 +190,25 @@ func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]s
 	return nil
 }
 
-func convertMapOfJSONSchemaProps(in map[string]apiextensions.JSONSchemaProps, postProcess PostProcessFunc) (map[string]spec.Schema, error) {
-	if in == nil {
-		return nil, nil
-	}
-
+func convertMapOfJSONSchemaProps(in map[string]apiextensions.JSONSchemaProps) (map[string]spec.Schema, error) {
 	out := make(map[string]spec.Schema)
-	for k, jsonSchemaProps := range in {
-		schema := spec.Schema{}
-		if err := ConvertJSONSchemaPropsWithPostProcess(&jsonSchemaProps, &schema, postProcess); err != nil {
-			return nil, err
+	if len(in) != 0 {
+		for k, jsonSchemaProps := range in {
+			schema := spec.Schema{}
+			if err := ConvertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
+				return nil, err
+			}
+			out[k] = schema
 		}
-		out[k] = schema
 	}
 	return out, nil
 }
 
-func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *spec.SchemaOrArray, postProcess PostProcessFunc) error {
+func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *spec.SchemaOrArray) error {
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -235,7 +216,7 @@ func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out
 		in, out := &in.JSONSchemas, &out.Schemas
 		*out = make([]spec.Schema, len(*in))
 		for i := range *in {
-			if err := ConvertJSONSchemaPropsWithPostProcess(&(*in)[i], &(*out)[i], postProcess); err != nil {
+			if err := ConvertJSONSchemaProps(&(*in)[i], &(*out)[i]); err != nil {
 				return err
 			}
 		}
@@ -243,24 +224,24 @@ func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out
 	return nil
 }
 
-func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *spec.SchemaOrBool, postProcess PostProcessFunc) error {
+func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *spec.SchemaOrBool) error {
 	out.Allows = in.Allows
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *spec.SchemaOrStringArray, postProcess PostProcessFunc) error {
+func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *spec.SchemaOrStringArray) error {
 	out.Property = in.Property
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
+		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}

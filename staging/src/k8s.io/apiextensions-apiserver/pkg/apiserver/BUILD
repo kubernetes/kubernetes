@@ -36,7 +36,6 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/crdserverscheme:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/openapi:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition:go_default_library",
