@@ -17,8 +17,11 @@ limitations under the License.
 package kubeadm
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -200,24 +203,62 @@ func TestCmdInitCertPhaseCSR(t *testing.T) {
 		t.Skip()
 	}
 
-	csrDir := testutil.SetupTempDir(t)
-
-	cert := &certs.KubeadmCertKubeletClient
-	kubeadmPath := getKubeadmPath()
-	_, _, err := RunCmd(kubeadmPath,
-		"init",
-		"phase",
-		"certs",
-		cert.BaseName,
-		"--csr-only",
-		"--csr-dir="+csrDir,
-	)
-	if err != nil {
-		t.Fatalf("couldn't run kubeadm: %v", err)
+	tests := []struct {
+		name          string
+		baseName      string
+		expectedError string
+	}{
+		{
+			name:     "generate CSR",
+			baseName: certs.KubeadmCertKubeletClient.BaseName,
+		},
+		{
+			name:          "fails on CSR",
+			baseName:      certs.KubeadmCertRootCA.BaseName,
+			expectedError: "unknown flag: --csr-only",
+		},
+		{
+			name:          "fails on all",
+			baseName:      "all",
+			expectedError: "unknown flag: --csr-only",
+		},
 	}
 
-	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, cert.BaseName); err != nil {
-		t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			csrDir := testutil.SetupTempDir(t)
+			cert := &certs.KubeadmCertKubeletClient
+			kubeadmPath := getKubeadmPath()
+			_, stderr, err := RunCmd(kubeadmPath,
+				"init",
+				"phase",
+				"certs",
+				test.baseName,
+				"--csr-only",
+				"--csr-dir="+csrDir,
+			)
+
+			if test.expectedError != "" {
+				cause := errors.Cause(err)
+				_, ok := cause.(*exec.ExitError)
+				if !ok {
+					t.Fatalf("expected exitErr: got %T (%v)", cause, err)
+				}
+
+				if !strings.Contains(stderr, test.expectedError) {
+					t.Errorf("expected %q to contain %q", stderr, test.expectedError)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("couldn't run kubeadm: %v", err)
+			}
+
+			if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, cert.BaseName); err != nil {
+				t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
+			}
+		})
 	}
 }
 
