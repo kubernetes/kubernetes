@@ -80,6 +80,9 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
       containers:
       - name: autoscaler
         image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.3.0
