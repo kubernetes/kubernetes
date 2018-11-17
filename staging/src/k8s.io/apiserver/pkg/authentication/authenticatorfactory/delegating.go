@@ -51,6 +51,8 @@ type DelegatingAuthenticatorConfig struct {
 	// ClientCAFile is the CA bundle file used to authenticate client certificates
 	ClientCAFile string
 
+	APIAudiences authenticator.Audiences
+
 	RequestHeaderConfig *RequestHeaderConfig
 }
 
@@ -86,7 +88,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	}
 
 	if c.TokenAccessReviewClient != nil {
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient)
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences)
 		if err != nil {
 			return nil, nil, err
 		}
