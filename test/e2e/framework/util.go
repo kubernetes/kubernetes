@@ -2054,8 +2054,7 @@ func LoadClientset() (*clientset.Clientset, error) {
 //       need to use such a function and can instead
 //       use the UUID utility function.
 func RandomSuffix() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return strconv.Itoa(r.Int() % 10000)
+	return strconv.Itoa(rand.Intn(10000))
 }
 
 // ExpectError expects an error happens, otherwise an exception raises
