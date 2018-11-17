@@ -19987,7 +19987,7 @@
      },
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
-      "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future."
+      "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is a beta feature."
      },
      "dataSource": {
       "$ref": "v1.TypedLocalObjectReference",
@@ -20320,7 +20320,7 @@
      },
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
-      "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future."
+      "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is a beta feature."
      },
      "nodeAffinity": {
       "$ref": "v1.VolumeNodeAffinity",
@@ -22143,7 +22143,7 @@
       "items": {
        "$ref": "v1.VolumeDevice"
       },
-      "description": "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future."
+      "description": "volumeDevices is the list of block devices to be used by the container. This is a beta feature."
      },
      "livenessProbe": {
       "$ref": "v1.Probe",

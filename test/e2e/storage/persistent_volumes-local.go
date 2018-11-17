@@ -218,11 +218,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		if testVolType == GCELocalSSDVolumeType {
 			serialStr = " [Serial]"
 		}
-		alphaStr := ""
-		if testVolType == BlockLocalVolumeType {
-			alphaStr = " [Feature:BlockVolume]"
-		}
-		ctxString := fmt.Sprintf("[Volume type: %s]%v%v", testVolType, serialStr, alphaStr)
+		ctxString := fmt.Sprintf("[Volume type: %s]%v", testVolType, serialStr)
 		testMode := immediateMode
 
 		Context(ctxString, func() {

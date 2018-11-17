@@ -950,13 +950,15 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 
+	fs := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pv",
 			UID:  "pvuid",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef: &v1.ObjectReference{Name: "pvc"},
+			ClaimRef:   &v1.ObjectReference{Name: "pvc"},
+			VolumeMode: &fs,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
@@ -966,6 +968,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "pv",
+			VolumeMode: &fs,
 		},
 	}
 	pod := &v1.Pod{

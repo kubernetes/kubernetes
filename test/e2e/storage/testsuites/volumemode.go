@@ -47,8 +47,7 @@ var _ TestSuite = &volumeModeTestSuite{}
 func InitVolumeModeTestSuite() TestSuite {
 	return &volumeModeTestSuite{
 		tsInfo: TestSuiteInfo{
-			name:       "volumeMode",
-			featureTag: "[Feature:BlockVolume]",
+			name: "volumeMode",
 			testPatterns: []testpatterns.TestPattern{
 				testpatterns.FsVolModePreprovisionedPV,
 				testpatterns.FsVolModeDynamicPV,
@@ -304,10 +303,10 @@ func testVolumeModeSuccessForPreprovisionedPV(input *volumeModeTestInput) {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking if persistent volume exists as expected volume mode")
-		checkVolumeModeOfPath(pod, input.volMode, "/mnt/volume1")
+		utils.CheckVolumeModeOfPath(pod, input.volMode, "/mnt/volume1")
 
 		By("Checking if read/write to persistent volume works properly")
-		checkReadWriteToPath(pod, input.volMode, "/mnt/volume1")
+		utils.CheckReadWriteToPath(pod, input.volMode, "/mnt/volume1")
 	})
 	// TODO(mkimuram): Add more tests
 }
@@ -366,10 +365,10 @@ func testVolumeModeSuccessForDynamicPV(input *volumeModeTestInput) {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking if persistent volume exists as expected volume mode")
-		checkVolumeModeOfPath(pod, input.volMode, "/mnt/volume1")
+		utils.CheckVolumeModeOfPath(pod, input.volMode, "/mnt/volume1")
 
 		By("Checking if read/write to persistent volume works properly")
-		checkReadWriteToPath(pod, input.volMode, "/mnt/volume1")
+		utils.CheckReadWriteToPath(pod, input.volMode, "/mnt/volume1")
 	})
 	// TODO(mkimuram): Add more tests
 }
@@ -400,46 +399,4 @@ func generateConfigsForPreprovisionedPVTest(scName string, volBindMode storagev1
 	}
 
 	return scConfig, pvConfig, pvcConfig
-}
-
-func checkVolumeModeOfPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
-	if volMode == v1.PersistentVolumeBlock {
-		// Check if block exists
-		utils.VerifyExecInPodSucceed(pod, fmt.Sprintf("test -b %s", path))
-
-		// Double check that it's not directory
-		utils.VerifyExecInPodFail(pod, fmt.Sprintf("test -d %s", path), 1)
-	} else {
-		// Check if directory exists
-		utils.VerifyExecInPodSucceed(pod, fmt.Sprintf("test -d %s", path))
-
-		// Double check that it's not block
-		utils.VerifyExecInPodFail(pod, fmt.Sprintf("test -b %s", path), 1)
-	}
-}
-
-func checkReadWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
-	if volMode == v1.PersistentVolumeBlock {
-		// random -> file1
-		utils.VerifyExecInPodSucceed(pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
-		// file1 -> dev (write to dev)
-		utils.VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
-		// dev -> file2 (read from dev)
-		utils.VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
-		// file1 == file2 (check contents)
-		utils.VerifyExecInPodSucceed(pod, "diff /tmp/file1 /tmp/file2")
-		// Clean up temp files
-		utils.VerifyExecInPodSucceed(pod, "rm -f /tmp/file1 /tmp/file2")
-
-		// Check that writing file to block volume fails
-		utils.VerifyExecInPodFail(pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
-	} else {
-		// text -> file1 (write to file)
-		utils.VerifyExecInPodSucceed(pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
-		// grep file1 (read from file and check contents)
-		utils.VerifyExecInPodSucceed(pod, fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path))
-
-		// Check that writing to directory as block volume fails
-		utils.VerifyExecInPodFail(pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
-	}
 }
