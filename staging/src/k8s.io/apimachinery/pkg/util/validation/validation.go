@@ -397,7 +397,7 @@ func IsValidSocketAddr(value string) []string {
 	var errs []string
 	ip, port, err := net.SplitHostPort(value)
 	if err != nil {
-		return append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
+		errs = append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
 		return errs
 	}
 	portInt, _ := strconv.Atoi(port)
