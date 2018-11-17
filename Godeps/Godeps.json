@@ -458,6 +458,11 @@
 			"Rev": "b38d23b8782a487059e8fc8773e9a5b228a77cb6"
 		},
 		{
+			"ImportPath": "github.com/cblecker/caddy/caddyfile",
+			"Comment": "v0.10.10-57-g2de495001514ed",
+			"Rev": "2de495001514ed50eac2e09f474c32d417100c5c"
+		},
+		{
 			"ImportPath": "github.com/chai2010/gettext-go/gettext",
 			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
 		},
@@ -2530,11 +2535,6 @@
 			"ImportPath": "github.com/mesos/mesos-go/api/v1/lib/roles",
 			"Comment": "mesos-1.6.x-12-gff8175bfda54b1",
 			"Rev": "ff8175bfda54b1eb1f1954c8102a9dc612aa2312"
-		},
-		{
-			"ImportPath": "github.com/mholt/caddy/caddyfile",
-			"Comment": "v0.10.10-57-g2de495001514ed",
-			"Rev": "2de495001514ed50eac2e09f474c32d417100c5c"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
