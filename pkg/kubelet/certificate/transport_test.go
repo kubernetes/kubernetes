@@ -124,7 +124,9 @@ func (f *fakeManager) SetCertificateSigningRequestClient(certificatesclient.Cert
 
 func (f *fakeManager) ServerHealthy() bool { return f.healthy }
 
-func (f *fakeManager) Start() {}
+func (f *fakeManager) Start()                     {}
+func (f *fakeManager) Stop()                      {}
+func (f *fakeManager) RotateCerts() (bool, error) { return false, nil }
 
 func (f *fakeManager) Current() *tls.Certificate {
 	if val := f.cert.Load(); val != nil {
