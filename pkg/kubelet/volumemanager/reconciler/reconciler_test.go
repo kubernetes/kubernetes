@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -1120,7 +1121,7 @@ func createTestClient() *fake.Clientset {
 					VolumesAttached: []v1.AttachedVolume{
 						{
 							Name:       "fake-plugin/fake-device1",
-							DevicePath: "fake/path",
+							DevicePath: "/fake/path",
 						},
 					}},
 			}, nil
@@ -1160,4 +1161,97 @@ func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolume
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 	return fakeClient
+}
+
+func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	kubeClient := createTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
+		fakeHandler))
+	reconciler := NewReconciler(
+		kubeClient,
+		true, /* controllerAttachDetachEnabled */
+		reconcilerLoopSleepDuration,
+		reconcilerSyncStatesSleepPeriod,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		&mount.FakeMounter{},
+		volumePluginMgr,
+		kubeletPodsDir)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Some steps are executes out of order in callbacks, follow the numbers.
+
+	// 1. Add a volume to DSW and wait until it's mounted
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	podName := util.GetUniquePodName(pod)
+	generatedVolumeName, err := dsw.AddPodToVolume(
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+	runReconciler(reconciler)
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
+
+	finished := make(chan interface{})
+	fakePlugin.UnmountDeviceHook = func(mountPath string) error {
+		// Act:
+		// 3. While a volume is being unmounted, add it back to the desired state of world
+		klog.Infof("UnmountDevice called")
+		generatedVolumeName, err = dsw.AddPodToVolume(
+			podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+		return nil
+	}
+
+	fakePlugin.WaitForAttachHook = func(spec *volume.Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error) {
+		// Assert
+		// 4. When the volume is mounted again, expect that UnmountDevice operation did not clear devicePath
+		if devicePath == "" {
+			t.Errorf("Expected WaitForAttach called with devicePath from Node.Status")
+			close(finished)
+			return "", fmt.Errorf("Expected devicePath from Node.Status")
+		}
+		close(finished)
+		return devicePath, nil
+	}
+
+	// 2. Delete the volume from DSW (and wait for callbacks)
+	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+
+	<-finished
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 }
