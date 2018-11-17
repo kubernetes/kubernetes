@@ -24,8 +24,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/imdario/mergo"
+	"k8s.io/klog"
 
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
@@ -229,11 +229,11 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
 	} else if len(configAuthInfo.TokenFile) > 0 {
-		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
-		if err != nil {
+		ts := restclient.NewCachedFileTokenSource(configAuthInfo.TokenFile)
+		if _, err := ts.Token(); err != nil {
 			return nil, err
 		}
-		mergedConfig.BearerToken = string(tokenBytes)
+		mergedConfig.WrapTransport = restclient.TokenSourceWrapTransport(ts)
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = restclient.ImpersonationConfig{
@@ -545,12 +545,12 @@ func (config *inClusterClientConfig) Possible() bool {
 // to the default config.
 func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
 	if kubeconfigPath == "" && masterUrl == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
+		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
 		kubeconfig, err := restclient.InClusterConfig()
 		if err == nil {
 			return kubeconfig, nil
 		}
-		glog.Warning("error creating inClusterConfig, falling back to default config: ", err)
+		klog.Warning("error creating inClusterConfig, falling back to default config: ", err)
 	}
 	return NewNonInteractiveDeferredLoadingClientConfig(
 		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},

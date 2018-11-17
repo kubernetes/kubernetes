@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -188,7 +188,7 @@ func shouldIgnore(a admission.Attributes) bool {
 	obj := a.GetObject()
 	_, ok := obj.(*api.Pod)
 	if !ok {
-		glog.Errorf("expected pod but got %s", a.GetKind().Kind)
+		klog.Errorf("expected pod but got %s", a.GetKind().Kind)
 		return true
 	}
 

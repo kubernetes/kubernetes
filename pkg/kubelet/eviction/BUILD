@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "eviction_manager_test.go",
         "helpers_test.go",
+        "main_test.go",
         "memory_threshold_notifier_test.go",
         "mock_threshold_notifier_test.go",
     ],
@@ -28,6 +29,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
     ],
@@ -67,7 +69,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",

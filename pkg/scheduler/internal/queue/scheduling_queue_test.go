@@ -112,8 +112,8 @@ func TestPriorityQueue_Add(t *testing.T) {
 	if p, err := q.Pop(); err != nil || p != &unschedulablePod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Name)
 	}
-	if len(q.nominatedPods) != 0 {
-		t.Errorf("Expected nomindatePods to be empty: %v", q.nominatedPods)
+	if len(q.nominatedPods["node1"]) != 2 {
+		t.Errorf("Expected medPriorityPod and unschedulablePod to be still present in nomindatePods: %v", q.nominatedPods["node1"])
 	}
 }
 
@@ -135,8 +135,8 @@ func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 	if p, err := q.Pop(); err != nil || p != &unschedulablePod {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Name)
 	}
-	if len(q.nominatedPods) != 0 {
-		t.Errorf("Expected nomindatePods to be empty: %v", q.nominatedPods)
+	if len(q.nominatedPods["node1"]) != 2 {
+		t.Errorf("Expected medPriorityPod and unschedulablePod to be still present in nomindatePods: %v", q.nominatedPods["node1"])
 	}
 	if q.unschedulableQ.get(&highPriNominatedPod) != &highPriNominatedPod {
 		t.Errorf("Pod %v was not found in the unschedulableQ.", highPriNominatedPod.Name)
@@ -178,8 +178,8 @@ func TestPriorityQueue_Pop(t *testing.T) {
 		if p, err := q.Pop(); err != nil || p != &medPriorityPod {
 			t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPod.Name, p.Name)
 		}
-		if len(q.nominatedPods) != 0 {
-			t.Errorf("Expected nomindatePods to be empty: %v", q.nominatedPods)
+		if len(q.nominatedPods["node1"]) != 1 {
+			t.Errorf("Expected medPriorityPod to be present in nomindatePods: %v", q.nominatedPods["node1"])
 		}
 	}()
 	q.Add(&medPriorityPod)

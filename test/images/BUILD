@@ -12,6 +12,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/images/apparmor-loader:all-srcs",
+        "//test/images/crd-conversion-webhook:all-srcs",
         "//test/images/echoserver:all-srcs",
         "//test/images/entrypoint-tester:all-srcs",
         "//test/images/fakegitserver:all-srcs",

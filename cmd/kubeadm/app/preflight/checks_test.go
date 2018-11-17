@@ -18,11 +18,11 @@ package preflight
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 
 	"net/http"
@@ -173,12 +173,12 @@ func (pfct preflightCheckTest) Name() string {
 	return "preflightCheckTest"
 }
 
-func (pfct preflightCheckTest) Check() (warning, errors []error) {
+func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 	if pfct.msg == "warning" {
-		return []error{fmt.Errorf("warning")}, nil
+		return []error{errors.New("warning")}, nil
 	}
 	if pfct.msg != "" {
-		return nil, []error{fmt.Errorf("fake error")}
+		return nil, []error{errors.New("fake error")}
 	}
 	return
 }
@@ -191,7 +191,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}{
 		{name: "Test valid advertised address",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
@@ -224,7 +224,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},

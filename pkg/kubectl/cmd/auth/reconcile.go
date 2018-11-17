@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -251,7 +251,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			return fmt.Errorf("only rbac.authorization.k8s.io/v1 is supported: not %T", t)
 
 		default:
-			glog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
+			klog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
 			// skip ignored resources
 		}
 

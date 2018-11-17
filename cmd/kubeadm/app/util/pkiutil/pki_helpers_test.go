@@ -29,6 +29,24 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// certificateRequest is an x509 certificate request in PEM encoded format
+// openssl req -new -key rsa2048.pem -sha256 -nodes -out x509certrequest.pem -subj "/C=US/CN=not-valid"
+const certificateRequest = `-----BEGIN CERTIFICATE REQUEST-----
+MIICZjCCAU4CAQAwITELMAkGA1UEBhMCVVMxEjAQBgNVBAMMCW5vdC12YWxpZDCC
+ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMdoBxV0SbSS+7XrgVDF/P4x
+tqyun+DLxeRF5265ZOFRJDXCJgYH7wKlxlkEaHZQhnNmnqFiy96MHSKaiQmlkEm4
+EhlqTf38yEWx+t98A0CDbHsIPZ0/+MPCjb2kf+OfBXJJl908io0grs02jxN9lceL
+RFrKT6vaB+6i7LxbPQcOmjF7OUqWS6S2qSpShw2GY+mJz4HM7OFb9RcN4izh+GF6
+7hajYgt7pAFyWF1ua/H98Ysn4FVgIYk30rHCNBkQpJnna7EyGYuj08VuFa088W9g
+c/DCpL+VgBDwTel9tfeMxRAoLIPF9iJ8Ftr7dsRZ/Y/SnxfUJo2ed8y7dgIiLuEC
+AwEAAaAAMA0GCSqGSIb3DQEBCwUAA4IBAQCOjPB/4LKa2G7LarMMLAeNqvWF9SIG
+y2VGQoTn9D5blXMvnfzWSYgU6nBzf/E/32q26OwiCriuOPXfxM/cxEMOJ62u7b50
+OR52JFvQdONsCZaLgylGWppl0YeqylbTosHjsWJNlp+zjXcQHjCQ9OoLgfmrwYyD
+2MsYJR4p7JZ2ZN8FF1hgMUrDzypZ0NSBKAiQMU9TFhxgyk75RNDtmX+2K35zqLyr
+0otimyYwPCGPD2GHwNfvu1oP0A+/cT+rCPz6AlXhWEbz2JkLo6/muRfRl0QSRgHE
+Q3+eWlA1YdqEBwvp3NEQI9BtMnzxJVWA5dvYluMNllsV/q8s2IEEAFG9
+-----END CERTIFICATE REQUEST-----`
+
 func TestNewCertificateAuthority(t *testing.T) {
 	cert, key, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 
@@ -435,6 +453,13 @@ func TestPathForPublicKey(t *testing.T) {
 	}
 }
 
+func TestPathForCSR(t *testing.T) {
+	csrPath := pathForCSR("/foo", "bar")
+	if csrPath != "/foo/bar.csr" {
+		t.Errorf("unexpected certificate path: %s", csrPath)
+	}
+}
+
 func TestGetAPIServerAltNames(t *testing.T) {
 
 	var tests = []struct {
@@ -444,9 +469,9 @@ func TestGetAPIServerAltNames(t *testing.T) {
 		expectedIPAddresses []string
 	}{
 		{
-			name: "ControlPlaneEndpoint DNS",
+			name: "",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ControlPlaneEndpoint: "api.k8s.io:6443",
 					Networking:           kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
@@ -462,7 +487,7 @@ func TestGetAPIServerAltNames(t *testing.T) {
 		{
 			name: "ControlPlaneEndpoint IP",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					ControlPlaneEndpoint: "4.5.6.7:6443",
 					Networking:           kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
@@ -517,7 +542,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 	proxy := "user-etcd-proxy"
 	proxyIP := "10.10.10.100"
 	cfg := &kubeadmapi.InitConfiguration{
-		APIEndpoint: kubeadmapi.APIEndpoint{
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 			AdvertiseAddress: "1.2.3.4",
 		},
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
@@ -579,7 +604,7 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 	proxyIP := "10.10.10.100"
 	advertiseIP := "1.2.3.4"
 	cfg := &kubeadmapi.InitConfiguration{
-		APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: advertiseIP},
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: advertiseIP},
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			Etcd: kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{

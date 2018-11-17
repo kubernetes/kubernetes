@@ -1,4 +1,125 @@
 aliases:
+  # sig-auth subproject aliases
+  sig-auth-audit-approvers:
+    - sttts
+    - tallclair
+  sig-auth-audit-reviewers:
+    - CaoShuFeng
+    - hzxuzhonghu
+    - lavalamp
+    - sttts
+    - tallclair
+
+  sig-auth-authenticators-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authenticators-reviewers:
+    - deads2k
+    - enj
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - sttts
+    - wojtek-t
+
+  sig-auth-authorizers-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authorizers-reviewers:
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - erictune
+    - jianhuiz
+    - krousey
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - mml
+    - ncdc
+    - nikhiljindal
+    - smarterclayton
+    - sttts
+    - thockin
+    - wojtek-t
+
+  sig-auth-certificates-approvers:
+    - liggitt
+    - mikedanese
+    - smarterclayton
+  sig-auth-certificates-reviewers:
+    - awly
+    - caesarxuchao
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - errordeveloper
+    - hongchaodeng
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - smarterclayton
+    - sttts
+    - thockin
+    - timothysc
+    - wojtek-t
+
+  sig-auth-encryption-at-rest-approvers:
+    - immutableT
+    - smarterclayton
+  sig-auth-encryption-at-rest-reviewers:
+    - enj
+    - immutableT
+    - lavalamp
+    - liggitt
+    - sakshamsharma
+    - smarterclayton
+    - wojtek-t
+
+  sig-auth-node-isolation-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+  sig-auth-node-isolation-reviewers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+
+  sig-auth-policy-approvers:
+    - deads2k
+    - liggitt
+    - tallclair
+  sig-auth-policy-reviewers:
+    - deads2k
+    - hongchaodeng    
+    - jianhuiz
+    - liggitt
+    - mbohlool
+    - pweil-
+    - tallclair
+
+  sig-auth-serviceaccounts-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-serviceaccounts-reviewers:
+    - awly
+    - deads2k
+    - enj
+    - liggitt
+    - mikedanese
+
   sig-storage-reviewers:
     - saad-ali
     - childsb

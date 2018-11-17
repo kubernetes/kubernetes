@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -112,7 +112,7 @@ func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ s
 
 func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		glog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
+		klog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
 }
 

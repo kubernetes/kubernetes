@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -218,11 +218,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		if testVolType == GCELocalSSDVolumeType {
 			serialStr = " [Serial]"
 		}
-		alphaStr := ""
-		if testVolType == BlockLocalVolumeType {
-			alphaStr = " [Feature:BlockVolume]"
-		}
-		ctxString := fmt.Sprintf("[Volume type: %s]%v%v", testVolType, serialStr, alphaStr)
+		ctxString := fmt.Sprintf("[Volume type: %s]%v", testVolType, serialStr)
 		testMode := immediateMode
 
 		Context(ctxString, func() {
@@ -1290,7 +1286,7 @@ func makeLocalPod(config *localTestConfig, volume *localTestVolume, cmd string) 
 		return pod
 	}
 	if volume.localVolumeType == BlockLocalVolumeType {
-		// Block e2e tests require utilities for writing to block devices (e.g. dd), and nginx has this utilites.
+		// Block e2e tests require utilities for writing to block devices (e.g. dd), and nginx has this utilities.
 		pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
 	}
 	return pod

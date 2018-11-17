@@ -119,6 +119,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
@@ -133,7 +134,6 @@ go_library(
         "//test/e2e/perftype:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
@@ -143,6 +143,7 @@ go_library(
         "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/golang.org/x/crypto/ssh:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

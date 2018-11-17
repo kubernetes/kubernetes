@@ -641,7 +641,7 @@ message Container {
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
-  // This is an alpha feature and may change in the future.
+  // This is a beta feature.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
   // +optional
@@ -1371,6 +1371,30 @@ message GitRepoVolumeSource {
   // the subdirectory with the given name.
   // +optional
   optional string directory = 3;
+}
+
+// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// Glusterfs volumes do not support ownership management or SELinux relabeling.
+message GlusterfsPersistentVolumeSource {
+  // EndpointsName is the endpoint name that details Glusterfs topology.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  optional string endpoints = 1;
+
+  // Path is the Glusterfs volume path.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  optional string path = 2;
+
+  // ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+  // Defaults to false.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // +optional
+  optional bool readOnly = 3;
+
+  // EndpointsNamespace is the namespace that contains Glusterfs endpoint.
+  // If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // +optional
+  optional string endpointsNamespace = 4;
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
@@ -2296,7 +2320,7 @@ message PersistentVolumeClaimSpec {
 
   // volumeMode defines what type of volume is required by the claim.
   // Value of Filesystem is implied when not included in claim spec.
-  // This is an alpha feature and may change in the future.
+  // This is a beta feature.
   // +optional
   optional string volumeMode = 6;
 
@@ -2389,7 +2413,7 @@ message PersistentVolumeSource {
   // exposed to the pod. Provisioned by an admin.
   // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
   // +optional
-  optional GlusterfsVolumeSource glusterfs = 4;
+  optional GlusterfsPersistentVolumeSource glusterfs = 4;
 
   // NFS represents an NFS mount on the host. Provisioned by an admin.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
@@ -2512,7 +2536,7 @@ message PersistentVolumeSpec {
 
   // volumeMode defines if a volume is intended to be used with a formatted filesystem
   // or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-  // This is an alpha feature and may change in the future.
+  // This is a beta feature.
   // +optional
   optional string volumeMode = 8;
 

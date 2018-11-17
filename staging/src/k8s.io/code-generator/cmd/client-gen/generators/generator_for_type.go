@@ -387,11 +387,16 @@ func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privateP
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -401,6 +406,10 @@ func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.resultT
 var listSubresourceTemplate = `
 // List takes $.type|raw$ name, label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List($.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
@@ -408,6 +417,7 @@ func (c *$.type|privatePlural$) List($.type|private$Name string, opts $.ListOpti
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -461,10 +471,15 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.DeleteOptions|raw
 var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
 func (c *$.type|privatePlural$) DeleteCollection(options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil{
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&listOptions, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()
@@ -553,11 +568,16 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Watch()
 }
 `

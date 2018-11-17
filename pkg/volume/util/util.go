@@ -25,7 +25,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -101,7 +101,7 @@ func IsReady(dir string) bool {
 	}
 
 	if !s.Mode().IsRegular() {
-		glog.Errorf("ready-file is not a file: %s", readyFile)
+		klog.Errorf("ready-file is not a file: %s", readyFile)
 		return false
 	}
 
@@ -113,14 +113,14 @@ func IsReady(dir string) bool {
 // created.
 func SetReady(dir string) {
 	if err := os.MkdirAll(dir, 0750); err != nil && !os.IsExist(err) {
-		glog.Errorf("Can't mkdir %s: %v", dir, err)
+		klog.Errorf("Can't mkdir %s: %v", dir, err)
 		return
 	}
 
 	readyFile := path.Join(dir, readyFileName)
 	file, err := os.Create(readyFile)
 	if err != nil {
-		glog.Errorf("Can't touch %s: %v", readyFile, err)
+		klog.Errorf("Can't touch %s: %v", readyFile, err)
 		return
 	}
 	file.Close()
@@ -140,7 +140,7 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)
@@ -171,13 +171,13 @@ func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMou
 		}
 
 		if notMnt {
-			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+			klog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
 			return os.Remove(mountPath)
 		}
 	}
 
 	// Unmount the mount path
-	glog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
+	klog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
 	if err := mounter.Unmount(mountPath); err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMou
 		return mntErr
 	}
 	if notMnt {
-		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
+		klog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
 		return os.Remove(mountPath)
 	}
 	return fmt.Errorf("Failed to unmount path %v", mountPath)
@@ -291,7 +291,7 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
-		glog.V(10).Infof("Match for Required node selector terms %+v", terms)
+		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
 		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
 			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
@@ -607,7 +607,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	zoneSlice := zones.List()
 	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
 
-	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	klog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
 	return zone
 }
 
@@ -666,7 +666,7 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 		replicaZones.Insert(zone)
 	}
 
-	glog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
+	klog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
 		pvcName, replicaZones.UnsortedList(), zoneSlice)
 	return replicaZones
 }
@@ -674,7 +674,7 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 	if pvcName == "" {
 		// We should always be called with a name; this shouldn't happen
-		glog.Warningf("No name defined during volume create; choosing random zone")
+		klog.Warningf("No name defined during volume create; choosing random zone")
 
 		hash = rand.Uint32()
 	} else {
@@ -710,7 +710,7 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 					hashString = hashString[lastDash+1:]
 				}
 
-				glog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
+				klog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
 			}
 		}
 
@@ -726,7 +726,7 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
 // to empty_dir
 func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volSpec volume.Spec, podUID utypes.UID) error {
-	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
+	klog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
 	wrapped, err := host.NewWrapperUnmounter(volName, volSpec, podUID)

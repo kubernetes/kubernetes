@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,9 @@ import (
 
 	"github.com/pkg/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -76,7 +78,14 @@ func NewKubeConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kubeconfig",
 		Short: "Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Generates all kubeconfig files",
+				InheritFlags:   getKubeConfigPhaseFlags("all"),
+				RunAllSiblings: true,
+			},
 			NewKubeConfigFilePhase(kubeadmconstants.AdminKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.KubeletKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
@@ -89,11 +98,28 @@ func NewKubeConfigPhase() workflow.Phase {
 // NewKubeConfigFilePhase creates a kubeadm workflow phase that creates a kubeconfig file.
 func NewKubeConfigFilePhase(kubeConfigFileName string) workflow.Phase {
 	return workflow.Phase{
-		Name:  kubeconfigFilePhaseProperties[kubeConfigFileName].name,
-		Short: kubeconfigFilePhaseProperties[kubeConfigFileName].short,
-		Long:  fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
-		Run:   runKubeConfigFile(kubeConfigFileName),
+		Name:         kubeconfigFilePhaseProperties[kubeConfigFileName].name,
+		Short:        kubeconfigFilePhaseProperties[kubeConfigFileName].short,
+		Long:         fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
+		Run:          runKubeConfigFile(kubeConfigFileName),
+		InheritFlags: getKubeConfigPhaseFlags(kubeConfigFileName),
 	}
+}
+
+func getKubeConfigPhaseFlags(name string) []string {
+	flags := []string{
+		options.APIServerAdvertiseAddress,
+		options.APIServerBindPort,
+		options.CertificatesDir,
+		options.CfgPath,
+		options.KubeconfigDir,
+	}
+	if name == "all" || name == kubeadmconstants.KubeletKubeConfigFileName {
+		flags = append(flags,
+			options.NodeName,
+		)
+	}
+	return flags
 }
 
 func runKubeConfig(c workflow.RunData) error {
@@ -116,7 +142,6 @@ func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 
 		// if external CA mode, skip certificate authority generation
 		if data.ExternalCA() {
-			//TODO: implement validation of existing kubeconfig files
 			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeConfigFileName)
 			return nil
 		}

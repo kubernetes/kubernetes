@@ -8,6 +8,7 @@
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
   - k8s.io/utils/pointer
+  - k8s.io/klog
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.
@@ -31,11 +32,13 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/api/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/code-generator/"
   ignoredSubTrees:
@@ -44,12 +47,14 @@
   - k8s.io/gengo
   - k8s.io/code-generator
   - k8s.io/kube-openapi
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/client-go/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/klog
 
 # prevent core machinery from taking explicit v1 references unless
 # necessary
@@ -58,6 +63,7 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/klog
 - baseImportPath: "./vendor/k8s.io/client-go/tools/"
   excludeTests: true
   ignoredSubTrees:
@@ -70,7 +76,7 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
-
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/apiserver/"
   allowedImports:
@@ -80,6 +86,7 @@
   - k8s.io/client-go
   - k8s.io/kube-openapi
   - k8s.io/utils
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/metrics/"
   allowedImports:
@@ -87,6 +94,7 @@
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/metrics
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/kube-aggregator/"
   allowedImports:
@@ -96,6 +104,7 @@
   - k8s.io/client-go
   - k8s.io/kube-aggregator
   - k8s.io/kube-openapi
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/sample-apiserver/"
   allowedImports:
@@ -104,6 +113,7 @@
   - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/sample-apiserver
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/apiextensions-apiserver/"
   allowedImports:
@@ -112,12 +122,14 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
   - k8s.io/gengo
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/sample-cli-plugin/"
   allowedImports:
@@ -158,3 +170,4 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/klog

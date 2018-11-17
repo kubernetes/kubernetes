@@ -18,12 +18,14 @@ package clientcmd
 
 import (
 	"io/ioutil"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/imdario/mergo"
+
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -332,7 +334,19 @@ func TestBasicTokenFile(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	matchStringArg(token, clientConfig.BearerToken, t)
+	var out *http.Request
+	clientConfig.WrapTransport(fakeTransport(func(req *http.Request) (*http.Response, error) {
+		out = req
+		return &http.Response{}, nil
+	})).RoundTrip(&http.Request{})
+
+	matchStringArg(token, strings.TrimPrefix(out.Header.Get("Authorization"), "Bearer "), t)
+}
+
+type fakeTransport func(*http.Request) (*http.Response, error)
+
+func (ft fakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return ft(req)
 }
 
 func TestPrecedenceTokenFile(t *testing.T) {

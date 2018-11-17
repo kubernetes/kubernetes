@@ -17,20 +17,12 @@ limitations under the License.
 package phases
 
 import (
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -38,24 +30,6 @@ var (
 	kubeletStartPhaseExample = normalizer.Examples(`
 		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
 		kubeadm init phase kubelet-start --config masterconfig.yaml
-		`)
-
-	kubeletConfigUploadLongDesc = normalizer.LongDesc(`
-		Uploads kubelet configuration extracted from the kubeadm InitConfiguration object to a ConfigMap
-		of the form kubelet-config-1.X in the cluster, where X is the minor version of the current (API Server) Kubernetes version.
-		` + cmdutil.AlphaDisclaimer)
-
-	kubeletConfigUploadExample = normalizer.Examples(`
-		# Uploads the kubelet configuration from the kubeadm Config file to a ConfigMap in the cluster.
-		kubeadm alpha phase kubelet config upload --config kubeadm.yaml
-		`)
-
-	kubeletConfigAnnotateCRILongDesc = normalizer.LongDesc(`
-		Adds an annotation to the current node with the CRI socket specified in the kubeadm InitConfiguration object.
-		` + cmdutil.AlphaDisclaimer)
-
-	kubeletConfigAnnotateCRIExample = normalizer.Examples(`
-		kubeadm alpha phase kubelet config annotate-cri --config kubeadm.yaml
 		`)
 )
 
@@ -76,6 +50,11 @@ func NewKubeletStartPhase() workflow.Phase {
 		Long:    "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
+		InheritFlags: []string{
+			options.CfgPath,
+			options.NodeCRISocket,
+			options.NodeName,
+		},
 	}
 }
 
@@ -89,14 +68,14 @@ func runKubeletStart(c workflow.RunData) error {
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !data.DryRun() {
-		glog.V(1).Infof("Stopping the kubelet")
+		klog.V(1).Infof("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	}
 
 	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 	// as we handle that ourselves in the markmaster phase
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().NodeRegistration, data.Cfg().FeatureGates, false, data.KubeletDir()); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(data.Cfg(), false, data.KubeletDir()); err != nil {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
 
@@ -107,110 +86,9 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		glog.V(1).Infof("Starting the kubelet")
+		klog.V(1).Infof("Starting the kubelet")
 		kubeletphase.TryStartKubelet()
 	}
 
 	return nil
-}
-
-// NewCmdKubelet returns command for `kubeadm phase kubelet`
-func NewCmdKubelet() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "kubelet",
-		Short: "Commands related to handling the kubelet.",
-		Long:  cmdutil.MacroCommandLongDescription,
-	}
-
-	cmd.AddCommand(NewCmdKubeletConfig())
-	return cmd
-}
-
-// NewCmdKubeletConfig returns command for `kubeadm phase kubelet config`
-func NewCmdKubeletConfig() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Handles kubelet configuration.",
-		Long:  cmdutil.MacroCommandLongDescription,
-	}
-
-	cmd.AddCommand(NewCmdKubeletConfigUpload())
-	cmd.AddCommand(NewCmdKubeletAnnotateCRI())
-	return cmd
-}
-
-// NewCmdKubeletConfigUpload calls cobra.Command for uploading dynamic kubelet configuration
-func NewCmdKubeletConfigUpload() *cobra.Command {
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
-	var cfgPath string
-	kubeConfigFile := constants.GetAdminKubeConfigPath()
-
-	cmd := &cobra.Command{
-		Use:     "upload",
-		Short:   "Uploads kubelet configuration to a ConfigMap based on a kubeadm InitConfiguration file.",
-		Long:    kubeletConfigUploadLongDesc,
-		Example: kubeletConfigUploadExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --config argument is required"))
-			}
-
-			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			SetKubernetesVersion(cfg)
-
-			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
-
-			err = kubeletphase.CreateConfigMap(internalcfg, client)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
-	options.AddConfigFlag(cmd.Flags(), &cfgPath)
-	return cmd
-}
-
-// NewCmdKubeletAnnotateCRI calls cobra.Command for annotating the node with the given crisocket
-func NewCmdKubeletAnnotateCRI() *cobra.Command {
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
-	var cfgPath string
-	kubeConfigFile := constants.GetAdminKubeConfigPath()
-
-	cmd := &cobra.Command{
-		Use:     "annotate-cri",
-		Short:   "annotates the node with the given crisocket",
-		Long:    kubeletConfigAnnotateCRILongDesc,
-		Example: kubeletConfigAnnotateCRIExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(errors.New("The --config argument is required"))
-			}
-
-			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			SetKubernetesVersion(cfg)
-
-			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
-
-			err = patchnodephase.AnnotateCRISocket(client, internalcfg.NodeRegistration.Name, internalcfg.NodeRegistration.CRISocket)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
-	options.AddConfigFlag(cmd.Flags(), &cfgPath)
-	return cmd
 }

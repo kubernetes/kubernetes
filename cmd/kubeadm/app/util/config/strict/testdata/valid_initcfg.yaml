@@ -1,0 +1,4 @@
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: InitConfiguration
+bootstrapTokens:
+- token: "9a08jv.c0izixklcxtmnze7"

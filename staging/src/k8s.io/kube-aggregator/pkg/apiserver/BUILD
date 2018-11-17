@@ -79,7 +79,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/status:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/rest:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

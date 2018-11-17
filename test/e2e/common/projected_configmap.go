@@ -481,6 +481,26 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 		})
 
 	})
+
+	//The pod is in pending during volume creation until the configMap objects are available
+	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/projected-configmap-volumes"
+		podName := "pod-projected-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
+
+	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error unless it is marked optional, during the pod creation.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/configmap-volumes"
+		podName := "pod-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
 })
 
 func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {

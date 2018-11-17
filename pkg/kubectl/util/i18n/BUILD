@@ -13,7 +13,7 @@ go_library(
     deps = [
         "//pkg/kubectl/generated:go_default_library",
         "//vendor/github.com/chai2010/gettext-go/gettext:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

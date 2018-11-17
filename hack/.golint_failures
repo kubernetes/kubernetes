@@ -134,14 +134,9 @@ pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher
 pkg/features
 pkg/kubeapiserver
-pkg/kubeapiserver/admission
-pkg/kubeapiserver/authenticator
-pkg/kubeapiserver/authorizer
-pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
 pkg/kubectl
 pkg/kubectl/apps
-pkg/kubectl/cmd
 pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apiresources
 pkg/kubectl/cmd/apply
@@ -186,11 +181,10 @@ pkg/kubectl/cmd/util/openapi
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/version
 pkg/kubectl/cmd/wait
+pkg/kubectl/describe/versioned
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
-pkg/kubectl/util
-pkg/kubectl/util/slice
 pkg/kubectl/util/templates
 pkg/kubelet
 pkg/kubelet/apis
@@ -400,8 +394,6 @@ pkg/version/verflag
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
-pkg/volume/cephfs
-pkg/volume/configmap
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/host_path
@@ -412,7 +404,6 @@ pkg/volume/photon_pd
 pkg/volume/portworx
 pkg/volume/rbd
 pkg/volume/scaleio
-pkg/volume/secret
 pkg/volume/storageos
 pkg/volume/testing
 pkg/volume/util/fs
@@ -663,7 +654,6 @@ staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
 staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
-staging/src/k8s.io/client-go/util/cert/triple
 staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
 staging/src/k8s.io/client-go/util/integer

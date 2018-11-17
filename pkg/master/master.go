@@ -58,7 +58,6 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -68,18 +67,16 @@ import (
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
-	endpointsstorage "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -144,10 +141,10 @@ type ExtraConfig struct {
 	// service because this pkg is linked by out-of-tree projects
 	// like openshift which want to use the GenericAPIServer but also do
 	// more stuff.
-	ExtraServicePorts []api.ServicePort
+	ExtraServicePorts []apiv1.ServicePort
 	// Additional ports to be exposed on the GenericAPIServer endpoints
 	// Port names should align with ports defined in ExtraServicePorts
-	ExtraEndpointPorts []api.EndpointPort
+	ExtraEndpointPorts []apiv1.EndpointPort
 	// If non-zero, the "kubernetes" services uses this port as NodePort.
 	KubernetesServiceNodePort int
 
@@ -170,8 +167,6 @@ type ExtraConfig struct {
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
-
-	APIAudiences authenticator.Audiences
 
 	VersionedInformers informers.SharedInformerFactory
 }
@@ -206,7 +201,7 @@ type Master struct {
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
-	endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
 }
 
@@ -215,31 +210,22 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
-		glog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
 	leaseStorage, _, err := storagefactory.Create(*config)
 	if err != nil {
-		glog.Fatalf("Error creating storage factory: %v", err)
+		klog.Fatalf("Error creating storage factory: %v", err)
 	}
-	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("endpoints"))
-	if err != nil {
-		glog.Fatalf("Error getting storage config: %v", err)
-	}
-	endpointsStorage := endpointsstorage.NewREST(generic.RESTOptions{
-		StorageConfig:           endpointConfig,
-		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 0,
-		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(api.Resource("endpoints")),
-	})
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
-	return reconcilers.NewLeaseEndpointReconciler(endpointsStorage.Store, masterLeases)
+	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
-	glog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
+	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {
 	// there are numerous test dependencies that depend on a default controller
 	case "", reconcilers.MasterCountReconcilerType:
@@ -249,7 +235,7 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 	case reconcilers.NoneEndpointReconcilerType:
 		return c.createNoneReconciler()
 	default:
-		glog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
+		klog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
 	}
 	return nil
 }
@@ -263,7 +249,7 @@ func (cfg *Config) Complete() CompletedConfig {
 
 	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ExtraConfig.ServiceIPRange)
 	if err != nil {
-		glog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
 	if c.ExtraConfig.ServiceIPRange.IP == nil {
 		c.ExtraConfig.ServiceIPRange = serviceIPRange
@@ -283,7 +269,7 @@ func (cfg *Config) Complete() CompletedConfig {
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
 		c.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
-		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
+		klog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
 	}
 
 	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
@@ -335,7 +321,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
 			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
 			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-			APIAudiences:                c.ExtraConfig.APIAudiences,
+			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
@@ -349,7 +335,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
 		auditregistrationrest.RESTStorageProvider{},
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
+		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
@@ -382,17 +368,17 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
-		glog.Fatalf("Error building core storage: %v", err)
+		klog.Fatalf("Error building core storage: %v", err)
 	}
 
 	controllerName := "bootstrap-controller"
-	coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		glog.Fatalf("Error in registering group versions: %v", err)
+		klog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
 
@@ -418,20 +404,20 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
 		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
-			glog.V(1).Infof("Skipping disabled API group %q.", groupName)
+			klog.V(1).Infof("Skipping disabled API group %q.", groupName)
 			continue
 		}
 		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 		if !enabled {
-			glog.Warningf("Problem initializing API group %q, skipping.", groupName)
+			klog.Warningf("Problem initializing API group %q, skipping.", groupName)
 			continue
 		}
-		glog.V(1).Infof("Enabling API group %q.", groupName)
+		klog.V(1).Infof("Enabling API group %q.", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
-				glog.Fatalf("Error building PostStartHook: %v", err)
+				klog.Fatalf("Error building PostStartHook: %v", err)
 			}
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
@@ -441,7 +427,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 
 	for i := range apiGroupsInfo {
 		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
-			glog.Fatalf("Error in registering group versions: %v", err)
+			klog.Fatalf("Error in registering group versions: %v", err)
 		}
 	}
 }

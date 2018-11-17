@@ -95,13 +95,15 @@ func TestCompileManifests(t *testing.T) {
 	}{
 		{
 			manifest: KubeDNSDeployment,
-			data: struct{ ImageRepository, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
-				ImageRepository: "foo",
-				Version:         "foo",
-				DNSBindAddr:     "foo",
-				DNSProbeAddr:    "foo",
-				DNSDomain:       "foo",
-				MasterTaintKey:  "foo",
+			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
+				DeploymentName: "foo",
+				KubeDNSImage:   "foo",
+				DNSMasqImage:   "foo",
+				SidecarImage:   "foo",
+				DNSBindAddr:    "foo",
+				DNSProbeAddr:   "foo",
+				DNSDomain:      "foo",
+				MasterTaintKey: "foo",
 			},
 			expected: true,
 		},
@@ -114,10 +116,10 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSDeployment,
-			data: struct{ ImageRepository, MasterTaintKey, Version string }{
-				ImageRepository: "foo",
-				MasterTaintKey:  "foo",
-				Version:         "foo",
+			data: struct{ DeploymentName, Image, MasterTaintKey string }{
+				DeploymentName: "foo",
+				Image:          "foo",
+				MasterTaintKey: "foo",
 			},
 			expected: true,
 		},

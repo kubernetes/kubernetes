@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	core "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -257,6 +258,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			config:         lec,
 			observedRecord: test.observedRecord,
 			observedTime:   test.observedTime,
+			clock:          clock.RealClock{},
 		}
 
 		if test.expectSuccess != le.tryAcquireOrRenew() {

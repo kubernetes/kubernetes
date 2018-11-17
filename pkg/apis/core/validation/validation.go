@@ -27,7 +27,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -903,6 +903,26 @@ func validateGlusterfsVolumeSource(glusterfs *core.GlusterfsVolumeSource, fldPat
 	}
 	return allErrs
 }
+func validateGlusterfsPersistentVolumeSource(glusterfs *core.GlusterfsPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(glusterfs.EndpointsName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("endpoints"), ""))
+	}
+	if len(glusterfs.Path) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	if glusterfs.EndpointsNamespace != nil {
+		endpointNs := glusterfs.EndpointsNamespace
+		if *endpointNs == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, "if the endpointnamespace is set, it must be a valid namespace name"))
+		} else {
+			for _, msg := range ValidateNamespaceName(*endpointNs, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, msg))
+			}
+		}
+	}
+	return allErrs
+}
 
 func validateFlockerVolumeSource(flocker *core.FlockerVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1423,24 +1443,27 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	return allErrs
 }
 
+func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(driverName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	if len(driverName) > 63 {
+		allErrs = append(allErrs, field.TooLong(fldPath, driverName, 63))
+	}
+
+	if !csiDriverNameRexp.MatchString(driverName) {
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+	}
+	return allErrs
+}
+
 func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "CSIPersistentVolume disabled by feature-gate"))
-	}
-
-	if len(csi.Driver) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
-	}
-
-	if len(csi.Driver) > 63 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("driver"), csi.Driver, 63))
-	}
-
-	if !csiDriverNameRexp.MatchString(csi.Driver) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), csi.Driver, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
-	}
+	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
 
 	if len(csi.VolumeHandle) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))
@@ -1567,7 +1590,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("glusterfs"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateGlusterfsVolumeSource(pv.Spec.Glusterfs, specPath.Child("glusterfs"))...)
+			allErrs = append(allErrs, validateGlusterfsPersistentVolumeSource(pv.Spec.Glusterfs, specPath.Child("glusterfs"))...)
 		}
 	}
 	if pv.Spec.Flocker != nil {
@@ -4281,7 +4304,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
-		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
+		klog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 

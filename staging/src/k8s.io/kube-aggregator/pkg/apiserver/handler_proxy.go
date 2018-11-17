@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -112,7 +112,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Scheme = "https"
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
 	if err != nil {
-		glog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -213,7 +213,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	if newInfo.transportBuildingError != nil {
-		glog.Warning(newInfo.transportBuildingError.Error())
+		klog.Warning(newInfo.transportBuildingError.Error())
 	}
 	r.handlingInfo.Store(newInfo)
 }

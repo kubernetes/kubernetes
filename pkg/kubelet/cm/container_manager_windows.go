@@ -24,13 +24,14 @@ package cm
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -56,7 +57,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
-	glog.V(2).Infof("Starting Windows container manager")
+	klog.V(2).Infof("Starting Windows container manager")
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
@@ -165,4 +166,8 @@ func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLi
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
+}
+
+func (cm *containerManagerImpl) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+	return nil
 }

@@ -39,7 +39,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["daemonset_util_test.go"],
+    srcs = [
+        "daemonset_util_test.go",
+        "main_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",
@@ -50,5 +53,6 @@ go_test(
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
     ],
 )

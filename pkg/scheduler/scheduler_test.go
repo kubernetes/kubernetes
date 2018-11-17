@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	corelister "k8s.io/client-go/listers/core/v1"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/api"
@@ -175,6 +177,8 @@ func TestSchedulerCreation(t *testing.T) {
 	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
 	factory.RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 	_, err := New(client,
 		informerFactory.Core().V1().Nodes(),
 		factory.NewPodInformer(client, 0),
@@ -188,6 +192,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Storage().V1().StorageClasses(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
+		stopCh,
 		WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err != nil {
@@ -771,8 +776,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 	// This can be small because we wait for pod to finish scheduling first
 	chanTimeout := 2 * time.Second
 
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
 	table := []struct {
 		name               string

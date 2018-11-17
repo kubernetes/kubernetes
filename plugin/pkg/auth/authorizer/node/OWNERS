@@ -1,8 +1,7 @@
 approvers:
-- tallclair
-- liggitt
-- deads2k
+- sig-auth-node-isolation-approvers
 reviewers:
-- tallclair
-- liggitt
-- deads2k
+- sig-auth-node-isolation-reviewers
+labels:
+- sig/auth
+

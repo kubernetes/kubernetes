@@ -952,7 +952,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	if err != nil {
 		Failf("Error getting node external ip : %v", err)
 	}
-	master := GetMasterAddress(c)
+	masterAddresses := GetAllMasterAddresses(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
@@ -960,14 +960,18 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		// had been inserted. (yes, we could look at the error code and ssh error
 		// separately, but I prefer to stay on the safe side).
 		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		UnblockNetwork(host, master)
+		for _, masterAddress := range masterAddresses {
+			UnblockNetwork(host, masterAddress)
+		}
 	}()
 
 	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
 	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
 		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
-	BlockNetwork(host, master)
+	for _, masterAddress := range masterAddresses {
+		BlockNetwork(host, masterAddress)
+	}
 
 	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
 	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {

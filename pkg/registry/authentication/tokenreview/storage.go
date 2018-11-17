@@ -18,6 +18,7 @@ package tokenreview
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -27,15 +28,22 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
+var badAuthenticatorAuds = apierrors.NewInternalError(errors.New("error validating audiences"))
+
 type REST struct {
 	tokenAuthenticator authenticator.Request
+	apiAudiences       []string
 }
 
-func NewREST(tokenAuthenticator authenticator.Request) *REST {
-	return &REST{tokenAuthenticator: tokenAuthenticator}
+func NewREST(tokenAuthenticator authenticator.Request, apiAudiences []string) *REST {
+	return &REST{
+		tokenAuthenticator: tokenAuthenticator,
+		apiAudiences:       apiAudiences,
+	}
 }
 
 func (r *REST) NamespaceScoped() bool {
@@ -68,14 +76,24 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	fakeReq := &http.Request{Header: http.Header{}}
 	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
 
+	auds := tokenReview.Spec.Audiences
+	if len(auds) == 0 {
+		auds = r.apiAudiences
+	}
+	if len(auds) > 0 {
+		fakeReq = fakeReq.WithContext(authenticator.WithAudiences(fakeReq.Context(), auds))
+	}
+
 	resp, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
 	tokenReview.Status.Authenticated = ok
 	if err != nil {
 		tokenReview.Status.Error = err.Error()
 	}
 
-	// TODO(mikedanese): verify the response audience matches one of apiAuds if
-	// non-empty
+	if len(auds) > 0 && resp != nil && len(authenticator.Audiences(auds).Intersect(resp.Audiences)) == 0 {
+		klog.Errorf("error validating audience. want=%q got=%q", auds, resp.Audiences)
+		return nil, badAuthenticatorAuds
+	}
 
 	if resp != nil && resp.User != nil {
 		tokenReview.Status.User = authentication.UserInfo{
@@ -87,6 +105,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		for k, v := range resp.User.GetExtra() {
 			tokenReview.Status.User.Extra[k] = authentication.ExtraValue(v)
 		}
+		tokenReview.Status.Audiences = resp.Audiences
 	}
 
 	return tokenReview, nil

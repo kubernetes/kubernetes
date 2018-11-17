@@ -17,12 +17,11 @@ limitations under the License.
 package storage
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -53,6 +52,10 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 }
 
+func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
+	return patterns
+}
+
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	f := framework.NewDefaultFramework("volumes")
@@ -72,7 +75,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
-		Context(fmt.Sprintf(drivers.GetDriverNameWithFeatureTags(curDriver)), func() {
+		Context(drivers.GetDriverNameWithFeatureTags(curDriver), func() {
 			driver := curDriver
 
 			BeforeEach(func() {
@@ -86,7 +89,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 				driver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, config, driver, testSuites)
+			testsuites.RunTestSuite(f, config, driver, testSuites, intreeTunePattern)
 		})
 	}
 })

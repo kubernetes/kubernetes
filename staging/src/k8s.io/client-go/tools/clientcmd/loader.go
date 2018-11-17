@@ -27,8 +27,8 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/imdario/mergo"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -356,7 +356,7 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.V(6).Infoln("Config loaded from file", filename)
+	klog.V(6).Infoln("Config loaded from file", filename)
 
 	// set LocationOfOrigin on every Cluster, User, and Context
 	for key, obj := range config.AuthInfos {

@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // NodeTree is a tree-like data structure that holds node names in each zone. Zone names are
@@ -46,7 +46,7 @@ type nodeArray struct {
 
 func (na *nodeArray) next() (nodeName string, exhausted bool) {
 	if len(na.nodes) == 0 {
-		glog.Error("The nodeArray is empty. It should have been deleted from NodeTree.")
+		klog.Error("The nodeArray is empty. It should have been deleted from NodeTree.")
 		return "", false
 	}
 	if na.lastIndex >= len(na.nodes) {
@@ -81,7 +81,7 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na.nodes {
 			if nodeName == n.Name {
-				glog.Warningf("node %v already exist in the NodeTree", n.Name)
+				klog.Warningf("node %v already exist in the NodeTree", n.Name)
 				return
 			}
 		}
@@ -90,7 +90,7 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = &nodeArray{nodes: []string{n.Name}, lastIndex: 0}
 	}
-	glog.V(5).Infof("Added node %v in group %v to NodeTree", n.Name, zone)
+	klog.V(5).Infof("Added node %v in group %v to NodeTree", n.Name, zone)
 	nt.NumNodes++
 }
 
@@ -110,13 +110,13 @@ func (nt *NodeTree) removeNode(n *v1.Node) error {
 				if len(na.nodes) == 0 {
 					nt.removeZone(zone)
 				}
-				glog.V(5).Infof("Removed node %v in group %v from NodeTree", n.Name, zone)
+				klog.V(5).Infof("Removed node %v in group %v from NodeTree", n.Name, zone)
 				nt.NumNodes--
 				return nil
 			}
 		}
 	}
-	glog.Errorf("Node %v in group %v was not found", n.Name, zone)
+	klog.Errorf("Node %v in group %v was not found", n.Name, zone)
 	return fmt.Errorf("node %v in group %v was not found", n.Name, zone)
 }
 

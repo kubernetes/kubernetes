@@ -21,9 +21,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -46,6 +48,11 @@ var (
 		` + cmdutil.AlphaDisclaimer)
 )
 
+var (
+	csrOnly bool
+	csrDir  string
+)
+
 // certsData defines the behavior that a runtime data struct passed to the certs phase should
 // have. Please note that we are using an interface in order to make this phase reusable in different workflows
 // (and thus with different runtime data struct, all of them requested to be compliant to this interface)
@@ -63,12 +70,30 @@ func NewCertsPhase() workflow.Phase {
 		Short:  "Certificate generation",
 		Phases: newCertSubPhases(),
 		Run:    runCerts,
+		Long:   cmdutil.MacroCommandLongDescription,
 	}
+}
+
+func localFlags() *pflag.FlagSet {
+	set := pflag.NewFlagSet("csr", pflag.ExitOnError)
+	options.AddCSRFlag(set, &csrOnly)
+	options.AddCSRDirFlag(set, &csrDir)
+	return set
 }
 
 // newCertSubPhases returns sub phases for certs phase
 func newCertSubPhases() []workflow.Phase {
 	subPhases := []workflow.Phase{}
+
+	// All subphase
+	allPhase := workflow.Phase{
+		Name:           "all",
+		Short:          "Generates all certificates",
+		InheritFlags:   getCertPhaseFlags("all"),
+		RunAllSiblings: true,
+	}
+
+	subPhases = append(subPhases, allPhase)
 
 	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
 
@@ -78,6 +103,7 @@ func newCertSubPhases() []workflow.Phase {
 
 		for _, cert := range certList {
 			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
+			certPhase.LocalFlags = localFlags()
 			subPhases = append(subPhases, certPhase)
 		}
 	}
@@ -105,15 +131,34 @@ func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunDa
 			certSpec.BaseName,
 			getSANDescription(certSpec),
 		),
-		Run: run,
+		Run:          run,
+		InheritFlags: getCertPhaseFlags(certSpec.Name),
 	}
 	return phase
+}
+
+func getCertPhaseFlags(name string) []string {
+	flags := []string{
+		options.CertificatesDir,
+		options.CfgPath,
+		options.CSROnly,
+		options.CSRDir,
+	}
+	if name == "all" || name == "apiserver" {
+		flags = append(flags,
+			options.APIServerAdvertiseAddress,
+			options.APIServerCertSANs,
+			options.NetworkingDNSDomain,
+			options.NetworkingServiceSubnet,
+		)
+	}
+	return flags
 }
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
 	defaultConfig := &kubeadmapiv1beta1.InitConfiguration{
-		APIEndpoint: kubeadmapiv1beta1.APIEndpoint{
+		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
 			AdvertiseAddress: "127.0.0.1",
 		},
@@ -121,7 +166,8 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(defaultConfig)
-	kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
+	err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
+	kubeadmutil.CheckErr(err)
 
 	certConfig, err := certSpec.GetConfig(defaultInternalConfig)
 	kubeadmutil.CheckErr(err)
@@ -215,6 +261,15 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 		if data.ExternalCA() {
 			fmt.Printf("[certs] External CA mode: Using existing %s certificate\n", cert.BaseName)
 			return nil
+		}
+
+		if csrOnly {
+			fmt.Printf("[certs] Generating CSR for %s instead of certificate\n", cert.BaseName)
+			if csrDir == "" {
+				csrDir = data.CertificateWriteDir()
+			}
+
+			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
 		}
 
 		// if using external etcd, skips etcd certificates generation

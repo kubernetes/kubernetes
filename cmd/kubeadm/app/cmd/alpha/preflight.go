@@ -81,8 +81,11 @@ func newCmdPreFlightNode() *cobra.Command {
 
 			internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
-			err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
-			kubeadmutil.CheckErr(err)
+
+			if internalcfg.ControlPlane != nil {
+				err = configutil.VerifyAPIServerBindAddress(internalcfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress)
+				kubeadmutil.CheckErr(err)
+			}
 
 			fmt.Println("[preflight] running pre-flight checks")
 

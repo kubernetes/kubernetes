@@ -30,9 +30,9 @@ go_library(
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/listers/csi/v1alpha1:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -44,6 +44,7 @@ go_test(
         "csi_client_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
+        "main_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -69,8 +70,8 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/fake:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

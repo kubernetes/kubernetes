@@ -23,4 +23,5 @@ const (
 	DefaultKubeletPluginsDirName          = "plugins"
 	DefaultKubeletContainersDirName       = "containers"
 	DefaultKubeletPluginContainersDirName = "plugin-containers"
+	DefaultKubeletPodResourcesDirName     = "pod-resources"
 )

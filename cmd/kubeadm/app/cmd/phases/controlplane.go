@@ -19,15 +19,13 @@ package phases
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
-	auditutil "k8s.io/kubernetes/cmd/kubeadm/app/util/audit"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -73,10 +71,16 @@ func getPhaseDescription(component string) string {
 // NewControlPlanePhase creates a kubeadm workflow phase that implements bootstrapping the control plane.
 func NewControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:    "control-plane",
-		Short:   "Generates all static Pod manifest files necessary to establish the control plane",
-		Example: controlPlaneExample,
+		Name:  "control-plane",
+		Short: "Generates all static Pod manifest files necessary to establish the control plane",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Generates all static Pod manifest files",
+				InheritFlags:   getControlPlanePhaseFlags("all"),
+				RunAllSiblings: true,
+			},
 			newControlPlaneSubPhase(kubeadmconstants.KubeAPIServer),
 			newControlPlaneSubPhase(kubeadmconstants.KubeControllerManager),
 			newControlPlaneSubPhase(kubeadmconstants.KubeScheduler),
@@ -88,11 +92,42 @@ func NewControlPlanePhase() workflow.Phase {
 
 func newControlPlaneSubPhase(component string) workflow.Phase {
 	phase := workflow.Phase{
-		Name:  controlPlanePhaseProperties[component].name,
-		Short: controlPlanePhaseProperties[component].short,
-		Run:   runControlPlaneSubPhase(component),
+		Name:         controlPlanePhaseProperties[component].name,
+		Short:        controlPlanePhaseProperties[component].short,
+		Run:          runControlPlaneSubPhase(component),
+		InheritFlags: getControlPlanePhaseFlags(component),
 	}
 	return phase
+}
+
+func getControlPlanePhaseFlags(name string) []string {
+	flags := []string{
+		options.CfgPath,
+		options.CertificatesDir,
+		options.KubernetesVersion,
+		options.ImageRepository,
+	}
+	if name == "all" || name == kubeadmconstants.KubeAPIServer {
+		flags = append(flags,
+			options.APIServerAdvertiseAddress,
+			options.APIServerBindPort,
+			options.APIServerExtraArgs,
+			options.FeatureGatesString,
+			options.NetworkingServiceSubnet,
+		)
+	}
+	if name == "all" || name == kubeadmconstants.KubeControllerManager {
+		flags = append(flags,
+			options.ControllerManagerExtraArgs,
+			options.NetworkingPodSubnet,
+		)
+	}
+	if name == "all" || name == kubeadmconstants.KubeScheduler {
+		flags = append(flags,
+			options.SchedulerExtraArgs,
+		)
+	}
+	return flags
 }
 
 func runControlPlanePhase(c workflow.RunData) error {
@@ -112,22 +147,6 @@ func runControlPlaneSubPhase(component string) func(c workflow.RunData) error {
 			return errors.New("control-plane phase invoked with an invalid data struct")
 		}
 		cfg := data.Cfg()
-
-		// special case to handle audit policy for the API server
-		if component == kubeadmconstants.KubeAPIServer && features.Enabled(cfg.FeatureGates, features.Auditing) {
-			// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
-			if cfg.AuditPolicyConfiguration.Path != "" {
-				// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
-				if _, err := os.Stat(cfg.AuditPolicyConfiguration.Path); err != nil {
-					return fmt.Errorf("error getting file info for audit policy file %q [%v]", cfg.AuditPolicyConfiguration.Path, err)
-				}
-			} else {
-				cfg.AuditPolicyConfiguration.Path = filepath.Join(data.KubeConfigDir(), kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
-				if err := auditutil.CreateDefaultAuditLogPolicy(cfg.AuditPolicyConfiguration.Path); err != nil {
-					return fmt.Errorf("error creating default audit policy %q [%v]", cfg.AuditPolicyConfiguration.Path, err)
-				}
-			}
-		}
 
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
 		if err := controlplane.CreateStaticPodFiles(data.ManifestDir(), cfg, component); err != nil {

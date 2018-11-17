@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	cadvisorfs "github.com/google/cadvisor/fs"
+	"k8s.io/klog"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -154,7 +154,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		// container stats
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
-			glog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
+			klog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
 		}
@@ -236,7 +236,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 		// container stats
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
-			glog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
+			klog.V(4).Infof("Unable to find cadvisor stats for %q", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
 		}
@@ -307,7 +307,7 @@ func (p *criStatsProvider) ImageFsDevice() (string, error) {
 // nil.
 func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cadvisorapiv2.FsInfo {
 	if fsID == nil {
-		glog.V(2).Infof("Failed to get filesystem info: fsID is nil.")
+		klog.V(2).Infof("Failed to get filesystem info: fsID is nil.")
 		return nil
 	}
 	mountpoint := fsID.GetMountpoint()
@@ -315,9 +315,9 @@ func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cad
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get the info of the filesystem with mountpoint %q: %v.", mountpoint, err)
 		if err == cadvisorfs.ErrNoSuchDevice {
-			glog.V(2).Info(msg)
+			klog.V(2).Info(msg)
 		} else {
-			glog.Error(msg)
+			klog.Error(msg)
 		}
 		return nil
 	}
@@ -362,7 +362,7 @@ func (p *criStatsProvider) addPodNetworkStats(
 	}
 
 	// TODO: sum Pod network stats from container stats.
-	glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
+	klog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
 }
 
 func (p *criStatsProvider) addPodCPUMemoryStats(
@@ -579,7 +579,7 @@ func (p *criStatsProvider) getContainerLogStats(path string, rootFsInfo *cadviso
 	m := p.logMetricsService.createLogMetricsProvider(path)
 	logMetrics, err := m.GetMetrics()
 	if err != nil {
-		glog.Errorf("Unable to fetch container log stats for path %s: %v ", path, err)
+		klog.Errorf("Unable to fetch container log stats for path %s: %v ", path, err)
 		return nil
 	}
 	result := &statsapi.FsStats{

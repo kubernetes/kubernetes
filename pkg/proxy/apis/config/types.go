@@ -172,7 +172,7 @@ type IPVSSchedulerMethod string
 const (
 	// RoundRobin distributes jobs equally amongst the available real servers.
 	RoundRobin IPVSSchedulerMethod = "rr"
-	// WeightedRoundRobin assigns jobs to real servers proportionally to there real servers' weight.
+	// WeightedRoundRobin assigns jobs to real servers proportionally to their real servers' weight.
 	// Servers with higher weights receive new jobs first and get more jobs than servers with lower weights.
 	// Servers with equal weights get an equal distribution of new jobs.
 	WeightedRoundRobin IPVSSchedulerMethod = "wrr"

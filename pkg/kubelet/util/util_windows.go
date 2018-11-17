@@ -103,3 +103,12 @@ func parseEndpoint(endpoint string) (string, string, error) {
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
 }
+
+// LocalEndpoint returns the full path to a windows named pipe
+func LocalEndpoint(path, file string) string {
+	u := url.URL{
+		Scheme: npipeProtocol,
+		Path:   path,
+	}
+	return u.String() + "//./pipe/" + file
+}

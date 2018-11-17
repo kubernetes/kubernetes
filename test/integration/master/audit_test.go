@@ -124,11 +124,7 @@ func testAudit(t *testing.T, version string) {
 
 		configMapChan, err := kubeclient.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
 		expectNoError(t, err, "failed to create watch for config maps")
-		for range configMapChan.ResultChan() {
-			// Block until watchOptions.TimeoutSeconds expires.
-			// If the test finishes before watchOptions.TimeoutSeconds expires, the watch audit
-			// event at stage ResponseComplete will not be generated.
-		}
+		configMapChan.Stop()
 
 		_, err = kubeclient.CoreV1().ConfigMaps(namespace).Update(configMap)
 		expectNoError(t, err, "failed to update audit-configmap")
@@ -183,7 +179,7 @@ func testAudit(t *testing.T, version string) {
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseStarted,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 			Verb:              "watch",
 			Code:              200,
 			User:              auditTestUser,
@@ -195,7 +191,7 @@ func testAudit(t *testing.T, version string) {
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 			Verb:              "watch",
 			Code:              200,
 			User:              auditTestUser,

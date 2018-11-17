@@ -151,7 +151,7 @@ func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, patt
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = "2Gi"
+			p.claimSize = "5Gi"
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
@@ -173,7 +173,7 @@ type provisioningTestInput struct {
 }
 
 func testProvisioning(input *provisioningTestInput) {
-	It("should provision storage", func() {
+	It("should provision storage with defaults", func() {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
@@ -186,7 +186,7 @@ func testProvisioning(input *provisioningTestInput) {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
-	It("should create and delete block persistent volumes [Feature:BlockVolume]", func() {
+	It("should create and delete block persistent volumes", func() {
 		if !input.dInfo.IsBlockSupported {
 			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
 		}

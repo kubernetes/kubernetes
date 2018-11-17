@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -186,7 +186,7 @@ func MaxRevision(allRSs []*apps.ReplicaSet) int64 {
 	for _, rs := range allRSs {
 		if v, err := Revision(rs); err != nil {
 			// Skip the replica sets when it failed to parse their revision information
-			glog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
+			klog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
 		} else if v > max {
 			max = v
 		}
@@ -200,7 +200,7 @@ func LastRevision(allRSs []*apps.ReplicaSet) int64 {
 	for _, rs := range allRSs {
 		if v, err := Revision(rs); err != nil {
 			// Skip the replica sets when it failed to parse their revision information
-			glog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
+			klog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
 		} else if v >= max {
 			secMax = max
 			max = v
@@ -241,7 +241,7 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	oldRevisionInt, err := strconv.ParseInt(oldRevision, 10, 64)
 	if err != nil {
 		if oldRevision != "" {
-			glog.Warningf("Updating replica set revision OldRevision not int %s", err)
+			klog.Warningf("Updating replica set revision OldRevision not int %s", err)
 			return false
 		}
 		//If the RS annotation is empty then initialise it to 0
@@ -249,13 +249,13 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	}
 	newRevisionInt, err := strconv.ParseInt(newRevision, 10, 64)
 	if err != nil {
-		glog.Warningf("Updating replica set revision NewRevision not int %s", err)
+		klog.Warningf("Updating replica set revision NewRevision not int %s", err)
 		return false
 	}
 	if oldRevisionInt < newRevisionInt {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
-		glog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
+		klog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
 	}
 	// If a revision annotation already existed and this replica set was updated with a new revision
 	// then that means we are rolling back to this replica set. We need to preserve the old revisions
@@ -376,7 +376,7 @@ func getIntFromAnnotation(rs *apps.ReplicaSet, annotationKey string) (int32, boo
 	}
 	intValue, err := strconv.Atoi(annotationValue)
 	if err != nil {
-		glog.V(2).Infof("Cannot convert the value %q with annotation key %q for the replica set %q", annotationValue, annotationKey, rs.Name)
+		klog.V(2).Infof("Cannot convert the value %q with annotation key %q for the replica set %q", annotationValue, annotationKey, rs.Name)
 		return int32(0), false
 	}
 	return int32(intValue), true
@@ -787,7 +787,7 @@ func DeploymentTimedOut(deployment *apps.Deployment, newStatus *apps.DeploymentS
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
 	timedOut := from.Add(delta).Before(now)
 
-	glog.V(4).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
+	klog.V(4).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
 	return timedOut
 }
 

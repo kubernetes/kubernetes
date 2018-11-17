@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -46,9 +46,9 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 	}
 
 	if len(s.Name) > 0 {
-		glog.Infof("Serving %s insecurely on %s", s.Name, s.Listener.Addr())
+		klog.Infof("Serving %s insecurely on %s", s.Name, s.Listener.Addr())
 	} else {
-		glog.Infof("Serving insecurely on %s", s.Listener.Addr())
+		klog.Infof("Serving insecurely on %s", s.Listener.Addr())
 	}
 	return RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
 }

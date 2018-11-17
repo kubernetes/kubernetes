@@ -26,7 +26,7 @@ import (
 	"syscall"
 
 	libipvs "github.com/docker/libnetwork/ipvs"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -43,7 +43,7 @@ type Protocol uint16
 func New(exec utilexec.Interface) Interface {
 	handle, err := libipvs.New("")
 	if err != nil {
-		glog.Errorf("IPVS interface can't be initialized, error: %v", err)
+		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
 		return nil
 	}
 	return &runner{

@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -82,7 +81,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interf
 		return errors.Wrap(err, "error when parsing kube-proxy configmap template")
 	}
 	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
-		Image:             images.GetKubeControlPlaneImage(constants.KubeProxy, &cfg.ClusterConfiguration),
+		Image:             images.GetKubernetesImage(constants.KubeProxy, &cfg.ClusterConfiguration),
 		ProxyConfigMap:    constants.KubeProxyConfigMap,
 		ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
 	})

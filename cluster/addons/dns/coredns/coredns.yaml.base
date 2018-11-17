@@ -108,13 +108,11 @@ spec:
     spec:
       serviceAccountName: coredns
       tolerations:
-        - key: node-role.kubernetes.io/master
-          effect: NoSchedule
         - key: "CriticalAddonsOnly"
           operator: "Exists"
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.2.4
+        image: k8s.gcr.io/coredns:1.2.6
         imagePullPolicy: IfNotPresent
         resources:
           limits:

@@ -35,6 +35,7 @@ type cacheRecord struct {
 type cachedTokenAuthenticator struct {
 	authenticator authenticator.Token
 
+	cacheErrs  bool
 	successTTL time.Duration
 	failureTTL time.Duration
 
@@ -51,13 +52,14 @@ type cache interface {
 }
 
 // New returns a token authenticator that caches the results of the specified authenticator. A ttl of 0 bypasses the cache.
-func New(authenticator authenticator.Token, successTTL, failureTTL time.Duration) authenticator.Token {
-	return newWithClock(authenticator, successTTL, failureTTL, utilclock.RealClock{})
+func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration) authenticator.Token {
+	return newWithClock(authenticator, cacheErrs, successTTL, failureTTL, utilclock.RealClock{})
 }
 
-func newWithClock(authenticator authenticator.Token, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
+func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
 	return &cachedTokenAuthenticator{
 		authenticator: authenticator,
+		cacheErrs:     cacheErrs,
 		successTTL:    successTTL,
 		failureTTL:    failureTTL,
 		cache:         newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock) }),
@@ -74,6 +76,9 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	}
 
 	resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
+	if !a.cacheErrs && err != nil {
+		return resp, ok, err
+	}
 
 	switch {
 	case ok && a.successTTL > 0:

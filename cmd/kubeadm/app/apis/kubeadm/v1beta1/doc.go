@@ -19,14 +19,26 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
-// Package v1beta1 defines the v1beta1 version of the kubeadm config file format, that is a big step
-// forward the objective of graduate kubeadm config to beta.
+// Package v1beta1 defines the v1beta1 version of the kubeadm config file format.
+// This version graduates the kubeadm config to BETA and is a big step towards GA.
 //
-// //TODO add notes about big changes introduced by this release
+//A list of changes since v1alpha3:
+//	- "apiServerEndpoint" in InitConfiguration was renamed to "localAPIServerEndpoint" for better clarity of what the field
+//	represents.
+//	- Common fields in ClusterConfiguration such as "*extraArgs" and "*extraVolumes" for control plane components are now moved
+//	under component structs - i.e. "apiServer", "controllerManager", "scheduler".
+//	- "auditPolicy" was removed from ClusterConfiguration. Please use "extraArgs" in "apiServer" to configure this feature instead.
+//	- "unifiedControlPlaneImage" in ClusterConfiguration was changed to a boolean field called "useHyperKubeImage".
+//	- ClusterConfiguration now has a "dns" field which can be used to select and configure the cluster DNS addon.
+//	- "featureGates" still exists under ClusterConfiguration, but there are no supported feature gates in 1.13.
+//	See the Kubernetes 1.13 changelog for further details.
+//	- Both "localEtcd" and "dns" configurations now support custom image repositories.
+//	- the "controlPlane*" related fields in JoinConfiguration were refactored into a sub structure.
+//	- "clusterName" was removed from JoinConfiguration and the name is now fetched from the existing cluster.
 //
 // Migration from old kubeadm config versions
 //
-// Please convert your v1alpha3 configuration files to v1beta1 using the kubeadm config migrate command of kubeadm v1.13.x
+// Please convert your v1alpha3 configuration files to v1beta1 using the "kubeadm config migrate" command of kubeadm v1.13.x
 // (conversion from older releases of kubeadm config files requires older release of kubeadm as well e.g.
 //	kubeadm v1.11 should be used to migrate v1alpha1 to v1alpha2; kubeadm v1.12 should be used to translate v1alpha2 to v1alpha3)
 //
@@ -88,7 +100,7 @@ limitations under the License.
 //         ...
 //     nodeRegistration:
 //         ...
-//     apiEndpoint:
+//     localApiEndpoint:
 //         ...
 //
 // The InitConfiguration type should be used to configure runtime settings, that in case of kubeadm init
@@ -99,7 +111,7 @@ limitations under the License.
 // use it to customize the node name, the CRI socket to use or any other settings that should apply to this
 // node only (e.g. the node ip).
 //
-// - APIEndpoint, that represents the endpoint of the instance of the API server to be deployed on this node;
+// - LocalAPIEndpoint, that represents the endpoint of the instance of the API server to be deployed on this node;
 // use it e.g. to customize the API server advertise address.
 //
 //     apiVersion: kubeadm.k8s.io/v1beta1
@@ -108,9 +120,10 @@ limitations under the License.
 //         ...
 //     etcd:
 //         ...
-//     apiServerExtraArgs:
+//     apiServer:
+//       extraArgs:
 //         ...
-//     APIServerExtraVolumes:
+//       extraVolumes:
 //         ...
 //     ...
 //
@@ -170,7 +183,7 @@ limitations under the License.
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    cgroupDriver: "cgroupfs"
-// 	apiEndpoint:
+// 	localApiEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
 // 	---
@@ -207,11 +220,12 @@ limitations under the License.
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
 //	    mountPath: "/etc/some-pod-path"
-//	    writable: true
+//	    readOnly: false
 //	    pathType: File
 //	  certSANs:
 //	  - "10.100.1.1"
 //	  - "ec2-10-100-0-1.compute-1.amazonaws.com"
+//	  timeoutForControlPlane: 4m0s
 //	controllerManager:
 //	  extraArgs:
 //	    node-cidr-mask-size: 20
@@ -219,7 +233,7 @@ limitations under the License.
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
 //	    mountPath: "/etc/some-pod-path"
-//	    writable: true
+//	    readOnly: false
 //	    pathType: File
 //	scheduler:
 //	  extraArgs:
@@ -228,18 +242,11 @@ limitations under the License.
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
 //	    mountPath: "/etc/some-pod-path"
-//	    writable: true
+//	    readOnly: false
 //	    pathType: File
 //	certificatesDir: "/etc/kubernetes/pki"
 //	imageRepository: "k8s.gcr.io"
-//	unifiedControlPlaneImage: "k8s.gcr.io/controlplane:v1.12.0"
-//	auditPolicy:
-//	  # https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#audit-policy
-//	  path: "/var/log/audit/audit.json"
-//	  logDir: "/var/log/audit"
-//	  logMaxAge: 7 # in days
-//	featureGates:
-//	  selfhosting: false
+//	useHyperKubeImage: false
 //	clusterName: "example-cluster"
 //
 // Kubeadm join configuration types

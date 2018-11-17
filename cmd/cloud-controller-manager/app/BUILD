@@ -19,13 +19,14 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

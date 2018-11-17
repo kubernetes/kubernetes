@@ -4,6 +4,7 @@ API rule violation: names_match,k8s.io/api/core/v1,ContainerStatus,LastTerminati
 API rule violation: names_match,k8s.io/api/core/v1,DaemonEndpoint,Port
 API rule violation: names_match,k8s.io/api/core/v1,Event,ReportingController
 API rule violation: names_match,k8s.io/api/core/v1,FCVolumeSource,WWIDs
+API rule violation: names_match,k8s.io/api/core/v1,GlusterfsPersistentVolumeSource,EndpointsName
 API rule violation: names_match,k8s.io/api/core/v1,GlusterfsVolumeSource,EndpointsName
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,DiscoveryCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,SessionCHAPAuth

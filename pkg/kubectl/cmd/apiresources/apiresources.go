@@ -77,7 +77,8 @@ func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *ApiResourcesO
 	}
 }
 
-func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdAPIResources creates the `api-resources` command
+func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -112,7 +113,7 @@ func (o *ApiResourcesOptions) Validate() error {
 
 func (o *ApiResourcesOptions) Complete(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "unexpected args: %v", args)
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
 	return nil
 }

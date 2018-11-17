@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,16 +88,16 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else {
-							glog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
+							klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 						}
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
-						glog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
+						klog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
 						return false, err
 					}
 				}
 			}
-			glog.Infof("all system priority classes are created successfully or already exist.")
+			klog.Infof("all system priority classes are created successfully or already exist.")
 			return true, nil
 		})
 		// if we're never able to make it through initialization, kill the API server.

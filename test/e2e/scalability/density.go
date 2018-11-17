@@ -728,6 +728,8 @@ var _ = SIGDescribe("Density", func() {
 					})
 			}
 			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, &scheduleThroughputs)
+			defer cleanupDensityTest(dConfig, testPhaseDurations)
+
 			if itArg.runLatencyTest {
 				// Pick latencyPodsIterations so that:
 				// latencyPodsIterations * nodeCount >= MinPodStartupMeasurements.
@@ -969,7 +971,6 @@ var _ = SIGDescribe("Density", func() {
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 			}
-			cleanupDensityTest(dConfig, testPhaseDurations)
 		})
 	}
 })

@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -562,7 +562,7 @@ func TestRBAC(t *testing.T) {
 					//
 					//    go test -v -tags integration -run RBAC -args -v 10
 					//
-					glog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
+					klog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
 					t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
 				}
 
