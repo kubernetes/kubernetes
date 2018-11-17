@@ -33,7 +33,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/kubernetes"
@@ -51,7 +51,7 @@ const (
 	metricsPrefix            = "apiserver_storage_"
 )
 
-type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
+type unSealSecret func(cipherText []byte, ctx value.Context, config apiserverconfigv1.ProviderConfiguration) ([]byte, error)
 
 type transformTest struct {
 	logger            kubeapiservertesting.Logger
@@ -186,8 +186,8 @@ func (e *transformTest) createEncryptionConfig() (string, error) {
 	return tempDir, nil
 }
 
-func (e *transformTest) getEncryptionConfig() (*encryptionconfig.ProviderConfig, error) {
-	var config encryptionconfig.EncryptionConfig
+func (e *transformTest) getEncryptionConfig() (*apiserverconfigv1.ProviderConfiguration, error) {
+	var config apiserverconfigv1.EncryptionConfiguration
 	err := yaml.Unmarshal([]byte(e.transformerConfig), &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract transformer key: %v", err)
