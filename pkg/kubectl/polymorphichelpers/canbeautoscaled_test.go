@@ -39,6 +39,10 @@ func TestCanBeAutoscaled(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			kind:      appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind(),
+			expectErr: false,
+		},
+		{
 			kind:      extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(),
 			expectErr: false,
 		},

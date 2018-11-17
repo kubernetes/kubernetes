@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	versionedfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -1482,8 +1481,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 }
 
 func TestDescribeDeployment(t *testing.T) {
-	fake := fake.NewSimpleClientset()
-	versionedFake := versionedfake.NewSimpleClientset(&appsv1.Deployment{
+	fakeClient := fake.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
@@ -1500,7 +1498,7 @@ func TestDescribeDeployment(t *testing.T) {
 			},
 		},
 	})
-	d := DeploymentDescriber{fake, versionedFake}
+	d := DeploymentDescriber{fakeClient}
 	out, err := d.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2217,8 +2215,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"DeploymentDescriber": &DeploymentDescriber{
-			fake.NewSimpleClientset(events),
-			versionedfake.NewSimpleClientset(&appsv1.Deployment{
+			fake.NewSimpleClientset(&appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -2227,7 +2224,7 @@ func TestDescribeEvents(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(1),
 					Selector: &metav1.LabelSelector{},
 				},
-			}),
+			}, events),
 		},
 		"EndpointsDescriber": &EndpointsDescriber{
 			fake.NewSimpleClientset(&corev1.Endpoints{

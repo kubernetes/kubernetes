@@ -106,8 +106,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 					podChan, err := f.PodClient().Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for pods")
-					for range podChan.ResultChan() {
-					}
+					podChan.Stop()
 
 					f.PodClient().Update(pod.Name, updatePod)
 
@@ -159,7 +158,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelRequest,
 						Stage:             auditinternal.StageResponseStarted,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -171,7 +170,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelRequest,
 						Stage:             auditinternal.StageResponseComplete,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -233,8 +232,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 					deploymentChan, err := f.ClientSet.AppsV1().Deployments(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for deployments")
-					for range deploymentChan.ResultChan() {
-					}
+					deploymentChan.Stop()
 
 					_, err = f.ClientSet.AppsV1().Deployments(namespace).Update(d)
 					framework.ExpectNoError(err, "failed to update audit-deployment")
@@ -288,7 +286,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelRequest,
 						Stage:             auditinternal.StageResponseStarted,
-						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -300,7 +298,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelRequest,
 						Stage:             auditinternal.StageResponseComplete,
-						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -368,8 +366,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 					configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for config maps")
-					for range configMapChan.ResultChan() {
-					}
+					configMapChan.Stop()
 
 					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(configMap)
 					framework.ExpectNoError(err, "failed to update audit-configmap")
@@ -423,7 +420,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelMetadata,
 						Stage:             auditinternal.StageResponseStarted,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -435,7 +432,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelMetadata,
 						Stage:             auditinternal.StageResponseComplete,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -502,8 +499,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 
 					secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for secrets")
-					for range secretChan.ResultChan() {
-					}
+					secretChan.Stop()
 
 					_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(secret)
 					framework.ExpectNoError(err, "failed to update audit-secret")
@@ -557,7 +553,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelMetadata,
 						Stage:             auditinternal.StageResponseStarted,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,
@@ -569,7 +565,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					}, {
 						Level:             auditinternal.LevelMetadata,
 						Stage:             auditinternal.StageResponseComplete,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
+						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
 						Verb:              "watch",
 						Code:              200,
 						User:              auditTestUser,

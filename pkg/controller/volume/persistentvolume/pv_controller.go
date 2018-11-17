@@ -270,11 +270,11 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("storageClassName does not match")
 	}
 
-	isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
+	isMismatch, err := checkVolumeModeMismatches(&claim.Spec, &volume.Spec)
 	if err != nil {
 		return fmt.Errorf("error checking volumeMode: %v", err)
 	}
-	if isMisMatch {
+	if isMismatch {
 		return fmt.Errorf("incompatible volumeMode")
 	}
 
@@ -613,7 +613,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			if isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec); err != nil || isMisMatch {
+			if isMismatch, err := checkVolumeModeMismatches(&claim.Spec, &volume.Spec); err != nil || isMismatch {
 				// Binding for the volume won't be called in syncUnboundClaim,
 				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
 				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)
@@ -1127,7 +1127,19 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 		klog.V(3).Infof("can't recycle volume %q: %v", volume.Name, err)
 		return
 	}
-	if used {
+
+	// Verify the claim is in cache: if so, then it is a different PVC with the same name
+	// since the volume is known to be released at this moment. Ths new (cached) PVC must use
+	// a different PV -- we checked that the PV is unused in isVolumeReleased.
+	// So the old PV is safe to be recycled.
+	claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
+	_, claimCached, err := ctrl.claims.GetByKey(claimName)
+	if err != nil {
+		klog.V(3).Infof("error getting the claim %s from cache", claimName)
+		return
+	}
+
+	if used && !claimCached {
 		msg := fmt.Sprintf("Volume is used by pods: %s", strings.Join(pods, ","))
 		klog.V(3).Infof("can't recycle volume %q: %s", volume.Name, msg)
 		ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeFailedRecycle, msg)

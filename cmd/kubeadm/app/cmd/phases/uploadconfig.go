@@ -44,7 +44,7 @@ var (
 
 	uploadKubeadmConfigExample = normalizer.Examples(`
 		# uploads the configuration of your cluster
-		kubeadm alpha phase upload-config --config=myConfig.yaml
+		kubeadm init phase upload-config --config=myConfig.yaml
 		`)
 
 	uploadKubeletConfigLongDesc = normalizer.LongDesc(`
@@ -71,6 +71,11 @@ func NewUploadConfigPhase() workflow.Phase {
 		Short:   "Uploads the kubeadm and kubelet configuration to a ConfigMap",
 		Long:    cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Uploads all configuration to a config map",
+				RunAllSiblings: true,
+			},
 			{
 				Name:         "kubeadm",
 				Short:        "Uploads the kubeadm ClusterConfiguration to a ConfigMap",

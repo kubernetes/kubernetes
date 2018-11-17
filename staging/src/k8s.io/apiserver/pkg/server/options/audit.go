@@ -574,7 +574,7 @@ func (o *AuditWebhookOptions) newUntruncatedBackend() (audit.Backend, error) {
 
 func (o *AuditDynamicOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.Enabled, "audit-dynamic-configuration", o.Enabled,
-		"Enables dynamic audit configuration. This feature also requires the DynamicAudit feature flag")
+		"Enables dynamic audit configuration. This feature also requires the DynamicAuditing feature flag")
 }
 
 func (o *AuditDynamicOptions) enabled() bool {
@@ -584,7 +584,7 @@ func (o *AuditDynamicOptions) enabled() bool {
 func (o *AuditDynamicOptions) Validate() []error {
 	var allErrors []error
 	if o.Enabled && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicAuditing) {
-		allErrors = append(allErrors, fmt.Errorf("--audit-dynamic-configuration set, but DynamicAudit feature gate is not enabled"))
+		allErrors = append(allErrors, fmt.Errorf("--audit-dynamic-configuration set, but DynamicAuditing feature gate is not enabled"))
 	}
 	return allErrors
 }

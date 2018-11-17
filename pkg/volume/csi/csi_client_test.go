@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 )
@@ -57,19 +57,19 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 	targetPath string,
 	accessMode api.PersistentVolumeAccessMode,
 	volumeInfo map[string]string,
-	volumeAttribs map[string]string,
-	nodePublishSecrets map[string]string,
+	volumeContext map[string]string,
+	secrets map[string]string,
 	fsType string,
 	mountOptions []string,
 ) error {
 	c.t.Log("calling fake.NodePublishVolume...")
 	req := &csipb.NodePublishVolumeRequest{
-		VolumeId:           volID,
-		TargetPath:         targetPath,
-		Readonly:           readOnly,
-		PublishInfo:        volumeInfo,
-		VolumeAttributes:   volumeAttribs,
-		NodePublishSecrets: nodePublishSecrets,
+		VolumeId:       volID,
+		TargetPath:     targetPath,
+		Readonly:       readOnly,
+		PublishContext: volumeInfo,
+		VolumeContext:  volumeContext,
+		Secrets:        secrets,
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
@@ -100,17 +100,17 @@ func (c *fakeCsiDriverClient) NodeUnpublishVolume(ctx context.Context, volID str
 
 func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 	volID string,
-	publishInfo map[string]string,
+	publishContext map[string]string,
 	stagingTargetPath string,
 	fsType string,
 	accessMode api.PersistentVolumeAccessMode,
-	nodeStageSecrets map[string]string,
-	volumeAttribs map[string]string,
+	secrets map[string]string,
+	volumeContext map[string]string,
 ) error {
 	c.t.Log("calling fake.NodeStageVolume...")
 	req := &csipb.NodeStageVolumeRequest{
 		VolumeId:          volID,
-		PublishInfo:       publishInfo,
+		PublishContext:    publishContext,
 		StagingTargetPath: stagingTargetPath,
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
@@ -122,8 +122,8 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 				},
 			},
 		},
-		NodeStageSecrets: nodeStageSecrets,
-		VolumeAttributes: volumeAttribs,
+		Secrets:       secrets,
+		VolumeContext: volumeContext,
 	}
 
 	_, err := c.nodeClient.NodeStageVolume(ctx, req)
@@ -321,7 +321,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 		volID             string
 		stagingTargetPath string
 		fsType            string
-		secret            map[string]string
+		secrets           map[string]string
 		mustFail          bool
 		err               error
 	}{
@@ -351,7 +351,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 			tc.stagingTargetPath,
 			tc.fsType,
 			api.ReadWriteOnce,
-			tc.secret,
+			tc.secrets,
 			map[string]string{"attr0": "val0"},
 		)
 		checkErr(t, tc.mustFail, err)

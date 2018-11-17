@@ -11,11 +11,11 @@ spec:
       labels:
         app: csi-hostpathplugin
     spec:
-      serviceAccountName: csi-driver-registrar
+      serviceAccountName: csi-node-sa
       hostNetwork: true
       containers:
         - name: driver-registrar
-          image: quay.io/k8scsi/driver-registrar:v0.4.1
+          image: gcr.io/gke-release/csi-driver-registrar:v1.0.0-gke.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -33,7 +33,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v0.4.1
+          image: quay.io/k8scsi/hostpathplugin:v1.0.0
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"

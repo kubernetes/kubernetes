@@ -19,6 +19,7 @@ package config
 import (
 	"io/ioutil"
 	"net"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -174,6 +175,9 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 			return defaultIP, nil
 		}
 		return nil, err
+	}
+	if bindAddress != nil && !bindAddress.IsUnspecified() && !reflect.DeepEqual(ip, bindAddress) {
+		klog.Warningf("WARNING: overriding requested API server bind address: requested %q, actual %q", bindAddress, ip)
 	}
 	return ip, nil
 }

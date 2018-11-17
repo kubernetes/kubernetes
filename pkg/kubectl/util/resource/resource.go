@@ -22,15 +22,15 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
-	reqs, limits = v1.ResourceList{}, v1.ResourceList{}
+func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
+	reqs, limits = corev1.ResourceList{}, corev1.ResourceList{}
 	for _, container := range pod.Spec.Containers {
 		addResourceList(reqs, container.Resources.Requests)
 		addResourceList(limits, container.Resources.Limits)
@@ -44,7 +44,7 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 }
 
 // addResourceList adds the resources in newList to list
-func addResourceList(list, new v1.ResourceList) {
+func addResourceList(list, new corev1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
 			list[name] = *quantity.Copy()
@@ -57,7 +57,7 @@ func addResourceList(list, new v1.ResourceList) {
 
 // maxResourceList sets list to the greater of list/newList for every resource
 // either list
-func maxResourceList(list, new v1.ResourceList) {
+func maxResourceList(list, new corev1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
 			list[name] = *quantity.Copy()
@@ -72,7 +72,7 @@ func maxResourceList(list, new v1.ResourceList) {
 
 // ExtractContainerResourceValue extracts the value of a resource
 // in an already known container
-func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.Container) (string, error) {
+func ExtractContainerResourceValue(fs *corev1.ResourceFieldSelector, container *corev1.Container) (string, error) {
 	divisor := resource.Quantity{}
 	if divisor.Cmp(fs.Divisor) == 0 {
 		divisor = resource.MustParse("1")
@@ -120,19 +120,19 @@ func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity
 }
 
 var standardContainerResources = sets.NewString(
-	string(v1.ResourceCPU),
-	string(v1.ResourceMemory),
-	string(v1.ResourceEphemeralStorage),
+	string(corev1.ResourceCPU),
+	string(corev1.ResourceMemory),
+	string(corev1.ResourceEphemeralStorage),
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
 func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str) || IsHugePageResourceName(v1.ResourceName(str))
+	return standardContainerResources.Has(str) || IsHugePageResourceName(corev1.ResourceName(str))
 }
 
 // IsHugePageResourceName returns true if the resource name has the huge page
 // resource prefix.
-func IsHugePageResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+func IsHugePageResourceName(name corev1.ResourceName) bool {
+	return strings.HasPrefix(string(name), corev1.ResourceHugePagesPrefix)
 }
