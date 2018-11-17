@@ -135,6 +135,9 @@ type Config struct {
 
 	// Disable pod preemption or not.
 	DisablePreemption bool
+
+	// SchedulingQueue holds pods to be scheduled
+	SchedulingQueue internalqueue.SchedulingQueue
 }
 
 // PodPreemptor has methods needed to delete a pod and to update
@@ -1261,9 +1264,10 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NextPod: func() *v1.Pod {
 			return c.getNextPod()
 		},
-		Error:          c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
-		StopEverything: c.StopEverything,
-		VolumeBinder:   c.volumeBinder,
+		Error:           c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
+		StopEverything:  c.StopEverything,
+		VolumeBinder:    c.volumeBinder,
+		SchedulingQueue: c.podQueue,
 	}, nil
 }
 
