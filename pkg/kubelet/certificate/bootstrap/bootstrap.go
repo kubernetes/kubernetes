@@ -59,7 +59,8 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
 		}
-		return clientConfig, clientConfig, nil
+		klog.V(2).Infof("No bootstrapping requested, will use kubeconfig")
+		return clientConfig, restclient.CopyConfig(clientConfig), nil
 	}
 
 	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
@@ -67,7 +68,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 		return nil, nil, fmt.Errorf("unable to build bootstrap cert store")
 	}
 
-	ok, err := verifyBootstrapClientConfig(kubeconfigPath)
+	ok, err := isClientConfigStillValid(kubeconfigPath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,7 +79,8 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
 		}
-		return clientConfig, clientConfig, nil
+		klog.V(2).Infof("Current kubeconfig file contents are still valid, no bootstrap necessary")
+		return clientConfig, restclient.CopyConfig(clientConfig), nil
 	}
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
@@ -93,6 +95,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 	if err := writeKubeconfigFromBootstrapping(clientConfig, kubeconfigPath, pemPath); err != nil {
 		return nil, nil, err
 	}
+	klog.V(2).Infof("Use the bootstrap credentials to request a cert, and set kubeconfig to point to the certificate dir")
 	return bootstrapClientConfig, clientConfig, nil
 }
 
@@ -102,7 +105,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 // The certificate and key file are stored in certDir.
 func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName types.NodeName) error {
 	// Short-circuit if the kubeconfig file exists and is valid.
-	ok, err := verifyBootstrapClientConfig(kubeconfigPath)
+	ok, err := isClientConfigStillValid(kubeconfigPath)
 	if err != nil {
 		return err
 	}
@@ -219,10 +222,10 @@ func loadRESTClientConfig(kubeconfig string) (*restclient.Config, error) {
 	).ClientConfig()
 }
 
-// verifyBootstrapClientConfig checks the provided kubeconfig to see if it has a valid
+// isClientConfigStillValid checks the provided kubeconfig to see if it has a valid
 // client certificate. It returns true if the kubeconfig is valid, or an error if bootstrapping
 // should stop immediately.
-func verifyBootstrapClientConfig(kubeconfigPath string) (bool, error) {
+func isClientConfigStillValid(kubeconfigPath string) (bool, error) {
 	_, err := os.Stat(kubeconfigPath)
 	if os.IsNotExist(err) {
 		return false, nil

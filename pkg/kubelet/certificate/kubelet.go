@@ -147,7 +147,16 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 // NewKubeletClientCertificateManager sets up a certificate manager without a
 // client that can be used to sign new certificates (or rotate). If a CSR
 // client is set later, it may begin rotating/renewing the client cert.
-func NewKubeletClientCertificateManager(certDirectory string, nodeName types.NodeName, certFile string, keyFile string, clientFn certificate.CSRClientFunc) (certificate.Manager, error) {
+func NewKubeletClientCertificateManager(
+	certDirectory string,
+	nodeName types.NodeName,
+	bootstrapCertData []byte,
+	bootstrapKeyData []byte,
+	certFile string,
+	keyFile string,
+	clientFn certificate.CSRClientFunc,
+) (certificate.Manager, error) {
+
 	certificateStore, err := certificate.NewFileStore(
 		"kubelet-client",
 		certDirectory,
@@ -165,7 +174,7 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 			Help:      "Gauge of the lifetime of a certificate. The value is the date the certificate will expire in seconds since January 1, 1970 UTC.",
 		},
 	)
-	prometheus.MustRegister(certificateExpiration)
+	prometheus.Register(certificateExpiration)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientFn: clientFn,
@@ -190,6 +199,14 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 			// authenticate itself to the TLS server.
 			certificates.UsageClientAuth,
 		},
+
+		// For backwards compatibility, the kubelet supports the ability to
+		// provide a higher privileged certificate as initial data that will
+		// then be rotated immediately. This code path is used by kubeadm on
+		// the masters.
+		BootstrapCertificatePEM: bootstrapCertData,
+		BootstrapKeyPEM:         bootstrapKeyData,
+
 		CertificateStore:      certificateStore,
 		CertificateExpiration: certificateExpiration,
 	})

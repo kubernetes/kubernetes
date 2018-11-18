@@ -19,10 +19,13 @@ package app
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	cryptorand "crypto/rand"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -53,7 +56,7 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	}
 	defer func() { os.RemoveAll(testDir) }()
 
-	serverPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	serverPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,6 +133,65 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	if len(fi) != 2 {
 		t.Fatalf("Unexpected directory contents: %#v", fi)
 	}
+}
+
+func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
+	testDir, err := ioutil.TempDir("", "kubeletcert")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { os.RemoveAll(testDir) }()
+
+	// when no cert is provided, write nothing to disk
+	config1 := &restclient.Config{
+		UserAgent: "FirstClient",
+		Host:      "http://localhost",
+	}
+	config2 := &restclient.Config{
+		UserAgent: "SecondClient",
+		Host:      "http://localhost",
+	}
+	nodeName := types.NodeName("test")
+	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err != nil {
+		t.Fatal(err)
+	}
+	fi := getFileInfo(testDir)
+	if len(fi) != 0 {
+		t.Fatalf("Unexpected directory contents: %#v", fi)
+	}
+
+	// an invalid cert should be ignored
+	config2.CertData = []byte("invalid contents")
+	config2.KeyData = []byte("invalid contents")
+	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err == nil {
+		t.Fatal("unexpected non error")
+	}
+	fi = getFileInfo(testDir)
+	if len(fi) != 0 {
+		t.Fatalf("Unexpected directory contents: %#v", fi)
+	}
+
+	// an expired client certificate should be written to disk, because the cert manager can
+	// use config1 to refresh it and the cert manager won't return it for clients.
+	config2.CertData, config2.KeyData = genClientCert(t, time.Now().Add(-2*time.Hour), time.Now().Add(-time.Hour))
+	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err != nil {
+		t.Fatal(err)
+	}
+	fi = getFileInfo(testDir)
+	if len(fi) != 2 {
+		t.Fatalf("Unexpected directory contents: %#v", fi)
+	}
+
+	// a valid, non-expired client certificate should be written to disk
+	config2.CertData, config2.KeyData = genClientCert(t, time.Now().Add(-time.Hour), time.Now().Add(24*time.Hour))
+	if _, err := buildClientCertificateManager(config1, config2, testDir, nodeName); err != nil {
+		t.Fatal(err)
+	}
+	fi = getFileInfo(testDir)
+	if len(fi) != 2 {
+		t.Fatalf("Unexpected directory contents: %#v", fi)
+	}
+
 }
 
 func getFileInfo(dir string) map[string]os.FileInfo {
@@ -278,4 +340,38 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	default:
 		t.Fatalf("unexpected request: %s %s", req.Method, req.URL)
 	}
+}
+
+// genClientCert generates an x509 certificate for testing. Certificate and key
+// are returned in PEM encoding.
+func genClientCert(t *testing.T, from, to time.Time) ([]byte, []byte) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyRaw, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject:      pkix.Name{Organization: []string{"Acme Co"}},
+		NotBefore:    from,
+		NotAfter:     to,
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+	}
+	certRaw, err := x509.CreateCertificate(rand.Reader, cert, cert, key.Public(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certRaw}),
+		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyRaw})
 }
