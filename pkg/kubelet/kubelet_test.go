@@ -47,6 +47,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	kubeletfakes "k8s.io/kubernetes/pkg/kubelet/fake"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -63,6 +64,7 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -70,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -316,6 +319,7 @@ func newTestKubeletWithImageList(
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 
 	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
@@ -2274,3 +2278,35 @@ type podsByUID []*v1.Pod
 func (p podsByUID) Len() int           { return len(p) }
 func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
+
+//go:generate $KUBE_ROOT/hack/generate-mocks.sh ./kubelet.go pluginWatcher ./fake/fake_plugin_watcher.go
+func TestCSIPluginHandlerRegistration(t *testing.T) {
+	testKubelet := newTestKubeletWithoutFakeVolumePlugin(t, false)
+	defer testKubelet.Cleanup()
+
+	kubelet := testKubelet.kubelet
+
+	kubelet.enablePluginsWatcher = true
+
+	pluginWatcher := &kubeletfakes.FakePluginWatcher{}
+	kubelet.pluginWatcher = pluginWatcher
+
+	kubelet.initializeRuntimeDependentModules()
+
+	var csiPluginHandler pluginwatcher.PluginHandler
+	for call := 0; call < pluginWatcher.AddHandlerCallCount(); call++ {
+		pluginType, pluginHandler := pluginWatcher.AddHandlerArgsForCall(call)
+		if pluginType == "CSIPlugin" {
+			csiPluginHandler = pluginHandler
+			break
+		}
+	}
+
+	if csiPluginHandler == nil {
+		t.Errorf("Expected CSIPlugin to have been registered")
+	}
+
+	if _, ok := csiPluginHandler.(*csi.RegistrationHandler); !ok {
+		t.Errorf("Expected registration handler to be a CSI Registration handler")
+	}
+}

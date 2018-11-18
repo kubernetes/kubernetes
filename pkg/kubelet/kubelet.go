@@ -487,48 +487,48 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet := &Kubelet{
-		hostname:                                hostname,
-		hostnameOverridden:                      len(hostnameOverride) > 0,
-		nodeName:                                nodeName,
-		kubeClient:                              kubeDeps.KubeClient,
-		csiClient:                               kubeDeps.CSIClient,
-		heartbeatClient:                         kubeDeps.HeartbeatClient,
-		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
-		rootDirectory:                           rootDirectory,
-		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
-		registerNode:                            registerNode,
-		registerWithTaints:                      registerWithTaints,
-		registerSchedulable:                     registerSchedulable,
-		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
-		serviceLister:                           serviceLister,
-		nodeInfo:                                nodeInfo,
-		masterServiceNamespace:                  masterServiceNamespace,
-		streamingConnectionIdleTimeout:          kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		recorder:                                kubeDeps.Recorder,
-		cadvisor:                                kubeDeps.CAdvisorInterface,
-		cloud:                                   kubeDeps.Cloud,
-		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
-		providerID:                              providerID,
-		nodeRef:                                 nodeRef,
-		nodeLabels:                              nodeLabels,
-		nodeStatusUpdateFrequency:               kubeCfg.NodeStatusUpdateFrequency.Duration,
-		nodeStatusReportFrequency:               kubeCfg.NodeStatusReportFrequency.Duration,
-		os:                                      kubeDeps.OSInterface,
-		oomWatcher:                              oomWatcher,
-		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
-		cgroupRoot:                              kubeCfg.CgroupRoot,
-		mounter:                                 kubeDeps.Mounter,
-		maxPods:                                 int(kubeCfg.MaxPods),
-		podsPerCore:                             int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:                         atomic.Value{},
-		daemonEndpoints:                         daemonEndpoints,
-		containerManager:                        kubeDeps.ContainerManager,
-		containerRuntimeName:                    containerRuntime,
-		redirectContainerStreaming:              crOptions.RedirectContainerStreaming,
-		nodeIP:                                  parsedNodeIP,
-		nodeIPValidator:                         validateNodeIP,
-		clock:                                   clock.RealClock{},
+		hostname:                       hostname,
+		hostnameOverridden:             len(hostnameOverride) > 0,
+		nodeName:                       nodeName,
+		kubeClient:                     kubeDeps.KubeClient,
+		csiClient:                      kubeDeps.CSIClient,
+		heartbeatClient:                kubeDeps.HeartbeatClient,
+		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
+		rootDirectory:                  rootDirectory,
+		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
+		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		registerNode:                   registerNode,
+		registerWithTaints:             registerWithTaints,
+		registerSchedulable:            registerSchedulable,
+		dnsConfigurer:                  dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
+		serviceLister:                  serviceLister,
+		nodeInfo:                       nodeInfo,
+		masterServiceNamespace:         masterServiceNamespace,
+		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		recorder:                       kubeDeps.Recorder,
+		cadvisor:                       kubeDeps.CAdvisorInterface,
+		cloud:                          kubeDeps.Cloud,
+		externalCloudProvider:     cloudprovider.IsExternal(cloudProvider),
+		providerID:                providerID,
+		nodeRef:                   nodeRef,
+		nodeLabels:                nodeLabels,
+		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
+		nodeStatusReportFrequency: kubeCfg.NodeStatusReportFrequency.Duration,
+		os:                         kubeDeps.OSInterface,
+		oomWatcher:                 oomWatcher,
+		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                 kubeCfg.CgroupRoot,
+		mounter:                    kubeDeps.Mounter,
+		maxPods:                    int(kubeCfg.MaxPods),
+		podsPerCore:                int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:            atomic.Value{},
+		daemonEndpoints:            daemonEndpoints,
+		containerManager:           kubeDeps.ContainerManager,
+		containerRuntimeName:       containerRuntime,
+		redirectContainerStreaming: crOptions.RedirectContainerStreaming,
+		nodeIP:          parsedNodeIP,
+		nodeIPValidator: validateNodeIP,
+		clock:           clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), protocol),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -1206,7 +1206,7 @@ type Kubelet struct {
 	// pluginwatcher is a utility for Kubelet to register different types of node-level plugins
 	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
 	// directory returned by kubelet.getPluginsDir()
-	pluginWatcher *pluginwatcher.Watcher
+	pluginWatcher pluginWatcher
 
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
@@ -1216,6 +1216,11 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+}
+
+type pluginWatcher interface {
+	AddHandler(pluginType string, handler pluginwatcher.PluginHandler)
+	Start() error
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1388,9 +1393,24 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.containerLogManager.Start()
 	if kl.enablePluginsWatcher {
 		// Adding Registration Callback function for CSI Driver
-		kl.pluginWatcher.AddHandler(pluginwatcherapi.CSIPlugin, pluginwatcher.PluginHandler(csi.PluginHandler))
+		csiPlugin, err := kl.volumePluginMgr.FindPluginByName(csi.PluginName)
+		if err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			klog.Fatalf("failed to find CSI plugin. err: %v", err)
+		}
+
+		// Adding Registration Callback function for CSI Plugins
+		kl.pluginWatcher.AddHandler(
+			pluginwatcherapi.CSIPlugin,
+			pluginwatcher.PluginHandler(csiPlugin.(*csi.CSIPlugin).RegistrationHandler),
+		)
+
 		// Adding Registration Callback function for Device Manager
-		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
+		kl.pluginWatcher.AddHandler(
+			pluginwatcherapi.DevicePlugin,
+			kl.containerManager.GetPluginRegistrationHandler(),
+		)
+
 		// Start the plugin watcher
 		klog.V(4).Infof("starting watcher")
 		if err := kl.pluginWatcher.Start(); err != nil {

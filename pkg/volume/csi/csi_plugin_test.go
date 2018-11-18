@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -48,7 +48,7 @@ import (
 )
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*csiPlugin, string) {
+func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*CSIPlugin, string) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -70,14 +70,14 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
-	plug, err := plugMgr.FindPluginByName(csiPluginName)
+	plug, err := plugMgr.FindPluginByName(PluginName)
 	if err != nil {
-		t.Fatalf("can't find plugin %v", csiPluginName)
+		t.Fatalf("can't find plugin %v", PluginName)
 	}
 
-	csiPlug, ok := plug.(*csiPlugin)
+	csiPlug, ok := plug.(*CSIPlugin)
 	if !ok {
-		t.Fatalf("cannot assert plugin to be type csiPlugin")
+		t.Fatalf("cannot assert plugin to be type CSIPlugin")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
@@ -540,32 +540,32 @@ func TestRegisterPlugin(t *testing.T) {
 		sockPath            string
 		nodeGetInfoResponse *csipb.NodeGetInfoResponse
 		nodeGetInfoErr      error
-		addNodeInfoErr      error
+		installCSIDriverErr error
 		// expectations
 		expectedRegisterPluginErrMsg string
-		expectedNimAddCalls          int
-		expectedNimRemoveCalls       int
+		expectedNimInstallCalls      int
+		expectedNimUninstallCalls    int
 		expectedDriverEntry          bool
 	}{
 		"happy path": {
-			sockPath:            "/tmp/some.csi.sock",
-			nodeGetInfoResponse: &csipb.NodeGetInfoResponse{NodeId: "some node id"},
-			expectedNimAddCalls: 1,
-			expectedDriverEntry: true,
+			sockPath:                "/tmp/some.csi.sock",
+			nodeGetInfoResponse:     &csipb.NodeGetInfoResponse{NodeId: "some node id"},
+			expectedNimInstallCalls: 1,
+			expectedDriverEntry:     true,
 		},
 		"when node server returns an error": {
 			sockPath:                     "/tmp/some.csi.sock",
 			nodeGetInfoErr:               errors.New("some random node get info error"),
-			expectedNimRemoveCalls:       1,
+			expectedNimUninstallCalls:    1,
 			expectedRegisterPluginErrMsg: "some random node get info error",
 			expectedDriverEntry:          false,
 		},
 		"when node info manager returns an error": {
 			sockPath:                     "/tmp/some.csi.sock",
 			nodeGetInfoResponse:          &csipb.NodeGetInfoResponse{NodeId: "some node id"},
-			addNodeInfoErr:               errors.New("some random node info add error"),
-			expectedNimAddCalls:          1,
-			expectedNimRemoveCalls:       1,
+			installCSIDriverErr:          errors.New("some random node info add error"),
+			expectedNimInstallCalls:      1,
+			expectedNimUninstallCalls:    1,
 			expectedRegisterPluginErrMsg: "some random node info add error",
 			expectedDriverEntry:          false,
 		},
@@ -573,36 +573,34 @@ func TestRegisterPlugin(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			registrationHandler := &RegistrationHandler{}
-
 			nodeServer := &fake.FakeNodeServer{}
 			nodeServer.NodeGetInfoReturns(tc.nodeGetInfoResponse, tc.nodeGetInfoErr)
 
 			nodeInfoManager := &fake.FakeNodeInfoManager{}
-			nodeInfoManager.AddNodeInfoReturns(tc.addNodeInfoErr)
+			nodeInfoManager.InstallCSIDriverReturns(tc.installCSIDriverErr)
+
+			registrationHandler := &RegistrationHandler{
+				csiDrivers: &csiDriversStore{
+					driversMap: map[string]csiDriver{},
+				},
+				nim: nodeInfoManager,
+			}
 
 			driverStarter, driverStopper := newCsiDriverServer(t, tc.sockPath, nodeServer)
 			go driverStarter()
 			defer driverStopper()
 
-			// TODO: globals!
-			csiDrivers = csiDriversStore{
-				driversMap: map[string]csiDriver{},
-			}
-			nim = nodeInfoManager
-
 			err := registrationHandler.RegisterPlugin("some driver name", tc.sockPath)
-			checkErr(t, err, tc.expectedRegisterPluginErrMsg)
+			checkErrWithMessage(t, err, tc.expectedRegisterPluginErrMsg)
 
-			if a, e := nodeInfoManager.AddNodeInfoCallCount(), tc.expectedNimAddCalls; e != a {
-				t.Errorf("Expected nim.AddNodeInfo to be called %d times, got called %d times", e, a)
+			if a, e := nodeInfoManager.InstallCSIDriverCallCount(), tc.expectedNimInstallCalls; e != a {
+				t.Errorf("Expected nim.InstallCSIDriver to be called %d times, got called %d times", e, a)
 			}
-			if a, e := nodeInfoManager.RemoveNodeInfoCallCount(), tc.expectedNimRemoveCalls; e != a {
-				t.Errorf("Expected nim.RemoveNodeInfo to be called %d times, got called %d times", e, a)
+			if a, e := nodeInfoManager.UninstallCSIDriverCallCount(), tc.expectedNimUninstallCalls; e != a {
+				t.Errorf("Expected nim.UninstallCSIDriver to be called %d times, got called %d times", e, a)
 			}
 
-			// TODO: globals!
-			driversEntry, foundDriver := csiDrivers.driversMap["some driver name"]
+			driversEntry, foundDriver := registrationHandler.csiDrivers.driversMap["some driver name"]
 			if foundDriver != tc.expectedDriverEntry {
 				if foundDriver {
 					t.Errorf("Expected to find the driver registered")
@@ -625,7 +623,7 @@ func TestCSIPluginInit(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			plugin := csiPlugin{}
+			plugin := CSIPlugin{}
 
 			csiClient := fakecsi.NewSimpleClientset(
 				getCSIDriver("fake csi driver name", nil, nil),
@@ -645,16 +643,16 @@ func TestCSIPluginInit(t *testing.T) {
 			}
 
 			err := plugin.Init(volumeHost)
-			checkErr(t, err, tc.expectedErrMsg)
+			checkErrWithMessage(t, err, tc.expectedErrMsg)
 
 			if plugin.host != volumeHost {
 				t.Errorf("Expected plugin.host to be the volume host")
 			}
 
-			if csiDrivers.driversMap == nil {
+			if plugin.RegistrationHandler.csiDrivers.driversMap == nil {
 				t.Errorf("Expected csiDrivers to be initialized")
 			}
-			if nim == nil {
+			if plugin.RegistrationHandler.nim == nil {
 				t.Errorf("Expected nodeInfoManager to be initialized")
 			}
 
@@ -697,7 +695,7 @@ func waitForInformerSync(t *testing.T, informer cache.SharedInformer) {
 	}
 }
 
-func checkErr(t *testing.T, actualErr error, expectedErrMsg string) {
+func checkErrWithMessage(t *testing.T, actualErr error, expectedErrMsg string) {
 	t.Helper()
 	if expectedErrMsg == "" {
 		if actualErr != nil {

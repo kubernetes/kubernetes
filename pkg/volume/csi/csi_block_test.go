@@ -33,7 +33,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
+func prepareBlockMapperTest(plug *CSIPlugin, specVolumeName string) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
 	pv := makeTestPV(specVolumeName, 10, testDriver, testVol)
 	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 	mapper, err := plug.NewBlockVolumeMapper(
