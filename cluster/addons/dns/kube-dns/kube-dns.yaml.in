@@ -86,6 +86,9 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

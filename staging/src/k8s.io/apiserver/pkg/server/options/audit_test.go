@@ -67,7 +67,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.PolicyFile = policy
 			return o
 		},
-		expected: "log",
+		expected: "ignoreErrors<log>",
 	}, {
 		name: "default log no policy",
 		options: func() *AuditOptions {
@@ -94,6 +94,16 @@ func TestAuditValidOptions(t *testing.T) {
 		},
 		expected: "",
 	}, {
+		name: "strict webhook",
+		options: func() *AuditOptions {
+			o := NewAuditOptions()
+			o.WebhookOptions.ConfigFile = webhookConfig
+			o.WebhookOptions.BatchOptions.Mode = ModeBlockingStrict
+			o.PolicyFile = policy
+			return o
+		},
+		expected: "webhook",
+	}, {
 		name: "default union",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
@@ -102,7 +112,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.PolicyFile = policy
 			return o
 		},
-		expected: "union[log,buffered<webhook>]",
+		expected: "union[ignoreErrors<log>,buffered<webhook>]",
 	}, {
 		name: "custom",
 		options: func() *AuditOptions {
@@ -114,7 +124,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.PolicyFile = policy
 			return o
 		},
-		expected: "union[buffered<log>,webhook]",
+		expected: "union[buffered<log>,ignoreErrors<webhook>]",
 	}, {
 		name: "default webhook with truncating",
 		options: func() *AuditOptions {
@@ -151,7 +161,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.PolicyFile = policy
 			return o
 		},
-		expected: "union[enforced<log>,dynamic[]]",
+		expected: "union[enforced<ignoreErrors<log>>,dynamic[]]",
 	}, {
 		name: "dynamic with truncating and webhook",
 		options: func() *AuditOptions {
@@ -174,7 +184,7 @@ func TestAuditValidOptions(t *testing.T) {
 			o.LogOptions.Path = "/audit"
 			return o
 		},
-		expected: "union[enforced<log>,truncate<union[enforced<buffered<webhook>>,dynamic[]]>]",
+		expected: "union[enforced<ignoreErrors<log>>,truncate<union[enforced<buffered<webhook>>,dynamic[]]>]",
 	},
 	}
 	for _, tc := range testCases {

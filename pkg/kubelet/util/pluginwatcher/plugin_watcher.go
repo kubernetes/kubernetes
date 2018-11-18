@@ -211,6 +211,8 @@ func (w *Watcher) traversePluginDir(dir string) error {
 }
 
 // Handle filesystem notify event.
+// Files names:
+// - MUST NOT start with a '.'
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	klog.V(6).Infof("Handling create event: %v", event)
 
@@ -220,11 +222,16 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	}
 
 	if strings.HasPrefix(fi.Name(), ".") {
-		klog.Errorf("Ignoring file: %s", fi.Name())
+		klog.V(5).Infof("Ignoring file (starts with '.'): %s", fi.Name())
 		return nil
 	}
 
 	if !fi.IsDir() {
+		if fi.Mode()&os.ModeSocket == 0 {
+			klog.V(5).Infof("Ignoring non socket file %s", fi.Name())
+			return nil
+		}
+
 		return w.handlePluginRegistration(event.Name)
 	}
 
@@ -290,7 +297,8 @@ func (w *Watcher) handleDeleteEvent(event fsnotify.Event) error {
 
 	plugin, ok := w.getPlugin(event.Name)
 	if !ok {
-		return fmt.Errorf("could not find plugin for deleted file %s", event.Name)
+		klog.V(5).Infof("could not find plugin for deleted file %s", event.Name)
+		return nil
 	}
 
 	// You should not get a Deregister call while registering a plugin
