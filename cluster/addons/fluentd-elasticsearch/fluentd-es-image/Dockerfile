@@ -31,13 +31,15 @@ COPY Gemfile /Gemfile
 # 2. Install fluentd via ruby.
 # 3. Remove build dependencies.
 # 4. Cleanup leftover caches & files.
-RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev libffi-dev" \
+RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev libffi-dev curl" \
     && clean-install $BUILD_DEPS \
                      ca-certificates \
                      libjemalloc1 \
                      ruby \
     && echo 'gem: --no-document' >> /etc/gemrc \
     && gem install --file Gemfile \
+    && mkdir -p /etc/fluent/plugin \
+    && curl -s https://raw.githubusercontent.com/openshift/origin-aggregated-logging/master/fluentd/lib/filter_parse_json_field/lib/filter_parse_json_field.rb -o /etc/fluent/plugin/filter_parse_json_field.rb \
     && apt-get purge -y --auto-remove \
                      -o APT::AutoRemove::RecommendsImportant=false \
                      $BUILD_DEPS \
