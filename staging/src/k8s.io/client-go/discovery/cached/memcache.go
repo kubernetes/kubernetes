@@ -131,7 +131,7 @@ func (d *memCacheClient) Invalidate() {
 	for _, g := range gl.Groups {
 		for _, v := range g.Versions {
 			r, err := d.delegate.ServerResourcesForGroupVersion(v.GroupVersion)
-			if err != nil || len(r.APIResources) == 0 {
+			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
 				if cur, ok := d.groupToServerResources[v.GroupVersion]; ok {
 					// retain the existing list, if we had it.
@@ -139,6 +139,10 @@ func (d *memCacheClient) Invalidate() {
 				} else {
 					continue
 				}
+			}
+			if len(r.APIResources) == 0 {
+				// retain the existing list, if we had it.
+				continue
 			}
 			rl[v.GroupVersion] = r
 		}
