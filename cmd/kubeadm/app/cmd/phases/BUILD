@@ -44,6 +44,7 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -72,7 +73,9 @@ go_test(
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
+        "//cmd/kubeadm/test/certs:go_default_library",
         "//pkg/version:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
 
