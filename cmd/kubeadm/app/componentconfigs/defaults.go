@@ -102,7 +102,11 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	externalkubeletcfg.ReadOnlyPort = 0
 
 	// Enables client certificate rotation for the kubelet
-	externalkubeletcfg.RotateCertificates = true
+	if internalcfg.ComponentConfigs.Kubelet != nil {
+		externalkubeletcfg.RotateCertificates = internalcfg.ComponentConfigs.Kubelet.RotateCertificates
+	} else {
+		externalkubeletcfg.RotateCertificates = true
+	}
 
 	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
 	externalkubeletcfg.HealthzBindAddress = "127.0.0.1"
