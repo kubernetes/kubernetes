@@ -79,6 +79,16 @@ var _ = SIGDescribe("Advanced Audit", func() {
 		anonymousClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err)
 
+		By("Creating a kubernetes client that impersonates an authorized user")
+		config, err = framework.LoadConfig()
+		framework.ExpectNoError(err)
+		config.Impersonate = restclient.ImpersonationConfig{
+			UserName: "superman",
+			Groups:   []string{"system:masters"},
+		}
+		impersonatedClient, err := clientset.NewForConfig(config)
+		framework.ExpectNoError(err)
+
 		testCases := []struct {
 			action func()
 			events []utils.AuditEvent
@@ -668,6 +678,30 @@ var _ = SIGDescribe("Advanced Audit", func() {
 					},
 				},
 			},
+			// List pods as impersonated user.
+			{
+				func() {
+					_, err = impersonatedClient.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+					framework.ExpectNoError(err, "failed to list pods")
+				},
+				[]utils.AuditEvent{
+					{
+						Level:              auditinternal.LevelRequest,
+						Stage:              auditinternal.StageResponseComplete,
+						RequestURI:         fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace),
+						Verb:               "list",
+						Code:               200,
+						User:               auditTestUser,
+						ImpersonatedUser:   "superman",
+						ImpersonatedGroups: "system:masters",
+						Resource:           "pods",
+						Namespace:          namespace,
+						RequestObject:      false,
+						ResponseObject:     false,
+						AuthorizeDecision:  "allow",
+					},
+				},
+			},
 		}
 
 		// test authorizer annotations, RBAC is required.
@@ -684,17 +718,19 @@ var _ = SIGDescribe("Advanced Audit", func() {
 				},
 				[]utils.AuditEvent{
 					{
-						Level:             auditinternal.LevelRequest,
-						Stage:             auditinternal.StageResponseComplete,
-						RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods/another-audit-pod", namespace),
-						Verb:              "get",
-						Code:              403,
-						User:              auditTestUser,
-						Resource:          "pods",
-						Namespace:         namespace,
-						RequestObject:     false,
-						ResponseObject:    false,
-						AuthorizeDecision: "forbid",
+						Level:              auditinternal.LevelRequest,
+						Stage:              auditinternal.StageResponseComplete,
+						RequestURI:         fmt.Sprintf("/api/v1/namespaces/%s/pods/another-audit-pod", namespace),
+						Verb:               "get",
+						Code:               403,
+						User:               auditTestUser,
+						ImpersonatedUser:   "system:anonymous",
+						ImpersonatedGroups: "system:unauthenticated",
+						Resource:           "pods",
+						Namespace:          namespace,
+						RequestObject:      false,
+						ResponseObject:     false,
+						AuthorizeDecision:  "forbid",
 					},
 				},
 			},
