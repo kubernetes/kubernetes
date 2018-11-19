@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -28,19 +27,23 @@ import (
 
 // VolumeBinder sets up the volume binding library
 type VolumeBinder struct {
-	Binder persistentvolume.SchedulerVolumeBinder
+	Binder         persistentvolume.SchedulerVolumeBinder
+	PVCAssumeCache persistentvolume.PVCAssumeCache
+	PVAssumeCache  persistentvolume.PVAssumeCache
 }
 
 // NewVolumeBinder sets up the volume binding library and binding queue
 func NewVolumeBinder(
 	client clientset.Interface,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	bindTimeout time.Duration) *VolumeBinder {
 
+	pvcCache := persistentvolume.NewPVCAssumeCache()
+	pvCache := persistentvolume.NewPVAssumeCache()
 	return &VolumeBinder{
-		Binder: persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer, bindTimeout),
+		Binder:         persistentvolume.NewVolumeBinder(client, pvcCache, pvCache, storageClassInformer, bindTimeout),
+		PVCAssumeCache: pvcCache,
+		PVAssumeCache:  pvCache,
 	}
 }
 

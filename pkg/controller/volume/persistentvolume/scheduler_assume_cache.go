@@ -33,6 +33,15 @@ import (
 // cache's version of the object.  Objects are assumed to be
 // Kubernetes API objects that implement meta.Interface
 type AssumeCache interface {
+	// Add the object from apiserver.
+	Add(obj interface{})
+
+	// Update the object from apiserver.
+	Update(oldObj interface{}, newObj interface{})
+
+	// Delete the object from apiserver.
+	Delete(obj interface{})
+
 	// Assume updates the object in-memory only
 	Assume(obj interface{}) error
 
@@ -124,28 +133,17 @@ func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 	return c.indexFunc(objInfo.latestObj)
 }
 
-func NewAssumeCache(informer cache.SharedIndexInformer, description, indexName string, indexFunc cache.IndexFunc) *assumeCache {
+func NewAssumeCache(description, indexName string, indexFunc cache.IndexFunc) *assumeCache {
 	c := &assumeCache{
 		description: description,
 		indexFunc:   indexFunc,
 		indexName:   indexName,
 	}
 	c.store = cache.NewIndexer(objInfoKeyFunc, cache.Indexers{indexName: c.objInfoIndexFunc})
-
-	// Unit tests don't use informers
-	if informer != nil {
-		informer.AddEventHandler(
-			cache.ResourceEventHandlerFuncs{
-				AddFunc:    c.add,
-				UpdateFunc: c.update,
-				DeleteFunc: c.delete,
-			},
-		)
-	}
 	return c
 }
 
-func (c *assumeCache) add(obj interface{}) {
+func (c *assumeCache) Add(obj interface{}) {
 	if obj == nil {
 		return
 	}
@@ -185,11 +183,11 @@ func (c *assumeCache) add(obj interface{}) {
 	klog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
 }
 
-func (c *assumeCache) update(oldObj interface{}, newObj interface{}) {
-	c.add(newObj)
+func (c *assumeCache) Update(oldObj interface{}, newObj interface{}) {
+	c.Add(newObj)
 }
 
-func (c *assumeCache) delete(obj interface{}) {
+func (c *assumeCache) Delete(obj interface{}) {
 	if obj == nil {
 		return
 	}
@@ -339,8 +337,8 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
 }
 
-func NewPVAssumeCache(informer cache.SharedIndexInformer) PVAssumeCache {
-	return &pvAssumeCache{assumeCache: NewAssumeCache(informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc)}
+func NewPVAssumeCache() PVAssumeCache {
+	return &pvAssumeCache{assumeCache: NewAssumeCache("v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc)}
 }
 
 func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
@@ -387,8 +385,8 @@ type pvcAssumeCache struct {
 	*assumeCache
 }
 
-func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
-	return &pvcAssumeCache{assumeCache: NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+func NewPVCAssumeCache() PVCAssumeCache {
+	return &pvcAssumeCache{assumeCache: NewAssumeCache("v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
 }
 
 func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -110,11 +111,27 @@ func newTestBinder(t *testing.T) *testEnv {
 
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
+	pvcCache := NewPVCAssumeCache()
+	pvCache := NewPVAssumeCache()
+	pvcInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    pvcCache.Add,
+			UpdateFunc: pvcCache.Update,
+			DeleteFunc: pvcCache.Delete,
+		},
+	)
+	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    pvCache.Add,
+			UpdateFunc: pvCache.Update,
+			DeleteFunc: pvCache.Delete,
+		},
+	)
 
 	binder := NewVolumeBinder(
 		client,
-		pvcInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
+		pvcCache,
+		pvCache,
 		classInformer,
 		10*time.Second)
 
@@ -182,14 +199,12 @@ func newTestBinder(t *testing.T) *testEnv {
 		t.Fatalf("Failed to convert to internal binder")
 	}
 
-	pvCache := internalBinder.pvCache
-	internalPVCache, ok := pvCache.(*pvAssumeCache)
+	internalPVCache, ok := internalBinder.pvCache.(*pvAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to convert to internal PV cache")
 	}
 
-	pvcCache := internalBinder.pvcCache
-	internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
+	internalPVCCache, ok := internalBinder.pvcCache.(*pvcAssumeCache)
 	if !ok {
 		t.Fatalf("Failed to convert to internal PVC cache")
 	}
@@ -207,7 +222,7 @@ func newTestBinder(t *testing.T) *testEnv {
 func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
 	internalPVCCache := env.internalPVCCache
 	for _, pvc := range cachedPVCs {
-		internalPVCCache.add(pvc)
+		internalPVCCache.Add(pvc)
 		if apiPVCs == nil {
 			env.reactor.claims[pvc.Name] = pvc
 		}
@@ -220,7 +235,7 @@ func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs [
 func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
 	internalPVCache := env.internalPVCache
 	for _, pv := range cachedPVs {
-		internalPVCache.add(pv)
+		internalPVCache.Add(pv)
 		if apiPVs == nil {
 			env.reactor.volumes[pv.Name] = pv
 		}
@@ -1322,7 +1337,7 @@ func TestBindPodVolumes(t *testing.T) {
 				if !ok {
 					t.Fatalf("Failed to convert to internal PVC cache")
 				}
-				internalPVCCache.add(newPVC)
+				internalPVCCache.Add(newPVC)
 			},
 		},
 		"pod-deleted-after-time": {
@@ -1376,7 +1391,7 @@ func TestBindPodVolumes(t *testing.T) {
 				if !ok {
 					t.Fatalf("Failed to convert to internal PVC cache")
 				}
-				internalPVCCache.delete(pvc)
+				internalPVCCache.Delete(pvc)
 			},
 			shouldFail: true,
 		},

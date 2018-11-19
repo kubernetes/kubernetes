@@ -395,7 +395,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
+		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 		args.StorageClassInformer.Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
@@ -480,6 +480,9 @@ func (c *configFactory) skipPodUpdate(pod *v1.Pod) bool {
 }
 
 func (c *configFactory) onPvAdd(obj interface{}) {
+	if c.volumeBinder != nil {
+		c.volumeBinder.PVAssumeCache.Add(obj)
+	}
 	if c.enableEquivalenceClassCache {
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
@@ -498,6 +501,9 @@ func (c *configFactory) onPvAdd(obj interface{}) {
 }
 
 func (c *configFactory) onPvUpdate(old, new interface{}) {
+	if c.volumeBinder != nil {
+		c.volumeBinder.PVAssumeCache.Update(old, new)
+	}
 	if c.enableEquivalenceClassCache {
 		newPV, ok := new.(*v1.PersistentVolume)
 		if !ok {
@@ -543,6 +549,9 @@ func isZoneRegionLabel(k string) bool {
 }
 
 func (c *configFactory) onPvDelete(obj interface{}) {
+	if c.volumeBinder != nil {
+		c.volumeBinder.PVAssumeCache.Delete(obj)
+	}
 	if c.enableEquivalenceClassCache {
 		var pv *v1.PersistentVolume
 		switch t := obj.(type) {
@@ -600,6 +609,9 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 }
 
 func (c *configFactory) onPvcAdd(obj interface{}) {
+	if c.volumeBinder != nil {
+		c.volumeBinder.PVCAssumeCache.Add(obj)
+	}
 	if c.enableEquivalenceClassCache {
 		pvc, ok := obj.(*v1.PersistentVolumeClaim)
 		if !ok {
@@ -612,6 +624,9 @@ func (c *configFactory) onPvcAdd(obj interface{}) {
 }
 
 func (c *configFactory) onPvcUpdate(old, new interface{}) {
+	if c.volumeBinder != nil {
+		c.volumeBinder.PVCAssumeCache.Update(old, new)
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		return
 	}
@@ -633,6 +648,9 @@ func (c *configFactory) onPvcUpdate(old, new interface{}) {
 }
 
 func (c *configFactory) onPvcDelete(obj interface{}) {
+	if c.volumeBinder != nil {
+		c.volumeBinder.PVCAssumeCache.Delete(obj)
+	}
 	if c.enableEquivalenceClassCache {
 		var pvc *v1.PersistentVolumeClaim
 		switch t := obj.(type) {
