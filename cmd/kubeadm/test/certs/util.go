@@ -20,6 +20,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"net"
+	"path"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -130,6 +131,119 @@ func AssertCertificateHasIPAddresses(t *testing.T, cert *x509.Certificate, IPAdd
 
 		if !found {
 			t.Errorf("cert does not contain IPAddress %s", IPAddress)
+		}
+	}
+}
+
+// CreateCACert creates a generic CA cert.
+func CreateCACert(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
+	certCfg := &certutil.Config{CommonName: "kubernetes"}
+	cert, key, err := pkiutil.NewCertificateAuthority(certCfg)
+	if err != nil {
+		t.Fatalf("couldn't create CA: %v", err)
+	}
+	return cert, key
+}
+
+// CreateTestCert makes a generic certficate with the given CA.
+func CreateTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey) {
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey,
+		&certutil.Config{
+			CommonName: "testCert",
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		})
+	if err != nil {
+		t.Fatalf("couldn't create test cert: %v", err)
+	}
+	return cert, key
+}
+
+// CertTestCase is a configuration of certificates and whether it's expected to work.
+type CertTestCase struct {
+	Name        string
+	Files       PKIFiles
+	ExpectError bool
+}
+
+// GetSparseCertTestCases produces a series of cert configurations and their intended outcomes.
+func GetSparseCertTestCases(t *testing.T) []CertTestCase {
+
+	caCert, caKey := CreateCACert(t)
+	fpCACert, fpCAKey := CreateCACert(t)
+	etcdCACert, etcdCAKey := CreateCACert(t)
+
+	fpCert, fpKey := CreateTestCert(t, fpCACert, fpCAKey)
+
+	return []CertTestCase{
+		{
+			Name: "nothing present",
+		},
+		{
+			Name: "CAs already exist",
+			Files: PKIFiles{
+				"ca.crt":             caCert,
+				"ca.key":             caKey,
+				"front-proxy-ca.crt": fpCACert,
+				"front-proxy-ca.key": fpCAKey,
+				"etcd/ca.crt":        etcdCACert,
+				"etcd/ca.key":        etcdCAKey,
+			},
+		},
+		{
+			Name: "CA certs only",
+			Files: PKIFiles{
+				"ca.crt":             caCert,
+				"front-proxy-ca.crt": fpCACert,
+				"etcd/ca.crt":        etcdCACert,
+			},
+			ExpectError: true,
+		},
+		{
+			Name: "FrontProxyCA with certs",
+			Files: PKIFiles{
+				"ca.crt":                 caCert,
+				"ca.key":                 caKey,
+				"front-proxy-ca.crt":     fpCACert,
+				"front-proxy-client.crt": fpCert,
+				"front-proxy-client.key": fpKey,
+				"etcd/ca.crt":            etcdCACert,
+				"etcd/ca.key":            etcdCAKey,
+			},
+		},
+		{
+			Name: "FrontProxy certs missing CA",
+			Files: PKIFiles{
+				"front-proxy-client.crt": fpCert,
+				"front-proxy-client.key": fpKey,
+			},
+			ExpectError: true,
+		},
+	}
+}
+
+// PKIFiles are a list of files that should be created for a test case
+type PKIFiles map[string]interface{}
+
+// WritePKIFiles writes the given files out to the given directory
+func WritePKIFiles(t *testing.T, dir string, files PKIFiles) {
+	for filename, body := range files {
+		switch body := body.(type) {
+		case *x509.Certificate:
+			if err := certutil.WriteCert(path.Join(dir, filename), certutil.EncodeCertPEM(body)); err != nil {
+				t.Errorf("unable to write certificate to file %q: [%v]", dir, err)
+			}
+		case *rsa.PublicKey:
+			publicKeyBytes, err := certutil.EncodePublicKeyPEM(body)
+			if err != nil {
+				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
+			}
+			if err := certutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
+				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
+			}
+		case *rsa.PrivateKey:
+			if err := certutil.WriteKey(path.Join(dir, filename), certutil.EncodePrivateKeyPEM(body)); err != nil {
+				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
+			}
 		}
 	}
 }

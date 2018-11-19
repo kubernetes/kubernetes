@@ -37,27 +37,6 @@ import (
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
-func createCACert(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
-	certCfg := &certutil.Config{CommonName: "kubernetes"}
-	cert, key, err := NewCACertAndKey(certCfg)
-	if err != nil {
-		t.Fatalf("couldn't create CA: %v", err)
-	}
-	return cert, key
-}
-
-func createTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey) {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey,
-		&certutil.Config{
-			CommonName: "testCert",
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-		})
-	if err != nil {
-		t.Fatalf("couldn't create test cert: %v", err)
-	}
-	return cert, key
-}
-
 func createTestCSR(t *testing.T) (*x509.CertificateRequest, *rsa.PrivateKey) {
 	csr, key, err := pkiutil.NewCSRAndKey(
 		&certutil.Config{
@@ -71,8 +50,8 @@ func createTestCSR(t *testing.T) (*x509.CertificateRequest, *rsa.PrivateKey) {
 }
 
 func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
-	setupCert, setupKey := createCACert(t)
-	caCert, caKey := createCACert(t)
+	setupCert, setupKey := certstestutil.CreateCACert(t)
+	caCert, caKey := certstestutil.CreateCACert(t)
 
 	var tests = []struct {
 		setupFunc     func(pkiDir string) error
@@ -97,7 +76,7 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 		},
 		{ // cert exists, but it is not a ca > err
 			setupFunc: func(pkiDir string) error {
-				cert, key := createTestCert(t, setupCert, setupKey)
+				cert, key := certstestutil.CreateTestCert(t, setupCert, setupKey)
 				return writeCertificateFilesIfNotExist(pkiDir, "dummy", setupCert, cert, key)
 			},
 			expectedError: true,
@@ -147,9 +126,9 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 
 func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 
-	caCert, caKey := createCACert(t)
-	setupCert, setupKey := createTestCert(t, caCert, caKey)
-	cert, key := createTestCert(t, caCert, caKey)
+	caCert, caKey := certstestutil.CreateCACert(t)
+	setupCert, setupKey := certstestutil.CreateTestCert(t, caCert, caKey)
+	cert, key := certstestutil.CreateTestCert(t, caCert, caKey)
 
 	var tests = []struct {
 		setupFunc     func(pkiDir string) error
@@ -174,8 +153,8 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		},
 		{ // cert exists, is signed by another ca > err
 			setupFunc: func(pkiDir string) error {
-				anotherCaCert, anotherCaKey := createCACert(t)
-				anotherCert, anotherKey := createTestCert(t, anotherCaCert, anotherCaKey)
+				anotherCaCert, anotherCaKey := certstestutil.CreateCACert(t)
+				anotherCert, anotherKey := certstestutil.CreateTestCert(t, anotherCaCert, anotherCaKey)
 
 				return writeCertificateFilesIfNotExist(pkiDir, "dummy", anotherCaCert, anotherCert, anotherKey)
 			},
@@ -375,18 +354,18 @@ func TestNewCACertAndKey(t *testing.T) {
 }
 
 func TestSharedCertificateExists(t *testing.T) {
-	caCert, caKey := createCACert(t)
-	_, key := createTestCert(t, caCert, caKey)
+	caCert, caKey := certstestutil.CreateCACert(t)
+	_, key := certstestutil.CreateTestCert(t, caCert, caKey)
 	publicKey := &key.PublicKey
 
 	var tests = []struct {
 		name          string
-		files         pkiFiles
+		files         certstestutil.PKIFiles
 		expectedError bool
 	}{
 		{
 			name: "success",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt":             caCert,
 				"ca.key":             caKey,
 				"front-proxy-ca.crt": caCert,
@@ -399,7 +378,7 @@ func TestSharedCertificateExists(t *testing.T) {
 		},
 		{
 			name: "missing ca.crt",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.key":             caKey,
 				"front-proxy-ca.crt": caCert,
 				"front-proxy-ca.key": caKey,
@@ -412,7 +391,7 @@ func TestSharedCertificateExists(t *testing.T) {
 		},
 		{
 			name: "missing sa.key",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt":             caCert,
 				"ca.key":             caKey,
 				"front-proxy-ca.crt": caCert,
@@ -425,7 +404,7 @@ func TestSharedCertificateExists(t *testing.T) {
 		},
 		{
 			name: "missing front-proxy.crt",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt":             caCert,
 				"ca.key":             caKey,
 				"front-proxy-ca.key": caKey,
@@ -438,7 +417,7 @@ func TestSharedCertificateExists(t *testing.T) {
 		},
 		{
 			name: "missing etcd/ca.crt",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt":             caCert,
 				"ca.key":             caKey,
 				"front-proxy-ca.key": caKey,
@@ -464,7 +443,7 @@ func TestSharedCertificateExists(t *testing.T) {
 			}
 
 			// created expected keys
-			writePKIFiles(t, tmpdir, test.files)
+			certstestutil.WritePKIFiles(t, tmpdir, test.files)
 
 			// executes create func
 			ret, err := SharedCertificateExists(cfg)
@@ -482,80 +461,24 @@ func TestSharedCertificateExists(t *testing.T) {
 }
 
 func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
-	caCert, caKey := createCACert(t)
-	fpCACert, fpCAKey := createCACert(t)
-	etcdCACert, etcdCAKey := createCACert(t)
-
-	fpCert, fpKey := createTestCert(t, fpCACert, fpCAKey)
-
-	tests := []struct {
-		name        string
-		files       pkiFiles
-		expectError bool
-	}{
-		{
-			name: "nothing present",
-		},
-		{
-			name: "CAs already exist",
-			files: pkiFiles{
-				"ca.crt":             caCert,
-				"ca.key":             caKey,
-				"front-proxy-ca.crt": fpCACert,
-				"front-proxy-ca.key": fpCAKey,
-				"etcd/ca.crt":        etcdCACert,
-				"etcd/ca.key":        etcdCAKey,
-			},
-		},
-		{
-			name: "CA certs only",
-			files: pkiFiles{
-				"ca.crt":             caCert,
-				"front-proxy-ca.crt": fpCACert,
-				"etcd/ca.crt":        etcdCACert,
-			},
-			expectError: true,
-		},
-		{
-			name: "FrontProxyCA with certs",
-			files: pkiFiles{
-				"ca.crt":                 caCert,
-				"ca.key":                 caKey,
-				"front-proxy-ca.crt":     fpCACert,
-				"front-proxy-client.crt": fpCert,
-				"front-proxy-client.key": fpKey,
-				"etcd/ca.crt":            etcdCACert,
-				"etcd/ca.key":            etcdCAKey,
-			},
-		},
-		{
-			name: "FrontProxy certs missing CA",
-			files: pkiFiles{
-				"front-proxy-client.crt": fpCert,
-				"front-proxy-client.key": fpKey,
-			},
-			expectError: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, test := range certstestutil.GetSparseCertTestCases(t) {
+		t.Run(test.Name, func(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
 			cfg := testutil.GetDefaultInternalConfig(t)
 			cfg.ClusterConfiguration.CertificatesDir = tmpdir
 
-			writePKIFiles(t, tmpdir, test.files)
+			certstestutil.WritePKIFiles(t, tmpdir, test.Files)
 
 			err := CreatePKIAssets(cfg)
 			if err != nil {
-				if test.expectError {
+				if test.ExpectError {
 					return
 				}
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if test.expectError {
+			if test.ExpectError {
 				t.Fatal("Expected error from CreatePKIAssets, got none")
 			}
 			assertCertsExist(t, tmpdir)
@@ -612,19 +535,19 @@ func TestUsingExternalCA(t *testing.T) {
 
 func TestValidateMethods(t *testing.T) {
 
-	caCert, caKey := createCACert(t)
-	cert, key := createTestCert(t, caCert, caKey)
+	caCert, caKey := certstestutil.CreateCACert(t)
+	cert, key := certstestutil.CreateTestCert(t, caCert, caKey)
 
 	tests := []struct {
 		name            string
-		files           pkiFiles
+		files           certstestutil.PKIFiles
 		validateFunc    func(l certKeyLocation) error
 		loc             certKeyLocation
 		expectedSuccess bool
 	}{
 		{
 			name: "validateCACert",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt": caCert,
 			},
 			validateFunc:    validateCACert,
@@ -633,7 +556,7 @@ func TestValidateMethods(t *testing.T) {
 		},
 		{
 			name: "validateCACertAndKey (files present)",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt": caCert,
 				"ca.key": caKey,
 			},
@@ -642,7 +565,7 @@ func TestValidateMethods(t *testing.T) {
 			expectedSuccess: true,
 		},
 		{
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt": caCert,
 			},
 			name:            "validateCACertAndKey (key missing)",
@@ -652,7 +575,7 @@ func TestValidateMethods(t *testing.T) {
 		},
 		{
 			name: "validateSignedCert",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"ca.crt":        caCert,
 				"ca.key":        caKey,
 				"apiserver.crt": cert,
@@ -664,7 +587,7 @@ func TestValidateMethods(t *testing.T) {
 		},
 		{
 			name: "validatePrivatePublicKey",
-			files: pkiFiles{
+			files: certstestutil.PKIFiles{
 				"sa.pub": &key.PublicKey,
 				"sa.key": key,
 			},
@@ -679,7 +602,7 @@ func TestValidateMethods(t *testing.T) {
 		defer os.RemoveAll(dir)
 		test.loc.pkiDir = dir
 
-		writePKIFiles(t, dir, test.files)
+		certstestutil.WritePKIFiles(t, dir, test.files)
 
 		err := test.validateFunc(test.loc)
 		if test.expectedSuccess && err != nil {
@@ -718,31 +641,6 @@ func TestNewCSR(t *testing.T) {
 	for i, ip := range csr.IPAddresses {
 		if !ip.Equal(certConfig.AltNames.IPs[i]) {
 			t.Errorf("[%d]: %v != %v", i, ip, certConfig.AltNames.IPs[i])
-		}
-	}
-}
-
-type pkiFiles map[string]interface{}
-
-func writePKIFiles(t *testing.T, dir string, files pkiFiles) {
-	for filename, body := range files {
-		switch body := body.(type) {
-		case *x509.Certificate:
-			if err := certutil.WriteCert(path.Join(dir, filename), certutil.EncodeCertPEM(body)); err != nil {
-				t.Errorf("unable to write certificate to file %q: [%v]", dir, err)
-			}
-		case *rsa.PublicKey:
-			publicKeyBytes, err := certutil.EncodePublicKeyPEM(body)
-			if err != nil {
-				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
-			}
-			if err := certutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
-				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
-			}
-		case *rsa.PrivateKey:
-			if err := certutil.WriteKey(path.Join(dir, filename), certutil.EncodePrivateKeyPEM(body)); err != nil {
-				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
-			}
 		}
 	}
 }
