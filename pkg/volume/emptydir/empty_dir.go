@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/quota"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -174,6 +175,7 @@ type emptyDir struct {
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
+	desiredSize   int64
 	volume.MetricsProvider
 }
 
@@ -233,6 +235,15 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
+	}
+	if mounterArgs.DesiredSize != 0 {
+		if hasQuotas, _ := quota.SupportsQuotas(ed.mounter, dir); hasQuotas {
+			klog.V(3).Infof("emptydir trying to assign quota")
+			err := quota.AssignQuota(ed.mounter, dir, mounterArgs.PodUID, mounterArgs.DesiredSize)
+			if err != nil {
+				klog.V(3).Infof("Set quota failed %v", err)
+			}
+		}
 	}
 
 	return err
@@ -397,9 +408,14 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
+	// Remove any quota
+	err := quota.ClearQuota(ed.mounter, dir)
+	if err != nil {
+		klog.V(3).Infof("Failed to clear quota on %s: %v", dir, err)
+	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err := os.RemoveAll(dir)
+	err = os.RemoveAll(dir)
 	if err != nil {
 		return err
 	}
