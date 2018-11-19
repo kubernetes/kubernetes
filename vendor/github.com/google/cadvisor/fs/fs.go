@@ -569,7 +569,7 @@ func GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
-	cmd := exec.Command("ionice", "-c3", "nice", "-n", "19", "du", "-s", dir)
+	cmd := exec.Command("ionice", "-c3", "nice", "-n", "19", "du", "-x", "-s", dir)
 	stdoutp, err := cmd.StdoutPipe()
 	if err != nil {
 		return 0, fmt.Errorf("failed to setup stdout for cmd %v - %v", cmd.Args, err)
