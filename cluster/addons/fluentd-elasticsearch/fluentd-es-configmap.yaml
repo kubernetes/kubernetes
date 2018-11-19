@@ -437,7 +437,7 @@ data:
       @id elasticsearch
       @type elasticsearch
       @log_level info
-      type_name fluentd
+      type_name _doc
       include_tag_key true
       host elasticsearch-logging
       port 9200
