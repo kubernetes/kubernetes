@@ -22,13 +22,13 @@ package app
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
 	"k8s.io/klog"
 
-	"net/http"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
@@ -38,12 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRSigningController(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 	if ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == "" {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	// Deprecation warning for old defaults.
@@ -77,7 +77,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		// setting up the signing controller. This isn't
 		// actually a problem since the signer is not a
 		// required controller.
-		return nil, false, nil
+		return nil, nil, false, nil
 	default:
 		// Note that '!filesExist && !usesDefaults' is obviously
 		// operator error. We don't handle this case here and instead
@@ -94,16 +94,16 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration,
 	)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to start certificate controller: %v", err)
+		return nil, nil, false, fmt.Errorf("failed to start certificate controller: %v", err)
 	}
 	go signer.Run(1, ctx.Stop)
 
-	return nil, true, nil
+	return nil, nil, true, nil
 }
 
-func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRApprovingController(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	approver := approver.NewCSRApprovingController(
@@ -112,21 +112,21 @@ func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, err
 	)
 	go approver.Run(1, ctx.Stop)
 
-	return nil, true, nil
+	return nil, nil, true, nil
 }
 
-func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRCleanerController(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
 		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1beta1().CertificateSigningRequests(),
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 	)
 	go cleaner.Run(1, ctx.Stop)
-	return nil, true, nil
+	return nil, nil, true, nil
 }
 
-func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
+func startRootCACertPublisher(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	var (
@@ -135,7 +135,7 @@ func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error)
 	)
 	if ctx.ComponentConfig.SAController.RootCAFile != "" {
 		if rootCA, err = readCA(ctx.ComponentConfig.SAController.RootCAFile); err != nil {
-			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
+			return nil, nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
 		rootCA = ctx.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
@@ -148,8 +148,8 @@ func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error)
 		rootCA,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
+		return nil, nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
 	}
 	go sac.Run(1, ctx.Stop)
-	return nil, true, nil
+	return nil, nil, true, nil
 }

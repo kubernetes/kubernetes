@@ -48,7 +48,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -327,7 +327,7 @@ func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, 
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
-type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
+type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, healthzHandlers []healthz.HealthzChecker, enabled bool, err error)
 
 func KnownControllers() []string {
 	ret := sets.StringKeySet(NewControllerInitializers(IncludeCloudLoops))
@@ -475,7 +475,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc, unsecuredMux *mux.PathRecorderMux) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
-	if _, _, err := startSATokenController(ctx); err != nil {
+	if _, _, _, err := startSATokenController(ctx); err != nil {
 		return err
 	}
 
@@ -494,7 +494,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		klog.V(1).Infof("Starting %q", controllerName)
-		debugHandler, started, err := initFn(ctx)
+		debugHandler, healthzHandlers, started, err := initFn(ctx)
 		if err != nil {
 			klog.Errorf("Error starting %q", controllerName)
 			return err
@@ -507,6 +507,11 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			basePath := "/debug/controllers/" + controllerName
 			unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
 			unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+		}
+		if unsecuredMux != nil {
+			for _, healthzHandler := range healthzHandlers {
+				healthz.InstallPathHandler(unsecuredMux, fmt.Sprintf("/healthz/controllers/%s", controllerName), healthzHandler)
+			}
 		}
 		klog.Infof("Started %q", controllerName)
 	}
@@ -521,25 +526,25 @@ type serviceAccountTokenControllerStarter struct {
 	rootClientBuilder controller.ControllerClientBuilder
 }
 
-func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
+func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	if !ctx.IsControllerEnabled(saTokenControllerName) {
 		klog.Warningf("%q is disabled", saTokenControllerName)
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	if len(ctx.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 		klog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.SAController.ServiceAccountKeyFile)
 	if err != nil {
-		return nil, true, fmt.Errorf("error reading key for service account token controller: %v", err)
+		return nil, nil, true, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}
 
 	var rootCA []byte
 	if ctx.ComponentConfig.SAController.RootCAFile != "" {
 		if rootCA, err = readCA(ctx.ComponentConfig.SAController.RootCAFile); err != nil {
-			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
+			return nil, nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
 		rootCA = c.rootClientBuilder.ConfigOrDie("tokens-controller").CAData
@@ -547,7 +552,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, privateKey)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to build token generator: %v", err)
+		return nil, nil, false, fmt.Errorf("failed to build token generator: %v", err)
 	}
 	controller, err := serviceaccountcontroller.NewTokensController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
@@ -559,14 +564,14 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		},
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
+		return nil, nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
 	}
 	go controller.Run(int(ctx.ComponentConfig.SAController.ConcurrentSATokenSyncs), ctx.Stop)
 
 	// start the first set of informers now so that other controllers can start
 	ctx.InformerFactory.Start(ctx.Stop)
 
-	return nil, true, nil
+	return nil, nil, true, nil
 }
 
 func readCA(file string) ([]byte, error) {

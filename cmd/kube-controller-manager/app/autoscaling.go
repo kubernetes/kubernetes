@@ -24,6 +24,7 @@ import (
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
@@ -34,9 +35,9 @@ import (
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
-func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
+func startHPAController(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 
 	if ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients {
@@ -47,7 +48,7 @@ func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
 	return startHPAControllerWithLegacyClient(ctx)
 }
 
-func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool, error) {
+func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	clientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 
@@ -67,7 +68,7 @@ func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }
 
-func startHPAControllerWithLegacyClient(ctx ControllerContext) (http.Handler, bool, error) {
+func startHPAControllerWithLegacyClient(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	metricsClient := metrics.NewHeapsterMetricsClient(
 		hpaClient,
@@ -79,7 +80,7 @@ func startHPAControllerWithLegacyClient(ctx ControllerContext) (http.Handler, bo
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }
 
-func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (http.Handler, bool, error) {
+func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	hpaClientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 
@@ -88,7 +89,7 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
 	scaleClient, err := scale.NewForConfig(hpaClientConfig, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 
 	go podautoscaler.NewHorizontalController(
@@ -105,5 +106,5 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	).Run(ctx.Stop)
-	return nil, true, nil
+	return nil, nil, true, nil
 }

@@ -21,15 +21,16 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/controller/disruption"
-
 	"net/http"
 
 	"k8s.io/klog"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/kubernetes/pkg/controller/disruption"
 )
 
-func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
+func startDisruptionController(ctx ControllerContext) (http.Handler, []healthz.HealthzChecker, bool, error) {
 	var group = "policy"
 	var version = "v1beta1"
 	var resource = "poddisruptionbudgets"
@@ -38,7 +39,7 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 		klog.Infof(
 			"Refusing to start disruption because resource %q in group %q is not available.",
 			resource, group+"/"+version)
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 	go disruption.NewDisruptionController(
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -49,5 +50,5 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
 		ctx.ClientBuilder.ClientOrDie("disruption-controller"),
 	).Run(ctx.Stop)
-	return nil, true, nil
+	return nil, nil, true, nil
 }
