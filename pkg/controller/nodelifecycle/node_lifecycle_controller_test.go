@@ -1613,14 +1613,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 							{
-								Type:               v1.NodeOutOfDisk,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusNeverUpdated",
-								Message:            "Kubelet never posted node status.",
-								LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-								LastTransitionTime: fakeNow,
-							},
-							{
 								Type:               v1.NodeMemoryPressure,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
@@ -1738,14 +1730,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 						Conditions: []v1.NodeCondition{
 							{
 								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusUnknown",
-								Message:            "Kubelet stopped posting node status.",
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: metav1.Time{Time: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
-							},
-							{
-								Type:               v1.NodeOutOfDisk,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusUnknown",
 								Message:            "Kubelet stopped posting node status.",
@@ -1961,14 +1945,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 							{
-								Type:               v1.NodeOutOfDisk,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusNeverUpdated",
-								Message:            "Kubelet never posted node status.",
-								LastHeartbeatTime:  nodeCreationTime,
-								LastTransitionTime: fakeNow,
-							},
-							{
 								Type:               v1.NodeMemoryPressure,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
@@ -2056,14 +2032,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 						Conditions: []v1.NodeCondition{
 							{
 								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusNeverUpdated",
-								Message:            "Kubelet never posted node status.",
-								LastHeartbeatTime:  nodeCreationTime,
-								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
-							},
-							{
-								Type:               v1.NodeOutOfDisk,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusNeverUpdated",
 								Message:            "Kubelet never posted node status.",
@@ -2350,14 +2318,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 						Conditions: []v1.NodeCondition{
 							{
 								Type:               v1.NodeReady,
-								Status:             v1.ConditionUnknown,
-								Reason:             "NodeStatusUnknown",
-								Message:            "Kubelet stopped posting node status.",
-								LastHeartbeatTime:  fakeNow,
-								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
-							},
-							{
-								Type:               v1.NodeOutOfDisk,
 								Status:             v1.ConditionUnknown,
 								Reason:             "NodeStatusUnknown",
 								Message:            "Kubelet stopped posting node status.",
@@ -3064,12 +3024,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 						{
 							Type:               v1.NodeNetworkUnavailable,
 							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-						{
-							Type:               v1.NodeOutOfDisk,
-							Status:             v1.ConditionUnknown,
 							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},

@@ -976,7 +976,6 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 
 		// remaining node conditions should also be set to Unknown
 		remainingNodeConditionTypes := []v1.NodeConditionType{
-			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			v1.NodePIDPressure,
@@ -1019,7 +1018,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 				status:                   &node.Status,
 				probeTimestamp:           nc.nodeHealthMap[node.Name].probeTimestamp,
 				readyTransitionTimestamp: nc.now(),
-				lease:                    observedLease,
+				lease: observedLease,
 			}
 			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 		}
