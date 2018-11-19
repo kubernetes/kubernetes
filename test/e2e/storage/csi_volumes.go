@@ -235,6 +235,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				handle := getVolumeHandle(cs, claim)
 				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, scTest.Provisioner, nodeName)))
 				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+				framework.Logf("handle: %s, provisioner: %s, NodeName: %s, hash: %s", handle, scTest.Provisioner, nodeName, attachmentName)
 				_, err = cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {

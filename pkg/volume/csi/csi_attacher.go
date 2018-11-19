@@ -584,6 +584,7 @@ func hasStageUnstageCapability(ctx context.Context, csi csiClient) (bool, error)
 // getAttachmentName returns csi-<sha252(volName,csiDriverName,NodeName>
 func getAttachmentName(volName, csiDriverName, nodeName string) string {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
+	klog.Infof("JSAF: volName: %s, csiDriverName: %s, nodeName: %s, hash: %s", volName, csiDriverName, nodeName, result)
 	return fmt.Sprintf("csi-%x", result)
 }
 
