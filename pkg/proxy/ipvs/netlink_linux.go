@@ -28,6 +28,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const defaultDummyDeviceMTU int = 65520
+
 type netlinkHandle struct {
 	netlink.Handle
 }
@@ -82,8 +84,12 @@ func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 		// found dummy device
 		return true, nil
 	}
+	linkAttrs := netlink.LinkAttrs{Name: devName}
+	if devName == DefaultDummyDevice {
+		linkAttrs.MTU = defaultDummyDeviceMTU
+	}
 	dummy := &netlink.Dummy{
-		LinkAttrs: netlink.LinkAttrs{Name: devName},
+		LinkAttrs: linkAttrs,
 	}
 	return false, h.LinkAdd(dummy)
 }
