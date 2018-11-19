@@ -103,8 +103,9 @@ type Attributes struct {
 
 // MounterArgs provides more easily extensible arguments to Mounter
 type MounterArgs struct {
-	FsGroup *int64
-	PodUID  string
+	FsGroup     *int64
+	DesiredSize int64
+	PodUID      string
 }
 
 // Mounter interface provides methods to set up/mount the volume.

@@ -27,6 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/volume/util/quota"
 )
 
 // FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
@@ -56,6 +57,13 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 
 // DiskUsage gets disk usage of specified path.
 func DiskUsage(path string) (*resource.Quantity, error) {
+	// First check whether the quota system knows about this directory
+	data, err := quota.GetConsumption(path)
+	if err == nil {
+		var q resource.Quantity
+		q.Set(data)
+		return &q, nil
+	}
 	// Uses the same niceness level as cadvisor.fs does when running du
 	// Uses -B 1 to always scale to a blocksize of 1 byte
 	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", path).CombinedOutput()
@@ -75,6 +83,11 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 func Find(path string) (int64, error) {
 	if path == "" {
 		return 0, fmt.Errorf("invalid directory")
+	}
+	// First check whether the quota system knows about this directory
+	inodes, err := quota.GetInodes(path)
+	if err == nil {
+		return inodes, nil
 	}
 	var counter byteCounter
 	var stderr bytes.Buffer

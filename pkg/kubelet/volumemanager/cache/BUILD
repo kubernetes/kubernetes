@@ -14,7 +14,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/cache",
     deps = [
+        "//pkg/api/v1/resource:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/eviction:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
