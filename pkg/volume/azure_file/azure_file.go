@@ -231,11 +231,11 @@ func (b *azureFileMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *azureFileMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *azureFileMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("AzureFile mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -278,7 +278,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 			options = append(options, "ro")
 		}
 		mountOptions = volutil.JoinMountOptions(b.mountOptions, options)
-		mountOptions = appendDefaultMountOptions(mountOptions, fsGroup)
+		mountOptions = appendDefaultMountOptions(mountOptions, mounterArgs.FsGroup)
 	}
 
 	err = b.mounter.Mount(source, dir, "cifs", mountOptions)

@@ -415,12 +415,12 @@ func (m *localVolumeMounter) CanMount() error {
 }
 
 // SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUp(fsGroup *int64) error {
-	return m.SetUpAt(m.GetPath(), fsGroup)
+func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return m.SetUpAt(m.GetPath(), mounterArgs)
 }
 
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
-func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	m.plugin.volumeLocks.LockKey(m.globalPath)
 	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
 
@@ -444,7 +444,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 	refs, err := m.mounter.GetMountRefs(m.globalPath)
-	if fsGroup != nil {
+	if mounterArgs.FsGroup != nil {
 		if err != nil {
 			klog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
 			return err
@@ -453,7 +453,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		// Only count mounts from other pods
 		refs = m.filterPodMounts(refs)
 		if len(refs) > 0 {
-			fsGroupNew := int64(*fsGroup)
+			fsGroupNew := int64(*mounterArgs.FsGroup)
 			fsGroupOld, err := m.mounter.GetFSGroup(m.globalPath)
 			if err != nil {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
@@ -511,7 +511,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !m.readOnly {
 		// Volume owner will be written only once on the first volume mount
 		if len(refs) == 0 {
-			return volume.SetVolumeOwnership(m, fsGroup)
+			return volume.SetVolumeOwnership(m, mounterArgs.FsGroup)
 		}
 	}
 	return nil

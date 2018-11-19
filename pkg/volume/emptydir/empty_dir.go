@@ -189,12 +189,12 @@ func (ed *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(fsGroup *int64) error {
-	return ed.SetUpAt(ed.GetPath(), fsGroup)
+func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
+func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -225,7 +225,7 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, fsGroup)
+	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup)
 
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())

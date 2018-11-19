@@ -39,12 +39,12 @@ var _ volume.Mounter = &flexVolumeMounter{}
 // Mounter interface
 
 // SetUp creates new directory.
-func (f *flexVolumeMounter) SetUp(fsGroup *int64) error {
-	return f.SetUpAt(f.GetPath(), fsGroup)
+func (f *flexVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return f.SetUpAt(f.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(f.mounter, dir)
 	if err != nil {
@@ -75,15 +75,15 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Implicit parameters
-	if fsGroup != nil {
-		extraOptions[optionFSGroup] = strconv.FormatInt(int64(*fsGroup), 10)
+	if mounterArgs.FsGroup != nil {
+		extraOptions[optionFSGroup] = strconv.FormatInt(int64(*mounterArgs.FsGroup), 10)
 	}
 
 	call.AppendSpec(f.spec, f.plugin.host, extraOptions)
 
 	_, err = call.Run()
 	if isCmdNotSupportedErr(err) {
-		err = (*mounterDefaults)(f).SetUpAt(dir, fsGroup)
+		err = (*mounterDefaults)(f).SetUpAt(dir, mounterArgs)
 	}
 
 	if err != nil {
@@ -93,7 +93,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	if !f.readOnly {
 		if f.plugin.capabilities.FSGroup {
-			volume.SetVolumeOwnership(f, fsGroup)
+			volume.SetVolumeOwnership(f, mounterArgs.FsGroup)
 		}
 	}
 
