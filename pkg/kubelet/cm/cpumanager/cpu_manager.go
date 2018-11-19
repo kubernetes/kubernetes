@@ -44,7 +44,7 @@ type runtimeService interface {
 
 type policyName string
 
-// cpuManagerStateFileName is the name file name where cpu manager stores it's state
+// cpuManagerStateFileName is the file name where cpu manager stores its state
 const cpuManagerStateFileName = "cpu_manager_state"
 
 // Manager interface provides methods for Kubelet to manage pod cpus.
