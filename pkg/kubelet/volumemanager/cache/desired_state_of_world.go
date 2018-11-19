@@ -25,8 +25,8 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
-	limits "k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -165,7 +165,7 @@ type volumeToMount struct {
 
 	// desiredSizeLimit indicates the desired upper bound on the size of the volume
 	// (if so implemented)
-	desiredSizeLimit int64
+	desiredSizeLimit *resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -232,15 +232,12 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	}
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
-		var sizeLimit int64
-		sizeLimit = 0
-		isLocal, _ := limits.IsLocalEphemeralVolume(pod, volumeSpec.Name())
-		if isLocal {
-			_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
-			ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
-			sizeLimit = ephemeralStorageLimit.Value()
-			if sizeLimit == 0 {
-				sizeLimit = -1
+		var sizeLimit *resource.Quantity
+		if volumeSpec.Volume != nil {
+			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
+				_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
+				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
+				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 			}
 		}
 		dsw.volumesToMount[volumeName] = volumeToMount{

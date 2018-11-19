@@ -29,15 +29,14 @@ import (
 	"sync"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume/util/quota/common"
 )
 
 var projectsFile = "/etc/projects"
 var projidFile = "/etc/projid"
 
-var projectsParseRegexp *regexp.Regexp = regexp.MustCompilePOSIX("^([[:digit:]]+):(.*)$")
-var projidParseRegexp *regexp.Regexp = regexp.MustCompilePOSIX("^([^#][^:]*):([[:digit:]]+)$")
+var projectsParseRegexp = regexp.MustCompilePOSIX("^([[:digit:]]+):(.*)$")
+var projidParseRegexp = regexp.MustCompilePOSIX("^([^#][^:]*):([[:digit:]]+)$")
 
 var quotaIDLock sync.RWMutex
 
@@ -78,12 +77,13 @@ func unlockFile(file *os.File) error {
 func openAndLockProjectFiles() (*os.File, *os.File, error) {
 	// Make sure neither project-related file is a symlink!
 	if err := projFilesAreOK(); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("system project files failed verification: %v", err)
 	}
 	// We don't actually modify the original files; we create temporaries and
 	// move them over the originals
 	fProjects, err := os.OpenFile(projectsFile, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
+		err = fmt.Errorf("unable to open %s: %v", projectsFile, err)
 		return nil, nil, err
 	}
 	fProjid, err := os.OpenFile(projidFile, os.O_RDONLY|os.O_CREATE, 0644)
@@ -97,10 +97,17 @@ func openAndLockProjectFiles() (*os.File, *os.File, error) {
 					return fProjects, fProjid, nil
 				}
 				// Nothing useful we can do if we get an error here
+				err = fmt.Errorf("unable to lock %s: %v", projidFile, err)
 				unlockFile(fProjects)
+			} else {
+				err = fmt.Errorf("unable to lock %s: %v", projectsFile, err)
 			}
+		} else {
+			err = fmt.Errorf("system project files failed re-verification: %v", err)
 		}
 		fProjid.Close()
+	} else {
+		err = fmt.Errorf("unable to open %s: %v", projidFile, err)
 	}
 	fProjects.Close()
 	return nil, nil, err
@@ -160,7 +167,7 @@ func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.Quot
 	unusedQuotasSearched := 0
 	for id := common.FirstQuota; id == id; id++ {
 		if _, ok := idMap[id]; !ok {
-			isInUse, err := getApplier(path).QuotaIDIsInUse(path, id)
+			isInUse, err := getApplier(path).QuotaIDIsInUse(id)
 			if err != nil {
 				return common.BadQuotaID, err
 			} else if !isInUse {
@@ -307,8 +314,7 @@ func writeProjectFiles(fProjects *os.File, fProjid *os.File, writeProjid bool, l
 		}
 		os.Remove(tmpProjects)
 	}
-	klog.V(3).Infof("Unable to write project files: %v", err)
-	return err
+	return fmt.Errorf("Unable to write project files: %v", err)
 }
 
 func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
@@ -326,8 +332,7 @@ func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
 			}
 		}
 	}
-	klog.V(3).Infof("addQuotaID %s %v failed %v", path, ID, err)
-	return common.BadQuotaID, err
+	return common.BadQuotaID, fmt.Errorf("createProjectID %s %v failed %v", path, ID, err)
 }
 
 func removeProjectID(path string, ID common.QuotaID) error {
@@ -348,6 +353,5 @@ func removeProjectID(path string, ID common.QuotaID) error {
 			}
 		}
 	}
-	klog.V(3).Infof("removeQuotaID %s %v failed %v", path, ID, err)
-	return err
+	return fmt.Errorf("removeProjectID %s %v failed %v", path, ID, err)
 }

@@ -13,12 +13,11 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/volume/util/quota/common:go_default_library",
-            "//pkg/volume/util/quota/extfs:go_default_library",
-            "//pkg/volume/util/quota/xfs:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
@@ -36,7 +35,9 @@ go_test(
             "//pkg/features:go_default_library",
             "//pkg/util/mount:go_default_library",
             "//pkg/volume/util/quota/common:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+            "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -54,8 +55,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/volume/util/quota/common:all-srcs",
-        "//pkg/volume/util/quota/extfs:all-srcs",
-        "//pkg/volume/util/quota/xfs:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

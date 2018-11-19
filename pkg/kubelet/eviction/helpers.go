@@ -32,6 +32,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
+	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -395,27 +396,11 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 	}, nil
 }
 
-func internalIsLocalEphemeralVolume(pod *v1.Pod, volume v1.Volume) bool {
-	return volume.GitRepo != nil ||
-		(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-		volume.ConfigMap != nil || volume.DownwardAPI != nil
-}
-
-// IsLocalEphemeralVolume determines whether a given volume name is ephemeral
-func IsLocalEphemeralVolume(pod *v1.Pod, volumeName string) (bool, error) {
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Name == volumeName {
-			return internalIsLocalEphemeralVolume(pod, volume), nil
-		}
-	}
-	return false, fmt.Errorf("Volume %s not found in pod %v", volumeName, pod)
-}
-
 // localEphemeralVolumeNames returns the set of ephemeral volumes for the pod that are local
 func localEphemeralVolumeNames(pod *v1.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {
-		if internalIsLocalEphemeralVolume(pod, volume) {
+		if volumeutils.IsLocalEphemeralVolume(volume) {
 			result = append(result, volume.Name)
 		}
 	}

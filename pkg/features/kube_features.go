@@ -446,7 +446,7 @@ const (
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.
 	// Only applies if LocalStorageCapacityIsolation is set.
-	FSQuotaForLSCIMonitoring = "FSQuotaForLSCIMonitoring"
+	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
 )
 
 func init() {
@@ -521,7 +521,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: featuregate.Alpha},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
-	FSQuotaForLSCIMonitoring:                    {Default: false, PreRelease: utilfeature.Alpha},
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

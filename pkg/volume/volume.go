@@ -104,7 +104,7 @@ type Attributes struct {
 // MounterArgs provides more easily extensible arguments to Mounter
 type MounterArgs struct {
 	FsGroup     *int64
-	DesiredSize int64
+	DesiredSize *resource.Quantity
 	PodUID      string
 }
 

@@ -18,17 +18,45 @@ limitations under the License.
 
 package common
 
-// QuotaID -- generic quota identifier
+import (
+	"regexp"
+)
+
+// QuotaID is generic quota identifier.
+// Data type based on quotactl(2).
 type QuotaID int32
 
 const (
+	// UnknownQuotaID -- cannot determine whether a quota is in force
+	UnknownQuotaID QuotaID = -1
 	// BadQuotaID -- Invalid quota
 	BadQuotaID QuotaID = 0
+)
+
+const (
+	acct      = iota
+	enforcing = iota
+)
+
+// QuotaType -- type of quota to be applied
+type QuotaType int
+
+const (
+	// FSQuotaAccounting for quotas for accounting only
+	FSQuotaAccounting QuotaType = 1 << iota
+	// FSQuotaEnforcing for quotas for enforcement
+	FSQuotaEnforcing QuotaType = 1 << iota
 )
 
 // FirstQuota is the quota ID we start with.
 // XXXXXXX Need a better way of doing this...
 var FirstQuota QuotaID = 1048577
+
+// MountsFile is the location of the system mount data
+var MountsFile = "/proc/self/mounts"
+
+// MountParseRegexp parses out /proc/sys/self/mounts
+var MountParseRegexp = regexp.MustCompilePOSIX("^([^ ]*)[ \t]*([^ ]*)[ \t]*([^ ]*)") // Ignore options etc.
 
 // LinuxVolumeQuotaProvider returns an appropriate quota applier
 // object if we can support quotas on this device
@@ -59,7 +87,7 @@ type LinuxVolumeQuotaApplier interface {
 	// Return value of false with no error means that the ID is not
 	// in use; true means that it is already in use.  An error
 	// return means that any quota ID will fail.
-	QuotaIDIsInUse(path string, id QuotaID) (bool, error)
+	QuotaIDIsInUse(id QuotaID) (bool, error)
 
 	// GetConsumption returns the consumption (in bytes) of the
 	// directory, determined by the implementation's quota-based

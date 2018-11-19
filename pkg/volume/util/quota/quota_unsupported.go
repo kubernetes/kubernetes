@@ -20,6 +20,7 @@ package quota
 
 import (
 	"errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -34,18 +35,18 @@ func SupportsQuotas(_ mount.Interface, _ string) (bool, error) {
 }
 
 // AssignQuota -- dummy implementation
-func AssignQuota(_ mount.Interface, _ string, _ string, _ int64) error {
+func AssignQuota(_ mount.Interface, _ string, _ string, _ *resource.Quantity) error {
 	return errNotImplemented
 }
 
 // GetConsumption -- dummy implementation
-func GetConsumption(_ string) (int64, error) {
-	return 0, errNotImplemented
+func GetConsumption(_ string) (*resource.Quantity, error) {
+	return nil, errNotImplemented
 }
 
 // GetInodes -- dummy implementation
-func GetInodes(_ string) (int64, error) {
-	return 0, errNotImplemented
+func GetInodes(_ string) (*resource.Quantity, error) {
+	return nil, errNotImplemented
 }
 
 // ClearQuota -- dummy implementation

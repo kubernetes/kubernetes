@@ -21,7 +21,9 @@ package quota
 import (
 	"fmt"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/quota/common"
@@ -74,13 +76,13 @@ func dummyFakeMount1() mount.Interface {
 				Opts:   []string{"rw", "relatime"},
 			},
 			{
-				Device: "dev/mapper/fedora-root",
+				Device: "/dev/mapper/fedora-root",
 				Path:   "/",
 				Type:   "ext4",
 				Opts:   []string{"rw", "relatime"},
 			},
 			{
-				Device: "dev/mapper/fedora-home",
+				Device: "/dev/mapper/fedora-home",
 				Path:   "/home",
 				Type:   "ext4",
 				Opts:   []string{"rw", "relatime"},
@@ -363,7 +365,7 @@ func (v testVolumeQuota) GetQuotaOnDir(path string) (common.QuotaID, error) {
 	return common.BadQuotaID, fmt.Errorf("No quota available for %s", path)
 }
 
-func (v testVolumeQuota) QuotaIDIsInUse(_ string, id common.QuotaID) (bool, error) {
+func (v testVolumeQuota) QuotaIDIsInUse(id common.QuotaID) (bool, error) {
 	if _, ok := testIDQuotaMap[id]; ok {
 		return true, nil
 	}
@@ -389,7 +391,7 @@ func fakeSupportsQuotas(path string) (bool, error) {
 
 func fakeAssignQuota(path string, poduid string, bytes int64) error {
 	dummySetFSInfo(path)
-	return AssignQuota(dummyQuotaTest(), path, poduid, bytes)
+	return AssignQuota(dummyQuotaTest(), path, poduid, resource.NewQuantity(bytes, resource.DecimalSI))
 }
 
 func fakeClearQuota(path string) error {
@@ -529,14 +531,6 @@ func compareProjectsFiles(t *testing.T, testcase quotaTestCase, projectsFile str
 	}
 }
 
-func setFeature(feature utilfeature.Feature, value bool) error {
-	v := "true"
-	if !value {
-		v = "false"
-	}
-	return utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%s", string(feature), v))
-}
-
 func runCaseEnabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 	fail := false
 	var err error
@@ -604,9 +598,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 }
 
 func testAddRemoveQuotas(t *testing.T, enabled bool) {
-	if err := setFeature(features.FSQuotaForLSCIMonitoring, enabled); err != nil {
-		t.Errorf("Unable to enable LSCI monitoring: %v", err)
-	}
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
 	tmpProjectsFile, err := ioutil.TempFile("", "projects")
 	if err == nil {
 		_, err = tmpProjectsFile.WriteString(projectsHeader)
