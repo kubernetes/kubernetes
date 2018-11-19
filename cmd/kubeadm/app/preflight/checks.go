@@ -886,6 +886,11 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
+
+	if runtime.GOOS == "linux" && (cfg.ComponentConfigs.Kubelet == nil || cfg.ComponentConfigs.Kubelet.FailSwapOn) {
+		checks = append(checks, SwapCheck{})
+	}
+
 	checks = addCommonChecks(execer, cfg, checks)
 
 	// Check ipvs required kernel module once we use ipvs kube-proxy mode
@@ -941,6 +946,11 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
+
+	if runtime.GOOS == "linux" {
+		checks = append(checks, SwapCheck{})
+	}
+
 	checks = addCommonChecks(execer, cfg, checks)
 	if cfg.ControlPlane == nil {
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
@@ -1009,7 +1019,6 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
-			SwapCheck{},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 			InPathCheck{executable: "mount", mandatory: true, exec: execer},
