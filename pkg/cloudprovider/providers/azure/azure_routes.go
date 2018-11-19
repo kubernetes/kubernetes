@@ -20,11 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	cloudprovider "k8s.io/cloud-provider"
-
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 )
 
@@ -104,18 +104,7 @@ func (az *Cloud) createRouteTable() error {
 	}
 
 	klog.V(3).Infof("createRouteTableIfNotExists: creating routetable. routeTableName=%q", az.RouteTableName)
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
-	resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, routeTable)
-	klog.V(10).Infof("RouteTablesClient.CreateOrUpdate(%q): end", az.RouteTableName)
-	if az.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-		klog.V(2).Infof("createRouteTableIfNotExists backing off: creating routetable. routeTableName=%q", az.RouteTableName)
-		retryErr := az.CreateOrUpdateRouteTableWithRetry(routeTable)
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("createRouteTableIfNotExists abort backoff: creating routetable. routeTableName=%q", az.RouteTableName)
-		}
-	}
+	err := az.CreateOrUpdateRouteTable(routeTable)
 	if err != nil {
 		return err
 	}
@@ -163,18 +152,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	}
 
 	klog.V(3).Infof("CreateRoute: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
-	resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, *route.Name, route)
-	klog.V(10).Infof("RoutesClient.CreateOrUpdate(%q): end", az.RouteTableName)
-	if az.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-		klog.V(2).Infof("CreateRoute backing off: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-		retryErr := az.CreateOrUpdateRouteWithRetry(route)
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("CreateRoute abort backoff: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-		}
-	}
+	err = az.CreateOrUpdateRoute(route)
 	if err != nil {
 		return err
 	}
@@ -202,20 +180,8 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 
 	klog.V(2).Infof("DeleteRoute: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
 	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
-	resp, err := az.RoutesClient.Delete(ctx, az.ResourceGroup, az.RouteTableName, routeName)
-	klog.V(10).Infof("RoutesClient.Delete(%q): end", az.RouteTableName)
-
-	if az.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-		klog.V(2).Infof("DeleteRoute backing off: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-		retryErr := az.DeleteRouteWithRetry(routeName)
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("DeleteRoute abort backoff: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-		}
-	}
+	err = az.DeleteRouteWithName(routeName)
 	if err != nil {
 		return err
 	}
