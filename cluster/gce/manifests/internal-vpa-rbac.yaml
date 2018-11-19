@@ -20,6 +20,25 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
+# leader election
+- apiGroups:
+  - ""
+  resources:
+  - "endpoints"
+  verbs:
+  - "create"
+- apiGroups:
+  - ""
+  resources:
+  - "endpoints"
+  resourceNames:
+  - "vertical-pod-autoscaler-recommender"
+  - "vertical-pod-autoscaler-updater"
+  verbs:
+  - "get"
+  - "update"
+  - "patch"
+  - "delete"
 - apiGroups:
   - ""
   resources:
