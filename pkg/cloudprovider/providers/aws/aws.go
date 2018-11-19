@@ -3507,6 +3507,22 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		// We don't have an `ensureLoadBalancerInstances()` function for elbv2
 		// because `ensureLoadBalancerv2()` requires instance Ids
 
+		// Two type of load balancers with exact same name means client changes from elb to nlb for same kubernetes service.
+		// Remove elb with same name if exists.
+		staleLoadBalancer, err := c.describeLoadBalancer(loadBalancerName)
+		if err != nil {
+			return nil, err
+		}
+
+		if staleLoadBalancer != nil {
+			// TODO: anything else to clean up?
+			err = c.deleteLoadBalancer(loadBalancerName, apiService)
+
+			if err != nil {
+				klog.Infof("Delete classic load balancer failed for %v with name: %s", serviceName, loadBalancerName)
+			}
+		}
+
 		// TODO: Wait for creation?
 		return v2toStatus(v2LoadBalancer), nil
 	}
@@ -3752,6 +3768,22 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	}
 
 	klog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, aws.StringValue(loadBalancer.DNSName))
+
+	// Two type of load balancers with exact same name means client changes from nlb to elb for same kubernetes service.
+	// Remove nlb with same name if exists.
+	staleLoadBalancer, err := c.describeLoadBalancerv2(loadBalancerName)
+	if err != nil {
+		return nil, err
+	}
+
+	if staleLoadBalancer != nil {
+		// TODO: anything else to clean up?
+		err = c.deleteLoadBalancerv2(loadBalancerName)
+
+		if err != nil {
+			klog.Infof("Delete network load balancer failed for %v with name: %s", serviceName, loadBalancerName)
+		}
+	}
 
 	// TODO: Wait for creation?
 
@@ -4029,152 +4061,150 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	return nil
 }
 
-// EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
-func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
-	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
-
-	if isNLB(service.Annotations) {
-		lb, err := c.describeLoadBalancerv2(loadBalancerName)
-		if err != nil {
-			return err
-		}
-		if lb == nil {
-			klog.Info("Load balancer already deleted: ", loadBalancerName)
-			return nil
-		}
-
-		// Delete the LoadBalancer and target groups
-		//
-		// Deleting a target group while associated with a load balancer will
-		// fail. We delete the loadbalancer first. This does leave the
-		// possibility of zombie target groups if DeleteLoadBalancer() fails
-		//
-		// * Get target groups for NLB
-		// * Delete Load Balancer
-		// * Delete target groups
-		// * Clean up SecurityGroupRules
-		{
-
-			targetGroups, err := c.elbv2.DescribeTargetGroups(
-				&elbv2.DescribeTargetGroupsInput{LoadBalancerArn: lb.LoadBalancerArn},
-			)
-			if err != nil {
-				return fmt.Errorf("Error listing target groups before deleting load balancer: %q", err)
-			}
-
-			_, err = c.elbv2.DeleteLoadBalancer(
-				&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: lb.LoadBalancerArn},
-			)
-			if err != nil {
-				return fmt.Errorf("Error deleting load balancer %q: %v", loadBalancerName, err)
-			}
-
-			for _, group := range targetGroups.TargetGroups {
-				_, err := c.elbv2.DeleteTargetGroup(
-					&elbv2.DeleteTargetGroupInput{TargetGroupArn: group.TargetGroupArn},
-				)
-				if err != nil {
-					return fmt.Errorf("Error deleting target groups after deleting load balancer: %q", err)
-				}
-			}
-		}
-
-		{
-			var matchingGroups []*ec2.SecurityGroup
-			{
-				// Server side filter
-				describeRequest := &ec2.DescribeSecurityGroupsInput{}
-				filters := []*ec2.Filter{
-					newEc2Filter("ip-permission.protocol", "tcp"),
-				}
-				describeRequest.Filters = c.tagging.addFilters(filters)
-				response, err := c.ec2.DescribeSecurityGroups(describeRequest)
-				if err != nil {
-					return fmt.Errorf("Error querying security groups for NLB: %q", err)
-				}
-				for _, sg := range response {
-					if !c.tagging.hasClusterTag(sg.Tags) {
-						continue
-					}
-					matchingGroups = append(matchingGroups, sg)
-				}
-
-				// client-side filter out groups that don't have IP Rules we've
-				// annotated for this service
-				matchingGroups = filterForIPRangeDescription(matchingGroups, loadBalancerName)
-			}
-
-			{
-				clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, loadBalancerName)
-				mtuRule := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, loadBalancerName)
-				healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, loadBalancerName)
-
-				for i := range matchingGroups {
-					removes := []*ec2.IpPermission{}
-					for j := range matchingGroups[i].IpPermissions {
-
-						v4rangesToRemove := []*ec2.IpRange{}
-						v6rangesToRemove := []*ec2.Ipv6Range{}
-
-						// Find IpPermission that contains k8s description
-						// If we removed the whole IpPermission, it could contain other non-k8s specified ranges
-						for k := range matchingGroups[i].IpPermissions[j].IpRanges {
-							description := aws.StringValue(matchingGroups[i].IpPermissions[j].IpRanges[k].Description)
-							if description == clientRule || description == mtuRule || description == healthRule {
-								v4rangesToRemove = append(v4rangesToRemove, matchingGroups[i].IpPermissions[j].IpRanges[k])
-							}
-						}
-
-						// Find IpPermission that contains k8s description
-						// If we removed the whole IpPermission, it could contain other non-k8s specified rangesk
-						for k := range matchingGroups[i].IpPermissions[j].Ipv6Ranges {
-							description := aws.StringValue(matchingGroups[i].IpPermissions[j].Ipv6Ranges[k].Description)
-							if description == clientRule || description == mtuRule || description == healthRule {
-								v6rangesToRemove = append(v6rangesToRemove, matchingGroups[i].IpPermissions[j].Ipv6Ranges[k])
-							}
-						}
-
-						// ipv4 and ipv6 removals cannot be included in the same permission
-						if len(v4rangesToRemove) > 0 {
-							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
-							removedPermission := &ec2.IpPermission{
-								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
-								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
-								IpRanges:   v4rangesToRemove,
-								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
-							}
-							removes = append(removes, removedPermission)
-						}
-						if len(v6rangesToRemove) > 0 {
-							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
-							removedPermission := &ec2.IpPermission{
-								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
-								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
-								Ipv6Ranges: v6rangesToRemove,
-								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
-							}
-							removes = append(removes, removedPermission)
-						}
-
-					}
-					if len(removes) > 0 {
-						changed, err := c.removeSecurityGroupIngress(aws.StringValue(matchingGroups[i].GroupId), removes)
-						if err != nil {
-							return err
-						}
-						if !changed {
-							klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", *matchingGroups[i].GroupId)
-						}
-					}
-
-				}
-
-			}
-
-		}
+func (c *Cloud) deleteLoadBalancerv2(loadBalancerName string) error {
+	lb, err := c.describeLoadBalancerv2(loadBalancerName)
+	if err != nil {
+		return err
+	}
+	if lb == nil {
+		klog.Info("Load balancer already deleted: ", loadBalancerName)
 		return nil
 	}
 
+	// Delete the LoadBalancer and target groups
+	//
+	// Deleting a target group while associated with a load balancer will
+	// fail. We delete the loadbalancer first. This does leave the
+	// possibility of zombie target groups if DeleteLoadBalancer() fails
+	//
+	// * Get target groups for NLB
+	// * Delete Load Balancer
+	// * Delete target groups
+	// * Clean up SecurityGroupRules
+	{
+
+		targetGroups, err := c.elbv2.DescribeTargetGroups(
+			&elbv2.DescribeTargetGroupsInput{LoadBalancerArn: lb.LoadBalancerArn},
+		)
+		if err != nil {
+			return fmt.Errorf("Error listing target groups before deleting load balancer: %q", err)
+		}
+
+		// sync call or async call here? Without deletion confirmation, we cannot move forward
+		_, err = c.elbv2.DeleteLoadBalancer(
+			&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: lb.LoadBalancerArn},
+		)
+		if err != nil {
+			return fmt.Errorf("Error deleting load balancer %q: %v", loadBalancerName, err)
+		}
+
+		for _, group := range targetGroups.TargetGroups {
+			_, err := c.elbv2.DeleteTargetGroup(
+				&elbv2.DeleteTargetGroupInput{TargetGroupArn: group.TargetGroupArn},
+			)
+			if err != nil {
+				return fmt.Errorf("Error deleting target groups after deleting load balancer: %q", err)
+			}
+		}
+	}
+
+	{
+		var matchingGroups []*ec2.SecurityGroup
+		{
+			// Server side filter
+			describeRequest := &ec2.DescribeSecurityGroupsInput{}
+			filters := []*ec2.Filter{
+				newEc2Filter("ip-permission.protocol", "tcp"),
+			}
+			describeRequest.Filters = c.tagging.addFilters(filters)
+			response, err := c.ec2.DescribeSecurityGroups(describeRequest)
+			if err != nil {
+				return fmt.Errorf("Error querying security groups for NLB: %q", err)
+			}
+			for _, sg := range response {
+				if !c.tagging.hasClusterTag(sg.Tags) {
+					continue
+				}
+				matchingGroups = append(matchingGroups, sg)
+			}
+
+			// client-side filter out groups that don't have IP Rules we've
+			// annotated for this service
+			matchingGroups = filterForIPRangeDescription(matchingGroups, loadBalancerName)
+		}
+
+		{
+			clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, loadBalancerName)
+			mtuRule := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, loadBalancerName)
+			healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, loadBalancerName)
+
+			for i := range matchingGroups {
+				removes := []*ec2.IpPermission{}
+				for j := range matchingGroups[i].IpPermissions {
+
+					v4rangesToRemove := []*ec2.IpRange{}
+					v6rangesToRemove := []*ec2.Ipv6Range{}
+
+					// Find IpPermission that contains k8s description
+					// If we removed the whole IpPermission, it could contain other non-k8s specified ranges
+					for k := range matchingGroups[i].IpPermissions[j].IpRanges {
+						description := aws.StringValue(matchingGroups[i].IpPermissions[j].IpRanges[k].Description)
+						if description == clientRule || description == mtuRule || description == healthRule {
+							v4rangesToRemove = append(v4rangesToRemove, matchingGroups[i].IpPermissions[j].IpRanges[k])
+						}
+					}
+
+					// Find IpPermission that contains k8s description
+					// If we removed the whole IpPermission, it could contain other non-k8s specified rangesk
+					for k := range matchingGroups[i].IpPermissions[j].Ipv6Ranges {
+						description := aws.StringValue(matchingGroups[i].IpPermissions[j].Ipv6Ranges[k].Description)
+						if description == clientRule || description == mtuRule || description == healthRule {
+							v6rangesToRemove = append(v6rangesToRemove, matchingGroups[i].IpPermissions[j].Ipv6Ranges[k])
+						}
+					}
+
+					// ipv4 and ipv6 removals cannot be included in the same permission
+					if len(v4rangesToRemove) > 0 {
+						// create a new *IpPermission to not accidentally remove UserIdGroupPairs
+						removedPermission := &ec2.IpPermission{
+							FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
+							IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
+							IpRanges:   v4rangesToRemove,
+							ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
+						}
+						removes = append(removes, removedPermission)
+					}
+					if len(v6rangesToRemove) > 0 {
+						// create a new *IpPermission to not accidentally remove UserIdGroupPairs
+						removedPermission := &ec2.IpPermission{
+							FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
+							IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
+							Ipv6Ranges: v6rangesToRemove,
+							ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
+						}
+						removes = append(removes, removedPermission)
+					}
+
+				}
+				if len(removes) > 0 {
+					changed, err := c.removeSecurityGroupIngress(aws.StringValue(matchingGroups[i].GroupId), removes)
+					if err != nil {
+						return err
+					}
+					if !changed {
+						klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", *matchingGroups[i].GroupId)
+					}
+				}
+
+			}
+
+		}
+
+	}
+	return nil
+}
+
+func (c *Cloud) deleteLoadBalancer(loadBalancerName string, service *v1.Service) error {
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return err
@@ -4251,6 +4281,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 
 			if len(securityGroupIDs) == 0 {
 				klog.V(2).Info("Deleted all security groups for load balancer: ", service.Name)
+				// break here won't give another retry to delete load balancer
 				break
 			}
 
@@ -4270,6 +4301,17 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 	}
 
 	return nil
+}
+
+// EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
+func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
+	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
+
+	if isNLB(service.Annotations) {
+		return c.deleteLoadBalancerv2(loadBalancerName)
+	} else {
+		return c.deleteLoadBalancer(loadBalancerName, service)
+	}
 }
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
