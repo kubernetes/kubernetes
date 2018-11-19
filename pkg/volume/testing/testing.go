@@ -765,11 +765,11 @@ func (fv *FakeVolume) CanMount() error {
 	return nil
 }
 
-func (fv *FakeVolume) SetUp(fsGroup *int64) error {
+func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.SetUpCallCount++
-	return fv.SetUpAt(fv.getPath(), fsGroup)
+	return fv.SetUpAt(fv.getPath(), mounterArgs)
 }
 
 func (fv *FakeVolume) GetSetUpCallCount() int {
@@ -778,7 +778,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 	return fv.SetUpCallCount
 }
 
-func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (fv *FakeVolume) SetUpAt(dir string, mounterArgs MounterArgs) error {
 	return os.MkdirAll(dir, 0750)
 }
 

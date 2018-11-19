@@ -330,13 +330,13 @@ func (b *iscsiDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *iscsiDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *iscsiDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup)
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
 	}
