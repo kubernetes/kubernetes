@@ -178,7 +178,7 @@ message VolumeError {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
 
   // String detailing the error encountered during Attach or Detach operation.
-  // This string maybe logged, so it should not contain sensitive
+  // This string may be logged, so it should not contain sensitive
   // information.
   // +optional
   optional string message = 2;
