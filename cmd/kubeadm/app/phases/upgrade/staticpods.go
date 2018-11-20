@@ -282,7 +282,7 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 	if err != nil {
 		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
 	}
-	currentEtcdVersionStr, ok := currentEtcdVersions[fmt.Sprintf("https://%s:%d", cfg.LocalAPIEndpoint.AdvertiseAddress, constants.EtcdListenClientPort)]
+	currentEtcdVersionStr, ok := currentEtcdVersions[etcdutil.GetClientURL(cfg)]
 	if !ok {
 		fmt.Println(currentEtcdVersions)
 		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
