@@ -77,8 +77,8 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		hostIP, err := secure.DefaultExternalAddress()
 		if err != nil {
-			return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
-				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+			return fmt.Errorf("unable to find suitable network address.error='%v'. "+
+				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this", err)
 		}
 		s.AdvertiseAddress = hostIP
 	}
