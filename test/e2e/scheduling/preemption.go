@@ -40,6 +40,11 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
+type priorityPair struct {
+	name  string
+	value int32
+}
+
 var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
@@ -50,24 +55,31 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	lowPriorityClassName := f.BaseName + "-low-priority"
 	mediumPriorityClassName := f.BaseName + "-medium-priority"
 	highPriorityClassName := f.BaseName + "-high-priority"
+	priorityPairs := []priorityPair{
+		{name: lowPriorityClassName, value: lowPriority},
+		{name: mediumPriorityClassName, value: mediumPriority},
+		{name: highPriorityClassName, value: highPriority},
+	}
+
 	AfterEach(func() {
+		for _, pair := range priorityPairs {
+			cs.SchedulingV1beta1().PriorityClasses().Delete(pair.name, metav1.NewDeleteOptions(0))
+		}
 	})
 
 	BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
-		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
-		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
-		_, err = f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: mediumPriorityClassName}, Value: mediumPriority})
-		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
-		_, err = f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: lowPriorityClassName}, Value: lowPriority})
-		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+		for _, pair := range priorityPairs {
+			_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
+			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+		}
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
 		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
-		err = framework.CheckTestingNSDeletedExcept(cs, ns)
+		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
 	})
 
@@ -366,6 +378,8 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 	var ns string
 	f := framework.NewDefaultFramework("sched-preemption-path")
 
+	priorityPairs := make([]priorityPair, 0)
+
 	AfterEach(func() {
 		if node != nil {
 			nodeCopy := node.DeepCopy()
@@ -374,6 +388,9 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			delete(nodeCopy.Status.Capacity, fakecpu)
 			_, err := cs.CoreV1().Nodes().UpdateStatus(nodeCopy)
 			framework.ExpectNoError(err)
+		}
+		for _, pair := range priorityPairs {
+			cs.SchedulingV1beta1().PriorityClasses().Delete(pair.name, metav1.NewDeleteOptions(0))
 		}
 	})
 
@@ -404,7 +421,9 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		// create four PriorityClass: p1, p2, p3, p4
 		for i := 1; i <= 4; i++ {
 			priorityName := fmt.Sprintf("p%d", i)
-			_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: int32(i)})
+			priorityVal := int32(i)
+			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
+			_, err := cs.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 		}
 	})
