@@ -19,9 +19,14 @@ package defaulttolerationseconds
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -35,9 +40,10 @@ func TestForgivenessAdmission(t *testing.T) {
 	handler := NewDefaultTolerationSeconds()
 	// NOTE: for anyone who want to modify this test, the order of tolerations matters!
 	tests := []struct {
-		description  string
-		requestedPod api.Pod
-		expectedPod  api.Pod
+		description       string
+		enableCriticalPod func()
+		requestedPod      api.Pod
+		expectedPod       api.Pod
 	}{
 		{
 			description: "pod has no tolerations, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`",
@@ -392,9 +398,38 @@ func TestForgivenessAdmission(t *testing.T) {
 				},
 			},
 		},
+		{
+			description:       "pod has no tolerations but has criticalPodAnnotation, expect add tolerations for `not-ready:NoExecute` and `unreachable:NoExecute`",
+			enableCriticalPod: utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true),
+			requestedPod: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   api.NamespaceSystem,
+					Annotations: map[string]string{kubelettypes.CriticalPodAnnotationKey: ""},
+				},
+			},
+			expectedPod: api.Pod{
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{
+						{
+							Key:      schedulerapi.TaintNodeNotReady,
+							Operator: api.TolerationOpExists,
+							Effect:   api.TaintEffectNoExecute,
+						},
+						{
+							Key:      schedulerapi.TaintNodeUnreachable,
+							Operator: api.TolerationOpExists,
+							Effect:   api.TaintEffectNoExecute,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
+		if test.enableCriticalPod != nil {
+			defer test.enableCriticalPod()
+		}
 		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil))
 		if err != nil {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)

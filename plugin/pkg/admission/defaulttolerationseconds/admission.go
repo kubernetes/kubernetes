@@ -21,9 +21,12 @@ import (
 	"fmt"
 	"io"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -45,12 +48,22 @@ var (
 		Effect:            api.TaintEffectNoExecute,
 		TolerationSeconds: defaultNotReadyTolerationSeconds,
 	}
+	notReadyTolerationWithoutSeconds = api.Toleration{
+		Key:      schedulerapi.TaintNodeNotReady,
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoExecute,
+	}
 
 	unreachableToleration = api.Toleration{
 		Key:               schedulerapi.TaintNodeUnreachable,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
 		TolerationSeconds: defaultUnreachableTolerationSeconds,
+	}
+	unreachableTolerationWithoutSeconds = api.Toleration{
+		Key:      schedulerapi.TaintNodeUnreachable,
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoExecute,
 	}
 )
 
@@ -112,12 +125,25 @@ func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 		}
 	}
 
+	// TODO(Huang-Wei): remove this when criticalPod annotation is totally removed
+	v1Pod := &corev1.Pod{}
+	k8s_api_v1.Convert_core_Pod_To_v1_Pod(pod, v1Pod, nil)
+	isCriticalPod := kubelettypes.IsCriticalPod(v1Pod)
+
 	if !toleratesNodeNotReady {
-		pod.Spec.Tolerations = append(pod.Spec.Tolerations, notReadyToleration)
+		if isCriticalPod {
+			pod.Spec.Tolerations = append(pod.Spec.Tolerations, notReadyTolerationWithoutSeconds)
+		} else {
+			pod.Spec.Tolerations = append(pod.Spec.Tolerations, notReadyToleration)
+		}
 	}
 
 	if !toleratesNodeUnreachable {
-		pod.Spec.Tolerations = append(pod.Spec.Tolerations, unreachableToleration)
+		if isCriticalPod {
+			pod.Spec.Tolerations = append(pod.Spec.Tolerations, unreachableTolerationWithoutSeconds)
+		} else {
+			pod.Spec.Tolerations = append(pod.Spec.Tolerations, unreachableToleration)
+		}
 	}
 
 	return nil
