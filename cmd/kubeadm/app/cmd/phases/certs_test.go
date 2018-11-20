@@ -20,11 +20,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/spf13/cobra"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 type testCertsData struct {
@@ -51,6 +53,9 @@ func TestCertsWithCSRs(t *testing.T) {
 	// global vars
 	csrOnly = true
 	csrDir = certDir
+	defer func() {
+		csrOnly = false
+	}()
 
 	phase := NewCertsPhase()
 	// find the api cert phase
@@ -73,5 +78,30 @@ func TestCertsWithCSRs(t *testing.T) {
 
 	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, cert.BaseName); err != nil {
 		t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
+	}
+}
+
+func TestCreateSparseCerts(t *testing.T) {
+	for _, test := range certstestutil.GetSparseCertTestCases(t) {
+		t.Run(test.Name, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+
+			certstestutil.WritePKIFiles(t, tmpdir, test.Files)
+
+			r := workflow.NewRunner()
+			r.AppendPhase(NewCertsPhase())
+			r.SetDataInitializer(func(*cobra.Command) (workflow.RunData, error) {
+				certsData := &testCertsData{
+					cfg: testutil.GetDefaultInternalConfig(t),
+				}
+				certsData.cfg.CertificatesDir = tmpdir
+				return certsData, nil
+			})
+
+			if err := r.Run(); (err != nil) != test.ExpectError {
+				t.Fatalf("expected error to be %t, got %t (%v)", test.ExpectError, (err != nil), err)
+			}
+		})
 	}
 }

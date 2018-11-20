@@ -349,8 +349,14 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
 		By("Expect no more scale-up to be happening after all pods are scheduled")
-		status, err = getScaleUpStatus(c)
+
+		// wait for a while until scale-up finishes; we cannot read CA status immediately
+		// after pods are scheduled as status config map is updated by CA once every loop iteration
+		status, err = waitForScaleUpStatus(c, func(s *scaleUpStatus) bool {
+			return s.status == caNoScaleUpStatus
+		}, 2*freshStatusLimit)
 		framework.ExpectNoError(err)
+
 		if status.target != target {
 			klog.Warningf("Final number of nodes (%v) does not match initial scale-up target (%v).", status.target, target)
 		}
