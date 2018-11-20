@@ -97,14 +97,15 @@ type fsquotastat struct {
 // IsFilesystemOfType determines whether the filesystem specified is of the type
 // specified by the magic number
 func IsFilesystemOfType(mountpoint string, backingDev string, magic int64) bool {
-
 	var buf syscall.Statfs_t
 	err := syscall.Statfs(mountpoint, &buf)
 	if err != nil {
 		klog.V(3).Infof("Extfs Unable to statfs %s: %v", mountpoint, err)
 		return false
 	}
-	if buf.Type != magic {
+	// Per https://golang.org/pkg/syscall/#Statfs_t buf.Type is int64, but
+	// typecheck complains about this on i386, ARM (int32) and s390x (uint32).
+	if int64(buf.Type) != magic {
 		return false
 	}
 

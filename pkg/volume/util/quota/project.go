@@ -36,8 +36,8 @@ import (
 var projectsFile = "/etc/projects"
 var projidFile = "/etc/projid"
 
-var projectsParseRegexp *regexp.Regexp = regexp.MustCompilePOSIX("^([[:digit:]]+):(.*)$")
-var projidParseRegexp *regexp.Regexp = regexp.MustCompilePOSIX("^([^#][^:]*):([[:digit:]]+)$")
+var projectsParseRegexp = regexp.MustCompilePOSIX("^([[:digit:]]+):(.*)$")
+var projidParseRegexp = regexp.MustCompilePOSIX("^([^#][^:]*):([[:digit:]]+)$")
 
 var quotaIDLock sync.RWMutex
 

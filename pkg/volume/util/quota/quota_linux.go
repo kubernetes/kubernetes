@@ -64,7 +64,7 @@ var quotaLock sync.RWMutex
 var supportsQuotasMap = make(map[string]bool)
 var supportsQuotasLock sync.RWMutex
 
-var mountParseRegexp *regexp.Regexp = regexp.MustCompilePOSIX("^([^ ]*)[ \t]*([^ ]*)[ \t]*([^ ]*)") // Ignore options etc.
+var mountParseRegexp = regexp.MustCompilePOSIX("^([^ ]*)[ \t]*([^ ]*)[ \t]*([^ ]*)") // Ignore options etc.
 
 // Directory -> backingDev
 var backingDevMap = make(map[string]string)
