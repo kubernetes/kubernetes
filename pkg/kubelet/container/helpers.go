@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -130,9 +131,22 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 	return command
 }
 
-func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (expandedSubpath string) {
-	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
-	return expansion.Expand(mount.SubPath, mapping)
+func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
+
+	envmap := EnvVarsToMap(envs)
+	missingKeys := sets.NewString()
+	expanded := expansion.Expand(mount.SubPathExpr, func(key string) string {
+		value, ok := envmap[key]
+		if !ok || len(value) == 0 {
+			missingKeys.Insert(key)
+		}
+		return value
+	})
+
+	if len(missingKeys) > 0 {
+		return "", fmt.Errorf("missing value for %s", strings.Join(missingKeys.List(), ", "))
+	}
+	return expanded, nil
 }
 
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
