@@ -22,7 +22,7 @@ https://git.k8s.io/community/contributors/devel/release.md#issue-kind-label
 
 **What this PR does / why we need it**:
 
-**Which issue(s) this PR fixes** *(optional, in `fixes #<issue number>(, fixes #<issue_number>, ...)` format, will close the issue(s) when PR gets merged)*:
+**Which issue(s) this PR fixes** *(optional, in `fixes #<issue number>(, fixes #<issue_number>, ...)` format, will close the issue(s) when PR gets merged | _When fixing failing-tests or flakes, please post the related issue in a comment and do not use this line_)*:
 Fixes #
 
 **Special notes for your reviewer**:
