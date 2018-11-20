@@ -281,7 +281,6 @@ func TestDelayBinding(t *testing.T) {
 		"no-mode-class": {
 			pvc:         makePVCClass(&classNoMode),
 			shouldDelay: false,
-			shouldFail:  true,
 		},
 		"immediate-mode-class": {
 			pvc:         makePVCClass(&classImmediateMode),
