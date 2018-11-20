@@ -198,11 +198,34 @@ func csiHostPathPod(
 	f *framework.Framework,
 	sa *v1.ServiceAccount,
 ) *v1.Pod {
+	var (
+		provisionerImage string
+		registrarImage   string
+		attacherImage    string
+		hostpathImage    string
+	)
+
 	podClient := client.CoreV1().Pods(config.Namespace)
 
 	priv := true
 	mountPropagation := v1.MountPropagationBidirectional
 	hostPathType := v1.HostPathDirectoryOrCreate
+
+	nodes := framework.GetReadySchedulableNodesOrDie(client)
+	kubeletVersion := getKubeletVersion(nodes.Items[0])
+	kubeletCSIV1 := kubeletVersion.AtLeast(getCSIV1Version())
+	if kubeletCSIV1 {
+		provisionerImage = "gcr.io/gke-release/csi-provisioner:v1.0.0-gke.0"
+		registrarImage = "gcr.io/gke-release/csi-driver-registrar:v1.0.0-gke.0"
+		attacherImage = "gcr.io/gke-release/csi-attacher:v1.0.0-gke.0"
+		hostpathImage = "quay.io/k8scsi/hostpathplugin:v1.0.0"
+	} else {
+		provisionerImage = csiContainerImage("csi-provisioner")
+		registrarImage = csiContainerImage("driver-registrar")
+		attacherImage = csiContainerImage("csi-attacher")
+		hostpathImage = csiContainerImage("hostpathplugin")
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.Prefix + "-pod",
@@ -218,7 +241,7 @@ func csiHostPathPod(
 			Containers: []v1.Container{
 				{
 					Name:            "external-provisioner",
-					Image:           csiContainerImage("csi-provisioner"),
+					Image:           provisionerImage,
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -234,7 +257,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "driver-registrar",
-					Image:           csiContainerImage("driver-registrar"),
+					Image:           registrarImage,
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -259,7 +282,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "external-attacher",
-					Image:           csiContainerImage("csi-attacher"),
+					Image:           attacherImage,
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -280,7 +303,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "hostpath-driver",
-					Image:           csiContainerImage("hostpathplugin"),
+					Image:           hostpathImage,
 					ImagePullPolicy: v1.PullAlways,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &priv,
@@ -338,6 +361,31 @@ func csiHostPathPod(
 				},
 			},
 		},
+	}
+
+	if kubeletCSIV1 {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name: "registration-dir",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/var/lib/kubelet/plugins_registry/",
+					Type: &hostPathType,
+				},
+			},
+		})
+		// Update driver-registrar container
+		var newContainers []v1.Container
+		for _, c := range pod.Spec.Containers {
+			if c.Name == "driver-registrar" {
+				c.Args = append(c.Args, "--kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock")
+				c.VolumeMounts = append(c.VolumeMounts, v1.VolumeMount{
+					Name:      "registration-dir",
+					MountPath: "/registration",
+				})
+			}
+			newContainers = append(newContainers, c)
+		}
+		pod.Spec.Containers = newContainers
 	}
 
 	err := framework.DeletePodWithWait(f, client, pod)

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/util/version"
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -222,4 +223,16 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
+}
+
+func getKubeletVersion(node v1.Node) *version.Version {
+	versionStr := node.Status.NodeInfo.KubeletVersion
+	kubeletVersion, err := version.ParseSemantic(versionStr)
+	Expect(err).To(BeNil(), "Failed to parse Kubelet version %s", versionStr)
+	return kubeletVersion
+}
+func getCSIV1Version() *version.Version {
+	csiV1Version, err := version.ParseSemantic("1.13.0")
+	Expect(err).To(BeNil(), "Failed to parse CSI V1 version 1.13.0")
+	return csiV1Version
 }
