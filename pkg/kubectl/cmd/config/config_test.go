@@ -116,10 +116,8 @@ func TestSetNonExistentContext(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			// Restore cmdutil behavior.
-			cmdutil.DefaultBehaviorOnFatal()
-		}()
+		// Restore cmdutil behavior.
+		defer cmdutil.DefaultBehaviorOnFatal()
 
 		// Check exit code.
 		cmdutil.BehaviorOnFatal(func(e string, code int) {
@@ -307,10 +305,8 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			// Restore cmdutil behavior.
-			cmdutil.DefaultBehaviorOnFatal()
-		}()
+		// Restore cmdutil behavior.
+		defer cmdutil.DefaultBehaviorOnFatal()
 
 		// Check exit code.
 		cmdutil.BehaviorOnFatal(func(e string, code int) {
@@ -366,10 +362,8 @@ func TestTokenAndBasicDisallowed(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			// Restore cmdutil behavior.
-			cmdutil.DefaultBehaviorOnFatal()
-		}()
+		// Restore cmdutil behavior.
+		defer cmdutil.DefaultBehaviorOnFatal()
 
 		// Check exit code.
 		cmdutil.BehaviorOnFatal(func(e string, code int) {
@@ -495,10 +489,8 @@ func TestSetBytesBad(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			// Restore cmdutil behavior.
-			cmdutil.DefaultBehaviorOnFatal()
-		}()
+		// Restore cmdutil behavior.
+		defer cmdutil.DefaultBehaviorOnFatal()
 
 		// Check exit code.
 		cmdutil.BehaviorOnFatal(func(e string, code int) {
@@ -673,10 +665,8 @@ func TestEmbedNoCADisallowed(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			// Restore cmdutil behavior.
-			cmdutil.DefaultBehaviorOnFatal()
-		}()
+		// Restore cmdutil behavior.
+		defer cmdutil.DefaultBehaviorOnFatal()
 
 		// Check exit code.
 		cmdutil.BehaviorOnFatal(func(e string, code int) {
@@ -700,10 +690,8 @@ func TestCAAndInsecureDisallowed(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			// Restore cmdutil behavior.
-			cmdutil.DefaultBehaviorOnFatal()
-		}()
+		// Restore cmdutil behavior.
+		defer cmdutil.DefaultBehaviorOnFatal()
 
 		// Check exit code.
 		cmdutil.BehaviorOnFatal(func(e string, code int) {

@@ -484,9 +484,7 @@ func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...utilfeatur
 	for _, fg := range gates {
 		func() {
 			enabled := utilfeature.DefaultFeatureGate.Enabled(fg)
-			defer func() {
-				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled))
-			}()
+			defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled))
 
 			for _, f := range []bool{true, false} {
 				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f))
