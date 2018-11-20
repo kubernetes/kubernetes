@@ -127,7 +127,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 	}
 }
 
-func TestVersionedNamspacedScopedCRD(t *testing.T) {
+func TestVersionedNamespacedScopedCRD(t *testing.T) {
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
