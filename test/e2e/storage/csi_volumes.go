@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/util/version"
 
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -380,9 +381,17 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 }
 
 func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
+	kubeletVersion := getKubeletVersion(node)
+	var driverName string
+	if kubeletVersion.LessThan(getCSIV1Version()) {
+		driverName = "com.google.csi.gcepd"
+	} else {
+		driverName = "pd.csi.storage.gke.io"
+	}
+
 	return storageClassTest{
-		name:         "com.google.csi.gcepd",
-		provisioner:  "com.google.csi.gcepd",
+		name:         driverName,
+		provisioner:  driverName,
 		parameters:   map[string]string{"type": "pd-standard"},
 		claimSize:    "5Gi",
 		expectedSize: "5Gi",
@@ -390,18 +399,34 @@ func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
 	}
 }
 
+func getKubeletVersion(node v1.Node) *version.Version {
+	versionStr := node.Status.NodeInfo.KubeletVersion
+	kubeletVersion, err := version.ParseSemantic(versionStr)
+	Expect(err).To(BeNil(), "Failed to parse Kubelet version %s", versionStr)
+	return kubeletVersion
+}
+
+func getCSIV1Version() *version.Version {
+	csiV1Version, err := version.ParseSemantic("1.13.0")
+	Expect(err).To(BeNil(), "Failed to parse CSI V1 version 1.13.0")
+	return csiV1Version
+}
+
 func (g *gcePDCSIDriver) createCSIDriver() {
 	By("deploying gce-pd driver")
 	f := g.f
 	cs := f.ClientSet
 	config := g.config
+
+	manifestDir := getGCEPDManifestDir(cs)
+
 	g.controllerServiceAccount = csiServiceAccount(cs, config, "gce-controller", false /* teardown */)
 	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
 	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace,
 		false /* teardown */, []string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
-	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
+	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount, manifestDir)
 }
 
 func (g *gcePDCSIDriver) cleanupCSIDriver() {
@@ -409,11 +434,24 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	f := g.f
 	cs := f.ClientSet
 	config := g.config
-	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
+
+	manifestDir := getGCEPDManifestDir(cs)
+
+	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount, manifestDir)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
 	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace,
 		true /* teardown */, []string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
+}
+
+func getGCEPDManifestDir(cs clientset.Interface) string {
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	kubeletVersion := getKubeletVersion(nodes.Items[0])
+	if kubeletVersion.LessThan(getCSIV1Version()) {
+		return "test/e2e/testing-manifests/storage-csi/gce-pd"
+	} else {
+		return "test/e2e/testing-manifests/storage-csi/gce-pd-csiv1"
+	}
 }

@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -207,11 +206,37 @@ func csiHostPathPod(
 	f *framework.Framework,
 	sa *v1.ServiceAccount,
 ) *v1.Pod {
+	var (
+		provisionerImage string
+		registrarImage   string
+		attacherImage    string
+		pluginRegDir     string
+		hostpathImage    string
+	)
+
 	podClient := client.CoreV1().Pods(config.Namespace)
 
 	priv := true
 	mountPropagation := v1.MountPropagationBidirectional
 	hostPathType := v1.HostPathDirectoryOrCreate
+
+	nodes := framework.GetReadySchedulableNodesOrDie(client)
+	kubeletVersion := getKubeletVersion(nodes.Items[0])
+	if kubeletVersion.AtLeast(getCSIV1Version()) {
+		provisionerImage = "gcr.io/gke-release/csi-provisioner:v1.0.0-gke.0"
+		registrarImage = "gcr.io/gke-release/csi-driver-registrar:v1.0.0-gke.0"
+		attacherImage = "gcr.io/gke-release/csi-attacher:v1.0.0-gke.0"
+		pluginRegDir = "/var/lib/kubelet/plugins_registry/"
+		hostpathImage = "quay.io/k8scsi/hostpathplugin:v1.0.0"
+
+	} else {
+		provisionerImage = csiContainerImage("csi-provisioner")
+		registrarImage = csiContainerImage("driver-registrar")
+		attacherImage = csiContainerImage("csi-attacher")
+		hostpathImage = csiContainerImage("hostpathplugin")
+		pluginRegDir = "/var/lib/kubelet/plugins"
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.Prefix + "-pod",
@@ -227,7 +252,7 @@ func csiHostPathPod(
 			Containers: []v1.Container{
 				{
 					Name:            "external-provisioner",
-					Image:           csiContainerImage("csi-provisioner"),
+					Image:           provisionerImage,
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -243,7 +268,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "driver-registrar",
-					Image:           csiContainerImage("driver-registrar"),
+					Image:           registrarImage,
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -273,7 +298,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "external-attacher",
-					Image:           csiContainerImage("csi-attacher"),
+					Image:           attacherImage,
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
@@ -294,7 +319,7 @@ func csiHostPathPod(
 				},
 				{
 					Name:            "hostpath-driver",
-					Image:           csiContainerImage("hostpathplugin"),
+					Image:           hostpathImage,
 					ImagePullPolicy: v1.PullAlways,
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &priv,
@@ -345,7 +370,7 @@ func csiHostPathPod(
 					Name: "registration-dir",
 					VolumeSource: v1.VolumeSource{
 						HostPath: &v1.HostPathVolumeSource{
-							Path: "/var/lib/kubelet/plugins",
+							Path: pluginRegDir,
 							Type: &hostPathType,
 						},
 					},
@@ -388,17 +413,21 @@ func deployGCEPDCSIDriver(
 	f *framework.Framework,
 	nodeSA *v1.ServiceAccount,
 	controllerSA *v1.ServiceAccount,
+	manifestDir string,
 ) {
 	// Get API Objects from manifests
-	nodeds, err := manifest.DaemonSetFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml", config.Namespace)
+	nodeFile := filepath.Join(manifestDir, "node_ds.yaml")
+	nodeds, err := manifest.DaemonSetFromManifest(nodeFile, config.Namespace)
 	framework.ExpectNoError(err, "Failed to create DaemonSet from manifest")
 	nodeds.Spec.Template.Spec.ServiceAccountName = nodeSA.GetName()
 
-	controllerss, err := manifest.StatefulSetFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml", config.Namespace)
+	controllerFile := filepath.Join(manifestDir, "controller_ss.yaml")
+	controllerss, err := manifest.StatefulSetFromManifest(controllerFile, config.Namespace)
 	framework.ExpectNoError(err, "Failed to create StatefulSet from manifest")
 	controllerss.Spec.Template.Spec.ServiceAccountName = controllerSA.GetName()
 
-	controllerservice, err := manifest.SvcFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/controller_service.yaml")
+	controllerServiceFile := filepath.Join(manifestDir, "controller_service.yaml")
+	controllerservice, err := manifest.SvcFromManifest(controllerServiceFile)
 	framework.ExpectNoError(err, "Failed to create Service from manifest")
 
 	// Got all objects from manifests now try to delete objects
@@ -446,6 +475,9 @@ func createCSICRDs(c apiextensionsclient.Interface) {
 
 	for _, crd := range crds {
 		_, err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+		if apierrs.IsAlreadyExists(err) {
+			continue
+		}
 		framework.ExpectNoError(err, "Failed to create CSI CRD %q: %v", crd.Name, err)
 	}
 }
@@ -486,8 +518,8 @@ func createGCESecrets(client clientset.Interface, config framework.VolumeTestCon
 	saEnv := "E2E_GOOGLE_APPLICATION_CREDENTIALS"
 	saFile := fmt.Sprintf("/tmp/%s/cloud-sa.json", string(uuid.NewUUID()))
 
-	os.MkdirAll(path.Dir(saFile), 0750)
-	defer os.Remove(path.Dir(saFile))
+	os.MkdirAll(filepath.Dir(saFile), 0750)
+	defer os.Remove(filepath.Dir(saFile))
 
 	premadeSAFile, ok := os.LookupEnv(saEnv)
 	if !ok {
