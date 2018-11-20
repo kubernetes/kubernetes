@@ -508,6 +508,7 @@ type CreateOptions struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PatchOptions may be provided when patching an API object.
+// PatchOptions is meant to be a superset of UpdateOptions.
 type PatchOptions struct {
 	TypeMeta `json:",inline"`
 
@@ -529,6 +530,7 @@ type PatchOptions struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // UpdateOptions may be provided when updating an API object.
+// All fields in UpdateOptions should also be present in PatchOptions.
 type UpdateOptions struct {
 	TypeMeta `json:",inline"`
 
