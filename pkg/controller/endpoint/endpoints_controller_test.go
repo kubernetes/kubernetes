@@ -703,55 +703,82 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 
 func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 	var tests = []struct {
+		name                  string
 		podsSynced            func() bool
 		servicesSynced        func() bool
 		endpointsSynced       func() bool
 		shouldUpdateEndpoints bool
 	}{
-		{neverReady, alwaysReady, alwaysReady, false},
-		{alwaysReady, neverReady, alwaysReady, false},
-		{alwaysReady, alwaysReady, neverReady, false},
-		{alwaysReady, alwaysReady, alwaysReady, true},
+		{
+			"Should not update endpoints with podsSynced never ready, servicesSynced always ready, endpointsSynced always ready",
+			neverReady,
+			alwaysReady,
+			alwaysReady,
+			false,
+		},
+		{
+			"Should not update endpoints with podsSynced always ready, servicesSynced never ready, endpointsSynced always ready",
+			alwaysReady,
+			neverReady,
+			alwaysReady,
+			false,
+		},
+		{
+			"Should not update endpoints with podsSynced always ready, servicesSynced always ready, endpointsSynced never ready",
+			alwaysReady,
+			alwaysReady,
+			neverReady,
+			false,
+		},
+		{
+			"Should update endpoints with podsSynced always ready, servicesSynced always ready, endpointsSynced always ready",
+			alwaysReady,
+			alwaysReady,
+			alwaysReady,
+			true,
+		},
 	}
 
 	for _, test := range tests {
-		func() {
-			ns := "other"
-			testServer, endpointsHandler := makeTestServer(t, ns)
-			defer testServer.Close()
-			endpoints := newController(testServer.URL)
-			addPods(endpoints.podStore, ns, 1, 1, 0)
-			service := &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
-				Spec: v1.ServiceSpec{
-					Selector: map[string]string{},
-					Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
-				},
-			}
-			endpoints.serviceStore.Add(service)
-			endpoints.enqueueService(service)
-			endpoints.podsSynced = test.podsSynced
-			endpoints.servicesSynced = test.servicesSynced
-			endpoints.endpointsSynced = test.endpointsSynced
-			endpoints.workerLoopPeriod = 10 * time.Millisecond
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			go endpoints.Run(1, stopCh)
+		t.Run(test.name, func(t *testing.T) {
+			func() {
+				ns := "other"
+				testServer, endpointsHandler := makeTestServer(t, ns)
+				defer testServer.Close()
+				endpoints := newController(testServer.URL)
+				addPods(endpoints.podStore, ns, 1, 1, 0)
+				service := &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+					Spec: v1.ServiceSpec{
+						Selector: map[string]string{},
+						Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
+					},
+				}
+				endpoints.serviceStore.Add(service)
+				endpoints.enqueueService(service)
+				endpoints.podsSynced = test.podsSynced
+				endpoints.servicesSynced = test.servicesSynced
+				endpoints.endpointsSynced = test.endpointsSynced
+				endpoints.workerLoopPeriod = 10 * time.Millisecond
+				stopCh := make(chan struct{})
+				defer close(stopCh)
+				go endpoints.Run(1, stopCh)
 
-			// cache.WaitForCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
-			// To ensure we get all updates, including unexpected ones, we need to wait at least as long as
-			// a single cache sync period and worker period, with some fudge room.
-			time.Sleep(150 * time.Millisecond)
-			if test.shouldUpdateEndpoints {
-				// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
-				wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
-					return endpoints.queue.Len() == 0, nil
-				})
-				endpointsHandler.ValidateRequestCount(t, 1)
-			} else {
-				endpointsHandler.ValidateRequestCount(t, 0)
-			}
-		}()
+				// cache.WaitForCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
+				// To ensure we get all updates, including unexpected ones, we need to wait at least as long as
+				// a single cache sync period and worker period, with some fudge room.
+				time.Sleep(150 * time.Millisecond)
+				if test.shouldUpdateEndpoints {
+					// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
+					wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+						return endpoints.queue.Len() == 0, nil
+					})
+					endpointsHandler.ValidateRequestCount(t, 1)
+				} else {
+					endpointsHandler.ValidateRequestCount(t, 0)
+				}
+			}()
+		})
 	}
 }
 
@@ -1016,10 +1043,12 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
-		result := shouldPodBeInEndpoints(test.pod)
-		if result != test.expected {
-			t.Errorf("%s: expected : %t, got: %t", test.name, test.expected, result)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			result := shouldPodBeInEndpoints(test.pod)
+			if result != test.expected {
+				t.Errorf("%s: expected : %t, got: %t", test.name, test.expected, result)
+			}
+		})
 	}
 }
 
@@ -1164,14 +1193,16 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
-		if !retval.Equal(testCase.xor) {
-			t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
-		}
+		t.Run(testCase.name, func(t *testing.T) {
+			retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
+			if !retval.Equal(testCase.xor) {
+				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
+			}
 
-		retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
-		if !retval.Equal(testCase.union) {
-			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
-		}
+			retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
+			if !retval.Equal(testCase.union) {
+				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
+			}
+		})
 	}
 }
