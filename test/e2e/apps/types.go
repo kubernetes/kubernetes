@@ -21,6 +21,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// NOTE(claudiub): These constants should NOT be used as Pod Container Images.
 const (
 	NginxImageName = "nginx"
 	RedisImageName = "redis"

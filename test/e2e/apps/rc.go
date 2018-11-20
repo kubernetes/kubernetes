@@ -264,7 +264,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImageName,
+					Image: NginxImage,
 				},
 			},
 		},
@@ -272,7 +272,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 
 	By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
@@ -301,7 +301,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
 	By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
