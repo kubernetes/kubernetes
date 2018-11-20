@@ -4309,9 +4309,9 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 
 	if isNLB(service.Annotations) {
 		return c.deleteLoadBalancerv2(loadBalancerName)
-	} else {
-		return c.deleteLoadBalancer(loadBalancerName, service)
 	}
+
+	return c.deleteLoadBalancer(loadBalancerName, service)
 }
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
