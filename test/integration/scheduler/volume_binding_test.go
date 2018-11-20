@@ -36,10 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -825,17 +827,9 @@ func TestVolumeProvision(t *testing.T) {
 // selectedNode annotation from a claim to reschedule volume provision
 // on provision failure.
 func TestRescheduleProvisioning(t *testing.T) {
-	features := map[string]bool{
-		"VolumeScheduling": true,
-	}
-	oldFeatures := make(map[string]bool, len(features))
-	for feature := range features {
-		oldFeatures[feature] = utilfeature.DefaultFeatureGate.Enabled(utilfeature.Feature(feature))
-	}
-	// Set feature gates
-	utilfeature.DefaultFeatureGate.SetFromMap(features)
-	controllerCh := make(chan struct{})
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
+	controllerCh := make(chan struct{})
 	context := initTestMaster(t, "reschedule-volume-provision", nil)
 
 	clientset := context.clientSet
@@ -846,8 +840,6 @@ func TestRescheduleProvisioning(t *testing.T) {
 		deleteTestObjects(clientset, ns, nil)
 		context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 		context.closeFn()
-		// Restore feature gates
-		utilfeature.DefaultFeatureGate.SetFromMap(oldFeatures)
 	}()
 
 	ctrl, informerFactory, err := initPVController(context, 0)
@@ -894,12 +886,12 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[string]bool, resyncPeriod time.Duration, provisionDelaySeconds int, disableEquivalenceCache bool) *testConfig {
-	oldFeatures := make(map[string]bool, len(features))
-	for feature := range features {
-		oldFeatures[feature] = utilfeature.DefaultFeatureGate.Enabled(utilfeature.Feature(feature))
+	featureGatesRestoreFuncs := []func(){}
+	for feature, enable := range features {
+		// Set feature gates
+		restoreFunc := utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, utilfeature.Feature(feature), enable)
+		featureGatesRestoreFuncs = append(featureGatesRestoreFuncs, restoreFunc)
 	}
-	// Set feature gates
-	utilfeature.DefaultFeatureGate.SetFromMap(features)
 
 	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), false, nil, false, disableEquivalenceCache, resyncPeriod)
 
@@ -939,7 +931,9 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 			deleteTestObjects(clientset, ns, nil)
 			cleanupTest(t, context)
 			// Restore feature gates
-			utilfeature.DefaultFeatureGate.SetFromMap(oldFeatures)
+			for _, restore := range featureGatesRestoreFuncs {
+				restore()
+			}
 		},
 	}
 }
