@@ -26,7 +26,7 @@ const (
 	// sense to set sandbox level oom score, e.g. a sandbox could only be a namespace
 	// without a process.
 	// TODO: Handle infra container oom score adj in a runtime agnostic way.
-	PodInfraOOMAdj        int = -999
+	PodInfraOOMAdj        int = -998
 	KubeletOOMScoreAdj    int = -999
 	DockerOOMScoreAdj     int = -999
 	KubeProxyOOMScoreAdj  int = -999
