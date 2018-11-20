@@ -19,6 +19,8 @@ package apiserver
 import (
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -227,4 +229,22 @@ func TestSync(t *testing.T) {
 			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
 		}
 	}
+}
+
+func TestUpdateAPIServiceStatus(t *testing.T) {
+	foo := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "foo"}}}}
+	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
+
+	fakeClient := fake.NewSimpleClientset()
+	updateAPIServiceStatus(fakeClient.Apiregistration(), foo, foo)
+	if e, a := 0, len(fakeClient.Actions()); e != a {
+		t.Error(spew.Sdump(fakeClient.Actions()))
+	}
+
+	fakeClient.ClearActions()
+	updateAPIServiceStatus(fakeClient.Apiregistration(), foo, bar)
+	if e, a := 1, len(fakeClient.Actions()); e != a {
+		t.Error(spew.Sdump(fakeClient.Actions()))
+	}
+
 }

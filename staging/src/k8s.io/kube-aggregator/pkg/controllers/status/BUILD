@@ -13,6 +13,7 @@ go_library(
     importpath = "k8s.io/kube-aggregator/pkg/controllers/status",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -46,6 +47,7 @@ go_test(
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )
 
