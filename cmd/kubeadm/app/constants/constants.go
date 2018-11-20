@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -388,6 +387,7 @@ var (
 		10: "3.1.12",
 		11: "3.2.18",
 		12: "3.2.24",
+		13: "3.2.24",
 	}
 )
 
