@@ -176,7 +176,7 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 		}
 		if excluded.Len() > 0 {
 			fmt.Fprintf(&verboseOut, "warn: some health checks cannot be excluded: no matches for %v\n", formatQuoted(excluded.List()...))
-			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %v",
+			glog.Warningf("cannot exclude some health checks, no health checks are installed matching %v",
 				formatQuoted(excluded.List()...))
 		}
 		// always be verbose on failure
