@@ -138,9 +138,9 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 		Do().
 		Get()
 }
-func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.UpdateOptions) (runtime.Object, error) {
+func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
 	if options == nil {
-		options = &metav1.UpdateOptions{}
+		options = &metav1.PatchOptions{}
 	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).

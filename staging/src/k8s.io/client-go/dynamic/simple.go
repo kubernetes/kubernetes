@@ -283,7 +283,7 @@ func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 		WatchWithSpecificDecoders(wrappedDecoderFn, unstructured.UnstructuredJSONScheme)
 }
 
-func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	result := c.client.client.
 		Patch(pt).
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).

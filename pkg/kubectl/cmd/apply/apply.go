@@ -370,7 +370,7 @@ func (o *ApplyOptions) Run() error {
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
-			options := metav1.UpdateOptions{}
+			options := metav1.PatchOptions{}
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}
 			}
@@ -868,7 +868,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return patch, obj, nil
 	}
 
-	options := metav1.UpdateOptions{}
+	options := metav1.PatchOptions{}
 	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
