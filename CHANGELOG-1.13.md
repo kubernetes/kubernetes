@@ -101,7 +101,6 @@ filename | sha512 hash
 * StatefulSet is supported in `kubectl autoscale` command ([#71103](https://github.com/kubernetes/kubernetes/pull/71103), [@Pingan2017](https://github.com/Pingan2017))
 * Report kube-scheduler unhealthy if leader election is deadlocked. ([#71085](https://github.com/kubernetes/kubernetes/pull/71085), [@bsalamat](https://github.com/bsalamat))
 * apiserver: fixes handling and logging of panics in REST handlers ([#71076](https://github.com/kubernetes/kubernetes/pull/71076), [@liggitt](https://github.com/liggitt))
-* kube-apiserver now serves OpenAPI specs for registered CRDs with defined validation schemata. Kubectl will validate client-side using those. ([#67205](https://github.com/kubernetes/kubernetes/pull/67205), [@roycaihw](https://github.com/roycaihw))
 * kubelets are no longer allowed to delete their own Node API object. Prior to 1.11, in rare circumstances related to cloudprovider node ID changes, kubelets would attempt to delete/recreate their Node object at startup. Kubelets older than 1.11 are not supported running against a v1.13+ API server. If an unsupported legacy kubelet encounters this situation, a cluster admin can remove the Node object: ([#71021](https://github.com/kubernetes/kubernetes/pull/71021), [@liggitt](https://github.com/liggitt))
         * `kubectl delete node/<nodeName>`
     * or grant self-deletion permission explicitly:
