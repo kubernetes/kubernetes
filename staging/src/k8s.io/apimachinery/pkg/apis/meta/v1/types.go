@@ -1022,23 +1022,28 @@ type VersionedFieldSet struct {
 	// APIVersion field. It is necessary to track the version of a field
 	// set because it cannot be automatically converted.
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
-	// Fields identifies a set of fields.
-	Fields FieldSet `json:"fields,omitempty" protobuf:"bytes,2,opt,name=fields,casttype=FieldSet"`
+	// Fields identifies the set of fields.
+	Fields Fields `json:"fields,omitempty" protobuf:"bytes,2,opt,name=fields,casttype=FieldSet"`
 }
 
-// FieldSet stores a set of fields in a data structure like a Trie.
-// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
-type FieldSet struct {
-	// Members lists fields that are part of the set.
-	Members []FieldPathElement `json:"members" protobuf:"bytes,1,rep,name=members"`
-	// Children lists child fields which themselves have children that are
-	// members of the set. Appearance in this list does not imply membership,
-	// although it does imply some descendant field is a member.
-	// Note: this is a tree, not an arbitrary graph.
-	Children []FieldSetNode `json:"children" protobuf:"bytes,2,rep,name=children"`
-}
+// Fields is a recursive structure for holding a set of fields. The key in the
+// structure identifies the field. The value identifies all child fields.
+//
+// The presence of a field doesn't mean it's included in the set, there are two
+// rules which govern that:
+// * A field named "." indicates that the containing field is included in the set.
+// * A field that is present in the set but has no children (a "leaf") is
+//   included in the set.
+//
+// The keys are encoded FieldPathElement structures; see the comment there for
+// the encoding.
+//
+// The unusual serialization mechanism technique is for brevity.
+type Fields map[string]Fields
 
 // FieldPathElement describes how to select a child field given a containing object.
+// Unlike most API objects, this is serialized as the keys in the `Fields`
+// type. This is a custom serialization, for readability.
 type FieldPathElement struct {
 	// Exactly one of the following fields should be non-nil.
 	// FieldName selects a single field from a map (reminder: this is also
@@ -1059,15 +1064,6 @@ type FieldPathElement struct {
 	// object must be an atomic list.
 	// +optional
 	Index *int32 `json:"index,omitempty" protobuf:"varint,4,opt,name=index"`
-}
-
-// FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing
-// nested set membership.
-type FieldSetNode struct {
-	// PathElement identifies which field this node expresses child membership for.
-	PathElement FieldPathElement `json:"pathElement" protobuf:"bytes,1,opt,name=pathElement,casttype=FieldPathElement"`
-	// Set identifies which child fields of this node are part of the FieldSet.
-	Set *FieldSet `json:"set" protobuf:"bytes,2,opt,name=set,casttype=FieldSet"`
 }
 
 // FieldNameValuePair is an individual key-value pair.
@@ -1095,5 +1091,5 @@ type FieldValue struct {
 	// +optional
 	BooleanValue *bool `json:"booleanValue,omitempty" protobuf:"varint,4,opt,name=booleanValue"`
 	// Null represents an explicit `"foo" = null`
-	Null bool `json:"null" protobuf:"varint,5,opt,name=null"`
+	Null bool `json:"null,omitempty" protobuf:"varint,5,opt,name=null"`
 }
