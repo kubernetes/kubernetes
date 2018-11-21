@@ -25,7 +25,7 @@ run_configmap_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing configmaps"
   kubectl create -f test/fixtures/doc-yaml/user-guide/configmap/configmap.yaml
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}{{end}}" 'test-configmap'
+  kube::test::get_object_assert 'configmap/test-configmap' "{{$id_field}}" 'test-configmap'
   kubectl delete configmap test-configmap "${kube_flags[@]}"
 
   ### Create a new namespace
@@ -37,8 +37,10 @@ run_configmap_tests() {
   kube::test::get_object_assert 'namespaces/test-configmaps' "{{$id_field}}" 'test-configmaps'
 
   ### Create a generic configmap in a specific namespace
-  # Pre-condition: no configmaps namespace exists
-  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: configmap test-configmap and test-binary-configmap does not exist
+  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"test-binary-configmap\" }}found{{end}}{{end}}:' ':'
+
   # Command
   kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
   kubectl create configmap test-binary-configmap --from-file <( head -c 256 /dev/urandom ) --namespace=test-configmaps
@@ -222,8 +224,11 @@ run_pod_tests() {
   kube::test::get_object_assert 'secret/test-secret --namespace=test-kubectl-describe-pod' "{{$secret_type}}" 'test-type'
 
   ### Create a generic configmap
-  # Pre-condition: no CONFIGMAP exists
-  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-condition: CONFIGMAP test-configmap does not exist
+  #kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" ''
+  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' '{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:' ':'
+
+  #kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create configmap test-configmap --from-literal=key-2=value2 --namespace=test-kubectl-describe-pod
   # Post-condition: configmap exists and has expected values
@@ -751,6 +756,13 @@ run_secrets_test() {
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
+  # Command with process substitution
+  kubectl create secret tls test-secret --namespace=test-secrets --key <(cat hack/testdata/tls.key) --cert <(cat hack/testdata/tls.crt)
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
+    # Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets
+
   # Create a secret using stringData
   kubectl create --namespace=test-secrets -f - "${kube_flags[@]}" << __EOF__
 {
@@ -1086,6 +1098,34 @@ run_rc_tests() {
   kube::test::get_object_assert 'deployment nginx-deployment' "{{$deployment_replicas}}" '1'
   # Clean-up
   kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
+
+  ### Expose deployments by creating a service
+  # Uses deployment selectors for created service
+  output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
+  # Post-condition: service created for deployment.
+  kube::test::if_has_string "${output_message}" 'service/expose-test-deployment exposed'
+  # Clean-up
+  kubectl delete service/expose-test-deployment "${kube_flags[@]}"
+  # Uses deployment selectors for created service
+  output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta2deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
+  # Post-condition: service created for deployment.
+  kube::test::if_has_string "${output_message}" 'service/expose-test-deployment exposed'
+  # Clean-up
+  kubectl delete service/expose-test-deployment "${kube_flags[@]}"
+  # Uses deployment selectors for created service
+  output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta1deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
+  # Post-condition: service created for deployment.
+  kube::test::if_has_string "${output_message}" 'service/expose-test-deployment exposed'
+  # Clean-up
+  kubectl delete service/expose-test-deployment "${kube_flags[@]}"
+  # Contains no selectors, should fail.
+  output_message=$(! kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment-no-selectors.yaml --port 80 2>&1 "${kube_flags[@]}")
+  # Post-condition: service created for deployment.
+  kube::test::if_has_string "${output_message}" 'invalid deployment: no selectors'
+  # Contains no selectors, should fail.
+  output_message=$(! kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1beta2deployment-no-selectors.yaml --port 80 2>&1 "${kube_flags[@]}")
+  # Post-condition: service created for deployment.
+  kube::test::if_has_string "${output_message}" 'invalid deployment: no selectors'
 
   ### Expose a deployment as a service
   kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]}"

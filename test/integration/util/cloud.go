@@ -52,9 +52,9 @@ func (*mockTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-// NewMockGCECloud returns a handle to a GCECloud instance that is
+// NewMockGCECloud returns a handle to a Cloud instance that is
 // served by a mock http server
-func NewMockGCECloud(cloud cloud.Cloud) (*gce.GCECloud, error) {
+func NewMockGCECloud(cloud cloud.Cloud) (*gce.Cloud, error) {
 	config := &gce.CloudConfig{
 		ProjectID:          TestProjectID,
 		NetworkProjectID:   TestNetworkProjectID,

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 )
 
 type BaseControllerRefManager struct {
@@ -223,7 +223,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
-	glog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
+	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), pod.UID)
 	err := m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(deleteOwnerRefPatch))
@@ -345,7 +345,7 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) er
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
-	glog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
+	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
 		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), replicaSet.UID)
 	err := m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(deleteOwnerRefPatch))
@@ -480,7 +480,7 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 // ReleaseControllerRevision sends a patch to free the ControllerRevision from the control of its controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
-	glog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
+	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
 		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), history.UID)
 	err := m.crControl.PatchControllerRevision(history.Namespace, history.Name, []byte(deleteOwnerRefPatch))

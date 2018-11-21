@@ -17,6 +17,7 @@ limitations under the License.
 package passwordfile
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -110,16 +111,16 @@ password7,user7,uid7,"group1,group2",otherdata
 		},
 	}
 	for i, testCase := range testCases {
-		user, ok, err := auth.AuthenticatePassword(testCase.Username, testCase.Password)
+		resp, ok, err := auth.AuthenticatePassword(context.Background(), testCase.Username, testCase.Password)
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 		}
 		if testCase.User == nil {
-			if user != nil {
-				t.Errorf("%d: unexpected non-nil user %#v", i, user)
+			if resp != nil {
+				t.Errorf("%d: unexpected non-nil user %#v", i, resp.User)
 			}
-		} else if !reflect.DeepEqual(testCase.User, user) {
-			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, user)
+		} else if !reflect.DeepEqual(testCase.User, resp.User) {
+			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, resp.User)
 		}
 		if testCase.Ok != ok {
 			t.Errorf("%d: expected auth %v, got %v", i, testCase.Ok, ok)

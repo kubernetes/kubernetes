@@ -19,9 +19,9 @@ package flexvolume
 import (
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -30,6 +30,8 @@ type flexVolumeAttacher struct {
 }
 
 var _ volume.Attacher = &flexVolumeAttacher{}
+
+var _ volume.DeviceMounter = &flexVolumeAttacher{}
 
 // Attach is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
@@ -89,9 +91,8 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		// plugin does not implement attach interface.
 		if devicePath != "" {
 			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
-		} else {
-			return nil
 		}
+		return nil
 	}
 	return err
 }
@@ -111,7 +112,7 @@ func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName t
 		} else if err == nil {
 			if !status.Attached {
 				volumesAttachedCheck[spec] = false
-				glog.V(2).Infof("VolumesAreAttached: check volume (%q) is no longer attached", spec.Name())
+				klog.V(2).Infof("VolumesAreAttached: check volume (%q) is no longer attached", spec.Name())
 			}
 		} else {
 			return nil, err

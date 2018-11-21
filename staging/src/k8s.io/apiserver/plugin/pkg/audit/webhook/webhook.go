@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,7 +48,20 @@ func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBac
 }
 
 type backend struct {
-	w *webhook.GenericWebhook
+	w    *webhook.GenericWebhook
+	name string
+}
+
+// NewDynamicBackend returns an audit backend configured from a REST client that
+// sends events over HTTP to an external service.
+func NewDynamicBackend(rc *rest.RESTClient, initialBackoff time.Duration) audit.Backend {
+	return &backend{
+		w: &webhook.GenericWebhook{
+			RestClient:     rc,
+			InitialBackoff: initialBackoff,
+		},
+		name: fmt.Sprintf("dynamic_%s", PluginName),
+	}
 }
 
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
@@ -56,7 +70,7 @@ func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion, initial
 	if err != nil {
 		return nil, err
 	}
-	return &backend{w}, nil
+	return &backend{w: w, name: PluginName}, nil
 }
 
 func (b *backend) Run(stopCh <-chan struct{}) error {
@@ -67,10 +81,12 @@ func (b *backend) Shutdown() {
 	// nothing to do here
 }
 
-func (b *backend) ProcessEvents(ev ...*auditinternal.Event) {
+func (b *backend) ProcessEvents(ev ...*auditinternal.Event) bool {
 	if err := b.processEvents(ev...); err != nil {
-		audit.HandlePluginError(PluginName, err, ev...)
+		audit.HandlePluginError(b.String(), err, ev...)
+		return false
 	}
+	return true
 }
 
 func (b *backend) processEvents(ev ...*auditinternal.Event) error {
@@ -84,5 +100,5 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 }
 
 func (b *backend) String() string {
-	return PluginName
+	return b.name
 }

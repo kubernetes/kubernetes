@@ -31,8 +31,10 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
@@ -44,8 +46,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		if isDryRun(req.URL) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
@@ -173,6 +175,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }
@@ -180,8 +183,11 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		if isDryRun(req.URL) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+		trace := utiltrace.New("Delete " + req.URL.Path)
+		defer trace.LogIfLong(500 * time.Millisecond)
+
+		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
@@ -308,6 +314,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }

@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "categories.go",
-        "rest_client.go",
         "tag_association.go",
         "tags.go",
     ],
@@ -12,8 +11,9 @@ go_library(
     importpath = "github.com/vmware/govmomi/vapi/tags",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
-        "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vapi/internal:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vapi/rest:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
     ],
 )
 

@@ -47,7 +47,11 @@ type WardleServerOptions struct {
 
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("wardle-apiserver", "wardle"),
+		),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -90,13 +94,16 @@ func (o WardleServerOptions) Validate(args []string) error {
 }
 
 func (o *WardleServerOptions) Complete() error {
+	// register admission plugins
+	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
+
+	// add admisison plugins to the RecommendedPluginOrder
+	o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
+
 	return nil
 }
 
 func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
-	// register admission plugins
-	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
-
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)

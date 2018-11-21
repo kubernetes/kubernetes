@@ -53,40 +53,48 @@ func TestParseResolvConf(t *testing.T) {
 		nameservers []string
 		searches    []string
 		options     []string
+		isErr       bool
 	}{
-		{"", []string{}, []string{}, []string{}},
-		{" ", []string{}, []string{}, []string{}},
-		{"\n", []string{}, []string{}, []string{}},
-		{"\t\n\t", []string{}, []string{}, []string{}},
-		{"#comment\n", []string{}, []string{}, []string{}},
-		{" #comment\n", []string{}, []string{}, []string{}},
-		{"#comment\n#comment", []string{}, []string{}, []string{}},
-		{"#comment\nnameserver", []string{}, []string{}, []string{}},
-		{"#comment\nnameserver\nsearch", []string{}, []string{}, []string{}},
-		{"nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
-		{" nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
-		{"\tnameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
-		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
-		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
-		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}, []string{}},
-		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}, []string{}},
-		{"search foo", []string{}, []string{"foo"}, []string{}},
-		{"search foo bar", []string{}, []string{"foo", "bar"}, []string{}},
-		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}, []string{}},
-		{"search foo\nsearch bar", []string{}, []string{"bar"}, []string{}},
-		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}, []string{}},
-		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{}},
-		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}, []string{}},
-		{"options ndots:5 attempts:2", []string{}, []string{}, []string{"ndots:5", "attempts:2"}},
-		{"options ndots:1\noptions ndots:5 attempts:3", []string{}, []string{}, []string{"ndots:5", "attempts:3"}},
-		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}},
+		{"", []string{}, []string{}, []string{}, false},
+		{" ", []string{}, []string{}, []string{}, false},
+		{"\n", []string{}, []string{}, []string{}, false},
+		{"\t\n\t", []string{}, []string{}, []string{}, false},
+		{"#comment\n", []string{}, []string{}, []string{}, false},
+		{" #comment\n", []string{}, []string{}, []string{}, false},
+		{"#comment\n#comment", []string{}, []string{}, []string{}, false},
+		{"#comment\nnameserver", []string{}, []string{}, []string{}, true},                           // nameserver empty
+		{"#comment\nnameserver\nsearch", []string{}, []string{}, []string{}, true},                   // nameserver and search empty
+		{"#comment\nnameserver 1.2.3.4\nsearch", []string{"1.2.3.4"}, []string{}, []string{}, false}, // nameserver specified and search empty
+		{"nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}, false},
+		{" nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}, false},
+		{"\tnameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}, false},
+		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}, false},
+		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}, false},
+		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}, []string{}, false},
+		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}, []string{}, false},
+		{"search ", []string{}, []string{}, []string{}, false}, // search empty
+		{"search foo", []string{}, []string{"foo"}, []string{}, false},
+		{"search foo bar", []string{}, []string{"foo", "bar"}, []string{}, false},
+		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}, []string{}, false},
+		{"search foo\nsearch bar", []string{}, []string{"bar"}, []string{}, false},
+		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}, []string{}, false},
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{}, false},
+		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}, []string{}, false},
+		{"options ", []string{}, []string{}, []string{}, false},
+		{"options ndots:5 attempts:2", []string{}, []string{}, []string{"ndots:5", "attempts:2"}, false},
+		{"options ndots:1\noptions ndots:5 attempts:3", []string{}, []string{}, []string{"ndots:5", "attempts:3"}, false},
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}, false},
 	}
 	for i, tc := range testCases {
 		ns, srch, opts, err := parseResolvConf(strings.NewReader(tc.data))
-		require.NoError(t, err)
-		assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
-		assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
-		assert.EqualValues(t, tc.options, opts, "test case [%d] options", i)
+		if !tc.isErr {
+			require.NoError(t, err)
+			assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
+			assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
+			assert.EqualValues(t, tc.options, opts, "test case [%d] options", i)
+		} else {
+			require.Error(t, err, "tc.searches %v", tc.searches)
+		}
 	}
 }
 
@@ -221,13 +229,13 @@ func TestMergeDNSOptions(t *testing.T) {
 		expectedOptions          []string
 	}{
 		{
-			desc: "Empty dnsConfigOptions",
+			desc:                     "Empty dnsConfigOptions",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions:         nil,
 			expectedOptions:          []string{"ndots:5", "debug"},
 		},
 		{
-			desc: "No duplicated entries",
+			desc:                     "No duplicated entries",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions: []v1.PodDNSConfigOption{
 				{Name: "single-request"},
@@ -236,7 +244,7 @@ func TestMergeDNSOptions(t *testing.T) {
 			expectedOptions: []string{"ndots:5", "debug", "single-request", "attempts:3"},
 		},
 		{
-			desc: "Overwrite duplicated entries",
+			desc:                     "Overwrite duplicated entries",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions: []v1.PodDNSConfigOption{
 				{Name: "ndots", Value: &testOptionValue},
@@ -335,7 +343,7 @@ func TestGetPodDNSType(t *testing.T) {
 			expectedDNSType: podDNSHost,
 		},
 		{
-			desc: "valid DNSNone with feature gate",
+			desc:                    "valid DNSNone with feature gate",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSNone,
 			expectedDNSType:         podDNSNone,
@@ -539,13 +547,13 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSNone without DNSConfig should have empty DNS settings",
+			desc:                    "feature gate is enabled, DNSNone without DNSConfig should have empty DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSNone,
 			expectedDNSConfig:       &runtimeapi.DNSConfig{},
 		},
 		{
-			desc: "feature gate is enabled, DNSNone with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSNone with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSNone,
 			dnsConfig: &v1.PodDNSConfig{
@@ -563,7 +571,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSClusterFirst with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSClusterFirst with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSClusterFirst,
 			dnsConfig: &v1.PodDNSConfig{
@@ -581,7 +589,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			hostnetwork:             true,
 			dnsPolicy:               v1.DNSClusterFirstWithHostNet,
@@ -600,7 +608,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSDefault with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSDefault with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSDefault,
 			dnsConfig: &v1.PodDNSConfig{

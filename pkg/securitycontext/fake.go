@@ -35,8 +35,10 @@ func ValidSecurityContextWithContainerDefaults() *v1.SecurityContext {
 // empty container defaults.  Used for testing.
 func ValidInternalSecurityContextWithContainerDefaults() *api.SecurityContext {
 	priv := false
+	dpm := api.DefaultProcMount
 	return &api.SecurityContext{
 		Capabilities: &api.Capabilities{},
 		Privileged:   &priv,
+		ProcMount:    &dpm,
 	}
 }

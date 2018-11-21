@@ -4,7 +4,7 @@ metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
     kubectl.kubernetes.io/last-applied-configuration: '{"kind":"Deployment","apiVersion":"extensions/v1beta1","metadata":{"name":"nginx-deployment","creationTimestamp":null},"spec":{"template":{"metadata":{"creationTimestamp":null,"labels":{"name":"nginx"}},"spec":{"containers":[{"name":"nginx","image":"nginx","resources":{}}]}},"strategy":{}},"status":{}}'
-  creationTimestamp: 2016-10-24T22:15:06Z
+  creationTimestamp: "2016-10-24T22:15:06Z"
   generation: 6
   labels:
     name: nginx

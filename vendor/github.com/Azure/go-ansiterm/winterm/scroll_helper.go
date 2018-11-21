@@ -50,8 +50,8 @@ func (h *windowsAnsiEventHandler) insertLines(param int) error {
 
 // scroll scrolls the provided scroll region by param lines. The scroll region is in buffer coordinates.
 func (h *windowsAnsiEventHandler) scroll(param int, sr scrollRegion, info *CONSOLE_SCREEN_BUFFER_INFO) error {
-	logger.Infof("scroll: scrollTop: %d, scrollBottom: %d", sr.top, sr.bottom)
-	logger.Infof("scroll: windowTop: %d, windowBottom: %d", info.Window.Top, info.Window.Bottom)
+	h.logf("scroll: scrollTop: %d, scrollBottom: %d", sr.top, sr.bottom)
+	h.logf("scroll: windowTop: %d, windowBottom: %d", info.Window.Top, info.Window.Bottom)
 
 	// Copy from and clip to the scroll region (full buffer width)
 	scrollRect := SMALL_RECT{

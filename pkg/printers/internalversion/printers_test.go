@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	genericprinters "k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -50,16 +52,10 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	genericprinters "k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/printers"
 )
-
-func init() {
-	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &TestPrintType{})
-	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &TestPrintType{})
-}
 
 var testData = TestStruct{
 	TypeMeta:   metav1.TypeMeta{APIVersion: "foo/bar", Kind: "TestStruct"},
@@ -257,8 +253,12 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	}
 }
 
+func yamlUnmarshal(data []byte, v interface{}) error {
+	return yaml.Unmarshal(data, v)
+}
+
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yaml.Unmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yamlUnmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
@@ -1152,6 +1152,10 @@ func TestPrintHumanReadableService(t *testing.T) {
 						Port:     8000,
 						Protocol: "TCP",
 					},
+					{
+						Port:     7777,
+						Protocol: "SCTP",
+					},
 				},
 			},
 		},
@@ -1289,7 +1293,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Image: "foo/bar",
+									Image:                  "foo/bar",
 									TerminationMessagePath: api.TerminationMessagePathDefault,
 									ImagePullPolicy:        api.PullIfNotPresent,
 								},
@@ -1645,6 +1649,9 @@ func TestPrintPod(t *testing.T) {
 }
 
 func TestPrintPodwide(t *testing.T) {
+	condition1 := "condition1"
+	condition2 := "condition2"
+	condition3 := "condition3"
 	tests := []struct {
 		pod    api.Pod
 		expect []metav1beta1.TableRow
@@ -1656,8 +1663,29 @@ func TestPrintPodwide(t *testing.T) {
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
 					NodeName:   "test1",
+					ReadinessGates: []api.PodReadinessGate{
+						{
+							ConditionType: api.PodConditionType(condition1),
+						},
+						{
+							ConditionType: api.PodConditionType(condition2),
+						},
+						{
+							ConditionType: api.PodConditionType(condition3),
+						},
+					},
 				},
 				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodConditionType(condition1),
+							Status: api.ConditionFalse,
+						},
+						{
+							Type:   api.PodConditionType(condition2),
+							Status: api.ConditionTrue,
+						},
+					},
 					Phase: "podPhase",
 					PodIP: "1.1.1.1",
 					ContainerStatuses: []api.ContainerStatus{
@@ -1667,7 +1695,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1686,7 +1714,7 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
 		},
 	}
 
@@ -1967,17 +1995,17 @@ func TestTranslateTimestampUntil(t *testing.T) {
 
 func TestPrintDeployment(t *testing.T) {
 	tests := []struct {
-		deployment extensions.Deployment
+		deployment apps.Deployment
 		expect     string
 		wideExpect string
 	}{
 		{
-			extensions.Deployment{
+			apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: apps.DeploymentSpec{
 					Replicas: 5,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
@@ -1995,15 +2023,15 @@ func TestPrintDeployment(t *testing.T) {
 					},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
-				Status: extensions.DeploymentStatus{
+				Status: apps.DeploymentStatus{
 					Replicas:            10,
 					UpdatedReplicas:     2,
 					AvailableReplicas:   1,
 					UnavailableReplicas: 4,
 				},
 			},
-			"test1\t5\t10\t2\t1\t0s\n",
-			"test1\t5\t10\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1\t0/5\t2\t1\t0s\n",
+			"test1\t0/5\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
 		},
 	}
 
@@ -2036,21 +2064,21 @@ func TestPrintDeployment(t *testing.T) {
 
 func TestPrintDaemonSet(t *testing.T) {
 	tests := []struct {
-		ds         extensions.DaemonSet
+		ds         apps.DaemonSet
 		startsWith string
 	}{
 		{
-			extensions.DaemonSet{
+			apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.DaemonSetSpec{
+				Spec: apps.DaemonSetSpec{
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
 					},
 				},
-				Status: extensions.DaemonSetStatus{
+				Status: apps.DaemonSetStatus{
 					CurrentNumberScheduled: 2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
@@ -2172,6 +2200,10 @@ func TestPrintHPA(t *testing.T) {
 	minReplicasVal := int32(2)
 	targetUtilizationVal := int32(80)
 	currentUtilizationVal := int32(50)
+	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
+	if err != nil {
+		t.Errorf("unable to parse label selector: %v", err)
+	}
 	tests := []struct {
 		hpa      autoscaling.HorizontalPodAutoscaler
 		expected string
@@ -2209,13 +2241,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:         "some-external-metric",
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2242,13 +2275,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:         "some-external-metric",
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2260,13 +2294,13 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricStatus{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:          "some-external-metric",
-								CurrentAverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2289,13 +2323,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-service-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:  "some-service-metric",
-								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2322,13 +2357,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:  "some-external-metric",
-								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2340,8 +2376,12 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricStatus{
-								MetricName:   "some-external-metric",
-								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-external-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									Value: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2364,8 +2404,13 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2392,8 +2437,13 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2405,8 +2455,12 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricStatus{
-								MetricName:          "some-pods-metric",
-								CurrentAverageValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2429,12 +2483,17 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ObjectMetricSourceType,
 							Object: &autoscaling.ObjectMetricSource{
-								Target: autoscaling.CrossVersionObjectReference{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								MetricName:  "some-service-metric",
-								TargetValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2461,12 +2520,17 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ObjectMetricSourceType,
 							Object: &autoscaling.ObjectMetricSource{
-								Target: autoscaling.CrossVersionObjectReference{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								MetricName:  "some-service-metric",
-								TargetValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2478,12 +2542,16 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ObjectMetricSourceType,
 							Object: &autoscaling.ObjectMetricStatus{
-								Target: autoscaling.CrossVersionObjectReference{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								MetricName:   "some-service-metric",
-								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									Value: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2506,8 +2574,11 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name:               api.ResourceCPU,
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Name: api.ResourceCPU,
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2534,8 +2605,11 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name:               api.ResourceCPU,
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Name: api.ResourceCPU,
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2547,8 +2621,10 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
-								Name:                api.ResourceCPU,
-								CurrentAverageValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Name: api.ResourceCPU,
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2572,7 +2648,10 @@ func TestPrintHPA(t *testing.T) {
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
 								Name: api.ResourceCPU,
-								TargetAverageUtilization: &targetUtilizationVal,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
 							},
 						},
 					},
@@ -2600,7 +2679,10 @@ func TestPrintHPA(t *testing.T) {
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
 								Name: api.ResourceCPU,
-								TargetAverageUtilization: &targetUtilizationVal,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
 							},
 						},
 					},
@@ -2613,8 +2695,10 @@ func TestPrintHPA(t *testing.T) {
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
 								Name: api.ResourceCPU,
-								CurrentAverageUtilization: &currentUtilizationVal,
-								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
+								Current: autoscaling.MetricValueStatus{
+									AverageUtilization: &currentUtilizationVal,
+									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2637,22 +2721,35 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
 								Name: api.ResourceCPU,
-								TargetAverageUtilization: &targetUtilizationVal,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
 							},
 						},
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "other-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(400, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "other-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(400, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2664,16 +2761,22 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricStatus{
-								MetricName:          "some-pods-metric",
-								CurrentAverageValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
 								Name: api.ResourceCPU,
-								CurrentAverageUtilization: &currentUtilizationVal,
-								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
+								Current: autoscaling.MetricValueStatus{
+									AverageUtilization: &currentUtilizationVal,
+									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -3075,17 +3178,17 @@ func boolP(b bool) *bool {
 
 func TestPrintReplicaSet(t *testing.T) {
 	tests := []struct {
-		replicaSet extensions.ReplicaSet
+		replicaSet apps.ReplicaSet
 		expect     string
 		wideExpect string
 	}{
 		{
-			extensions.ReplicaSet{
+			apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.ReplicaSetSpec{
+				Spec: apps.ReplicaSetSpec{
 					Replicas: 5,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
@@ -3103,7 +3206,7 @@ func TestPrintReplicaSet(t *testing.T) {
 					},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
-				Status: extensions.ReplicaSetStatus{
+				Status: apps.ReplicaSetStatus{
 					Replicas:      5,
 					ReadyReplicas: 2,
 				},
@@ -3408,6 +3511,51 @@ func TestPrintLease(t *testing.T) {
 	}
 }
 
+func TestPrintPriorityClass(t *testing.T) {
+	tests := []struct {
+		pc     scheduling.PriorityClass
+		expect string
+	}{
+		{
+			scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Value: 1,
+			},
+			"pc1\t1\tfalse\t0s\n",
+		},
+		{
+			scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Value:         1000000000,
+				GlobalDefault: true,
+			},
+			"pc2\t1000000000\ttrue\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
 func verifyTable(t *testing.T, table *metav1beta1.Table) {
 	var panicErr interface{}
 	func() {
@@ -3419,5 +3567,29 @@ func verifyTable(t *testing.T, table *metav1beta1.Table) {
 
 	if panicErr != nil {
 		t.Errorf("unexpected panic during deepcopy of table %#v: %v", table, panicErr)
+	}
+}
+
+// VerifyDatesInOrder checks the start of each line for a RFC1123Z date
+// and posts error if all subsequent dates are not equal or increasing
+func VerifyDatesInOrder(
+	resultToTest, rowDelimiter, columnDelimiter string, t *testing.T) {
+	lines := strings.Split(resultToTest, rowDelimiter)
+	var previousTime time.Time
+	for _, str := range lines {
+		columns := strings.Split(str, columnDelimiter)
+		if len(columns) > 0 {
+			currentTime, err := time.Parse(time.RFC1123Z, columns[0])
+			if err == nil {
+				if previousTime.After(currentTime) {
+					t.Errorf(
+						"Output is not sorted by time. %s should be listed after %s. Complete output: %s",
+						previousTime.Format(time.RFC1123Z),
+						currentTime.Format(time.RFC1123Z),
+						resultToTest)
+				}
+				previousTime = currentTime
+			}
+		}
 	}
 }

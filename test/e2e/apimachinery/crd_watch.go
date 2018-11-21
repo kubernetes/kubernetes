@@ -80,35 +80,35 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			noxuResourceClient := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
 
 			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to watch custom resource: %s", watchCRNameA)
 
 			watchB, err := watchCRWithName(noxuResourceClient, watchCRNameB)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to watch custom resource: %s", watchCRNameB)
 
 			testCrA := fixtures.NewNoxuInstance(ns, watchCRNameA)
 			testCrB := fixtures.NewNoxuInstance(ns, watchCRNameB)
 
 			By("Creating first CR ")
 			testCrA, err = instantiateCustomResource(testCrA, noxuResourceClient, noxuDefinition)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to instantiate custom resource: %+v", testCrA)
 			expectEvent(watchA, watch.Added, testCrA)
 			expectNoEvent(watchB, watch.Added, testCrA)
 
 			By("Creating second CR")
 			testCrB, err = instantiateCustomResource(testCrB, noxuResourceClient, noxuDefinition)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to instantiate custom resource: %+v", testCrB)
 			expectEvent(watchB, watch.Added, testCrB)
 			expectNoEvent(watchA, watch.Added, testCrB)
 
 			By("Deleting first CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameA)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to delete custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Deleted, nil)
 			expectNoEvent(watchB, watch.Deleted, nil)
 
 			By("Deleting second CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameB)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to delete custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Deleted, nil)
 			expectNoEvent(watchA, watch.Deleted, nil)
 		})

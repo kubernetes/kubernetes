@@ -27,9 +27,9 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"golang.org/x/net/context"
 
-	"github.com/golang/glog"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"k8s.io/klog"
 )
 
 type rktContainerHandler struct {
@@ -48,7 +48,7 @@ type rktContainerHandler struct {
 	// Filesystem handler.
 	fsHandler common.FsHandler
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	apiPod *rktapi.Pod
 
@@ -59,7 +59,7 @@ type rktContainerHandler struct {
 	libcontainerHandler *libcontainer.Handler
 }
 
-func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPath string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, rootFs string, ignoreMetrics container.MetricSet) (container.ContainerHandler, error) {
+func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPath string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, rootFs string, includedMetrics container.MetricSet) (container.ContainerHandler, error) {
 	aliases := make([]string, 1)
 	isPod := false
 
@@ -89,7 +89,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 	annotations := resp.Pod.Annotations
 	if parsed.Container != "" { // As not empty string, an App container
 		if contAnnotations, ok := findAnnotations(resp.Pod.Apps, parsed.Container); !ok {
-			glog.Warningf("couldn't find app %v in pod", parsed.Container)
+			klog.Warningf("couldn't find app %v in pod", parsed.Container)
 		} else {
 			annotations = append(annotations, contAnnotations...)
 		}
@@ -109,7 +109,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 		Paths: cgroupPaths,
 	}
 
-	libcontainerHandler := libcontainer.NewHandler(cgroupManager, rootFs, pid, ignoreMetrics)
+	libcontainerHandler := libcontainer.NewHandler(cgroupManager, rootFs, pid, includedMetrics)
 
 	rootfsStorageDir := getRootFs(rktPath, parsed)
 
@@ -125,14 +125,14 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 		fsInfo:              fsInfo,
 		isPod:               isPod,
 		rootfsStorageDir:    rootfsStorageDir,
-		ignoreMetrics:       ignoreMetrics,
+		includedMetrics:     includedMetrics,
 		apiPod:              apiPod,
 		labels:              labels,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
 	}
 
-	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if includedMetrics.Has(container.DiskUsageMetrics) {
 		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, "", fsInfo)
 	}
 
@@ -170,8 +170,8 @@ func (handler *rktContainerHandler) Cleanup() {
 }
 
 func (handler *rktContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	hasNetwork := handler.isPod && !handler.ignoreMetrics.Has(container.NetworkUsageMetrics)
-	hasFilesystem := !handler.ignoreMetrics.Has(container.DiskUsageMetrics)
+	hasNetwork := handler.isPod && handler.includedMetrics.Has(container.NetworkUsageMetrics)
+	hasFilesystem := handler.includedMetrics.Has(container.DiskUsageMetrics)
 
 	spec, err := common.GetSpec(handler.cgroupPaths, handler.machineInfoFactory, hasNetwork, hasFilesystem)
 
@@ -186,11 +186,11 @@ func (handler *rktContainerHandler) getFsStats(stats *info.ContainerStats) error
 		return err
 	}
 
-	if !handler.ignoreMetrics.Has(container.DiskIOMetrics) {
+	if handler.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 
-	if handler.ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if !handler.includedMetrics.Has(container.DiskUsageMetrics) {
 		return nil
 	}
 

@@ -67,7 +67,10 @@ func validNewHorizontalPodAutoscaler(name string) *autoscaling.HorizontalPodAuto
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
 						Name: api.ResourceCPU,
-						TargetAverageUtilization: &cpu,
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: &cpu,
+						},
 					},
 				},
 			},

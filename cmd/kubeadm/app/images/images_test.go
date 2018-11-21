@@ -18,7 +18,6 @@ package images
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -32,61 +31,63 @@ const (
 	gcrPrefix   = "k8s.gcr.io"
 )
 
-func TestGetGenericArchImage(t *testing.T) {
+func TestGetGenericImage(t *testing.T) {
 	const (
 		prefix = "foo"
 		image  = "bar"
 		tag    = "baz"
 	)
-	expected := fmt.Sprintf("%s/%s-%s:%s", prefix, image, runtime.GOARCH, tag)
-	actual := GetGenericArchImage(prefix, image, tag)
+	expected := fmt.Sprintf("%s/%s:%s", prefix, image, tag)
+	actual := GetGenericImage(prefix, image, tag)
 	if actual != expected {
-		t.Errorf("failed GetGenericArchImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
+		t.Errorf("failed GetGenericImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
 	}
 }
 
-func TestGetKubeControlPlaneImage(t *testing.T) {
+func TestGetKubernetesImage(t *testing.T) {
 	var tests = []struct {
 		image    string
 		expected string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "override",
-			cfg: &kubeadmapi.InitConfiguration{
-				UnifiedControlPlaneImage: "override",
+			expected: GetGenericImage(gcrPrefix, constants.HyperKube, expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+				UseHyperKubeImage: true,
 			},
 		},
 		{
 			image:    constants.KubeAPIServer,
-			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.InitConfiguration{
+			expected: GetGenericImage(gcrPrefix, "kube-apiserver", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
 		},
 		{
 			image:    constants.KubeControllerManager,
-			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
-			cfg: &kubeadmapi.InitConfiguration{
+			expected: GetGenericImage(gcrPrefix, "kube-controller-manager", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
 		},
 		{
 			image:    constants.KubeScheduler,
-			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
-			cfg: &kubeadmapi.InitConfiguration{
+			expected: GetGenericImage(gcrPrefix, "kube-scheduler", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
 		},
 	}
 	for _, rt := range tests {
-		actual := GetKubeControlPlaneImage(rt.image, rt.cfg)
+		actual := GetKubernetesImage(rt.image, rt.cfg)
 		if actual != rt.expected {
 			t.Errorf(
-				"failed GetKubeControlPlaneImage:\n\texpected: %s\n\t  actual: %s",
+				"failed GetKubernetesImage:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actual,
 			)
@@ -97,21 +98,49 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 func TestGetEtcdImage(t *testing.T) {
 	var tests = []struct {
 		expected string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: "override",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   "real.repo",
+				KubernetesVersion: "1.12.0",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{},
+				},
+			},
+			expected: "real.repo/etcd:3.2.24",
+		},
+		{
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   "real.repo",
+				KubernetesVersion: "1.12.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
-						Image: "override",
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageTag: "override",
+						},
 					},
 				},
 			},
+			expected: "real.repo/etcd:override",
 		},
 		{
-			expected: GetGenericArchImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   "real.repo",
+				KubernetesVersion: "1.12.0",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "override",
+						},
+					},
+				},
+			},
+			expected: "override/etcd:3.2.24",
+		},
+		{
+			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
+			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -129,29 +158,57 @@ func TestGetEtcdImage(t *testing.T) {
 	}
 }
 
+func TestGetPauseImage(t *testing.T) {
+	testcases := []struct {
+		name     string
+		cfg      *kubeadmapi.ClusterConfiguration
+		expected string
+	}{
+		{
+			name: "pause image defined",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+			},
+			expected: "test.repo/pause:" + constants.PauseVersion,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetPauseImage(tc.cfg)
+			if actual != tc.expected {
+				t.Fatalf(
+					"failed GetPauseImage:\n\texpected: %s\n\t  actual: %s",
+					tc.expected,
+					actual,
+				)
+			}
+		})
+	}
+}
+
 func TestGetAllImages(t *testing.T) {
 	testcases := []struct {
 		name   string
-		cfg    *kubeadmapi.InitConfiguration
 		expect string
+		cfg    *kubeadmapi.ClusterConfiguration
 	}{
 		{
 			name: "defined CIImageRepository",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CIImageRepository: "test.repo",
 			},
 			expect: "test.repo",
 		},
 		{
 			name: "undefined CIImagerRepository should contain the default image prefix",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "real.repo",
 			},
 			expect: "real.repo",
 		},
 		{
 			name: "test that etcd is returned when it is not external",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{},
 				},
@@ -160,39 +217,39 @@ func TestGetAllImages(t *testing.T) {
 		},
 		{
 			name: "CoreDNS image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": true,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
 				},
 			},
-			expect: constants.CoreDNS,
+			expect: constants.CoreDNSImageName,
 		},
 		{
 			name: "main kube-dns image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": false,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
 				},
 			},
-			expect: "k8s-dns-kube-dns",
+			expect: constants.KubeDNSKubeDNSImageName,
 		},
 		{
 			name: "kube-dns sidecar image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": false,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
 				},
 			},
-			expect: "k8s-dns-sidecar",
+			expect: constants.KubeDNSSidecarImageName,
 		},
 		{
 			name: "kube-dns dnsmasq-nanny image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				FeatureGates: map[string]bool{
-					"CoreDNS": false,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
 				},
 			},
-			expect: "k8s-dns-dnsmasq-nanny",
+			expect: constants.KubeDNSDnsMasqNannyImageName,
 		},
 	}
 	for _, tc := range testcases {

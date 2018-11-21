@@ -59,8 +59,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -90,6 +90,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/rules:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testing:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/util:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:all-srcs",
     ],
     tags = ["automanaged"],

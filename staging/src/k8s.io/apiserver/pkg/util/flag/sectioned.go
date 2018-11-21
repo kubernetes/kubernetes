@@ -52,6 +52,9 @@ func (nfs *NamedFlagSets) FlagSet(name string) *pflag.FlagSet {
 func PrintSections(w io.Writer, fss NamedFlagSets, cols int) {
 	for _, name := range fss.Order {
 		fs := fss.FlagSets[name]
+		if !fs.HasFlags() {
+			continue
+		}
 
 		wideFS := pflag.NewFlagSet("", pflag.ExitOnError)
 		wideFS.AddFlagSet(fs)

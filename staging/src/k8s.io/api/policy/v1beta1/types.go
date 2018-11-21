@@ -28,16 +28,19 @@ type PodDisruptionBudgetSpec struct {
 	// "selector" will still be available after the eviction, i.e. even in the
 	// absence of the evicted pod.  So for example you can prevent all voluntary
 	// evictions by specifying "100%".
+	// +optional
 	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty" protobuf:"bytes,1,opt,name=minAvailable"`
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
+	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
 	// the evicted pod. For example, one can prevent all voluntary evictions
 	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
+	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,3,opt,name=maxUnavailable"`
 }
 
@@ -60,7 +63,8 @@ type PodDisruptionBudgetStatus struct {
 	// the list automatically by PodDisruptionBudget controller after some time.
 	// If everything goes smooth this map should be empty for the most of the time.
 	// Large number of entries in the map may indicate problems with pod deletions.
-	DisruptedPods map[string]metav1.Time `json:"disruptedPods" protobuf:"bytes,2,rep,name=disruptedPods"`
+	// +optional
+	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
 	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
@@ -80,12 +84,15 @@ type PodDisruptionBudgetStatus struct {
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior of the PodDisruptionBudget.
+	// +optional
 	Spec PodDisruptionBudgetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// Most recently observed status of the PodDisruptionBudget.
+	// +optional
 	Status PodDisruptionBudgetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -94,6 +101,7 @@ type PodDisruptionBudget struct {
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
 	metav1.TypeMeta `json:",inline"`
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -109,9 +117,11 @@ type Eviction struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// ObjectMeta describes the pod that is being evicted.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// DeleteOptions may be provided
+	// +optional
 	DeleteOptions *metav1.DeleteOptions `json:"deleteOptions,omitempty" protobuf:"bytes,2,opt,name=deleteOptions"`
 }
 
@@ -173,6 +183,11 @@ type PodSecurityPolicySpec struct {
 	SELinux SELinuxStrategyOptions `json:"seLinux" protobuf:"bytes,10,opt,name=seLinux"`
 	// runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions `json:"runAsUser" protobuf:"bytes,11,opt,name=runAsUser"`
+	// RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+	// If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+	// RunAsGroup feature gate to be enabled.
+	// +optional
+	RunAsGroup *RunAsGroupStrategyOptions `json:"runAsGroup,omitempty" protobuf:"bytes,22,opt,name=runAsGroup"`
 	// supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
 	SupplementalGroups SupplementalGroupsStrategyOptions `json:"supplementalGroups" protobuf:"bytes,12,opt,name=supplementalGroups"`
 	// fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.
@@ -220,6 +235,11 @@ type PodSecurityPolicySpec struct {
 	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
 	// +optional
 	ForbiddenSysctls []string `json:"forbiddenSysctls,omitempty" protobuf:"bytes,20,rep,name=forbiddenSysctls"`
+	// AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+	// Empty or nil indicates that only the DefaultProcMountType may be used.
+	// This requires the ProcMountType feature flag to be enabled.
+	// +optional
+	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -238,6 +258,10 @@ type AllowedHostPath struct {
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 }
+
+// AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
+// field and means that any capabilities are allowed to be requested.
+var AllowAllCapabilities v1.Capability = "*"
 
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
@@ -262,8 +286,15 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	VsphereVolume         FSType = "vsphereVolume"
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
+	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	StorageOS             FSType = "storageos"
+	Projected             FSType = "projected"
+	PortworxVolume        FSType = "portworxVolume"
+	ScaleIO               FSType = "scaleIO"
+	CSI                   FSType = "csi"
 	All                   FSType = "*"
 )
 
@@ -313,6 +344,16 @@ type RunAsUserStrategyOptions struct {
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
 
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+type RunAsGroupStrategyOptions struct {
+	// rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
+	Rule RunAsGroupStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsGroupStrategy"`
+	// ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+	// then supply a single range with the same start and end. Required for MustRunAs.
+	// +optional
+	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
+}
+
 // IDRange provides a min/max of an allowed range of IDs.
 type IDRange struct {
 	// min is the start of the range, inclusive.
@@ -334,6 +375,20 @@ const (
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
 )
 
+// RunAsGroupStrategy denotes strategy types for generating RunAsGroup values for a
+// Security Context.
+type RunAsGroupStrategy string
+
+const (
+	// RunAsGroupStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when RunAsGroup are specified, they have to fall in the defined range.
+	RunAsGroupStrategyMayRunAs RunAsGroupStrategy = "MayRunAs"
+	// RunAsGroupStrategyMustRunAs means that container must run as a particular gid.
+	RunAsGroupStrategyMustRunAs RunAsGroupStrategy = "MustRunAs"
+	// RunAsUserStrategyRunAsAny means that container may make requests for any gid.
+	RunAsGroupStrategyRunAsAny RunAsGroupStrategy = "RunAsAny"
+)
+
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
 type FSGroupStrategyOptions struct {
 	// rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
@@ -350,6 +405,9 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
+	// FSGroupStrategyMayRunAs means that container does not need to have FSGroup of X applied.
+	// However, when FSGroups are specified, they have to fall in the defined range.
+	FSGroupStrategyMayRunAs FSGroupStrategyType = "MayRunAs"
 	// FSGroupStrategyMustRunAs meant that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
 	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
@@ -372,6 +430,9 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
+	// SupplementalGroupsStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when gids are specified, they have to fall in the defined range.
+	SupplementalGroupsStrategyMayRunAs SupplementalGroupsStrategyType = "MayRunAs"
 	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.

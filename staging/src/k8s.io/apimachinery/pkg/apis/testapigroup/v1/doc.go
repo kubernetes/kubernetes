@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=testapigroup.apimachinery.k8s.io
+
 package v1 // import "k8s.io/apimachinery/pkg/apis/testapigroup/v1"

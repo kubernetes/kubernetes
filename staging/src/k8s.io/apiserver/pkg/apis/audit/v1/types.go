@@ -127,9 +127,10 @@ type Event struct {
 
 	// Annotations is an unstructured key value map stored with an audit event that may be set by
 	// plugins invoked in the request serving chain, including authentication, authorization and
-	// admission plugins. Keys should uniquely identify the informing component to avoid name
-	// collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values should be short. Annotations
-	// are included in the Metadata level.
+	// admission plugins. Note that these annotations are for the audit event, and do not correspond
+	// to the metadata.annotations of the submitted object. Keys should uniquely identify the informing
+	// component to avoid name collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values
+	// should be short. Annotations are included in the Metadata level.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,15,rep,name=annotations"`
 }

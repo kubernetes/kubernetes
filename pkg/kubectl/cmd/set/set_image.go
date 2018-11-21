@@ -19,21 +19,21 @@ package set
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -101,11 +101,11 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	o := NewImageOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
+		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update image of a pod template"),
-		Long:    image_long,
-		Example: image_example,
+		Short:                 i18n.T("Update image of a pod template"),
+		Long:                  image_long,
+		Example:               image_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -256,7 +256,7 @@ func (o *SetImageOptions) Run() error {
 		}
 		// record this change (for rollout history)
 		if err := o.Recorder.Record(obj); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
@@ -282,7 +282,7 @@ func (o *SetImageOptions) Run() error {
 		}
 
 		// patch the change
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
 			continue

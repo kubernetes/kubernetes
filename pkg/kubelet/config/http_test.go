@@ -129,6 +129,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	nodeName := "different-value"
 
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
@@ -173,10 +174,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SecurityContext:               &v1.PodSecurityContext{},
 						TerminationGracePeriodSeconds: &grace,
 						SchedulerName:                 api.DefaultSchedulerName,
+						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "1",
-							Image: "foo",
+							Name:                     "1",
+							Image:                    "foo",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -244,10 +246,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
 						SchedulerName:                 api.DefaultSchedulerName,
+						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "1",
-							Image: "foo",
+							Name:                     "1",
+							Image:                    "foo",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -272,10 +275,11 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
 						SchedulerName:                 api.DefaultSchedulerName,
+						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "2",
-							Image: "bar:bartag",
+							Name:                     "2",
+							Image:                    "bar:bartag",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "IfNotPresent",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,

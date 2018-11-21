@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -38,7 +38,7 @@ func TestCreateRole(t *testing.T) {
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	tests := map[string]struct {
 		verbs         string
@@ -358,7 +358,7 @@ func TestComplete(t *testing.T) {
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	defaultTestResources := "pods,deployments.extensions"
 

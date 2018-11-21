@@ -1,0 +1,4 @@
+# GCE Node Termination Handler
+
+This addon deploys [GCE Node Termination Handler](https://github.com/GoogleCloudPlatform/k8s-node-termination-handler) on to kubernetes clusters on GCP.
+It is meant to help translate GCE VM termination notifications into kubernetes graceful terminations.

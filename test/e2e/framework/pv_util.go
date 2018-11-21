@@ -18,16 +18,9 @@ package framework
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
-	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -507,22 +498,28 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 // Deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
-	const maxWait = 5 * time.Minute
 	if pod == nil {
 		return nil
 	}
-	Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
-	err := c.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil)
+	return DeletePodWithWaitByName(f, c, pod.GetName(), pod.GetNamespace())
+}
+
+// Deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
+// not existing.
+func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNamespace string) error {
+	const maxWait = 5 * time.Minute
+	Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	err := c.CoreV1().Pods(podNamespace).Delete(podName, nil)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			return nil // assume pod was already deleted
 		}
 		return fmt.Errorf("pod Delete API error: %v", err)
 	}
-	Logf("Wait up to %v for pod %q to be fully deleted", maxWait, pod.Name)
-	err = f.WaitForPodNotFound(pod.Name, maxWait)
+	Logf("Wait up to %v for pod %q to be fully deleted", maxWait, podName)
+	err = f.WaitForPodNotFound(podName, maxWait)
 	if err != nil {
-		return fmt.Errorf("pod %q was not deleted: %v", pod.Name, err)
+		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
 	}
 	return nil
 }
@@ -549,19 +546,6 @@ func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc 
 		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
 	}
 	return // note: named return value
-}
-
-// Sanity check for GCE testing.  Verify the persistent disk attached to the node.
-func VerifyGCEDiskAttached(diskName string, nodeName types.NodeName) (bool, error) {
-	gceCloud, err := GetGCECloud()
-	if err != nil {
-		return false, fmt.Errorf("GetGCECloud error: %v", err)
-	}
-	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
-	if err != nil {
-		return false, fmt.Errorf("cannot verify if GCE disk is attached: %v", err)
-	}
-	return isAttached, nil
 }
 
 // Return a pvckey struct.
@@ -684,131 +668,15 @@ func DeletePDWithRetry(diskName string) error {
 	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
 }
 
-func newAWSClient(zone string) *ec2.EC2 {
-	var cfg *aws.Config
-
-	if zone == "" {
-		zone = TestContext.CloudConfig.Zone
-	}
-	if zone == "" {
-		glog.Warning("No AWS zone configured!")
-		cfg = nil
-	} else {
-		region := zone[:len(zone)-1]
-		cfg = &aws.Config{Region: aws.String(region)}
-	}
-	return ec2.New(session.New(), cfg)
-}
-
 func createPD(zone string) (string, error) {
 	if zone == "" {
 		zone = TestContext.CloudConfig.Zone
 	}
-
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
-
-		gceCloud, err := GetGCECloud()
-		if err != nil {
-			return "", err
-		}
-
-		if zone == "" && TestContext.CloudConfig.MultiZone {
-			zones, err := gceCloud.GetAllZonesFromCloudProvider()
-			if err != nil {
-				return "", err
-			}
-			zone, _ = zones.PopAny()
-		}
-
-		tags := map[string]string{}
-		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, zone, 10 /* sizeGb */, tags)
-		if err != nil {
-			return "", err
-		}
-		return pdName, nil
-	} else if TestContext.Provider == "aws" {
-		client := newAWSClient(zone)
-		request := &ec2.CreateVolumeInput{}
-		request.AvailabilityZone = aws.String(zone)
-		request.Size = aws.Int64(10)
-		request.VolumeType = aws.String(awscloud.DefaultVolumeType)
-		response, err := client.CreateVolume(request)
-		if err != nil {
-			return "", err
-		}
-
-		az := aws.StringValue(response.AvailabilityZone)
-		awsID := aws.StringValue(response.VolumeId)
-
-		volumeName := "aws://" + az + "/" + awsID
-		return volumeName, nil
-	} else if TestContext.Provider == "azure" {
-		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
-		azureCloud, err := GetAzureCloud()
-
-		if err != nil {
-			return "", err
-		}
-
-		_, diskURI, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
-		if err != nil {
-			return "", err
-		}
-		return diskURI, nil
-	} else {
-		return "", fmt.Errorf("provider does not support volume creation")
-	}
+	return TestContext.CloudConfig.Provider.CreatePD(zone)
 }
 
 func deletePD(pdName string) error {
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		gceCloud, err := GetGCECloud()
-		if err != nil {
-			return err
-		}
-
-		err = gceCloud.DeleteDisk(pdName)
-
-		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
-				// PD already exists, ignore error.
-				return nil
-			}
-
-			Logf("error deleting PD %q: %v", pdName, err)
-		}
-		return err
-	} else if TestContext.Provider == "aws" {
-		client := newAWSClient("")
-
-		tokens := strings.Split(pdName, "/")
-		awsVolumeID := tokens[len(tokens)-1]
-
-		request := &ec2.DeleteVolumeInput{VolumeId: aws.String(awsVolumeID)}
-		_, err := client.DeleteVolume(request)
-		if err != nil {
-			if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-				Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
-			} else {
-				return fmt.Errorf("error deleting EBS volumes: %v", err)
-			}
-		}
-		return nil
-	} else if TestContext.Provider == "azure" {
-		azureCloud, err := GetAzureCloud()
-		if err != nil {
-			return err
-		}
-		err = azureCloud.DeleteVolume(pdName)
-		if err != nil {
-			Logf("failed to delete Azure volume %q: %v", pdName, err)
-			return err
-		}
-		return nil
-	} else {
-		return fmt.Errorf("provider does not support volume deletion")
-	}
+	return TestContext.CloudConfig.Provider.DeletePD(pdName)
 }
 
 // Returns a pod definition based on the namespace. The pod references the PVC's
@@ -1006,11 +874,20 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 
 // create security pod with given claims
 func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
+	return CreateSecPodWithNodeName(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, "", timeout)
+}
+
+// create security pod with given claims
+func CreateSecPodWithNodeName(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, nodeName string, timeout time.Duration) (*v1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
+	// Setting nodeName
+	pod.Spec.NodeName = nodeName
+
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
+
 	// Waiting for pod to be running
 	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
 	if err != nil {
@@ -1077,33 +954,9 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		return &v1.PersistentVolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-				PDName:   diskName,
-				FSType:   "ext3",
-				ReadOnly: false,
-			},
-		}, nil
-	} else if TestContext.Provider == "aws" {
-		return &v1.PersistentVolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-				VolumeID: diskName,
-				FSType:   "ext3",
-			},
-		}, nil
-	} else {
-		return nil, fmt.Errorf("Provider not supported")
-	}
+	return TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
 }
 
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		return DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
-	} else if TestContext.Provider == "aws" {
-		return DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
-	} else {
-		return fmt.Errorf("Provider not supported")
-	}
+	return TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
 }

@@ -222,7 +222,7 @@ EOF
   kube::test::if_has_string "${output_message}" 'deploy:'
 
   # check that "rollout undo" supports --template output
-  output_message=$(kubectl "${kube_flags[@]}" rollout undo deploy/deploy --template="{{ .metadata.name }}:")
+  output_message=$(kubectl "${kube_flags[@]}" rollout undo deploy/deploy --to-revision=1 --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'deploy:'
 
   # check that "config view" command supports --template output

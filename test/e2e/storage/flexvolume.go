@@ -27,12 +27,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -95,7 +95,7 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
 	sshAndLog(cmd, host, true /*failOnError*/)
 
-	data := generated.ReadOrDie(filePath)
+	data := testfiles.ReadOrDie(filePath, Fail)
 	cmd = fmt.Sprintf("sudo tee <<'EOF' %s\n%s\nEOF", flexFile, string(data))
 	sshAndLog(cmd, host, true /*failOnError*/)
 

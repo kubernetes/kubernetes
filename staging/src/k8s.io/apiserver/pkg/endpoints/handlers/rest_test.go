@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,7 +102,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 }
 
-func TestPatchInvalid(t *testing.T) {
+func TestStrategicMergePatchInvalid(t *testing.T) {
 	testGV := schema.GroupVersion{Group: "", Version: "v"}
 	scheme.AddKnownTypes(testGV, &testPatchType{})
 	defaulter := runtime.ObjectDefaulter(scheme)
@@ -120,6 +121,61 @@ func TestPatchInvalid(t *testing.T) {
 	}
 	if err.Error() != expectedError {
 		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
+	}
+}
+
+func TestJSONPatch(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		patch             string
+		expectedError     string
+		expectedErrorType metav1.StatusReason
+	}{
+		{
+			name:  "valid",
+			patch: `[{"op": "test", "value": "podA", "path": "/metadata/name"}]`,
+		},
+		{
+			name:              "invalid-syntax",
+			patch:             `invalid json patch`,
+			expectedError:     "invalid character 'i' looking for beginning of value",
+			expectedErrorType: metav1.StatusReasonBadRequest,
+		},
+		{
+			name:              "invalid-semantics",
+			patch:             `[{"op": "test", "value": "podA", "path": "/invalid/path"}]`,
+			expectedError:     "the server rejected our request due to an error in our request",
+			expectedErrorType: metav1.StatusReasonInvalid,
+		},
+	} {
+		p := &patcher{
+			patchType: types.JSONPatchType,
+			patchJS:   []byte(test.patch),
+		}
+		jp := jsonPatcher{p}
+		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
+		pod := &examplev1.Pod{}
+		pod.Name = "podA"
+		versionedJS, err := runtime.Encode(codec, pod)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+		_, err = jp.applyJSPatch(versionedJS)
+		if err != nil {
+			if len(test.expectedError) == 0 {
+				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
+				continue
+			}
+			if err.Error() != test.expectedError {
+				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
+			}
+			if test.expectedErrorType != apierrors.ReasonForError(err) {
+				t.Errorf("%s: expected error type %v, but got %v", test.name, test.expectedErrorType, apierrors.ReasonForError(err))
+			}
+		} else if len(test.expectedError) > 0 {
+			t.Errorf("%s: expected err %s", test.name, test.expectedError)
+		}
 	}
 }
 
@@ -312,6 +368,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
 	schemaReferenceObj := &examplev1.Pod{}
+	hubVersion := example.SchemeGroupVersion
 
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
@@ -383,6 +440,8 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			unsafeConvertor: convertor,
 			kind:            kind,
 			resource:        resource,
+
+			hubGroupVersion: hubVersion,
 
 			createValidation: rest.ValidateAllObjectFunc,
 			updateValidation: admissionValidation,
@@ -777,13 +836,15 @@ func TestFinishRequest(t *testing.T) {
 	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
 	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
 	testcases := []struct {
-		timeout     time.Duration
-		fn          resultFunc
-		expectedObj runtime.Object
-		expectedErr error
+		name          string
+		timeout       time.Duration
+		fn            resultFunc
+		expectedObj   runtime.Object
+		expectedErr   error
+		expectedPanic string
 	}{
 		{
-			// Expected obj is returned.
+			name:    "Expected obj is returned",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return exampleObj, nil
@@ -792,7 +853,7 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			// Expected error is returned.
+			name:    "Expected error is returned",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return nil, exampleErr
@@ -801,7 +862,7 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: exampleErr,
 		},
 		{
-			// Successful status object is returned as expected.
+			name:    "Successful status object is returned as expected",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return successStatusObj, nil
@@ -810,7 +871,7 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			// Error status object is converted to StatusError.
+			name:    "Error status object is converted to StatusError",
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				return errorStatusObj, nil
@@ -818,15 +879,50 @@ func TestFinishRequest(t *testing.T) {
 			expectedObj: nil,
 			expectedErr: apierrors.FromObject(errorStatusObj),
 		},
+		{
+			name:    "Panic is propagated up",
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				panic("my panic")
+				return nil, nil
+			},
+			expectedObj:   nil,
+			expectedErr:   nil,
+			expectedPanic: "my panic",
+		},
+		{
+			name:    "Panic is propagated with stack",
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				panic("my panic")
+				return nil, nil
+			},
+			expectedObj:   nil,
+			expectedErr:   nil,
+			expectedPanic: "rest_test.go",
+		},
 	}
 	for i, tc := range testcases {
-		obj, err := finishRequest(tc.timeout, tc.fn)
-		if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
-			t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
-		}
-		if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
-			t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				r := recover()
+				switch {
+				case r == nil && len(tc.expectedPanic) > 0:
+					t.Errorf("expected panic containing '%s', got none", tc.expectedPanic)
+				case r != nil && len(tc.expectedPanic) == 0:
+					t.Errorf("unexpected panic: %v", r)
+				case r != nil && len(tc.expectedPanic) > 0 && !strings.Contains(fmt.Sprintf("%v", r), tc.expectedPanic):
+					t.Errorf("expected panic containing '%s', got '%v'", tc.expectedPanic, r)
+				}
+			}()
+			obj, err := finishRequest(tc.timeout, tc.fn)
+			if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
+				t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
+			}
+			if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
+				t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
+			}
+		})
 	}
 }
 

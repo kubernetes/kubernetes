@@ -297,7 +297,7 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // after calling this function. f's queue is reset, too; upon return, it
 // will contain the items in the map, in no particular order.
 func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
-	items := map[string]interface{}{}
+	items := make(map[string]interface{}, len(list))
 	for _, item := range list {
 		key, err := f.keyFunc(item)
 		if err != nil {

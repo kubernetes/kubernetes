@@ -29,6 +29,8 @@ import (
 	fakeadmissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion/fake"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	fakeappsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
+	auditregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/auditregistration/internalversion"
+	fakeauditregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/auditregistration/internalversion/fake"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
 	fakeauthenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion/fake"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
@@ -116,6 +118,11 @@ func (c *Clientset) Core() coreinternalversion.CoreInterface {
 // Apps retrieves the AppsClient
 func (c *Clientset) Apps() appsinternalversion.AppsInterface {
 	return &fakeappsinternalversion.FakeApps{Fake: &c.Fake}
+}
+
+// Auditregistration retrieves the AuditregistrationClient
+func (c *Clientset) Auditregistration() auditregistrationinternalversion.AuditregistrationInterface {
+	return &fakeauditregistrationinternalversion.FakeAuditregistration{Fake: &c.Fake}
 }
 
 // Authentication retrieves the AuthenticationClient

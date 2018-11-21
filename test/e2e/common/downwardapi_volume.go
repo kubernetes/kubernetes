@@ -33,7 +33,7 @@ import (
 
 var _ = Describe("[sig-storage] Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
-	const podLogTimeout = 2 * time.Minute
+	const podLogTimeout = 3 * time.Minute
 	f := framework.NewDefaultFramework("downward-api")
 	var podClient *framework.PodClient
 	BeforeEach(func() {

@@ -86,7 +86,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -137,6 +137,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If IncludeUninitialized is specified, the object may be returned without completing initialization.",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -248,7 +264,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -357,7 +373,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -481,6 +497,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -541,6 +565,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -593,7 +625,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -746,7 +778,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -865,7 +897,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -968,7 +1000,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -1068,6 +1100,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1124,6 +1164,14 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -1241,7 +1289,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -1284,6 +1332,22 @@
         "name": "body",
         "description": "",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If IncludeUninitialized is specified, the object may be returned without completing initialization.",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -1387,7 +1451,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -1488,7 +1552,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        }
@@ -1596,6 +1660,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the PodSecurityPolicy",
@@ -1648,6 +1720,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the PodSecurityPolicy",
@@ -1692,7 +1772,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -1837,7 +1917,7 @@
         "type": "string",
         "paramType": "query",
         "name": "continue",
-        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
         "required": false,
         "allowMultiple": false
        },
@@ -1935,7 +2015,7 @@
      },
      "continue": {
       "type": "string",
-      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response."
+      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message."
      }
     }
    },
@@ -2044,7 +2124,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
     "required": [
      "apiVersion",
      "kind",
@@ -2266,7 +2346,6 @@
     "id": "v1beta1.PodDisruptionBudgetStatus",
     "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
     "required": [
-     "disruptedPods",
      "disruptionsAllowed",
      "currentHealthy",
      "desiredHealthy",
@@ -2499,6 +2578,10 @@
       "$ref": "v1beta1.RunAsUserStrategyOptions",
       "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set."
      },
+     "runAsGroup": {
+      "$ref": "v1beta1.RunAsGroupStrategyOptions",
+      "description": "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled."
+     },
      "supplementalGroups": {
       "$ref": "v1beta1.SupplementalGroupsStrategyOptions",
       "description": "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext."
@@ -2546,6 +2629,13 @@
        "type": "string"
       },
       "description": "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc."
+     },
+     "allowedProcMountTypes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ProcMountType"
+      },
+      "description": "AllowedProcMountTypes is a whitelist of allowed ProcMountTypes. Empty or nil indicates that only the DefaultProcMountType may be used. This requires the ProcMountType feature flag to be enabled."
      }
     }
    },
@@ -2656,6 +2746,26 @@
      }
     }
    },
+   "v1beta1.RunAsGroupStrategyOptions": {
+    "id": "v1beta1.RunAsGroupStrategyOptions",
+    "description": "RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "rule": {
+      "type": "string",
+      "description": "rule is the strategy that will dictate the allowable RunAsGroup values that may be set."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IDRange"
+      },
+      "description": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs."
+     }
+    }
+   },
    "v1beta1.SupplementalGroupsStrategyOptions": {
     "id": "v1beta1.SupplementalGroupsStrategyOptions",
     "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
@@ -2716,6 +2826,10 @@
       "description": "driver is the name of the Flexvolume driver."
      }
     }
+   },
+   "v1.ProcMountType": {
+    "id": "v1.ProcMountType",
+    "properties": {}
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",

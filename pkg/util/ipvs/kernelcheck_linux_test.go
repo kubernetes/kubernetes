@@ -97,8 +97,8 @@ func TestRequiredIPVSKernelModulesAvailableCheck(t *testing.T) {
 	for i, tc := range cases {
 		fcmd := fakeexec.FakeCmd{
 			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(cases[i].loadedKernel), nil },
 				func() ([]byte, error) { return []byte(cases[i].kernelVersion), nil },
+				func() ([]byte, error) { return []byte(cases[i].loadedKernel), nil },
 				func() ([]byte, error) { return []byte(cases[i].builtinKernel), nil },
 			},
 		}

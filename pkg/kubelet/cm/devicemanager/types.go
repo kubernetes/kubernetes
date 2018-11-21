@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -53,7 +54,10 @@ type Manager interface {
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
 	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
-	GetWatcherCallback() watcher.RegisterCallbackFn
+	GetWatcherHandler() watcher.PluginHandler
+
+	// GetDevices returns information about the devices assigned to pods and containers
+	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

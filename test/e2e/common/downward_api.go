@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -35,7 +35,7 @@ var (
 	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
 )
 
-var _ = Describe("[sig-api-machinery] Downward API", func() {
+var _ = Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*

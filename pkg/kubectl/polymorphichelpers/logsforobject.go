@@ -26,11 +26,10 @@ import (
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	coreinternal "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 )
 
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
@@ -55,17 +54,6 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	}
 
 	switch t := object.(type) {
-	case *coreinternal.PodList:
-		ret := []*rest.Request{}
-		for i := range t.Items {
-			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
-			if err != nil {
-				return nil, err
-			}
-			ret = append(ret, currRet...)
-		}
-		return ret, nil
-
 	case *corev1.PodList:
 		ret := []*rest.Request{}
 		for i := range t.Items {
@@ -75,34 +63,6 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			}
 			ret = append(ret, currRet...)
 		}
-		return ret, nil
-
-	case *coreinternal.Pod:
-		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
-		if !allContainers {
-			return []*rest.Request{clientset.Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
-		}
-
-		ret := []*rest.Request{}
-		for _, c := range t.Spec.InitContainers {
-			currOpts := opts.DeepCopy()
-			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
-			if err != nil {
-				return nil, err
-			}
-			ret = append(ret, currRet...)
-		}
-		for _, c := range t.Spec.Containers {
-			currOpts := opts.DeepCopy()
-			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
-			if err != nil {
-				return nil, err
-			}
-			ret = append(ret, currRet...)
-		}
-
 		return ret, nil
 
 	case *corev1.Pod:
@@ -115,7 +75,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +84,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +99,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
 	}
 
-	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
+	sortBy := func(pods []*v1.Pod) sort.Interface { return podutils.ByLogging(pods) }
 	pod, numPods, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err

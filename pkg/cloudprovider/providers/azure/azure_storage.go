@@ -19,20 +19,26 @@ package azure
 import (
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
-	"github.com/golang/glog"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"k8s.io/klog"
 )
 
 const (
 	defaultStorageAccountType      = string(storage.StandardLRS)
+	defaultStorageAccountKind      = storage.StorageV2
 	fileShareAccountNamePrefix     = "f"
 	sharedDiskAccountNamePrefix    = "ds"
 	dedicatedDiskAccountNamePrefix = "dd"
 )
 
-// CreateFileShare creates a file share, using a matching storage account
-func (az *Cloud) CreateFileShare(shareName, accountName, accountType, location string, requestGiB int) (string, string, error) {
-	account, key, err := az.ensureStorageAccount(accountName, accountType, location, fileShareAccountNamePrefix)
+// CreateFileShare creates a file share, using a matching storage account type, account kind, etc.
+// storage account will be created if specified account is not found
+func (az *Cloud) CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error) {
+	if resourceGroup == "" {
+		resourceGroup = az.resourceGroup
+	}
+
+	account, key, err := az.ensureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, fileShareAccountNamePrefix)
 	if err != nil {
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
@@ -40,7 +46,7 @@ func (az *Cloud) CreateFileShare(shareName, accountName, accountType, location s
 	if err := az.createFileShare(account, key, shareName, requestGiB); err != nil {
 		return "", "", fmt.Errorf("failed to create share %s in account %s: %v", shareName, account, err)
 	}
-	glog.V(4).Infof("created share %s in account %s", shareName, account)
+	klog.V(4).Infof("created share %s in account %s", shareName, account)
 	return account, key, nil
 }
 
@@ -49,7 +55,7 @@ func (az *Cloud) DeleteFileShare(accountName, accountKey, shareName string) erro
 	if err := az.deleteFileShare(accountName, accountKey, shareName); err != nil {
 		return err
 	}
-	glog.V(4).Infof("share %s deleted", shareName)
+	klog.V(4).Infof("share %s deleted", shareName)
 	return nil
 }
 

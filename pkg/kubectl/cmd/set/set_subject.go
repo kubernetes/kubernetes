@@ -27,13 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -90,11 +90,11 @@ func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
-		Use: "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
-		Long:    subject_long,
-		Example: subject_example,
+		Short:                 i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
+		Long:                  subject_long,
+		Example:               subject_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -255,7 +255,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch subjects to rolebinding: %v\n", err))
 			continue

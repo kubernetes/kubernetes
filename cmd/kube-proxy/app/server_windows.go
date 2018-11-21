@@ -32,7 +32,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
@@ -42,7 +42,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // NewProxyServer returns a new ProxyServer.
@@ -99,7 +99,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
-		glog.V(0).Info("Using Kernelspace Proxier.")
+		klog.V(0).Info("Using Kernelspace Proxier.")
 		proxierKernelspace, err := winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -107,7 +107,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			utilnode.GetNodeIP(client, hostname),
 			recorder,
 			healthzUpdater,
 		)
@@ -118,7 +118,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		endpointsEventHandler = proxierKernelspace
 		serviceEventHandler = proxierKernelspace
 	} else {
-		glog.V(0).Info("Using userspace Proxier.")
+		klog.V(0).Info("Using userspace Proxier.")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)
@@ -143,7 +143,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		}
 		proxier = proxierUserspace
 		serviceEventHandler = proxierUserspace
-		glog.V(0).Info("Tearing down pure-winkernel proxy rules.")
+		klog.V(0).Info("Tearing down pure-winkernel proxy rules.")
 		winkernel.CleanupLeftovers()
 	}
 
@@ -182,13 +182,13 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
 	useWinKerelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
 	if err != nil {
-		glog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
+		klog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
 		return proxyModeUserspace
 	}
 	if useWinKerelProxy {
 		return proxyModeKernelspace
 	}
 	// Fallback.
-	glog.V(1).Infof("Can't use winkernel proxy, using userspace proxier")
+	klog.V(1).Infof("Can't use winkernel proxy, using userspace proxier")
 	return proxyModeUserspace
 }

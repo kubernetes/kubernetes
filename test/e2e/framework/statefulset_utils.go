@@ -183,7 +183,7 @@ func (s *StatefulSetTester) DeleteStatefulPodAtIndex(index int, ss *apps.Statefu
 // VerifyStatefulPodFunc is a func that examines a StatefulSetPod.
 type VerifyStatefulPodFunc func(*v1.Pod)
 
-// VerifyPodAtIndex applies a visitor patter to the Pod at index in ss. verify is is applied to the Pod to "visit" it.
+// VerifyPodAtIndex applies a visitor patter to the Pod at index in ss. verify is applied to the Pod to "visit" it.
 func (s *StatefulSetTester) VerifyPodAtIndex(index int, ss *apps.StatefulSet, verify VerifyStatefulPodFunc) {
 	name := getStatefulSetPodNameAtIndex(index, ss)
 	pod, err := s.c.CoreV1().Pods(ss.Namespace).Get(name, metav1.GetOptions{})
@@ -599,7 +599,7 @@ func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 		if resumedPod != "" {
 			Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		_, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, "touch /data/statefulset-continue; sync", StatefulSetPoll, StatefulPodTimeout)
+		_, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
 		ExpectNoError(err)
 		Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name

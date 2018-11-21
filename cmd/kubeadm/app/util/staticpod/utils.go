@@ -17,20 +17,21 @@ limitations under the License.
 package staticpod
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"github.com/pkg/errors"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -146,6 +147,10 @@ func VolumeMapToSlice(volumes map[string]v1.Volume) []v1.Volume {
 		v = append(v, vol)
 	}
 
+	sort.Slice(v, func(i, j int) bool {
+		return strings.Compare(v[i].Name, v[j].Name) == -1
+	})
+
 	return v
 }
 
@@ -156,6 +161,10 @@ func VolumeMountMapToSlice(volumeMounts map[string]v1.VolumeMount) []v1.VolumeMo
 	for _, volMount := range volumeMounts {
 		v = append(v, volMount)
 	}
+
+	sort.Slice(v, func(i, j int) bool {
+		return strings.Compare(v[i].Name, v[j].Name) == -1
+	})
 
 	return v
 }
@@ -181,19 +190,19 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(manifestDir, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", manifestDir, err)
+		return errors.Wrapf(err, "failed to create directory %q", manifestDir)
 	}
 
 	// writes the pod to disk
 	serialized, err := util.MarshalToYaml(&pod, v1.SchemeGroupVersion)
 	if err != nil {
-		return fmt.Errorf("failed to marshal manifest for %q to YAML: %v", componentName, err)
+		return errors.Wrapf(err, "failed to marshal manifest for %q to YAML", componentName)
 	}
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
 	if err := ioutil.WriteFile(filename, serialized, 0600); err != nil {
-		return fmt.Errorf("failed to write static pod manifest file for %q (%q): %v", componentName, filename, err)
+		return errors.Wrapf(err, "failed to write static pod manifest file for %q (%q)", componentName, filename)
 	}
 
 	return nil
@@ -203,12 +212,12 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	buf, err := ioutil.ReadFile(manifestPath)
 	if err != nil {
-		return &v1.Pod{}, fmt.Errorf("failed to read manifest for %q: %v", manifestPath, err)
+		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
 	}
 
 	obj, err := util.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
 	if err != nil {
-		return &v1.Pod{}, fmt.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
+		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
 	}
 
 	pod := obj.(*v1.Pod)
@@ -228,17 +237,15 @@ func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) st
 		// future hosts that do not have the same address. Furthermore, since liveness and readiness
 		// probes do not support the Downward API we cannot dynamically set the advertise address to
 		// the node's IP. The only option then is to use localhost.
-		if features.Enabled(cfg.FeatureGates, features.SelfHosting) {
-			return "127.0.0.1"
-		} else if cfg.API.AdvertiseAddress != "" {
-			return cfg.API.AdvertiseAddress
+		if cfg.LocalAPIEndpoint.AdvertiseAddress != "" {
+			return cfg.LocalAPIEndpoint.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:
-		if addr, exists := cfg.ControllerManagerExtraArgs[kubeControllerManagerAddressArg]; exists {
+		if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {
 			return addr
 		}
 	case componentName == kubeadmconstants.KubeScheduler:
-		if addr, exists := cfg.SchedulerExtraArgs[kubeSchedulerAddressArg]; exists {
+		if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerAddressArg]; exists {
 			return addr
 		}
 	case componentName == kubeadmconstants.Etcd:
@@ -286,4 +293,18 @@ func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) st
 		}
 	}
 	return "127.0.0.1"
+}
+
+// ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
+func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
+	content1, err := ioutil.ReadFile(path1)
+	if err != nil {
+		return false, err
+	}
+	content2, err := ioutil.ReadFile(path2)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(content1, content2), nil
 }

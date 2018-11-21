@@ -17,7 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/logs-generator",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

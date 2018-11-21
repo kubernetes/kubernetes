@@ -7,3 +7,5 @@ reviewers:
 - mikedanese
 - tnozicka
 - k82cn
+labels:
+- sig/apps

@@ -1011,6 +1011,10 @@ func (f *fakeSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
+func (f *fakeSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+	return f.result, nil
+}
+
 // newPodStats returns a pod stat where each container is using the specified working set
 // each pod must have a Name, UID, Namespace
 func newPodStats(pod *v1.Pod, containerWorkingSetBytes int64) statsapi.PodStats {

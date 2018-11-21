@@ -15,9 +15,10 @@
 package adapter
 
 import (
-	"golang.org/x/net/context"
+	"context"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+
 	"google.golang.org/grpc"
 )
 
@@ -46,6 +47,10 @@ func (c *ls2lc) LeaseKeepAlive(ctx context.Context, opts ...grpc.CallOption) (pb
 
 func (c *ls2lc) LeaseTimeToLive(ctx context.Context, in *pb.LeaseTimeToLiveRequest, opts ...grpc.CallOption) (*pb.LeaseTimeToLiveResponse, error) {
 	return c.leaseServer.LeaseTimeToLive(ctx, in)
+}
+
+func (c *ls2lc) LeaseLeases(ctx context.Context, in *pb.LeaseLeasesRequest, opts ...grpc.CallOption) (*pb.LeaseLeasesResponse, error) {
+	return c.leaseServer.LeaseLeases(ctx, in)
 }
 
 // ls2lcClientStream implements Lease_LeaseKeepAliveClient

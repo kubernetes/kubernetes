@@ -32,14 +32,6 @@ import (
 // Avoid emitting errors that look like valid HTML. Quotes are okay.
 var sanitizer = strings.NewReplacer(`&`, "&amp;", `<`, "&lt;", `>`, "&gt;")
 
-// BadGatewayError renders a simple bad gateway error.
-func BadGatewayError(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusBadGateway)
-	fmt.Fprintf(w, "Bad Gateway: %q", sanitizer.Replace(req.RequestURI))
-}
-
 // Forbidden renders a simple forbidden error
 func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
 	msg := sanitizer.Replace(forbiddenMessage(attributes))
@@ -80,15 +72,7 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 
 // InternalError renders a simple internal error
 func InternalError(w http.ResponseWriter, req *http.Request, err error) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %q: %v", sanitizer.Replace(req.RequestURI), err)
+	http.Error(w, sanitizer.Replace(fmt.Sprintf("Internal Server Error: %q: %v", req.RequestURI, err)),
+		http.StatusInternalServerError)
 	utilruntime.HandleError(err)
-}
-
-// NotFound renders a simple not found error.
-func NotFound(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, "Not Found: %q", sanitizer.Replace(req.RequestURI))
 }

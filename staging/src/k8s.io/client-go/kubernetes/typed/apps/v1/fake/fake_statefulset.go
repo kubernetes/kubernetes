@@ -20,6 +20,7 @@ package fake
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -131,10 +132,32 @@ func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptio
 // Patch applies the patch and returns the patched statefulSet.
 func (c *FakeStatefulSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *appsv1.StatefulSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, data, subresources...), &appsv1.StatefulSet{})
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), &appsv1.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*appsv1.StatefulSet), err
+}
+
+// GetScale takes name of the statefulSet, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeStatefulSets) GetScale(statefulSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(statefulsetsResource, c.ns, "scale", statefulSetName), &autoscalingv1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeStatefulSets) UpdateScale(statefulSetName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
 }

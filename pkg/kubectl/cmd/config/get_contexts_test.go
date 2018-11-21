@@ -21,9 +21,9 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 type getContextsTest struct {
@@ -61,7 +61,7 @@ func TestGetContextsAllNoHeader(t *testing.T) {
 		names:          []string{},
 		noHeader:       true,
 		nameOnly:       false,
-		expectedOut:    "*         shaker-context   big-cluster   blue-user   saw-ns\n",
+		expectedOut:    "*     shaker-context   big-cluster   blue-user   saw-ns\n",
 	}
 	test.run(t)
 }
@@ -171,7 +171,7 @@ func (test getContextsTest) run(t *testing.T) {
 	cmd.Run(cmd, test.names)
 	if len(test.expectedOut) != 0 {
 		if buf.String() != test.expectedOut {
-			t.Errorf("Expected %v, but got %v", test.expectedOut, buf.String())
+			t.Errorf("Expected\n%s\ngot\n%s", test.expectedOut, buf.String())
 		}
 		return
 	}

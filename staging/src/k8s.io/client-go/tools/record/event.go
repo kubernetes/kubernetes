@@ -33,7 +33,7 @@ import (
 
 	"net/http"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const maxTriesPerEvent = 12
@@ -144,7 +144,7 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 		}
 		tries++
 		if tries >= maxTriesPerEvent {
-			glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
+			klog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
 			break
 		}
 		// Randomize the first sleep so that various clients won't all be
@@ -194,13 +194,13 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 	switch err.(type) {
 	case *restclient.RequestConstructionError:
 		// We will construct the request the same next time, so don't keep trying.
-		glog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
+		klog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
 		return true
 	case *errors.StatusError:
 		if errors.IsAlreadyExists(err) {
-			glog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
-			glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		}
 		return true
 	case *errors.UnexpectedObjectError:
@@ -209,7 +209,7 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 	default:
 		// This case includes actual http transport errors. Go ahead and retry.
 	}
-	glog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
+	klog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
 	return false
 }
 
@@ -256,12 +256,12 @@ type recorderImpl struct {
 func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations map[string]string, timestamp metav1.Time, eventtype, reason, message string) {
 	ref, err := ref.GetReference(recorder.scheme, object)
 	if err != nil {
-		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
+		klog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
 		return
 	}
 
 	if !validateEventType(eventtype) {
-		glog.Errorf("Unsupported event type: '%v'", eventtype)
+		klog.Errorf("Unsupported event type: '%v'", eventtype)
 		return
 	}
 

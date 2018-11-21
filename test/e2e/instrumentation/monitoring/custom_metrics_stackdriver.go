@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/test/e2e/framework"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
@@ -57,8 +59,12 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		if err != nil {
 			framework.Failf("Failed to load config: %s", err)
 		}
-		customMetricsClient := customclient.NewForConfigOrDie(config)
 		discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+		restMapper.Reset()
+		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
+		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
 		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
 	})
 
@@ -68,8 +74,12 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		if err != nil {
 			framework.Failf("Failed to load config: %s", err)
 		}
-		customMetricsClient := customclient.NewForConfigOrDie(config)
 		discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+		restMapper.Reset()
+		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
+		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
 		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
 	})
 
@@ -187,7 +197,7 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	if !containsResource(resources.APIResources, "*/custom.googleapis.com|"+UnusedMetricName) {
 		framework.Failf("Metric '%s' expected but not received", UnusedMetricName)
 	}
-	value, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObject(schema.GroupKind{Group: "", Kind: "Pod"}, stackdriverExporterPod1, CustomMetricName)
+	value, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObject(schema.GroupKind{Group: "", Kind: "Pod"}, stackdriverExporterPod1, CustomMetricName, labels.NewSelector())
 	if err != nil {
 		framework.Failf("Failed query: %s", err)
 	}
@@ -198,7 +208,7 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	if err != nil {
 		framework.Failf("Couldn't create a label filter")
 	}
-	values, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObjects(schema.GroupKind{Group: "", Kind: "Pod"}, labels.NewSelector().Add(*filter), CustomMetricName)
+	values, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObjects(schema.GroupKind{Group: "", Kind: "Pod"}, labels.NewSelector().Add(*filter), CustomMetricName, labels.NewSelector())
 	if err != nil {
 		framework.Failf("Failed query: %s", err)
 	}

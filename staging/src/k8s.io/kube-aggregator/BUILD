@@ -28,7 +28,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/cmd/server:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

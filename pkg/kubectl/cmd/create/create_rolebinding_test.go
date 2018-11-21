@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -103,7 +103,7 @@ func TestCreateRoleBinding(t *testing.T) {
 
 					responseBinding := &rbac.RoleBinding{}
 					responseBinding.Name = "fake-binding"
-					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
+					return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil

@@ -24,9 +24,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

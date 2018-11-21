@@ -21,7 +21,7 @@ Still the job of `main` to expose these configurations. `main` may delegate this
 
 Splitting streams is probably not the job of your program, but rather, your log aggregation framework. If you must split output streams, again, `main` configures this and you can write a very simple two-output struct that satisfies io.Writer.
 
-Fancy colorful formatting and JSON output are beyond the scope of a basic logging framework -- they're application/log-collector dependant. These are, at best, provided as options, but more likely, provided by your application.
+Fancy colorful formatting and JSON output are beyond the scope of a basic logging framework -- they're application/log-collector dependent. These are, at best, provided as options, but more likely, provided by your application.
 
 ##### Log objects are an interface
 

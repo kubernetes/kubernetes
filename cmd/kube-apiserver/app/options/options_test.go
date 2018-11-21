@@ -98,7 +98,6 @@ func TestAddFlags(t *testing.T) {
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
-		"--etcd-quorum-read=false",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
@@ -112,7 +111,7 @@ func TestAddFlags(t *testing.T) {
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
-		"--storage-backend=etcd2",
+		"--storage-backend=etcd3",
 	}
 	fs.Parse(args)
 
@@ -142,11 +141,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
-				Type:       "etcd2",
-				ServerList: nil,
-				Prefix:     "/registry",
-				DeserializationCacheSize: 0,
-				Quorum:                false,
+				Type:                  "etcd3",
+				ServerList:            nil,
+				Prefix:                "/registry",
 				KeyFile:               "/var/run/kubernetes/etcd.key",
 				CAFile:                "/var/run/kubernetes/etcdca.crt",
 				CertFile:              "/var/run/kubernetes/etcdce.crt",
@@ -159,7 +156,7 @@ func TestAddFlags(t *testing.T) {
 			EnableWatchCache:        true,
 			DefaultWatchCacheSize:   100,
 		},
-		SecureServing: apiserveroptions.WithLoopback(&apiserveroptions.SecureServingOptions{
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindAddress: net.ParseIP("192.168.10.20"),
 			BindPort:    6443,
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -168,11 +165,11 @@ func TestAddFlags(t *testing.T) {
 			},
 			HTTP2MaxStreamsPerConnection: 42,
 			Required:                     true,
-		}),
-		InsecureServing: &kubeoptions.InsecureServingOptions{
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),
 			BindPort:    8080,
-		},
+		}).WithLoopback(),
 		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         10250,
@@ -230,6 +227,7 @@ func TestAddFlags(t *testing.T) {
 						ThrottleEnable: false,
 						ThrottleQPS:    43.5,
 						ThrottleBurst:  44,
+						AsyncDelegate:  true,
 					},
 				},
 				TruncateOptions: apiserveroptions.AuditTruncateOptions{

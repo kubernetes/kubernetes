@@ -53,6 +53,68 @@ var (
 		[]string{"From"},
 	)
 
+	snapshotSend = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "snapshot_send_success",
+		Help:      "Total number of successful snapshot sends",
+	},
+		[]string{"To"},
+	)
+
+	snapshotSendFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "snapshot_send_failures",
+		Help:      "Total number of snapshot send failures",
+	},
+		[]string{"To"},
+	)
+
+	snapshotSendSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "snapshot_send_total_duration_seconds",
+		Help:      "Total latency distributions of v3 snapshot sends",
+
+		// lowest bucket start of upper bound 0.1 sec (100 ms) with factor 2
+		// highest bucket start of 0.1 sec * 2^9 == 51.2 sec
+		Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
+	},
+		[]string{"To"},
+	)
+
+	snapshotReceive = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "snapshot_receive_success",
+		Help:      "Total number of successful snapshot receives",
+	},
+		[]string{"From"},
+	)
+
+	snapshotReceiveFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "snapshot_receive_failures",
+		Help:      "Total number of snapshot receive failures",
+	},
+		[]string{"From"},
+	)
+
+	snapshotReceiveSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "etcd",
+		Subsystem: "network",
+		Name:      "snapshot_receive_total_duration_seconds",
+		Help:      "Total latency distributions of v3 snapshot receives",
+
+		// lowest bucket start of upper bound 0.1 sec (100 ms) with factor 2
+		// highest bucket start of 0.1 sec * 2^9 == 51.2 sec
+		Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
+	},
+		[]string{"From"},
+	)
+
 	rtts = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "etcd",
 		Subsystem: "network",
@@ -69,5 +131,13 @@ func init() {
 	prometheus.MustRegister(receivedBytes)
 	prometheus.MustRegister(sentFailures)
 	prometheus.MustRegister(recvFailures)
+
+	prometheus.MustRegister(snapshotSend)
+	prometheus.MustRegister(snapshotSendFailures)
+	prometheus.MustRegister(snapshotSendSeconds)
+	prometheus.MustRegister(snapshotReceive)
+	prometheus.MustRegister(snapshotReceiveFailures)
+	prometheus.MustRegister(snapshotReceiveSeconds)
+
 	prometheus.MustRegister(rtts)
 }

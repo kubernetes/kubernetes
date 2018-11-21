@@ -1,3 +1,7 @@
+approvers:
+- sig-auth-policy-approvers
 reviewers:
-- deads2k
-- hongchaodeng
+- sig-auth-policy-reviewers
+labels:
+- sig/auth
+

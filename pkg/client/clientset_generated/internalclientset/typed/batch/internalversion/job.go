@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	"time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -76,11 +78,16 @@ func (c *jobs) Get(name string, options v1.GetOptions) (result *batch.Job, err e
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
 func (c *jobs) List(opts v1.ListOptions) (result *batch.JobList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &batch.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -88,11 +95,16 @@ func (c *jobs) List(opts v1.ListOptions) (result *batch.JobList, err error) {
 
 // Watch returns a watch.Interface that watches the requested jobs.
 func (c *jobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -150,10 +162,15 @@ func (c *jobs) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *jobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

@@ -123,7 +123,7 @@ func (c *FakeNodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 // Patch applies the patch and returns the patched node.
 func (c *FakeNodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, data, subresources...), &core.Node{})
+		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, pt, data, subresources...), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
@@ -33,19 +33,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 type mutatingDispatcher struct {
-	cm     *config.ClientManager
+	cm     *webhook.ClientManager
 	plugin *Plugin
 }
 
-func newMutatingDispatcher(p *Plugin) func(cm *config.ClientManager) generic.Dispatcher {
-	return func(cm *config.ClientManager) generic.Dispatcher {
+func newMutatingDispatcher(p *Plugin) func(cm *webhook.ClientManager) generic.Dispatcher {
+	return func(cm *webhook.ClientManager) generic.Dispatcher {
 		return &mutatingDispatcher{cm, p}
 	}
 }
@@ -62,13 +63,13 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 		}
 
 		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
-		if callErr, ok := err.(*webhookerrors.ErrCallingWebhook); ok {
+		if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
-				glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
+				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 				utilruntime.HandleError(callErr)
 				continue
 			}
-			glog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 		}
 		return apierrors.NewInternalError(err)
 	}
@@ -83,23 +84,34 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 // note that callAttrMutatingHook updates attr
 func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	if attr.IsDryRun() {
-		// TODO: support this
-		webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		if h.SideEffects == nil {
+			return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+		}
+		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
+			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		}
 	}
 
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
-	client, err := a.cm.HookClient(h)
+	client, err := a.cm.HookClient(util.HookClientConfigForWebhook(h))
 	if err != nil {
-		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
-		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Response == nil {
-		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	}
+
+	for k, v := range response.Response.AuditAnnotations {
+		key := h.Name + "/" + k
+		if err := attr.AddAnnotation(key, v); err != nil {
+			klog.Warningf("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
+		}
 	}
 
 	if !response.Response.Allowed {

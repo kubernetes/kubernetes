@@ -23,6 +23,7 @@ import (
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -95,7 +96,14 @@ type ContainerManager interface {
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
-	GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn
+
+	// GetPluginRegistrationHandler returns a plugin registration handler
+	// The pluginwatcher's Handlers allow to have a single module for handling
+	// registration.
+	GetPluginRegistrationHandler() pluginwatcher.PluginHandler
+
+	// GetDevices returns information about the devices assigned to pods and containers
+	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
 }
 
 type NodeConfig struct {
@@ -114,6 +122,7 @@ type NodeConfig struct {
 	ExperimentalCPUManagerReconcilePeriod time.Duration
 	ExperimentalPodPidsLimit              int64
 	EnforceCPULimits                      bool
+	CPUCFSQuotaPeriod                     time.Duration
 }
 
 type NodeAllocatableConfig struct {

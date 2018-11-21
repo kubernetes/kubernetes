@@ -1,17 +1,17 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 
 	"github.com/docker/docker/api/types/filters"
 	volumetypes "github.com/docker/docker/api/types/volume"
-	"golang.org/x/net/context"
 )
 
 // VolumeList returns the volumes configured in the docker host.
-func (cli *Client) VolumeList(ctx context.Context, filter filters.Args) (volumetypes.VolumesListOKBody, error) {
-	var volumes volumetypes.VolumesListOKBody
+func (cli *Client) VolumeList(ctx context.Context, filter filters.Args) (volumetypes.VolumeListOKBody, error) {
+	var volumes volumetypes.VolumeListOKBody
 	query := url.Values{}
 
 	if filter.Len() > 0 {

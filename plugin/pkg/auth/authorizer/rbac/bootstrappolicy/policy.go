@@ -107,7 +107,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Use the NodeRestriction admission plugin to limit a node to creating/updating its own API object.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-		rbacv1helpers.NewRule("update", "patch", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		// TODO: restrict to the bound node as creator in the NodeRestrictions admission plugin
 		rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
@@ -159,6 +159,25 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie()
+			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
+	}
+
+	// Node leases
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie())
+	}
+
+	// RuntimeClass
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
 	}
 	return nodePolicyRules
 }
@@ -287,6 +306,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
+					"controllerrevisions",
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
 					"deployments", "deployments/scale",
@@ -383,7 +403,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				eventsRule(),
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts").RuleOrDie(),
+				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts", "configmaps").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				// Needed to check API access.  These creates are non-mutating
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
@@ -439,16 +459,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role for the csi external provisioner
-			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
-				rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-			},
-		},
-		{
 			// a role for the csi external attacher
 			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-attacher"},
 			Rules: []rbacv1.PolicyRule{
@@ -482,18 +492,31 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		rules := []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-			rules = append(rules, rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
-		}
 		roles = append(roles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
-			Rules:      rules,
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			},
 		})
 	}
+
+	externalProvisionerRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+		rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie())
+	}
+	roles = append(roles, rbacv1.ClusterRole{
+		// a role for the csi external provisioner
+		ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
+		Rules:      externalProvisionerRules,
+	})
 
 	addClusterRoleLabel(roles)
 	return roles

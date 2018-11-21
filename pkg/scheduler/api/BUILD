@@ -11,10 +11,12 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "well_known_labels.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/api",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

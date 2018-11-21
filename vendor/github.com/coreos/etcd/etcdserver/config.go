@@ -15,13 +15,12 @@
 package etcdserver
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/coreos/etcd/pkg/netutil"
 	"github.com/coreos/etcd/pkg/transport"
@@ -48,12 +47,44 @@ type ServerConfig struct {
 	ForceNewCluster     bool
 	PeerTLSInfo         transport.TLSInfo
 
-	TickMs           uint
-	ElectionTicks    int
+	TickMs        uint
+	ElectionTicks int
+
+	// InitialElectionTickAdvance is true, then local member fast-forwards
+	// election ticks to speed up "initial" leader election trigger. This
+	// benefits the case of larger election ticks. For instance, cross
+	// datacenter deployment may require longer election timeout of 10-second.
+	// If true, local node does not need wait up to 10-second. Instead,
+	// forwards its election ticks to 8-second, and have only 2-second left
+	// before leader election.
+	//
+	// Major assumptions are that:
+	//  - cluster has no active leader thus advancing ticks enables faster
+	//    leader election, or
+	//  - cluster already has an established leader, and rejoining follower
+	//    is likely to receive heartbeats from the leader after tick advance
+	//    and before election timeout.
+	//
+	// However, when network from leader to rejoining follower is congested,
+	// and the follower does not receive leader heartbeat within left election
+	// ticks, disruptive election has to happen thus affecting cluster
+	// availabilities.
+	//
+	// Disabling this would slow down initial bootstrap process for cross
+	// datacenter deployments. Make your own tradeoffs by configuring
+	// --initial-election-tick-advance at the cost of slow initial bootstrap.
+	//
+	// If single-node, it advances ticks regardless.
+	//
+	// See https://github.com/coreos/etcd/issues/9333 for more detail.
+	InitialElectionTickAdvance bool
+
 	BootstrapTimeout time.Duration
 
-	AutoCompactionRetention int
+	AutoCompactionRetention time.Duration
+	AutoCompactionMode      string
 	QuotaBackendBytes       int64
+	MaxTxnOps               uint
 
 	// MaxRequestBytes is the maximum request size to send over raft.
 	MaxRequestBytes uint
@@ -64,6 +95,11 @@ type ServerConfig struct {
 	ClientCertAuthEnabled bool
 
 	AuthToken string
+
+	// InitialCorruptCheck is true to check data corruption on boot
+	// before serving any peer/client traffic.
+	InitialCorruptCheck bool
+	CorruptCheckTime    time.Duration
 
 	Debug bool
 }
@@ -118,11 +154,49 @@ func (c *ServerConfig) advertiseMatchesCluster() error {
 	sort.Strings(apurls)
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
-	if !netutil.URLStringsEqual(ctx, apurls, urls.StringSlice()) {
-		umap := map[string]types.URLs{c.Name: c.PeerURLs}
-		return fmt.Errorf("--initial-cluster must include %s given --initial-advertise-peer-urls=%s", types.URLsMap(umap).String(), strings.Join(apurls, ","))
+	ok, err := netutil.URLStringsEqual(ctx, apurls, urls.StringSlice())
+	if ok {
+		return nil
 	}
-	return nil
+
+	initMap, apMap := make(map[string]struct{}), make(map[string]struct{})
+	for _, url := range c.PeerURLs {
+		apMap[url.String()] = struct{}{}
+	}
+	for _, url := range c.InitialPeerURLsMap[c.Name] {
+		initMap[url.String()] = struct{}{}
+	}
+
+	missing := []string{}
+	for url := range initMap {
+		if _, ok := apMap[url]; !ok {
+			missing = append(missing, url)
+		}
+	}
+	if len(missing) > 0 {
+		for i := range missing {
+			missing[i] = c.Name + "=" + missing[i]
+		}
+		mstr := strings.Join(missing, ",")
+		apStr := strings.Join(apurls, ",")
+		return fmt.Errorf("--initial-cluster has %s but missing from --initial-advertise-peer-urls=%s (%v)", mstr, apStr, err)
+	}
+
+	for url := range apMap {
+		if _, ok := initMap[url]; !ok {
+			missing = append(missing, url)
+		}
+	}
+	if len(missing) > 0 {
+		mstr := strings.Join(missing, ",")
+		umap := types.URLsMap(map[string]types.URLs{c.Name: c.PeerURLs})
+		return fmt.Errorf("--initial-advertise-peer-urls has %s but missing from --initial-cluster=%s", mstr, umap.String())
+	}
+
+	// resolved URLs from "--initial-advertise-peer-urls" and "--initial-cluster" did not match or failed
+	apStr := strings.Join(apurls, ",")
+	umap := types.URLsMap(map[string]types.URLs{c.Name: c.PeerURLs})
+	return fmt.Errorf("failed to resolve %s to match --initial-cluster=%s (%v)", apStr, umap.String(), err)
 }
 
 func (c *ServerConfig) MemberDir() string { return filepath.Join(c.DataDir, "member") }
@@ -142,17 +216,16 @@ func (c *ServerConfig) ShouldDiscover() bool { return c.DiscoveryURL != "" }
 func (c *ServerConfig) ReqTimeout() time.Duration {
 	// 5s for queue waiting, computation and disk IO delay
 	// + 2 * election timeout for possible leader election
-	return 5*time.Second + 2*time.Duration(c.ElectionTicks)*time.Duration(c.TickMs)*time.Millisecond
+	return 5*time.Second + 2*time.Duration(c.ElectionTicks*int(c.TickMs))*time.Millisecond
 }
 
 func (c *ServerConfig) electionTimeout() time.Duration {
-	return time.Duration(c.ElectionTicks) * time.Duration(c.TickMs) * time.Millisecond
+	return time.Duration(c.ElectionTicks*int(c.TickMs)) * time.Millisecond
 }
 
 func (c *ServerConfig) peerDialTimeout() time.Duration {
-	// 1s for queue wait and system delay
-	// + one RTT, which is smaller than 1/5 election timeout
-	return time.Second + time.Duration(c.ElectionTicks)*time.Duration(c.TickMs)*time.Millisecond/5
+	// 1s for queue wait and election timeout
+	return time.Second + time.Duration(c.ElectionTicks*int(c.TickMs))*time.Millisecond
 }
 
 func (c *ServerConfig) PrintWithInitial() { c.print(true) }

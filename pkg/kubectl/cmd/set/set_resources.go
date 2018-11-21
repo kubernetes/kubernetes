@@ -19,22 +19,22 @@ package set
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -108,11 +108,11 @@ func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := NewResourcesOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
+		Use:                   "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update resource requests/limits on objects with pod templates"),
-		Long:    fmt.Sprintf(resources_long, cmdutil.SuggestApiResources("kubectl")),
-		Example: resources_example,
+		Short:                 i18n.T("Update resource requests/limits on objects with pod templates"),
+		Long:                  fmt.Sprintf(resources_long, cmdutil.SuggestApiResources("kubectl")),
+		Example:               resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -206,7 +206,7 @@ func (o *SetResourcesOptions) Validate() error {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
-	o.ResourceRequirements, err = kubectl.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
+	o.ResourceRequirements, err = generateversioned.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func (o *SetResourcesOptions) Run() error {
 		}
 		// record this change (for rollout history)
 		if err := o.Recorder.Record(obj); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
@@ -276,7 +276,7 @@ func (o *SetResourcesOptions) Run() error {
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch limit update to pod template %v\n", err))
 			continue

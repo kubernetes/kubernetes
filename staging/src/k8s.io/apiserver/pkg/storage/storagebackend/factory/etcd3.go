@@ -104,8 +104,8 @@ func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
 		Endpoints: c.ServerList,
 		TLS:       tlsConfig,
 	}
-	client, err := clientv3.New(cfg)
-	return client, err
+
+	return clientv3.New(cfg)
 }
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
@@ -123,8 +123,5 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	if c.Quorum {
-		return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
-	}
-	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }

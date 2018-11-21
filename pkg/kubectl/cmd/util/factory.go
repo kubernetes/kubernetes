@@ -18,12 +18,12 @@ package util
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 

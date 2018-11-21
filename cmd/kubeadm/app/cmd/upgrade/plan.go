@@ -24,17 +24,17 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 type planFlags struct {
@@ -62,8 +62,8 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
-				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
@@ -88,8 +88,8 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 // RunPlan takes care of outputting available versions to upgrade to for the user
 func RunPlan(flags *planFlags) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
-	glog.V(1).Infof("[upgrade/plan] verifying health of cluster")
-	glog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
+	klog.V(1).Infof("[upgrade/plan] verifying health of cluster")
+	klog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
 	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, false, flags.newK8sVersionStr)
 	if err != nil {
 		return err
@@ -111,11 +111,8 @@ func RunPlan(flags *planFlags) error {
 		}
 		etcdClient = client
 	} else {
-		client, err := etcdutil.NewFromStaticPod(
-			[]string{"localhost:2379"},
-			constants.GetStaticPodDirectory(),
-			upgradeVars.cfg.CertificatesDir,
-		)
+		// Connects to local/stacked etcd existing in the cluster
+		client, err := etcdutil.NewFromCluster(upgradeVars.client, upgradeVars.cfg.CertificatesDir)
 		if err != nil {
 			return err
 		}
@@ -123,10 +120,10 @@ func RunPlan(flags *planFlags) error {
 	}
 
 	// Compute which upgrade possibilities there are
-	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
+	klog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
+	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.DNS.Type, upgradeVars.client)
 	if err != nil {
-		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
+		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
 
 	// Tell the user which upgrades are available
@@ -210,19 +207,19 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		coreDNSBeforeVersion, coreDNSAfterVersion, kubeDNSBeforeVersion, kubeDNSAfterVersion := "", "", "", ""
 
 		switch upgrade.Before.DNSType {
-		case constants.CoreDNS:
+		case kubeadmapi.CoreDNS:
 			printCoreDNS = true
 			coreDNSBeforeVersion = upgrade.Before.DNSVersion
-		case constants.KubeDNS:
+		case kubeadmapi.KubeDNS:
 			printKubeDNS = true
 			kubeDNSBeforeVersion = upgrade.Before.DNSVersion
 		}
 
 		switch upgrade.After.DNSType {
-		case constants.CoreDNS:
+		case kubeadmapi.CoreDNS:
 			printCoreDNS = true
 			coreDNSAfterVersion = upgrade.After.DNSVersion
-		case constants.KubeDNS:
+		case kubeadmapi.KubeDNS:
 			printKubeDNS = true
 			kubeDNSAfterVersion = upgrade.After.DNSVersion
 		}

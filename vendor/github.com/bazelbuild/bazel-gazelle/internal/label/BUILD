@@ -2,17 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "label.go",
-        "labeler.go",
-    ],
+    srcs = ["label.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/label",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/label",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
-    deps = [
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/config:go_default_library",
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/pathtools:go_default_library",
-    ],
+    deps = ["//vendor/github.com/bazelbuild/bazel-gazelle/internal/pathtools:go_default_library"],
 )
 
 filegroup(

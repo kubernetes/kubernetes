@@ -72,7 +72,7 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	containerSc := container.SecurityContext
 
 	if effectiveSc == nil && containerSc == nil {
-		return nil
+		return &v1.SecurityContext{}
 	}
 	if effectiveSc != nil && containerSc == nil {
 		return effectiveSc
@@ -121,6 +121,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
 	}
 
+	if containerSc.ProcMount != nil {
+		effectiveSc.ProcMount = new(v1.ProcMountType)
+		*effectiveSc.ProcMount = *containerSc.ProcMount
+	}
+
 	return effectiveSc
 }
 
@@ -166,4 +171,53 @@ func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
 
 	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
 	return !*sc.AllowPrivilegeEscalation
+}
+
+var (
+	// These *must* be kept in sync with moby/moby.
+	// https://github.com/moby/moby/blob/master/oci/defaults.go#L116-L134
+	// @jessfraz will watch changes to those files upstream.
+	defaultMaskedPaths = []string{
+		"/proc/acpi",
+		"/proc/kcore",
+		"/proc/keys",
+		"/proc/latency_stats",
+		"/proc/timer_list",
+		"/proc/timer_stats",
+		"/proc/sched_debug",
+		"/proc/scsi",
+		"/sys/firmware",
+	}
+	defaultReadonlyPaths = []string{
+		"/proc/asound",
+		"/proc/bus",
+		"/proc/fs",
+		"/proc/irq",
+		"/proc/sys",
+		"/proc/sysrq-trigger",
+	}
+)
+
+// ConvertToRuntimeMaskedPaths converts the ProcMountType to the specified or default
+// masked paths.
+func ConvertToRuntimeMaskedPaths(opt *v1.ProcMountType) []string {
+	if opt != nil && *opt == v1.UnmaskedProcMount {
+		// Unmasked proc mount should have no paths set as masked.
+		return []string{}
+	}
+
+	// Otherwise, add the default masked paths to the runtime security context.
+	return defaultMaskedPaths
+}
+
+// ConvertToRuntimeReadonlyPaths converts the ProcMountType to the specified or default
+// readonly paths.
+func ConvertToRuntimeReadonlyPaths(opt *v1.ProcMountType) []string {
+	if opt != nil && *opt == v1.UnmaskedProcMount {
+		// Unmasked proc mount should have no paths set as readonly.
+		return []string{}
+	}
+
+	// Otherwise, add the default readonly paths to the runtime security context.
+	return defaultReadonlyPaths
 }

@@ -33,6 +33,22 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If IncludeUninitialized is specified, the object may be returned without completing initialization.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -196,7 +212,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
     "required": [
      "apiVersion",
      "kind",
@@ -316,7 +332,7 @@
      },
      "continue": {
       "type": "string",
-      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response."
+      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message."
      }
     }
    },
@@ -379,6 +395,13 @@
      "token": {
       "type": "string",
       "description": "Token is the opaque bearer token."
+     },
+     "audiences": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver."
      }
     }
    },
@@ -393,6 +416,13 @@
      "user": {
       "$ref": "v1beta1.UserInfo",
       "description": "User is the UserInfo associated with the provided token."
+     },
+     "audiences": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server."
      },
      "error": {
       "type": "string",

@@ -37,13 +37,9 @@ func TestObserveAdmissionStep(t *testing.T) {
 	handler.(admission.MutationInterface).Admit(attr)
 	handler.(admission.ValidationInterface).Validate(attr)
 	wantLabels := map[string]string{
-		"operation":   string(admission.Create),
-		"group":       resource.Group,
-		"version":     resource.Version,
-		"resource":    resource.Resource,
-		"subresource": "subresource",
-		"type":        "admit",
-		"rejected":    "false",
+		"operation": string(admission.Create),
+		"type":      "admit",
+		"rejected":  "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", wantLabels, 1)
 	expectFindMetric(t, "apiserver_admission_step_admission_latencies_seconds_summary", wantLabels)
@@ -59,14 +55,10 @@ func TestObserveAdmissionController(t *testing.T) {
 	handler.(admission.MutationInterface).Admit(attr)
 	handler.(admission.ValidationInterface).Validate(attr)
 	wantLabels := map[string]string{
-		"name":        "a",
-		"operation":   string(admission.Create),
-		"group":       resource.Group,
-		"version":     resource.Version,
-		"resource":    resource.Resource,
-		"subresource": "subresource",
-		"type":        "admit",
-		"rejected":    "false",
+		"name":      "a",
+		"operation": string(admission.Create),
+		"type":      "admit",
+		"rejected":  "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
 
@@ -78,14 +70,10 @@ func TestObserveWebhook(t *testing.T) {
 	Metrics.reset()
 	Metrics.ObserveWebhook(2*time.Second, false, attr, stepAdmit, "x")
 	wantLabels := map[string]string{
-		"name":        "x",
-		"operation":   string(admission.Create),
-		"group":       resource.Group,
-		"version":     resource.Version,
-		"resource":    resource.Resource,
-		"subresource": "subresource",
-		"type":        "admit",
-		"rejected":    "false",
+		"name":      "x",
+		"operation": string(admission.Create),
+		"type":      "admit",
+		"rejected":  "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_latencies_seconds", wantLabels, 1)
 }

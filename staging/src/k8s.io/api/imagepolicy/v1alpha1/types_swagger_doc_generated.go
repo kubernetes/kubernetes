@@ -58,9 +58,10 @@ func (ImageReviewSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ImageReviewStatus = map[string]string{
-	"":        "ImageReviewStatus is the result of the token authentication request.",
-	"allowed": "Allowed indicates that all images were allowed to be run.",
-	"reason":  "Reason should be empty unless Allowed is false in which case it may contain a short description of what is wrong.  Kubernetes may truncate excessively long errors when displaying to the user.",
+	"":                 "ImageReviewStatus is the result of the review for the pod creation request.",
+	"allowed":          "Allowed indicates that all images were allowed to be run.",
+	"reason":           "Reason should be empty unless Allowed is false in which case it may contain a short description of what is wrong.  Kubernetes may truncate excessively long errors when displaying to the user.",
+	"auditAnnotations": "AuditAnnotations will be added to the attributes object of the admission controller request using 'AddAnnotation'.  The keys should be prefix-less (i.e., the admission controller will add an appropriate prefix).",
 }
 
 func (ImageReviewStatus) SwaggerDoc() map[string]string {

@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
-	watcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
+	watcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 )
 
 // Stub implementation for DevicePlugin.
@@ -165,10 +165,10 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}))
-	defer conn.Close()
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	client := pluginapi.NewRegistrationClient(conn)
 	reqt := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,

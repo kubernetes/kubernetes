@@ -21,15 +21,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"gopkg.in/square/go-jose.v2/jwt"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -61,7 +64,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	pk := sk.(*ecdsa.PrivateKey).PublicKey
 
 	const iss = "https://foo.bar.example.com"
-	aud := []string{"api"}
+	aud := authenticator.Audiences{"api"}
 
 	maxExpirationSeconds := int64(60 * 60)
 	maxExpirationDuration, err := time.ParseDuration(fmt.Sprintf("%ds", maxExpirationSeconds))
@@ -74,16 +77,22 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
 		serviceaccount.JWTTokenAuthenticator(
 			iss,
 			[]interface{}{&pk},
-			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
+			aud,
+			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(gcs)),
 		),
 	)
-	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
-	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
+	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
@@ -157,7 +166,10 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
-		doTokenReview(t, cs, treq, false)
+		info := doTokenReview(t, cs, treq, false)
+		if info.Extra != nil {
+			t.Fatalf("expected Extra to be nil but got: %#v", info.Extra)
+		}
 		delSvcAcct()
 		doTokenReview(t, cs, treq, true)
 	})
@@ -210,7 +222,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
-		doTokenReview(t, cs, treq, false)
+		info := doTokenReview(t, cs, treq, false)
+		if len(info.Extra) != 2 {
+			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
+		}
+		if expected := map[string]authenticationv1.ExtraValue{
+			"authentication.kubernetes.io/pod-name": {pod.ObjectMeta.Name},
+			"authentication.kubernetes.io/pod-uid":  {string(pod.ObjectMeta.UID)},
+		}; !reflect.DeepEqual(info.Extra, expected) {
+			t.Fatalf("unexpected Extra:\ngot:\t%#v\nwant:\t%#v", info.Extra, expected)
+		}
 		delPod()
 		doTokenReview(t, cs, treq, true)
 	})
@@ -535,7 +556,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	})
 }
 
-func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
+func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) authenticationv1.UserInfo {
 	t.Helper()
 	trev, err := cs.AuthenticationV1().TokenReviews().Create(&authenticationv1.TokenReview{
 		Spec: authenticationv1.TokenReviewSpec{
@@ -555,6 +576,7 @@ func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.
 	if !trev.Status.Authenticated && !expectErr {
 		t.Fatal("expected token to be authenticated but it wasn't")
 	}
+	return trev.Status.User
 }
 
 func checkPayload(t *testing.T, tok string, want string, parts ...string) {

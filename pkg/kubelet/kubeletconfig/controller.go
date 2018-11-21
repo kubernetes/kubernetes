@@ -26,8 +26,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store"
@@ -309,7 +309,7 @@ func (cc *Controller) graduateAssignedToLastKnownGood() error {
 	}
 	// if the sources are equal, no need to change
 	if assigned == lastKnownGood ||
-		assigned != nil && lastKnownGood != nil && apiequality.Semantic.DeepEqual(assigned, lastKnownGood) {
+		assigned != nil && lastKnownGood != nil && apiequality.Semantic.DeepEqual(assigned.NodeConfigSource(), lastKnownGood.NodeConfigSource()) {
 		return nil
 	}
 	// update last-known-good

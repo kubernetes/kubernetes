@@ -40,6 +40,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Act
 	_, err := NewAttachDetachController(
 		fakeKubeClient,
+		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
@@ -214,6 +215,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	// Create the controller
 	adcObj, err := NewAttachDetachController(
 		fakeKubeClient,
+		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),

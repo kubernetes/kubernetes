@@ -26,9 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api/pod"
-	podv1 "k8s.io/kubernetes/pkg/api/v1/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ControllerHasDesiredReplicas returns a condition that will be true if and only if
@@ -56,36 +53,6 @@ func ControllerHasDesiredReplicas(rcClient corev1client.ReplicationControllersGe
 // the pod has already reached completed state.
 var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 
-// ErrContainerTerminated is returned by PodContainerRunning in the intermediate
-// state where the pod indicates it's still running, but its container is already terminated
-var ErrContainerTerminated = fmt.Errorf("container terminated")
-
-// PodRunning returns true if the pod is running, false if the pod has not yet reached running state,
-// returns ErrPodCompleted if the pod has run to completion, or an error in any other case.
-func PodRunning(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *api.Pod:
-		switch t.Status.Phase {
-		case api.PodRunning:
-			return true, nil
-		case api.PodFailed, api.PodSucceeded:
-			return false, ErrPodCompleted
-		}
-	case *corev1.Pod:
-		switch t.Status.Phase {
-		case corev1.PodRunning:
-			return true, nil
-		case corev1.PodFailed, corev1.PodSucceeded:
-			return false, ErrPodCompleted
-		}
-	}
-	return false, nil
-}
-
 // PodCompleted returns true if the pod has run to completion, false if the pod has not yet
 // reached running state, or an error in any other case.
 func PodCompleted(event watch.Event) (bool, error) {
@@ -94,11 +61,6 @@ func PodCompleted(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.Pod:
-		switch t.Status.Phase {
-		case api.PodFailed, api.PodSucceeded:
-			return true, nil
-		}
 	case *corev1.Pod:
 		switch t.Status.Phase {
 		case corev1.PodFailed, corev1.PodSucceeded:
@@ -117,38 +79,21 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.Pod:
-		switch t.Status.Phase {
-		case api.PodFailed, api.PodSucceeded:
-			return false, ErrPodCompleted
-		case api.PodRunning:
-			return pod.IsPodReady(t), nil
-		}
 	case *corev1.Pod:
 		switch t.Status.Phase {
 		case corev1.PodFailed, corev1.PodSucceeded:
 			return false, ErrPodCompleted
 		case corev1.PodRunning:
-			return podv1.IsPodReady(t), nil
-		}
-	}
-	return false, nil
-}
-
-// PodNotPending returns true if the pod has left the pending state, false if it has not,
-// or an error in any other case (such as if the pod was deleted).
-func PodNotPending(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *api.Pod:
-		switch t.Status.Phase {
-		case api.PodPending:
-			return false, nil
-		default:
-			return true, nil
+			conditions := t.Status.Conditions
+			if conditions == nil {
+				return false, nil
+			}
+			for i := range conditions {
+				if conditions[i].Type == corev1.PodReady &&
+					conditions[i].Status == corev1.ConditionTrue {
+					return true, nil
+				}
+			}
 		}
 	}
 	return false, nil

@@ -21,16 +21,19 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/features"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -82,9 +85,7 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 
-	if err := utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=true"); err != nil {
-		t.Errorf("Failed to enable TaintByCondition feature: %v.", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	tests := []struct {
 		pod                       *api.Pod
@@ -98,7 +99,7 @@ func TestPodAdmission(t *testing.T) {
 		testName                  string
 	}{
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      nil,
 			podTolerations:            []api.Toleration{},
@@ -107,7 +108,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "default cluster tolerations with empty pod tolerations and nil namespace tolerations",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -116,7 +117,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "default cluster tolerations with pod tolerations specified",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -125,7 +126,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "namespace tolerations",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{},
@@ -134,7 +135,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "no pod tolerations",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -142,7 +143,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "conflicting pod and namespace tolerations",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue2", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -151,7 +152,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "conflicting pod and default cluster tolerations but overridden by empty namespace tolerations",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			whitelist:                 []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -161,7 +162,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "merged pod tolerations satisfy whitelist",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{},
@@ -179,7 +180,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:          "pod toleration conflicts with default cluster white list which is overridden by empty namespace whitelist",
 		},
 		{
-			pod: bestEffortPod,
+			pod:                       bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			whitelist:                 []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -188,26 +189,26 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "merged pod tolerations conflict with the whitelist",
 		},
 		{
-			pod: burstablePod,
+			pod:                       burstablePod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			whitelist:                 []api.Toleration{},
 			podTolerations:            []api.Toleration{},
 			mergedTolerations: []api.Toleration{
-				{Key: algorithm.TaintNodeMemoryPressure, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
+				{Key: schedulerapi.TaintNodeMemoryPressure, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
 				{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil},
 			},
 			admit:    true,
 			testName: "added memoryPressure/DiskPressure for Burstable pod",
 		},
 		{
-			pod: guaranteedPod,
+			pod:                       guaranteedPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			whitelist:                 []api.Toleration{},
 			podTolerations:            []api.Toleration{},
 			mergedTolerations: []api.Toleration{
-				{Key: algorithm.TaintNodeMemoryPressure, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
+				{Key: schedulerapi.TaintNodeMemoryPressure, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
 				{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil},
 			},
 			admit:    true,
@@ -216,7 +217,7 @@ func TestPodAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
-			namespace := &api.Namespace{
+			namespace := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testNamespace",
 					Namespace:   "",
@@ -335,14 +336,14 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 	if err != nil {
 		t.Errorf("error in marshalling namespace tolerations %v", namespaceTolerations)
 	}
-	namespace := &api.Namespace{
+	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testNamespace",
 			Namespace: "",
 		},
 	}
 	namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationsStr)}
-	err = informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+	err = informerFactory.Core().V1().Namespaces().Informer().GetStore().Update(namespace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +356,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 }
 
 // newHandlerForTest returns the admission controller configured for testing.
-func newHandlerForTest(c clientset.Interface) (*podTolerationsPlugin, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c kubernetes.Interface) (*podTolerationsPlugin, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	pluginConfig, err := loadConfiguration(nil)
 	// must not fail
@@ -363,7 +364,7 @@ func newHandlerForTest(c clientset.Interface) (*podTolerationsPlugin, informers.
 		return nil, nil, err
 	}
 	handler := NewPodTolerationsPlugin(pluginConfig)
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err

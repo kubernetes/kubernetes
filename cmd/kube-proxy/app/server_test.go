@@ -26,10 +26,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -288,11 +289,11 @@ nodePortAddresses:
 		}
 		expected := &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: expBindAddr,
-			ClientConnection: kubeproxyconfig.ClientConnectionConfiguration{
+			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 				AcceptContentTypes: "abc",
 				Burst:              100,
 				ContentType:        "content-type",
-				KubeConfigFile:     "/path/to/kubeconfig",
+				Kubeconfig:         "/path/to/kubeconfig",
 				QPS:                7,
 			},
 			ClusterCIDR:      tc.clusterCIDR,
@@ -371,5 +372,41 @@ func TestLoadConfigFailures(t *testing.T) {
 		if assert.Error(t, err, tc.name) {
 			assert.Contains(t, err.Error(), tc.expErr, tc.name)
 		}
+	}
+}
+
+// TestProcessHostnameOverrideFlag tests processing hostname-override arg
+func TestProcessHostnameOverrideFlag(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		hostnameOverrideFlag string
+		expectedHostname     string
+	}{
+		{
+			name:                 "Hostname from config file",
+			hostnameOverrideFlag: "",
+			expectedHostname:     "foo",
+		},
+		{
+			name:                 "Hostname from flag",
+			hostnameOverrideFlag: "  bar ",
+			expectedHostname:     "bar",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewOptions()
+			options.config = &kubeproxyconfig.KubeProxyConfiguration{
+				HostnameOverride: "foo",
+			}
+
+			options.hostnameOverride = tc.hostnameOverrideFlag
+
+			err := options.processHostnameOverrideFlag()
+			assert.NoError(t, err, "unexpected error %v", err)
+			if tc.expectedHostname != options.config.HostnameOverride {
+				t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
+			}
+		})
 	}
 }

@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -13,14 +8,17 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers",
     importpath = "k8s.io/client-go/informers",
+    visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
+        "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta1:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
@@ -45,6 +43,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/informers/admissionregistration:go_default_library",
         "//staging/src/k8s.io/client-go/informers/apps:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/auditregistration:go_default_library",
         "//staging/src/k8s.io/client-go/informers/autoscaling:go_default_library",
         "//staging/src/k8s.io/client-go/informers/batch:go_default_library",
         "//staging/src/k8s.io/client-go/informers/certificates:go_default_library",
@@ -77,6 +76,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/client-go/informers/admissionregistration:all-srcs",
         "//staging/src/k8s.io/client-go/informers/apps:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/auditregistration:all-srcs",
         "//staging/src/k8s.io/client-go/informers/autoscaling:all-srcs",
         "//staging/src/k8s.io/client-go/informers/batch:all-srcs",
         "//staging/src/k8s.io/client-go/informers/certificates:all-srcs",
@@ -93,4 +93,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/informers/storage:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

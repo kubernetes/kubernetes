@@ -13,6 +13,7 @@ go_library(
         "pv_controller.go",
         "pv_controller_base.go",
         "scheduler_assume_cache.go",
+        "scheduler_bind_cache_metrics.go",
         "scheduler_binder.go",
         "scheduler_binder_cache.go",
         "scheduler_binder_fake.go",
@@ -21,7 +22,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/events:go_default_library",
         "//pkg/controller/volume/persistentvolume/metrics:go_default_library",
@@ -56,7 +56,10 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -67,6 +70,7 @@ go_test(
         "delete_test.go",
         "framework_test.go",
         "index_test.go",
+        "main_test.go",
         "provision_test.go",
         "pv_controller_test.go",
         "recycle_test.go",
@@ -79,6 +83,7 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
@@ -93,6 +98,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
@@ -103,7 +109,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

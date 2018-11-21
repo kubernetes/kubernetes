@@ -119,7 +119,7 @@ func (c *FakeLeases) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 // Patch applies the patch and returns the patched lease.
 func (c *FakeLeases) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Lease, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(leasesResource, c.ns, name, data, subresources...), &v1beta1.Lease{})
+		Invokes(testing.NewPatchSubresourceAction(leasesResource, c.ns, name, pt, data, subresources...), &v1beta1.Lease{})
 
 	if obj == nil {
 		return nil, err

@@ -362,7 +362,7 @@ var getSubresourceTemplate = `
 func (c *Fake$.type|publicPlural$) Get($.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, "$.subresourcePath$", $.type|private$Name), &$.resultType|raw${})
-		$else$Invokes($.NewRootGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name), &$.resultType|raw${})$end$
+		$else$Invokes($.NewRootGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, "$.subresourcePath$", $.type|private$Name), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -469,8 +469,8 @@ var patchTemplate = `
 // Patch applies the patch and returns the patched $.resultType|private$.
 func (c *Fake$.type|publicPlural$) Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.resultType|raw$, err error) {
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, name, data, subresources... ), &$.resultType|raw${})
-		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, name, data, subresources...), &$.resultType|raw${})$end$
+		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, name, pt, data, subresources... ), &$.resultType|raw${})
+		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, name, pt, data, subresources...), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}

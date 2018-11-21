@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -37,11 +38,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -52,9 +56,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/restmapper"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -231,6 +232,8 @@ var _ = SIGDescribe("Load capacity", func() {
 				framework.ExpectNoError(CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation")))
 			}
 
+			f.AddonResourceConstraints = loadResourceConstraints()
+
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
@@ -240,7 +243,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					defer GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
-				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
+				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
@@ -250,7 +253,7 @@ var _ = SIGDescribe("Load capacity", func() {
 						defer GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
-					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
+					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {
@@ -321,20 +324,11 @@ var _ = SIGDescribe("Load capacity", func() {
 			// to make it possible to create/schedule & delete them in the meantime.
 			// Currently we assume that <throughput> pods/second average throughput.
 
-			// The expected number of created/deleted pods is totalPods/4 when scaling
-			// for the first time, with each RC changing its size from X to a uniform
-			// random value in the interval [X/2, 3X/2].
+			// The expected number of created/deleted pods is totalPods/4 when scaling,
+			// as each RC changes its size from X to a uniform random value in [X/2, 3X/2].
 			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
 			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
-			By("============================================================================")
-
-			// The expected number of created/deleted pods is totalPods/3 when scaling for
-			// the second time, with each RC changing its size from a uniform random value
-			// in the interval [X/2, 3X/2] to another uniform random value in same interval.
-			scalingTime = time.Duration(totalPods/(3*throughput)) * time.Second
-			framework.Logf("Starting to scale %v objects second time...", itArg.kind)
-			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(400, "scaling second time"))
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
@@ -435,6 +429,19 @@ func computePodCounts(total int) (int, int, int) {
 	total -= mediumGroupCount * mediumGroupSize
 	smallGroupCount := total / smallGroupSize
 	return smallGroupCount, mediumGroupCount, bigGroupCount
+}
+
+func loadResourceConstraints() map[string]framework.ResourceConstraint {
+	constraints := make(map[string]framework.ResourceConstraint)
+	constraints["coredns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	constraints["kubedns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	return constraints
 }
 
 func generateConfigs(

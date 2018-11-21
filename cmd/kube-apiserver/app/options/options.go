@@ -27,13 +27,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
-
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // ServerRunOptions runs a kubernetes api server.
@@ -41,7 +40,7 @@ type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
-	InsecureServing         *kubeoptions.InsecureServingOptions
+	InsecureServing         *genericoptions.DeprecatedInsecureServingOptionsWithLoopback
 	Audit                   *genericoptions.AuditOptions
 	Features                *genericoptions.FeatureOptions
 	Admission               *kubeoptions.AdmissionOptions
@@ -70,24 +69,26 @@ type ServerRunOptions struct {
 	MasterCount            int
 	EndpointReconcilerType string
 
-	ServiceAccountSigningKeyFile string
+	ServiceAccountSigningKeyFile     string
+	ServiceAccountIssuer             serviceaccount.TokenGenerator
+	ServiceAccountTokenMaxExpiration time.Duration
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
-		SecureServing:        kubeoptions.NewSecureServingOptions(),
-		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
-		Audit:                genericoptions.NewAuditOptions(),
-		Features:             genericoptions.NewFeatureOptions(),
-		Admission:            kubeoptions.NewAdmissionOptions(),
-		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
-		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
-		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
-		APIEnablement:        genericoptions.NewAPIEnablementOptions(),
+		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
+		SecureServing:           kubeoptions.NewSecureServingOptions(),
+		InsecureServing:         kubeoptions.NewInsecureServingOptions(),
+		Audit:                   genericoptions.NewAuditOptions(),
+		Features:                genericoptions.NewFeatureOptions(),
+		Admission:               kubeoptions.NewAdmissionOptions(),
+		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:           kubeoptions.NewCloudProviderOptions(),
+		StorageSerialization:    kubeoptions.NewStorageSerializationOptions(),
+		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
@@ -128,7 +129,7 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	s.Etcd.AddFlags(fss.FlagSet("etcd"))
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	s.InsecureServing.AddFlags(fss.FlagSet("insecure serving"))
-	s.InsecureServing.AddDeprecatedFlags(fss.FlagSet("insecure serving"))
+	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving")) // TODO: remove it until kops stops using `--address`
 	s.Audit.AddFlags(fss.FlagSet("auditing"))
 	s.Features.AddFlags(fss.FlagSet("features"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))

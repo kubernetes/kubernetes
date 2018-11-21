@@ -75,6 +75,54 @@ run_kubectl_apply_tests() {
   # cleanup
   kubectl delete pods selector-test-pod
 
+  ## kubectl apply --server-dry-run
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply dry-run
+  kubectl apply --server-dry-run -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # No pod exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply non dry-run creates the pod
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # apply changes
+  kubectl apply --server-dry-run -f hack/testdata/pod-apply.yaml "${kube_flags[@]}"
+  # Post-Condition: label still has initial value
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+
+  # clean-up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
+
+  ## kubectl apply dry-run on CR
+  # Create CRD
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "resources.mygroup.example.com"
+  },
+  "spec": {
+    "group": "mygroup.example.com",
+    "version": "v1alpha1",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "resources",
+      "singular": "resource",
+      "kind": "Kind",
+      "listKind": "KindList"
+    }
+  }
+}
+__EOF__
+
+  # Dry-run create the CR
+  kubectl "${kube_flags[@]}" apply --server-dry-run -f hack/testdata/CRD/resource.yaml "${kube_flags[@]}"
+  # Make sure that the CR doesn't exist
+  ! kubectl "${kube_flags[@]}" get resource/myobj
+
+  # clean-up
+  kubectl "${kube_flags[@]}" delete customresourcedefinition resources.mygroup.example.com
 
   ## kubectl apply --prune
   # Pre-Condition: no POD exists

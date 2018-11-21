@@ -12,6 +12,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 

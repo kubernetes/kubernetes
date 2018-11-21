@@ -29,6 +29,7 @@ readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
 KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
+KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 
 # Validate a ci version
 #
@@ -193,17 +194,46 @@ function kube::release::package_node_tarballs() {
   done
 }
 
+# Package up all of the server binaries in docker images
+function kube::release::build_server_images() {
+  # Clean out any old images
+  rm -rf "${RELEASE_IMAGES}"
+  local platform
+  for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+    local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename "${platform}")
+    kube::log::status "Building images: $platform_tag"
+
+    local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
+    rm -rf "${release_stage}"
+    mkdir -p "${release_stage}/server/bin"
+
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_SERVER_IMAGE_BINARIES array.
+    cp "${KUBE_SERVER_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/server/bin/"
+
+    # if we are building hyperkube, we also need to copy that binary
+    if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
+      cp "${LOCAL_OUTPUT_BINPATH}/${platform}/hyperkube" "${release_stage}/server/bin"
+    fi
+
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+  done
+}
+
 # Package up all of the server binaries
 function kube::release::package_server_tarballs() {
+  kube::release::build_server_images
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
 
+    # NOTE: this directory was setup in kube::release::build_server_images
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
-    rm -rf "${release_stage}"
-    mkdir -p "${release_stage}/server/bin"
     mkdir -p "${release_stage}/addons"
 
     # This fancy expression will expand to prepend a path
@@ -211,8 +241,6 @@ function kube::release::package_server_tarballs() {
     # KUBE_SERVER_BINARIES array.
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
-
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -262,15 +290,28 @@ function kube::release::build_hyperkube_image() {
   if [[ -n "${save_dir}" ]]; then
     "${DOCKER[@]}" save "${hyperkube_tag}" > "${save_dir}/hyperkube-${arch}.tar"
   fi
-  if [[ -z "${KUBE_DOCKER_IMAGE_TAG-}" || -z "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    # not a release
-    kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
-    "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
-  fi
+  kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
+  "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
 }
 
-# This will take binaries that run on master and creates Docker images
-# that wrap the binary in them. (One docker image per binary)
+function kube::release::build_conformance_image() {
+  local -r arch="$1"
+  local -r registry="$2"
+  local -r version="$3"
+  local -r save_dir="${4-}"
+  kube::log::status "Building conformance image for arch: ${arch}"
+  ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
+    make -C cluster/images/conformance/ build >/dev/null
+
+  local conformance_tag="${registry}/conformance-${arch}:${version}"
+  if [[ -n "${save_dir}" ]]; then
+    "${DOCKER[@]}" save "${conformance_tag}" > "${save_dir}/conformance-${arch}.tar"
+  fi
+  kube::log::status "Deleting conformance image ${conformance_tag}"
+  "${DOCKER[@]}" rmi "${conformance_tag}" &>/dev/null || true
+}
+
+# This builds all the release docker images (One docker image per binary)
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
 #  $2 - arch, architecture for which we are building docker images.
@@ -285,10 +326,6 @@ function kube::release::create_docker_images_for_server() {
     mkdir -p "${images_dir}"
 
     local -r docker_registry="k8s.gcr.io"
-    # TODO(thockin): Remove all traces of this after 1.11 release.
-    # The following is the old non-indirected registry name.  To ease the
-    # transition to the new name (above), we are double-tagging saved images.
-    local -r deprecated_registry="gcr.io/google_containers"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -309,17 +346,14 @@ function kube::release::create_docker_images_for_server() {
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}"
-      local deprecated_image_tag="${deprecated_registry}"
       if [[ ${arch} == "amd64" ]]; then
         # If we are building a amd64 docker image, preserve the original
         # image name
         docker_image_tag+="/${binary_name}:${docker_tag}"
-        deprecated_image_tag+="/${binary_name}:${docker_tag}"
       else
         # If we are building a docker image for another architecture,
         # append the arch in the image tag
         docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-        deprecated_image_tag+="/${binary_name}-${arch}:${docker_tag}"
       fi
 
 
@@ -328,11 +362,18 @@ function kube::release::create_docker_images_for_server() {
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
         ln "${binary_dir}/${binary_name}" "${docker_build_path}/${binary_name}"
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > "${docker_file_path}"
-
+        ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
+        chmod 0644 "${docker_build_path}/nsswitch.conf"
+        cat <<EOF > "${docker_file_path}"
+FROM ${base_image}
+COPY ${binary_name} /usr/local/bin/${binary_name}
+EOF
+        # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
+        if [[ "${base_image}" =~ busybox ]]; then
+          echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
+        fi
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
-        "${DOCKER[@]}" tag "${docker_image_tag}" "${deprecated_image_tag}" >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" "${deprecated_image_tag}" > "${binary_dir}/${binary_name}.tar"
+        "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
@@ -351,13 +392,16 @@ function kube::release::create_docker_images_for_server() {
           # not a release
           kube::log::status "Deleting docker image ${docker_image_tag}"
           "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-          "${DOCKER[@]}" rmi "${deprecated_image_tag}" &>/dev/null || true
         fi
       ) &
     done
 
     if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
       kube::release::build_hyperkube_image "${arch}" "${docker_registry}" \
+        "${docker_tag}" "${images_dir}" &
+    fi
+    if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
+      kube::release::build_conformance_image "${arch}" "${docker_registry}" \
         "${docker_tag}" "${images_dir}" &
     fi
 
@@ -382,14 +426,11 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd.manifest" "${dst_dir}"
   cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
-  cp "${src_dir}/kms-plugin-container.manifest" "${dst_dir}"
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
-  cp "${src_dir}/rescheduler.manifest" "${dst_dir}/"
-  cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   local internal_manifest
   for internal_manifest in $(ls "${src_dir}" | grep "^internal-*"); do

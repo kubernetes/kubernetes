@@ -32,8 +32,6 @@ import (
 func TestErrors(t *testing.T) {
 	internalError := errors.New("ARGH")
 	fns := map[string]func(http.ResponseWriter, *http.Request){
-		"BadGatewayError": BadGatewayError,
-		"NotFound":        NotFound,
 		"InternalError": func(w http.ResponseWriter, req *http.Request) {
 			InternalError(w, req, internalError)
 		},
@@ -43,12 +41,8 @@ func TestErrors(t *testing.T) {
 		uri      string
 		expected string
 	}{
-		{"BadGatewayError", "/get", `Bad Gateway: "/get"`},
-		{"BadGatewayError", "/<script>", `Bad Gateway: "/&lt;script&gt;"`},
-		{"NotFound", "/get", `Not Found: "/get"`},
-		{"NotFound", "/<script&>", `Not Found: "/&lt;script&amp;&gt;"`},
-		{"InternalError", "/get", `Internal Server Error: "/get": ARGH`},
-		{"InternalError", "/<script>", `Internal Server Error: "/&lt;script&gt;": ARGH`},
+		{"InternalError", "/get", "Internal Server Error: \"/get\": ARGH\n"},
+		{"InternalError", "/<script>", "Internal Server Error: \"/&lt;script&gt;\": ARGH\n"},
 	}
 	for _, test := range cases {
 		observer := httptest.NewRecorder()

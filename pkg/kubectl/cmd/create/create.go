@@ -24,24 +24,25 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 type CreateOptions struct {
@@ -93,11 +94,11 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	o := NewCreateOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "create -f FILENAME",
+		Use:                   "create -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a resource from a file or from stdin."),
-		Long:    createLong,
-		Example: createExample,
+		Short:                 i18n.T("Create a resource from a file or from stdin."),
+		Long:                  createLong,
+		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
@@ -241,12 +242,12 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if !o.DryRun {
@@ -318,7 +319,7 @@ func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags
 
 // createAndRefresh creates an object from input info and refreshes info with that object
 func createAndRefresh(info *resource.Info) error {
-	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, nil)
 	if err != nil {
 		return err
 	}
@@ -328,8 +329,13 @@ func createAndRefresh(info *resource.Info) error {
 
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) != 1 {
-		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", len(args))
+	argsLen := cmd.ArgsLenAtDash()
+	// ArgsLenAtDash returns -1 when -- was not specified
+	if argsLen == -1 {
+		argsLen = len(args)
+	}
+	if argsLen != 1 {
+		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", argsLen)
 	}
 	return args[0], nil
 }
@@ -341,7 +347,7 @@ type CreateSubcommandOptions struct {
 	// Name of resource being created
 	Name string
 	// StructuredGenerator is the resource generator for the object being created
-	StructuredGenerator kubectl.StructuredGenerator
+	StructuredGenerator generate.StructuredGenerator
 	// DryRun is true if the command should be simulated but not run against the server
 	DryRun           bool
 	CreateAnnotation bool
@@ -364,7 +370,7 @@ func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSu
 	}
 }
 
-func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
+func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator generate.StructuredGenerator) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -423,7 +429,7 @@ func (o *CreateSubcommandOptions) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 

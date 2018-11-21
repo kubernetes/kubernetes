@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // NodeUpdate updates a Node.

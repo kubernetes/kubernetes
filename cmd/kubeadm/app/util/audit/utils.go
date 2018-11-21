@@ -17,10 +17,11 @@ limitations under the License.
 package audit
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,7 +50,7 @@ func CreateDefaultAuditLogPolicy(policyFile string) error {
 func writePolicyToDisk(policyFile string, policy *auditv1.Policy) error {
 	// creates target folder if not already exists
 	if err := os.MkdirAll(filepath.Dir(policyFile), 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", filepath.Dir(policyFile), err)
+		return errors.Wrapf(err, "failed to create directory %q: ", filepath.Dir(policyFile))
 	}
 
 	scheme := runtime.NewScheme()
@@ -62,11 +63,11 @@ func writePolicyToDisk(policyFile string, policy *auditv1.Policy) error {
 	serialized, err := util.MarshalToYamlForCodecs(policy, auditv1.SchemeGroupVersion, codecs)
 
 	if err != nil {
-		return fmt.Errorf("failed to marshal audit policy to YAML: %v", err)
+		return errors.Wrap(err, "failed to marshal audit policy to YAML")
 	}
 
 	if err := ioutil.WriteFile(policyFile, serialized, 0600); err != nil {
-		return fmt.Errorf("failed to write audit policy to %v: %v", policyFile, err)
+		return errors.Wrapf(err, "failed to write audit policy to %v: ", policyFile)
 	}
 
 	return nil

@@ -112,7 +112,7 @@ func (c *FakePriorityClasses) DeleteCollection(options *v1.DeleteOptions, listOp
 // Patch applies the patch and returns the patched priorityClass.
 func (c *FakePriorityClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PriorityClass, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, data, subresources...), &v1alpha1.PriorityClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), &v1alpha1.PriorityClass{})
 	if obj == nil {
 		return nil, err
 	}

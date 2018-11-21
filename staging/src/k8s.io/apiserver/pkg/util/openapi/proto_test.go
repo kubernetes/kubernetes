@@ -22,35 +22,40 @@ import (
 
 	"github.com/go-openapi/spec"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // TestOpenAPIDefinitionsToProtoSchema tests the openapi parser
-func TestOpenAPIDefinitionsToProtoSchema(t *testing.T) {
-	openAPIDefinitions := &spec.Definitions{
-		"io.k8s.api.testgroup.v1.Foo": spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Description of Foos",
-				Properties:  map[string]spec.Schema{},
+func TestOpenAPIDefinitionsToProtoModels(t *testing.T) {
+	openAPISpec := &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Swagger: "2.0",
+			Info: &spec.Info{
+				InfoProps: spec.InfoProps{
+					Title:   "Kubernetes",
+					Version: "0.0.0",
+				},
 			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-group-version-kind": []map[string]string{
-						{
-							"group":   "testgroup.k8s.io",
-							"version": "v1",
-							"kind":    "Foo",
+			Definitions: spec.Definitions{
+				"io.k8s.api.testgroup.v1.Foo": spec.Schema{
+					SchemaProps: spec.SchemaProps{
+						Description: "Description of Foos",
+						Properties:  map[string]spec.Schema{},
+					},
+					VendorExtensible: spec.VendorExtensible{
+						Extensions: spec.Extensions{
+							"x-kubernetes-group-version-kind": []map[string]string{
+								{
+									"group":   "testgroup.k8s.io",
+									"version": "v1",
+									"kind":    "Foo",
+								},
+							},
 						},
 					},
 				},
 			},
 		},
-	}
-	gvk := schema.GroupVersionKind{
-		Group:   "testgroup.k8s.io",
-		Version: "v1",
-		Kind:    "Foo",
 	}
 	expectedSchema := &proto.Arbitrary{
 		BaseSchema: proto.BaseSchema{
@@ -67,10 +72,11 @@ func TestOpenAPIDefinitionsToProtoSchema(t *testing.T) {
 			Path: proto.NewPath("io.k8s.api.testgroup.v1.Foo"),
 		},
 	}
-	actualSchema, err := ToProtoSchema(openAPIDefinitions, gvk)
+	protoModels, err := ToProtoModels(openAPISpec)
 	if err != nil {
-		t.Fatalf("expected ToProtoSchema not to return an error")
+		t.Fatalf("expected ToProtoModels not to return an error")
 	}
+	actualSchema := protoModels.LookupModel("io.k8s.api.testgroup.v1.Foo")
 	if !reflect.DeepEqual(expectedSchema, actualSchema) {
 		t.Fatalf("expected schema:\n%v\nbut got:\n%v", expectedSchema, actualSchema)
 	}

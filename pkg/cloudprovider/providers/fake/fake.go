@@ -26,8 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 const defaultProviderName = "fake"
@@ -98,7 +97,8 @@ func (f *FakeCloud) ClearCalls() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (f *FakeCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (f *FakeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 func (f *FakeCloud) ListClusters(ctx context.Context) ([]string, error) {
 	return f.ClusterList, f.Err
@@ -156,6 +156,7 @@ func (f *FakeCloud) GetLoadBalancer(ctx context.Context, clusterName string, ser
 
 // GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName.
 func (f *FakeCloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 

@@ -473,7 +473,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">continue</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -867,7 +867,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1_ownerreference">v1.OwnerReference</h3>
 <div class="paragraph">
-<p>OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.</p>
+<p>OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1053,6 +1053,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">audiences</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -1092,6 +1099,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">User is the UserInfo associated with the provided token.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_userinfo">v1.UserInfo</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">audiences</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token&#8217;s audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is "true", the token is valid against the audience of the Kubernetes API server.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>

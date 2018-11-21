@@ -128,10 +128,6 @@ func newOwnerDeployment(f *framework.Framework, deploymentName string, labels ma
 	}
 }
 
-func getSelector() map[string]string {
-	return map[string]string{"app": "gc-test"}
-}
-
 func newOwnerRC(f *framework.Framework, name string, replicas int32, labels map[string]string) *v1.ReplicationController {
 	template := getPodTemplateSpec(labels)
 	return &v1.ReplicationController{
@@ -149,45 +145,6 @@ func newOwnerRC(f *framework.Framework, name string, replicas int32, labels map[
 			Template: &template,
 		},
 	}
-}
-
-// verifyRemainingDeploymentsReplicaSetsPods verifies if the number
-// of the remaining deployments, replica set and pods are deploymentNum,
-// rsNum and podNum. It returns error if the communication with the API
-// server fails.
-func verifyRemainingDeploymentsReplicaSetsPods(
-	f *framework.Framework,
-	clientSet clientset.Interface,
-	deployment *v1beta1.Deployment,
-	deploymentNum, rsNum, podNum int,
-) (bool, error) {
-	var ret = true
-	rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list rs: %v", err)
-	}
-	if len(rs.Items) != rsNum {
-		ret = false
-		By(fmt.Sprintf("expected %d rs, got %d rs", rsNum, len(rs.Items)))
-	}
-	deployments, err := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list deployments: %v", err)
-	}
-	if len(deployments.Items) != deploymentNum {
-		ret = false
-		By(fmt.Sprintf("expected %d Deployments, got %d Deployments", deploymentNum, len(deployments.Items)))
-	}
-	pods, err := clientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
-	}
-	if len(pods.Items) != podNum {
-		ret = false
-		By(fmt.Sprintf("expected %v Pods, got %d Pods", podNum, len(pods.Items)))
-	}
-
-	return ret, nil
 }
 
 func newGCPod(name string) *v1.Pod {
@@ -211,62 +168,70 @@ func newGCPod(name string) *v1.Pod {
 	}
 }
 
-// verifyRemainingReplicationControllersPods verifies if the number of the remaining replication
-// controllers and pods are rcNum and podNum. It returns error if the
-// communication with the API server fails.
-func verifyRemainingReplicationControllersPods(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
-	pods, err := clientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
-	}
-	var ret = true
-	if len(pods.Items) != podNum {
-		ret = false
-		By(fmt.Sprintf("expected %d pods, got %d pods", podNum, len(pods.Items)))
-	}
-	rcs, err := rcClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
-	}
-	if len(rcs.Items) != rcNum {
-		ret = false
-		By(fmt.Sprintf("expected %d RCs, got %d RCs", rcNum, len(rcs.Items)))
-	}
-	return ret, nil
-}
-
-// verifyRemainingCronJobsJobsPods verifies if the number of remaining cronjobs,
-// jobs and pods. It returns error if the communication with the API server fails.
-func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset.Interface,
-	cjNum, jobNum, podNum int) (bool, error) {
+// verifyRemainingObjects verifies if the number of remaining objects.
+// It returns error if the communication with the API server fails.
+func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (bool, error) {
 	var ret = true
 
-	cronJobs, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list cronjobs: %v", err)
-	}
-	if len(cronJobs.Items) != cjNum {
-		ret = false
-		By(fmt.Sprintf("expected %d cronjobs, got %d cronjobs", cjNum, len(cronJobs.Items)))
-	}
-
-	jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list jobs: %v", err)
-	}
-	if len(jobs.Items) != jobNum {
-		ret = false
-		By(fmt.Sprintf("expected %d jobs, got %d jobs", jobNum, len(jobs.Items)))
-	}
-
-	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
-	}
-	if len(pods.Items) != podNum {
-		ret = false
-		By(fmt.Sprintf("expected %d pods, got %d pods", podNum, len(pods.Items)))
+	for object, num := range objects {
+		switch object {
+		case "Pods":
+			pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list pods: %v", err)
+			}
+			if len(pods.Items) != num {
+				ret = false
+				By(fmt.Sprintf("expected %d pods, got %d pods", num, len(pods.Items)))
+			}
+		case "Deployments":
+			deployments, err := f.ClientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list deployments: %v", err)
+			}
+			if len(deployments.Items) != num {
+				ret = false
+				By(fmt.Sprintf("expected %d Deployments, got %d Deployments", num, len(deployments.Items)))
+			}
+		case "ReplicaSets":
+			rs, err := f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list rs: %v", err)
+			}
+			if len(rs.Items) != num {
+				ret = false
+				By(fmt.Sprintf("expected %d rs, got %d rs", num, len(rs.Items)))
+			}
+		case "ReplicationControllers":
+			rcs, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list replication controllers: %v", err)
+			}
+			if len(rcs.Items) != num {
+				ret = false
+				By(fmt.Sprintf("expected %d RCs, got %d RCs", num, len(rcs.Items)))
+			}
+		case "CronJobs":
+			cronJobs, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list cronjobs: %v", err)
+			}
+			if len(cronJobs.Items) != num {
+				ret = false
+				By(fmt.Sprintf("expected %d cronjobs, got %d cronjobs", num, len(cronJobs.Items)))
+			}
+		case "Jobs":
+			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to list jobs: %v", err)
+			}
+			if len(jobs.Items) != num {
+				ret = false
+				By(fmt.Sprintf("expected %d jobs, got %d jobs", num, len(jobs.Items)))
+			}
+		default:
+			return false, fmt.Errorf("object %s is not supported", object)
+		}
 	}
 
 	return ret, nil
@@ -379,7 +344,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 		By("wait for all pods to be garbage collected")
 		// wait for the RCs and Pods to reach the expected numbers.
 		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-			return verifyRemainingReplicationControllersPods(f, clientSet, 0, 0)
+			objects := map[string]int{"ReplicationControllers": 0, "Pods": 0}
+			return verifyRemainingObjects(f, objects)
 		}); err != nil {
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
 			remainingPods, err := podClient.List(metav1.ListOptions{})
@@ -546,7 +512,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for all rs to be garbage collected")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
-			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 0, 0)
+			objects := map[string]int{"Deployments": 0, "ReplicaSets": 0, "Pods": 0}
+			return verifyRemainingObjects(f, objects)
 		})
 		if err != nil {
 			errList := make([]error, 0)
@@ -604,7 +571,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the rs")
 		time.Sleep(30 * time.Second)
-		ok, err := verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 1, 2)
+		objects := map[string]int{"Deployments": 0, "ReplicaSets": 1, "Pods": 2}
+		ok, err := verifyRemainingObjects(f, objects)
 		if err != nil {
 			framework.Failf("Unexpected error while verifying remaining deployments, rs, and pods: %v", err)
 		}
@@ -769,12 +737,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By(fmt.Sprintf("set half of pods created by rc %s to have rc %s as owner as well", rc1Name, rc2Name))
 		pods, err := podClient.List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to list pods in namespace: %s", f.Namespace.Name)
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
 		for i := 0; i < halfReplicas; i++ {
 			pod := pods.Items[i]
 			_, err := podClient.Patch(pod.Name, types.StrategicMergePatchType, []byte(patch))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
 		}
 
 		By(fmt.Sprintf("delete the rc %s", rc1Name))
@@ -848,33 +816,39 @@ var _ = SIGDescribe("Garbage collector", func() {
 	framework.ConformanceIt("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
-		pod1 := newGCPod("pod1")
+		pod1Name := "pod1"
+		pod1 := newGCPod(pod1Name)
 		pod1, err := podClient.Create(pod1)
-		Expect(err).NotTo(HaveOccurred())
-		pod2 := newGCPod("pod2")
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
+		pod2Name := "pod2"
+		pod2 := newGCPod(pod2Name)
 		pod2, err = podClient.Create(pod2)
-		Expect(err).NotTo(HaveOccurred())
-		pod3 := newGCPod("pod3")
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
+		pod3Name := "pod3"
+		pod3 := newGCPod(pod3Name)
 		pod3, err = podClient.Create(pod3)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
 		// create circular dependency
 		addRefPatch := func(name string, uid types.UID) []byte {
 			return []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"Pod","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}]}}`, name, uid))
 		}
-		pod1, err = podClient.Patch(pod1.Name, types.StrategicMergePatchType, addRefPatch(pod3.Name, pod3.UID))
-		Expect(err).NotTo(HaveOccurred())
+		patch1 := addRefPatch(pod3.Name, pod3.UID)
+		pod1, err = podClient.Patch(pod1.Name, types.StrategicMergePatchType, patch1)
+		Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
 		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
-		pod2, err = podClient.Patch(pod2.Name, types.StrategicMergePatchType, addRefPatch(pod1.Name, pod1.UID))
-		Expect(err).NotTo(HaveOccurred())
+		patch2 := addRefPatch(pod1.Name, pod1.UID)
+		pod2, err = podClient.Patch(pod2.Name, types.StrategicMergePatchType, patch2)
+		Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
 		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
-		pod3, err = podClient.Patch(pod3.Name, types.StrategicMergePatchType, addRefPatch(pod2.Name, pod2.UID))
-		Expect(err).NotTo(HaveOccurred())
+		patch3 := addRefPatch(pod2.Name, pod2.UID)
+		pod3, err = podClient.Patch(pod3.Name, types.StrategicMergePatchType, patch3)
+		Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
 		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod1.UID))
 		err = podClient.Delete(pod1.ObjectMeta.Name, deleteOptions)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to delete pod %s in namespace: %s", pod1.Name, f.Namespace.Name)
 		var pods *v1.PodList
 		var err2 error
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
@@ -1105,7 +1079,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
 		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		By("Wait for the CronJob to create new Job")
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
@@ -1125,7 +1099,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("Verify if cronjob does not leave jobs nor pods behind")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
-			return verifyRemainingCronJobsJobsPods(f, f.ClientSet, 0, 0, 0)
+			objects := map[string]int{"CronJobs": 0, "Jobs": 0, "Pods": 0}
+			return verifyRemainingObjects(f, objects)
 		})
 		if err != nil {
 			framework.Failf("Failed to wait for all jobs and pods to be deleted: %v", err)
