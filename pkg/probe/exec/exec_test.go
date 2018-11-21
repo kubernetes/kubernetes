@@ -66,7 +66,7 @@ func (f *FakeCmd) Stop() {}
 
 func (f *FakeCmd) Start() error { return nil }
 
-func (f *FakeCmd) Wait() error { return nil }
+func (f *FakeCmd) Wait() error { return f.err }
 
 type fakeExitError struct {
 	exited     bool
@@ -125,5 +125,40 @@ func TestExec(t *testing.T) {
 		if test.output != output {
 			t.Errorf("[%d] expected %s, got %s", i, test.output, output)
 		}
+	}
+}
+
+func TestOutputLimit(t *testing.T) {
+	testCases := map[string]struct {
+		fakeCmdStdout       string
+		maxReadBytes        int64
+		expectedProbeOutput string
+	}{
+		"truncate output":               {"hello world", 5, "hello"},
+		"short output ":                 {"hello world", 20, "hello world"},
+		"truncate at zero":              {"hello world", 0, ""},
+		"negative count does not break": {"hello world", -1, ""},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			prober := execProber{maxReadBytes: tc.maxReadBytes}
+			cmd := &FakeCmd{
+				stdout: []byte(tc.fakeCmdStdout),
+			}
+			status, output, err := prober.Probe(cmd)
+
+			if status != probe.Success {
+				t.Errorf("expected success even if the output has been truncated, got: %v", status)
+			}
+
+			if err != nil {
+				t.Errorf("expected prober not to return an error, got %v", err)
+			}
+
+			if a, e := output, tc.expectedProbeOutput; a != e {
+				t.Errorf("Expected output '%s', got '%s'", e, a)
+			}
+		})
 	}
 }
