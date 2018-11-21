@@ -6383,8 +6383,7 @@ func TestValidatePodSpec(t *testing.T) {
 		}
 	}
 
-	// original value will be restored by previous defer
-	utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)()
 
 	featuregatedCases := map[string]core.PodSpec{
 		"set ShareProcessNamespace": {
