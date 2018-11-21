@@ -43,10 +43,14 @@ func newFakeCsiDriverClient(t *testing.T, stagingCapable bool) *fakeCsiDriverCli
 func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
-	accessibleTopology *csipb.Topology,
+	accessibleTopology map[string]string,
 	err error) {
 	resp, err := c.nodeClient.NodeGetInfo(ctx, &csipb.NodeGetInfoRequest{})
-	return resp.GetNodeId(), resp.GetMaxVolumesPerNode(), resp.GetAccessibleTopology(), err
+	topology := resp.GetAccessibleTopology()
+	if topology != nil {
+		accessibleTopology = topology.Segments
+	}
+	return resp.GetNodeId(), resp.GetMaxVolumesPerNode(), accessibleTopology, err
 }
 
 func (c *fakeCsiDriverClient) NodePublishVolume(
@@ -140,14 +144,26 @@ func (c *fakeCsiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stag
 	return err
 }
 
-func (c *fakeCsiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
-	c.t.Log("calling fake.NodeGetCapabilities...")
+func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeGetCapabilities for NodeSupportsStageUnstage...")
 	req := &csipb.NodeGetCapabilitiesRequest{}
 	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	return resp.GetCapabilities(), nil
+
+	capabilities := resp.GetCapabilities()
+
+	stageUnstageSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
+			stageUnstageSet = true
+		}
+	}
+	return stageUnstageSet, nil
 }
 
 func setupClient(t *testing.T, stageUnstageSet bool) csiClient {
@@ -173,17 +189,15 @@ func TestClientNodeGetInfo(t *testing.T) {
 		name                       string
 		expectedNodeID             string
 		expectedMaxVolumePerNode   int64
-		expectedAccessibleTopology *csipb.Topology
+		expectedAccessibleTopology map[string]string
 		mustFail                   bool
 		err                        error
 	}{
 		{
-			name:                     "test ok",
-			expectedNodeID:           "node1",
-			expectedMaxVolumePerNode: 16,
-			expectedAccessibleTopology: &csipb.Topology{
-				Segments: map[string]string{"com.example.csi-topology/zone": "zone1"},
-			},
+			name:                       "test ok",
+			expectedNodeID:             "node1",
+			expectedMaxVolumePerNode:   16,
+			expectedAccessibleTopology: map[string]string{"com.example.csi-topology/zone": "zone1"},
 		},
 		{
 			name:     "grpc error",
@@ -202,9 +216,11 @@ func TestClientNodeGetInfo(t *testing.T) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				nodeClient.SetNodeGetInfoResp(&csipb.NodeGetInfoResponse{
-					NodeId:             tc.expectedNodeID,
-					MaxVolumesPerNode:  tc.expectedMaxVolumePerNode,
-					AccessibleTopology: tc.expectedAccessibleTopology,
+					NodeId:            tc.expectedNodeID,
+					MaxVolumesPerNode: tc.expectedMaxVolumePerNode,
+					AccessibleTopology: &csipb.Topology{
+						Segments: tc.expectedAccessibleTopology,
+					},
 				})
 				return nodeClient, fakeCloser, nil
 			},
@@ -222,7 +238,7 @@ func TestClientNodeGetInfo(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(accessibleTopology, tc.expectedAccessibleTopology) {
-			t.Errorf("expected accessibleTopology: %v; got: %v", *tc.expectedAccessibleTopology, *accessibleTopology)
+			t.Errorf("expected accessibleTopology: %v; got: %v", tc.expectedAccessibleTopology, accessibleTopology)
 		}
 
 		if !tc.mustFail {

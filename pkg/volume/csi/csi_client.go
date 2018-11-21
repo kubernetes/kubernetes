@@ -36,7 +36,7 @@ type csiClient interface {
 	NodeGetInfo(ctx context.Context) (
 		nodeID string,
 		maxVolumePerNode int64,
-		accessibleTopology *csipb.Topology,
+		accessibleTopology map[string]string,
 		err error)
 	NodePublishVolume(
 		ctx context.Context,
@@ -66,7 +66,7 @@ type csiClient interface {
 		volumeContext map[string]string,
 	) error
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
-	NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error)
+	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 }
 
 // csiClient encapsulates all csi-plugin methods
@@ -110,7 +110,7 @@ func newCsiDriverClient(driverName string) *csiDriverClient {
 func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
-	accessibleTopology *csipb.Topology,
+	accessibleTopology map[string]string,
 	err error) {
 	klog.V(4).Info(log("calling NodeGetInfo rpc"))
 
@@ -125,7 +125,11 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 		return "", 0, nil, err
 	}
 
-	return res.GetNodeId(), res.GetMaxVolumesPerNode(), res.GetAccessibleTopology(), nil
+	topology := res.GetAccessibleTopology()
+	if topology != nil {
+		accessibleTopology = topology.Segments
+	}
+	return res.GetNodeId(), res.GetMaxVolumesPerNode(), accessibleTopology, nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(
@@ -288,21 +292,33 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 	return err
 }
 
-func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
-	klog.V(4).Info(log("calling NodeGetCapabilities rpc"))
+func (c *csiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
+	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsStageUnstage"))
 
 	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	defer closer.Close()
 
 	req := &csipb.NodeGetCapabilitiesRequest{}
 	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	return resp.GetCapabilities(), nil
+
+	capabilities := resp.GetCapabilities()
+
+	stageUnstageSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
+			stageUnstageSet = true
+		}
+	}
+	return stageUnstageSet, nil
 }
 
 func asCSIAccessMode(am api.PersistentVolumeAccessMode) csipb.VolumeCapability_AccessMode_Mode {

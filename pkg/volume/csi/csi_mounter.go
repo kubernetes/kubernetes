@@ -121,7 +121,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 	deviceMountPath := ""
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
 		klog.Error(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
 		return err
