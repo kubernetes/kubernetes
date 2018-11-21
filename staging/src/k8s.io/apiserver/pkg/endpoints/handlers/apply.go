@@ -17,164 +17,97 @@ limitations under the License.
 package handlers
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/ghodss/yaml"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/apply"
-	"k8s.io/apimachinery/pkg/apply/parse"
-	"k8s.io/apimachinery/pkg/apply/strategy"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/merge"
+	"sigs.k8s.io/structured-merge-diff/typed"
 )
 
 type applyPatcher struct {
 	*patcher
 
-	model proto.Schema
+	parser  *gvkParser
+	updater merge.Updater
 }
 
-// TODO(apelisse): workflowId needs to be passed as a query
-// param/header, and a better defaulting needs to be defined too.
-const workflowId = "default"
+const applyManager = "apply"
 
-func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]interface{}, error) {
-	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.hubGroupVersion)
-	if err != nil {
-		return nil, err
+func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
+	gvk := schema.GroupVersionKind{
+		Group:   p.hubGroupVersion.Group,
+		Version: p.hubGroupVersion.Version,
+		Kind:    currentObject.GetObjectKind().GroupVersionKind().Kind,
 	}
-	return runtime.DefaultUnstructuredConverter.ToUnstructured(vo)
-}
+	pType := p.parser.Type(gvk)
+	if pType == nil {
+		return nil, fmt.Errorf("unable to find schema for type: %v", gvk)
+	}
+	vo, err := p.unsafeConvertor.ConvertToVersion(currentObject, p.hubGroupVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert object to version: %v", err)
+	}
+	current, err := runtime.DefaultUnstructuredConverter.ToUnstructured(vo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert to unstructured: %v", err)
+	}
 
-func (p *applyPatcher) extractLastIntent(obj runtime.Object, workflow string) (map[string]interface{}, error) {
-	accessor, err := meta.Accessor(obj)
+	accessor, err := meta.Accessor(current)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
-	last := make(map[string]interface{})
-	// TODO: use the managedFields correctly
-	if _, ok := accessor.GetManagedFields()[workflow]; ok {
-		if err := json.Unmarshal([]byte(accessor.GetManagedFields()[workflow].APIVersion), &last); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal managedFields field: %v", err)
-		}
-	}
-	return last, nil
-}
+	managedFields := accessor.GetManagedFields()
+	accessor.SetManagedFields(nil)
 
-func (p *applyPatcher) getNewIntent() (map[string]interface{}, error) {
-	patch := make(map[string]interface{})
-	if err := yaml.Unmarshal(p.patchBytes, &patch); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal patch object: %v (patch: %v)", err, string(p.patchBytes))
-	}
-	return patch, nil
-}
-
-func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.Object, error) {
-	voutput, err := p.creater.New(p.kind)
+	currentTyped, err := pType.FromUnstructured(current)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create empty output object: %v", err)
+		return nil, fmt.Errorf("failed to create typed current object: %v", err)
 	}
 
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(result.MergedResult.(map[string]interface{}), voutput)
+	newTyped, err := pType.FromYAML(typed.YAMLObject(p.patchBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert merge result back: %v", err)
+		return nil, fmt.Errorf("failed to convert patch to typed object: %v", err)
 	}
-	p.defaulter.Default(voutput)
 
-	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-	uoutput, err := p.unsafeConvertor.ConvertToVersion(voutput, gvk.GroupVersion())
+	// XXX: This needs to be converted from managedFields
+	managed := fieldpath.ManagedFields{}
+
+	// XXX: We don't have a force-flag yet, hence hard-coded to false.
+	outputTyped, managed, err := p.updater.Apply(currentTyped, newTyped, fieldpath.APIVersion(p.hubGroupVersion.String()), managed, applyManager, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert to unversioned: %v", err)
+		return nil, err
 	}
-	return uoutput, nil
-}
 
-func (p *applyPatcher) saveNewIntent(patch map[string]interface{}, workflow string, dst runtime.Object) error {
-	// Make sure we have the gvk set on the object.
-	(&unstructured.Unstructured{Object: patch}).SetGroupVersionKind(p.kind)
+	output, ok := outputTyped.AsValue().ToUnstructured(true).(map[string]interface{})
+	if !ok {
+		return nil, errors.New("Unable to convert typed unstructured to object unstructured")
+	}
+	newObj := unstructured.Unstructured{Object: output}
 
-	j, err := json.Marshal(patch)
+	accessor, err = meta.Accessor(newObj)
 	if err != nil {
-		return fmt.Errorf("failed to serialize json: %v", err)
+		return nil, fmt.Errorf("couldn't get accessor on output: %v", err)
 	}
+	// XXX: This needs to be converted from managed
+	accessor.SetManagedFields(managedFields)
 
-	accessor, err := meta.Accessor(dst)
-	if err != nil {
-		return fmt.Errorf("couldn't get accessor: %v", err)
-	}
-	m := accessor.GetManagedFields()
-	if m == nil {
-		m = make(map[string]metav1.VersionedFieldSet)
-	}
-	// TODO: save the managedFields correctly
-	m[workflow] = metav1.VersionedFieldSet{
-		APIVersion: string(j),
-	}
-	accessor.SetManagedFields(m)
-	return nil
-}
-
-func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
-	current, err := p.convertCurrentVersion(currentObject)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert current object: %v", err)
-	}
-
-	lastIntent, err := p.extractLastIntent(currentObject, workflowId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract last intent: %v", err)
-	}
-	newIntent, err := p.getNewIntent()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new intent: %v", err)
-	}
-
-	element, err := parse.CreateElement(lastIntent, newIntent, current, p.model)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse elements: %v", err)
-	}
-	result, err := element.Merge(strategy.Create(strategy.Options{}))
-	if err != nil {
-		return nil, fmt.Errorf("failed to merge elements: %v", err)
-	}
-
-	output, err := p.convertResultToUnversioned(result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert merge result: %v", err)
-	}
-
-	if err := p.saveNewIntent(newIntent, workflowId, output); err != nil {
-		return nil, fmt.Errorf("failed to save last intent: %v", err)
-	}
-
-	// TODO(apelisse): Check for conflicts with other managedFields
-	// and report actionable errors to users.
-
-	return output, nil
+	return &newObj, nil
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
-	original := p.restPatcher.New()
-	objToCreate, gvk, err := p.codec.Decode(p.patchBytes, &p.kind, original)
-	if err != nil {
-		return nil, transformDecodeError(p.typer, err, original, gvk, p.patchBytes)
-	}
-	if gvk.GroupVersion() != p.kind.GroupVersion() {
-		return nil, errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), p.kind.GroupVersion().String()))
-	}
+	return p.applyPatchToCurrentObject(p.restPatcher.New())
+}
 
-	newIntent, err := p.getNewIntent()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new intent: %v", err)
-	}
+type failConverter struct{}
 
-	if err := p.saveNewIntent(newIntent, workflowId, objToCreate); err != nil {
-		return nil, fmt.Errorf("failed to save last intent: %v", err)
+func (failConverter) Convert(object typed.TypedValue, version fieldpath.APIVersion) (typed.TypedValue, error) {
+	if version != "" {
+		return typed.TypedValue{}, fmt.Errorf("Converter can only handle empty version (received %v)", version)
 	}
-
-	return objToCreate, nil
+	return object, nil
 }

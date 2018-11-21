@@ -110,12 +110,28 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		admit = admission.WithAudit(admit, ae)
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
+			err = errors.NewInternalError(err)
 			scope.err(err, w, req)
 			return
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		var transformers []rest.TransformFunc
+		transformers := []rest.TransformFunc{}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			if scope.OpenAPIModels == nil {
+				fmt.Println("No OpenAPI for: %v", scope.Kind)
+			} else {
+				parser, err := newgvkParser(scope.OpenAPIModels)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
+				// We start by updating the managed fields before
+				// performing any other mutation.
+				transformers = append(transformers, makeManagedFieldsUpdater(parser, newConvertor(scope.UnsafeConvertor, scope.Kind.GroupVersion()), "put"))
+			}
+		}
+
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)
