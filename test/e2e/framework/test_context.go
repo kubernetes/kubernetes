@@ -148,6 +148,26 @@ type TestContextType struct {
 
 	// The DNS Domain of the cluster.
 	ClusterDNSDomain string
+
+	// The configration of NodeKiller.
+	NodeKiller NodeKillerConfig
+}
+
+// NodeKillerConfig describes configuration of NodeKiller -- a utility to
+// simulate node failures.
+type NodeKillerConfig struct {
+	// Enabled determines whether NodeKill should do anything at all.
+	// All other options below are ignored if Enabled = false.
+	Enabled bool
+	// FailureRatio is a percentage of all nodes that could fail simultinously.
+	FailureRatio float64
+	// Interval is time between node failures.
+	Interval time.Duration
+	// JitterFactor is factor used to jitter node failures.
+	// Node will be killed between [Interval, Interval + (1.0 + JitterFactor)].
+	JitterFactor float64
+	// SimulatedDowntime is a duration between node is killed and recreated.
+	SimulatedDowntime time.Duration
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -281,6 +301,13 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.IngressUpgradeImage, "ingress-upgrade-image", "", "Image to upgrade to if doing an upgrade test for ingress.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
+
+	nodeKiller := &TestContext.NodeKiller
+	flag.BoolVar(&nodeKiller.Enabled, "node-killer", false, "Whether NodeKiller should kill any nodes.")
+	flag.Float64Var(&nodeKiller.FailureRatio, "node-killer-failure-ratio", 0.01, "Percentage of nodes to be killed")
+	flag.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
+	flag.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
+	flag.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
 // Register flags specific to the node e2e test suite.
