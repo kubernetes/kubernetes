@@ -192,7 +192,7 @@ type Bootstrap interface {
 	GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool)
+	ListenAndServe(address net.IP, port uint, tlsOptions *tls.Config, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool)
 	ListenAndServeReadOnly(address net.IP, port uint)
 	ListenAndServePodResources()
 	Run(<-chan kubetypes.PodUpdate)
@@ -257,7 +257,7 @@ type Dependencies struct {
 	Recorder                record.EventRecorder
 	VolumePlugins           []volume.VolumePlugin
 	DynamicPluginProber     volume.DynamicPluginProber
-	TLSOptions              *server.TLSOptions
+	ServerTLSConfig         *tls.Config
 	KubeletConfigController *kubeletconfig.Controller
 }
 
@@ -753,12 +753,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerLogManager = logs.NewStubContainerLogManager()
 	}
 
-	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+	if kubeCfg.ServerTLSBootstrap && kubeDeps.ServerTLSConfig != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}
-		kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+		kubeDeps.ServerTLSConfig.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 			cert := klet.serverCertificateManager.Current()
 			if cert == nil {
 				return nil, fmt.Errorf("no serving certificate available for the kubelet")
@@ -2199,7 +2199,7 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 }
 
 // ListenAndServe runs the kubelet HTTP server.
-func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
+func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *tls.Config, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
 	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, kl.criHandler)
 }
 
@@ -2273,8 +2273,8 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		config.BaseURL = &url.URL{
 			Path: "/cri/",
 		}
-		if kubeDeps.TLSOptions != nil {
-			config.TLSConfig = kubeDeps.TLSOptions.Config
+		if kubeDeps.ServerTLSConfig != nil {
+			config.TLSConfig = kubeDeps.ServerTLSConfig
 		}
 	}
 	return config

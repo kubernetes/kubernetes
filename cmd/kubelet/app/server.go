@@ -36,7 +36,6 @@ import (
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -59,6 +58,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	"k8s.io/klog"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -82,7 +82,6 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	dynamickubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
-	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -354,7 +353,7 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, error) {
 	// Initialize the TLS Options
-	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
+	tlsServerConfig, err := initializeServerTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +395,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       ProbeVolumePlugins(),
 		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
-		TLSOptions:          tlsOptions}, nil
+		ServerTLSConfig:     tlsServerConfig}, nil
 }
 
 // Run runs the specified KubeletServer with the given Dependencies. This should never exit.
@@ -869,10 +868,43 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 	return nodeName, nil
 }
 
-// InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
+// initializeServerTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
-	if !kc.ServerTLSBootstrap && kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
+func initializeServerTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*tls.Config, error) {
+	tlsCipherSuites, err := flag.TLSCipherSuites(kc.TLSCipherSuites)
+	if err != nil {
+		return nil, err
+	}
+
+	minTLSVersion, err := flag.TLSVersion(kc.TLSMinVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &tls.Config{
+		MinVersion:   minTLSVersion,
+		CipherSuites: tlsCipherSuites,
+	}
+
+	if len(kc.Authentication.X509.ClientCAFile) > 0 {
+		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file %s: %v", kc.Authentication.X509.ClientCAFile, err)
+		}
+		// Specify allowed CAs for client certificates
+		cfg.ClientCAs = clientCAs
+		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
+		cfg.ClientAuth = tls.RequestClientCert
+	}
+
+	if kc.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+		// The certificate manager needs to be started in the kubelet main because
+		// it needs access to the status manager to get up to date SANs. It will
+		// fill in GetCertificate.
+		return cfg, nil
+	}
+
+	if kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
 		kc.TLSCertFile = path.Join(kf.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = path.Join(kf.CertDirectory, "kubelet.key")
 
@@ -902,37 +934,14 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		}
 	}
 
-	tlsCipherSuites, err := flag.TLSCipherSuites(kc.TLSCipherSuites)
+	cert, err := tls.LoadX509KeyPair(kc.TLSCertFile, kc.TLSPrivateKeyFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to load kubelet serving cert and key: %v", err)
 	}
 
-	minTLSVersion, err := flag.TLSVersion(kc.TLSMinVersion)
-	if err != nil {
-		return nil, err
-	}
+	cfg.Certificates = []tls.Certificate{cert}
 
-	tlsOptions := &server.TLSOptions{
-		Config: &tls.Config{
-			MinVersion:   minTLSVersion,
-			CipherSuites: tlsCipherSuites,
-		},
-		CertFile: kc.TLSCertFile,
-		KeyFile:  kc.TLSPrivateKeyFile,
-	}
-
-	if len(kc.Authentication.X509.ClientCAFile) > 0 {
-		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %v", kc.Authentication.X509.ClientCAFile, err)
-		}
-		// Specify allowed CAs for client certificates
-		tlsOptions.Config.ClientCAs = clientCAs
-		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
-		tlsOptions.Config.ClientAuth = tls.RequestClientCert
-	}
-
-	return tlsOptions, nil
+	return cfg, nil
 }
 
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
@@ -1052,7 +1061,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
+		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.ServerTLSConfig, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
 
 	}
 	if kubeCfg.ReadOnlyPort > 0 {

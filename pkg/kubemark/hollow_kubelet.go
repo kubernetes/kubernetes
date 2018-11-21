@@ -75,7 +75,7 @@ func NewHollowKubelet(
 		OSInterface:        &containertest.FakeOS{},
 		ContainerManager:   containerManager,
 		VolumePlugins:      volumePlugins,
-		TLSOptions:         nil,
+		ServerTLSConfig:    nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
 		Mounter:            mount.New("" /* default mount path */),
 	}

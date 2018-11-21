@@ -38,7 +38,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -86,12 +86,6 @@ type Server struct {
 	restfulCont                containerInterface
 	resourceAnalyzer           stats.ResourceAnalyzer
 	redirectContainerStreaming bool
-}
-
-type TLSOptions struct {
-	Config   *tls.Config
-	CertFile string
-	KeyFile  string
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -128,7 +122,7 @@ func ListenAndServeKubeletServer(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	address net.IP,
 	port uint,
-	tlsOptions *TLSOptions,
+	tlsOptions *tls.Config,
 	auth AuthInterface,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
@@ -142,11 +136,11 @@ func ListenAndServeKubeletServer(
 		MaxHeaderBytes: 1 << 20,
 	}
 	if tlsOptions != nil {
-		s.TLSConfig = tlsOptions.Config
+		s.TLSConfig = tlsOptions
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
-		klog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
+		klog.Fatal(s.ListenAndServeTLS("", ""))
 	} else {
 		klog.Fatal(s.ListenAndServe())
 	}
