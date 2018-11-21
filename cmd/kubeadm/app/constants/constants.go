@@ -377,10 +377,10 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.11.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.12.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.11.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.12.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
