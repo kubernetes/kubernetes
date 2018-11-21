@@ -177,8 +177,8 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	}, nil
 }
 
-// getUniqueCoreID computes coreId as the lowest cpuID
-// for a given Threads []int slice. This will assure that coreID's are
+// getUniqueCoreID computes coreID as the lowest cpuID
+// for a given Threads []int slice. This will assure that the coreID is
 // platform unique (opposite to what cAdvisor reports - socket unique)
 func getUniqueCoreID(threads []int) (coreID int, err error) {
 	err = nil
