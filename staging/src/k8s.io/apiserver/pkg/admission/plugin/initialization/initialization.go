@@ -85,7 +85,7 @@ func (i *initializer) ValidateInitialization() error {
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		if err := utilfeature.DefaultFeatureGate.Set(string(features.Initializers) + "=true"); err != nil {
+		if err := utilfeature.DefaultMutableFeatureGate.Set(string(features.Initializers) + "=true"); err != nil {
 			klog.Errorf("error enabling Initializers feature as part of admission plugin setup: %v", err)
 		} else {
 			klog.Infof("enabled Initializers feature as part of admission plugin setup")
