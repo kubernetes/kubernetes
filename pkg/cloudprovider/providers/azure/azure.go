@@ -93,6 +93,8 @@ type Config struct {
 	SecurityGroupName string `json:"securityGroupName" yaml:"securityGroupName"`
 	// (Optional in 1.6) The name of the route table attached to the subnet that the cluster is deployed in
 	RouteTableName string `json:"routeTableName" yaml:"routeTableName"`
+	// The name of the resource group that the RouteTable is deployed in
+	RouteTableResourceGroup string `json:"routeTableResourceGroup" yaml:"routeTableResourceGroup"`
 	// (Optional) The name of the availability set that should be used as the load balancer backend
 	// If this is set, the Azure cloudprovider will only add nodes from that availability set to the load
 	// balancer backend pool. If this is not set, and multiple agent pools (availability sets) are used, then

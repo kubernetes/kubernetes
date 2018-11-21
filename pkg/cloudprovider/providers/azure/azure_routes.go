@@ -97,6 +97,12 @@ func (az *Cloud) createRouteTableIfNotExists(clusterName string, kubeRoute *clou
 }
 
 func (az *Cloud) createRouteTable() error {
+	var rg string
+	if len(az.RouteTableResourceGroup) > 0 {
+		rg = az.RouteTableResourceGroup
+	} else {
+		rg = az.ResourceGroup
+	}
 	routeTable := network.RouteTable{
 		Name:                       to.StringPtr(az.RouteTableName),
 		Location:                   to.StringPtr(az.Location),
@@ -106,7 +112,7 @@ func (az *Cloud) createRouteTable() error {
 	klog.V(3).Infof("createRouteTableIfNotExists: creating routetable. routeTableName=%q", az.RouteTableName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, routeTable)
+	resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, rg, az.RouteTableName, routeTable)
 	klog.V(10).Infof("RouteTablesClient.CreateOrUpdate(%q): end", az.RouteTableName)
 	if az.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("createRouteTableIfNotExists backing off: creating routetable. routeTableName=%q", az.RouteTableName)
@@ -165,7 +171,13 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	klog.V(3).Infof("CreateRoute: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, *route.Name, route)
+	var rg string
+	if len(az.RouteTableResourceGroup) > 0 {
+		rg = az.RouteTableResourceGroup
+	} else {
+		rg = az.ResourceGroup
+	}
+	resp, err := az.RoutesClient.CreateOrUpdate(ctx, rg, az.RouteTableName, *route.Name, route)
 	klog.V(10).Infof("RoutesClient.CreateOrUpdate(%q): end", az.RouteTableName)
 	if az.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("CreateRoute backing off: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
@@ -205,7 +217,13 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
-	resp, err := az.RoutesClient.Delete(ctx, az.ResourceGroup, az.RouteTableName, routeName)
+	var rg string
+	if len(az.RouteTableResourceGroup) > 0 {
+		rg = az.RouteTableResourceGroup
+	} else {
+		rg = az.ResourceGroup
+	}
+	resp, err := az.RoutesClient.Delete(ctx, rg, az.RouteTableName, routeName)
 	klog.V(10).Infof("RoutesClient.Delete(%q): end", az.RouteTableName)
 
 	if az.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
