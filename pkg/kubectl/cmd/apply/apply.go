@@ -17,6 +17,7 @@ limitations under the License.
 package apply
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -436,6 +437,7 @@ func (o *ApplyOptions) Run() error {
 				GracePeriod:   o.DeleteOptions.GracePeriod,
 				ServerDryRun:  o.ServerDryRun,
 				OpenapiSchema: openapiSchema,
+				Retries:       maxPatchRetry,
 			}
 
 			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
@@ -699,6 +701,12 @@ type Patcher struct {
 	GracePeriod  int
 	ServerDryRun bool
 
+	// If set, forces the patch against a specific resourceVersion
+	ResourceVersion *string
+
+	// Number of retries to make if the patch fails with conflict
+	Retries int
+
 	OpenapiSchema openapi.Resources
 }
 
@@ -739,6 +747,22 @@ func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 		return fmt.Errorf("%v doesn't support dry-run", gvk)
 	}
 	return nil
+}
+
+func addResourceVersion(patch []byte, rv string) ([]byte, error) {
+	var patchMap map[string]interface{}
+	err := json.Unmarshal(patch, &patchMap)
+	if err != nil {
+		return nil, err
+	}
+	u := unstructured.Unstructured{Object: patchMap}
+	a, err := meta.Accessor(&u)
+	if err != nil {
+		return nil, err
+	}
+	a.SetResourceVersion(rv)
+
+	return json.Marshal(patchMap)
 }
 
 func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
@@ -812,6 +836,13 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return patch, obj, nil
 	}
 
+	if p.ResourceVersion != nil {
+		patch, err = addResourceVersion(patch, *p.ResourceVersion)
+		if err != nil {
+			return nil, nil, cmdutil.AddSourceToErr("Failed to insert resourceVersion in patch", source, err)
+		}
+	}
+
 	options := metav1.UpdateOptions{}
 	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
@@ -824,7 +855,10 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
 	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name, errOut)
-	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
+	if p.Retries == 0 {
+		p.Retries = maxPatchRetry
+	}
+	for i := 1; i <= p.Retries && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.BackOff.Sleep(backOffPeriod)
 		}
