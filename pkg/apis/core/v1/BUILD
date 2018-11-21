@@ -36,7 +36,6 @@ go_test(
     srcs = [
         "conversion_test.go",
         "defaults_test.go",
-        "main_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

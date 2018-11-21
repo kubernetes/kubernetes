@@ -40,10 +40,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "main_test.go",
-        "scheduler_test.go",
-    ],
+    srcs = ["scheduler_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",

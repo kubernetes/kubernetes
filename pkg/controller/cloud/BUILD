@@ -50,7 +50,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "main_test.go",
         "node_controller_test.go",
         "pvlcontroller_test.go",
     ],
