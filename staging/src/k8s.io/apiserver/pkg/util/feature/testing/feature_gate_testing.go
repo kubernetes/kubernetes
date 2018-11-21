@@ -69,16 +69,16 @@ func VerifyFeatureGatesUnchanged(gate feature.FeatureGate, tests func() int) {
 // Example use:
 //
 // defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
-func SetFeatureGateDuringTest(t *testing.T, gate feature.FeatureGate, feature feature.Feature, value bool) func() {
-	originalValue := gate.Enabled(feature)
+func SetFeatureGateDuringTest(t *testing.T, gate feature.FeatureGate, f feature.Feature, value bool) func() {
+	originalValue := gate.Enabled(f)
 
-	if err := gate.Set(fmt.Sprintf("%s=%v", feature, value)); err != nil {
-		t.Errorf("error setting %s=%v: %v", feature, value, err)
+	if err := gate.(feature.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
+		t.Errorf("error setting %s=%v: %v", f, value, err)
 	}
 
 	return func() {
-		if err := gate.Set(fmt.Sprintf("%s=%v", feature, originalValue)); err != nil {
-			t.Errorf("error restoring %s=%v: %v", feature, originalValue, err)
+		if err := gate.(feature.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
+			t.Errorf("error restoring %s=%v: %v", f, originalValue, err)
 		}
 	}
 }
