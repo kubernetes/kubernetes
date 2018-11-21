@@ -331,7 +331,7 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 	fw.criHandler = &utiltesting.FakeHandler{
 		StatusCode: http.StatusOK,
 	}
-	server := NewServer(
+	server := newServer(
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
 		fw.fakeAuth,

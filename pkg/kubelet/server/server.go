@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -86,6 +87,7 @@ type Server struct {
 	restfulCont                containerInterface
 	resourceAnalyzer           stats.ResourceAnalyzer
 	redirectContainerStreaming bool
+	rt                         http.RoundTripper
 }
 
 // containerInterface defines the restful.Container functions used on the root container
@@ -122,21 +124,21 @@ func ListenAndServeKubeletServer(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	address net.IP,
 	port uint,
-	tlsOptions *tls.Config,
+	tlsServerConfig *tls.Config,
 	auth AuthInterface,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
+	handler := newServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
 		MaxHeaderBytes: 1 << 20,
 	}
-	if tlsOptions != nil {
-		s.TLSConfig = tlsOptions
+	if tlsServerConfig != nil {
+		s.TLSConfig = tlsServerConfig
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
@@ -149,7 +151,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, false, false, false, nil)
+	s := newServer(host, resourceAnalyzer, nil, false, false, false, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -195,8 +197,8 @@ type HostInterface interface {
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 }
 
-// NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(
+// newServer initializes and configures a kubelet.Server object to handle HTTP requests.
+func newServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
@@ -204,12 +206,20 @@ func NewServer(
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
 	criHandler http.Handler) Server {
+	rt := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// TODO: authenticate connections to proxied streaming servers.
+			InsecureSkipVerify: true,
+		},
+	}
+	rt = utilnet.SetOldTransportDefaults(rt)
 	server := Server{
 		host:                       host,
 		resourceAnalyzer:           resourceAnalyzer,
 		auth:                       auth,
 		restfulCont:                &filteringContainer{Container: restful.NewContainer()},
 		redirectContainerStreaming: redirectContainerStreaming,
+		rt:                         rt,
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
@@ -662,9 +672,9 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 }
 
 // proxyStream proxies stream to url.
-func proxyStream(w http.ResponseWriter, r *http.Request, url *url.URL) {
+func (s *Server) proxyStream(w http.ResponseWriter, r *http.Request, url *url.URL) {
 	// TODO(random-liu): Set MaxBytesPerSec to throttle the stream.
-	handler := proxy.NewUpgradeAwareHandler(url, nil /*transport*/, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
+	handler := proxy.NewUpgradeAwareHandler(url, s.rt, false /*wrapTransport*/, true /*upgradeRequired*/, &responder{})
 	handler.ServeHTTP(w, r)
 }
 
@@ -694,7 +704,7 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	s.proxyStream(response.ResponseWriter, request.Request, url)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -722,7 +732,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	s.proxyStream(response.ResponseWriter, request.Request, url)
 }
 
 // getRun handles requests to run a command inside a container.
@@ -788,7 +798,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	s.proxyStream(response.ResponseWriter, request.Request, url)
 }
 
 // ServeHTTP responds to HTTP requests on the Kubelet.

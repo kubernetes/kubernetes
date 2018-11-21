@@ -2273,9 +2273,9 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		config.BaseURL = &url.URL{
 			Path: "/cri/",
 		}
-		if kubeDeps.ServerTLSConfig != nil {
-			config.TLSConfig = kubeDeps.ServerTLSConfig
-		}
+	}
+	if kubeDeps.ServerTLSConfig != nil {
+		config.TLSConfig = kubeDeps.ServerTLSConfig
 	}
 	return config
 }
