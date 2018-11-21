@@ -90,7 +90,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	}
 
 	// notifies the other members of the etcd cluster about the joining member
-	etcdPeerAddress := fmt.Sprintf("https://%s:%d", cfg.LocalAPIEndpoint.AdvertiseAddress, kubeadmconstants.EtcdListenPeerPort)
+	etcdPeerAddress := etcdutil.GetPeerURL(cfg)
 
 	klog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
 	initialCluster, err := etcdClient.AddMember(cfg.NodeRegistration.Name, etcdPeerAddress)
@@ -141,10 +141,10 @@ func GetEtcdPodSpec(cfg *kubeadmapi.InitConfiguration, initialCluster []etcdutil
 func getEtcdCommand(cfg *kubeadmapi.InitConfiguration, initialCluster []etcdutil.Member) []string {
 	defaultArguments := map[string]string{
 		"name":                        cfg.GetNodeName(),
-		"listen-client-urls":          fmt.Sprintf("https://127.0.0.1:%d,https://%s:%d", kubeadmconstants.EtcdListenClientPort, cfg.LocalAPIEndpoint.AdvertiseAddress, kubeadmconstants.EtcdListenClientPort),
-		"advertise-client-urls":       fmt.Sprintf("https://%s:%d", cfg.LocalAPIEndpoint.AdvertiseAddress, kubeadmconstants.EtcdListenClientPort),
-		"listen-peer-urls":            fmt.Sprintf("https://%s:%d", cfg.LocalAPIEndpoint.AdvertiseAddress, kubeadmconstants.EtcdListenPeerPort),
-		"initial-advertise-peer-urls": fmt.Sprintf("https://%s:%d", cfg.LocalAPIEndpoint.AdvertiseAddress, kubeadmconstants.EtcdListenPeerPort),
+		"listen-client-urls":          fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP("127.0.0.1"), etcdutil.GetClientURL(cfg)),
+		"advertise-client-urls":       etcdutil.GetClientURL(cfg),
+		"listen-peer-urls":            etcdutil.GetPeerURL(cfg),
+		"initial-advertise-peer-urls": etcdutil.GetPeerURL(cfg),
 		"data-dir":                    cfg.Etcd.Local.DataDir,
 		"cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
 		"key-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
@@ -158,7 +158,7 @@ func getEtcdCommand(cfg *kubeadmapi.InitConfiguration, initialCluster []etcdutil
 	}
 
 	if len(initialCluster) == 0 {
-		defaultArguments["initial-cluster"] = fmt.Sprintf("%s=https://%s:%d", cfg.GetNodeName(), cfg.LocalAPIEndpoint.AdvertiseAddress, kubeadmconstants.EtcdListenPeerPort)
+		defaultArguments["initial-cluster"] = fmt.Sprintf("%s=%s", cfg.GetNodeName(), etcdutil.GetPeerURL(cfg))
 	} else {
 		// NB. the joining etcd instance should be part of the initialCluster list
 		endpoints := []string{}
