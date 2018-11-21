@@ -104,6 +104,16 @@ func makeTestPV(name string, sizeGig int, driverName, volID string) *api.Persist
 	}
 }
 
+func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
+	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
+	highestSupportedVersions, err := highestSupportedVersion(versions)
+	if err != nil {
+		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
+	}
+
+	csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint, highestSupportedVersion: highestSupportedVersions}
+}
+
 func TestPluginGetPluginName(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
@@ -133,6 +143,7 @@ func TestPluginGetVolumeName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
+		registerFakePlugin(tc.driverName, "endpoint", []string{"0.3.0"}, t)
 		pv := makeTestPV("test-pv", 10, tc.driverName, tc.volName)
 		spec := volume.NewSpecFromPersistentVolume(pv, false)
 		name, err := plug.GetVolumeName(spec)
@@ -151,6 +162,7 @@ func TestPluginCanSupport(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 	spec := volume.NewSpecFromPersistentVolume(pv, false)
 
@@ -227,6 +239,7 @@ func TestPluginNewMounter(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 	mounter, err := plug.NewMounter(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
@@ -243,7 +256,7 @@ func TestPluginNewMounter(t *testing.T) {
 	csiMounter := mounter.(*csiMountMgr)
 
 	// validate mounter fields
-	if csiMounter.driverName != testDriver {
+	if string(csiMounter.driverName) != testDriver {
 		t.Error("mounter driver name not set")
 	}
 	if csiMounter.volumeID != testVol {
@@ -277,6 +290,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -364,6 +378,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-block-pv", 10, testDriver, testVol)
 	mounter, err := plug.NewBlockVolumeMapper(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
@@ -380,7 +395,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	csiMapper := mounter.(*csiBlockMapper)
 
 	// validate mounter fields
-	if csiMapper.driverName != testDriver {
+	if string(csiMapper.driverName) != testDriver {
 		t.Error("CSI block mapper missing driver name")
 	}
 	if csiMapper.volumeID != testVol {
@@ -411,6 +426,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -456,7 +472,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 	}
 
 	// test loaded vol data
-	if csiUnmapper.driverName != testDriver {
+	if string(csiUnmapper.driverName) != testDriver {
 		t.Error("unmapper driverName not set")
 	}
 	if csiUnmapper.volumeID != testVol {

@@ -341,7 +341,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}()
 
 	if c.csiClient == nil {
-		c.csiClient = newCsiDriverClient(csiSource.Driver)
+		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
+		if err != nil {
+			klog.Errorf(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
+			return err
+		}
 	}
 	csi := c.csiClient
 
@@ -360,7 +364,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Start MountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
-	publishVolumeInfo, err := c.plugin.getPublishVolumeInfo(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
+	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
 	nodeStageSecrets := map[string]string{}
 	if csiSource.NodeStageSecretRef != nil {
@@ -381,7 +385,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	fsType := csiSource.FSType
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
-		publishVolumeInfo,
+		publishContext,
 		deviceMountPath,
 		fsType,
 		accessMode,
@@ -521,7 +525,11 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if c.csiClient == nil {
-		c.csiClient = newCsiDriverClient(driverName)
+		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName))
+		if err != nil {
+			klog.Errorf(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
+			return err
+		}
 	}
 	csi := c.csiClient
 

@@ -154,7 +154,11 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	}()
 
 	// Get node info from the driver.
-	csi := newCsiDriverClient(pluginName)
+	csi, err := newCsiDriverClient(csiDriverName(pluginName))
+	if err != nil {
+		return err
+	}
+
 	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
@@ -298,7 +302,10 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
-	csi := newCsiDriverClient(pvSource.Driver)
+	csi, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
+	if err != nil {
+		return nil, err
+	}
 
 	mounter := &csiMountMgr{
 		plugin:       p,
@@ -306,7 +313,7 @@ func (p *csiPlugin) NewMounter(
 		spec:         spec,
 		pod:          pod,
 		podUID:       pod.UID,
-		driverName:   pvSource.Driver,
+		driverName:   csiDriverName(pvSource.Driver),
 		volumeID:     pvSource.VolumeHandle,
 		specVolumeID: spec.Name(),
 		csiClient:    csi,
@@ -365,9 +372,12 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 		klog.Error(log("unmounter failed to load volume data file [%s]: %v", dir, err))
 		return nil, err
 	}
-	unmounter.driverName = data[volDataKey.driverName]
+	unmounter.driverName = csiDriverName(data[volDataKey.driverName])
 	unmounter.volumeID = data[volDataKey.volHandle]
-	unmounter.csiClient = newCsiDriverClient(unmounter.driverName)
+	unmounter.csiClient, err = newCsiDriverClient(unmounter.driverName)
+	if err != nil {
+		return nil, err
+	}
 
 	return unmounter, nil
 }
@@ -479,7 +489,10 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	}
 
 	klog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client := newCsiDriverClient(pvSource.Driver)
+	client, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
+	if err != nil {
+		return nil, err
+	}
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -492,7 +505,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		k8s:        k8s,
 		plugin:     p,
 		volumeID:   pvSource.VolumeHandle,
-		driverName: pvSource.Driver,
+		driverName: csiDriverName(pvSource.Driver),
 		readOnly:   readOnly,
 		spec:       spec,
 		specName:   spec.Name(),
@@ -550,9 +563,12 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 		klog.Error(log("unmapper failed to load volume data file [%s]: %v", dataDir, err))
 		return nil, err
 	}
-	unmapper.driverName = data[volDataKey.driverName]
+	unmapper.driverName = csiDriverName(data[volDataKey.driverName])
 	unmapper.volumeID = data[volDataKey.volHandle]
-	unmapper.csiClient = newCsiDriverClient(unmapper.driverName)
+	unmapper.csiClient, err = newCsiDriverClient(unmapper.driverName)
+	if err != nil {
+		return nil, err
+	}
 
 	return unmapper, nil
 }
@@ -613,7 +629,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
 	skip, err := p.skipAttach(driver)
 	if err != nil {
 		return nil, err

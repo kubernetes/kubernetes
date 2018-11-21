@@ -40,7 +40,7 @@ type csiBlockMapper struct {
 	k8s        kubernetes.Interface
 	csiClient  csiClient
 	plugin     *csiPlugin
-	driverName string
+	driverName csiDriverName
 	specName   string
 	volumeID   string
 	readOnly   bool
