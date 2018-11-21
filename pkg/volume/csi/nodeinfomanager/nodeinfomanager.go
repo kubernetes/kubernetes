@@ -133,6 +133,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 // If multiple calls to UninstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINodeInfo update conflicts, which causes the function to retry the corresponding update.
 func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
+	// TODO: shouldn't this be feature gated?
 	err := nim.uninstallDriverFromCSINodeInfo(driverName)
 	if err != nil {
 		return fmt.Errorf("error uninstalling CSI driver from CSINodeInfo object %v", err)

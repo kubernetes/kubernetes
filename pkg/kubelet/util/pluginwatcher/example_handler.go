@@ -38,6 +38,8 @@ type exampleHandler struct {
 
 	m     sync.Mutex
 	count int
+
+	permitDeprecatedDir bool
 }
 
 type examplePluginEvent int
@@ -50,16 +52,21 @@ const (
 )
 
 // NewExampleHandler provide a example handler
-func NewExampleHandler(supportedVersions []string) *exampleHandler {
+func NewExampleHandler(supportedVersions []string, permitDeprecatedDir bool) *exampleHandler {
 	return &exampleHandler{
 		SupportedVersions: supportedVersions,
 		ExpectedNames:     make(map[string]int),
 
-		eventChans: make(map[string]chan examplePluginEvent),
+		eventChans:          make(map[string]chan examplePluginEvent),
+		permitDeprecatedDir: permitDeprecatedDir,
 	}
 }
 
-func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+	if foundInDeprecatedDir && !p.permitDeprecatedDir {
+		return fmt.Errorf("device plugin socket was found in a directory that is no longer supported and this test does not permit plugins from deprecated dir")
+	}
+
 	p.SendEvent(pluginName, exampleEventValidate)
 
 	n, ok := p.DecreasePluginCount(pluginName)
@@ -79,7 +86,7 @@ func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, vers
 	return nil
 }
 
-func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string) error {
+func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []string) error {
 	p.SendEvent(pluginName, exampleEventRegister)
 
 	// Verifies the grpcServer is ready to serve services.

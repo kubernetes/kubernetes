@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -36,11 +37,12 @@ import (
 
 // Watcher is the plugin watcher
 type Watcher struct {
-	path      string
-	stopCh    chan interface{}
-	fs        utilfs.Filesystem
-	fsWatcher *fsnotify.Watcher
-	wg        sync.WaitGroup
+	path           string
+	deprecatedPath string
+	stopCh         chan interface{}
+	fs             utilfs.Filesystem
+	fsWatcher      *fsnotify.Watcher
+	wg             sync.WaitGroup
 
 	mutex       sync.Mutex
 	handlers    map[string]PluginHandler
@@ -54,10 +56,13 @@ type pathInfo struct {
 }
 
 // NewWatcher provides a new watcher
-func NewWatcher(sockDir string) *Watcher {
+// deprecatedSockDir refers to a pre-GA directory that was used by older plugins
+// for socket registration. New plugins should not use this directory.
+func NewWatcher(sockDir string, deprecatedSockDir string) *Watcher {
 	return &Watcher{
-		path: sockDir,
-		fs:   &utilfs.DefaultFs{},
+		path:           sockDir,
+		deprecatedPath: deprecatedSockDir,
+		fs:             &utilfs.DefaultFs{},
 
 		handlers:    make(map[string]PluginHandler),
 		plugins:     make(map[string]pathInfo),
@@ -137,7 +142,15 @@ func (w *Watcher) Start() error {
 	// Traverse plugin dir after starting the plugin processing goroutine
 	if err := w.traversePluginDir(w.path); err != nil {
 		w.Stop()
-		return fmt.Errorf("failed to traverse plugin socket path, err: %v", err)
+		return fmt.Errorf("failed to traverse plugin socket path %q, err: %v", w.path, err)
+	}
+
+	// Traverse deprecated plugin dir, if specified.
+	if len(w.deprecatedPath) != 0 {
+		if err := w.traversePluginDir(w.deprecatedPath); err != nil {
+			w.Stop()
+			return fmt.Errorf("failed to traverse deprecated plugin socket path %q, err: %v", w.deprecatedPath, err)
+		}
 	}
 
 	return nil
@@ -190,6 +203,10 @@ func (w *Watcher) traversePluginDir(dir string) error {
 
 		switch mode := info.Mode(); {
 		case mode.IsDir():
+			if w.containsBlacklistedDir(path) {
+				return filepath.SkipDir
+			}
+
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
@@ -215,6 +232,10 @@ func (w *Watcher) traversePluginDir(dir string) error {
 // - MUST NOT start with a '.'
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	klog.V(6).Infof("Handling create event: %v", event)
+
+	if w.containsBlacklistedDir(event.Name) {
+		return nil
+	}
 
 	fi, err := os.Stat(event.Name)
 	if err != nil {
@@ -271,8 +292,10 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 		infoResp.Endpoint = socketPath
 	}
 
+	foundInDeprecatedDir := w.foundInDeprecatedDir(socketPath)
+
 	// calls handler callback to verify registration request
-	if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
+	if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, foundInDeprecatedDir); err != nil {
 		return w.notifyPlugin(client, false, fmt.Sprintf("plugin validation failed with err: %v", err))
 	}
 
@@ -280,7 +303,7 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 	// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
 	w.registerPlugin(socketPath, infoResp.Type, infoResp.Name)
 
-	if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint); err != nil {
+	if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 		return w.notifyPlugin(client, false, fmt.Sprintf("plugin registration failed with err: %v", err))
 	}
 
@@ -416,4 +439,28 @@ func dial(unixSocketPath string, timeout time.Duration) (registerapi.Registratio
 	}
 
 	return registerapi.NewRegistrationClient(c), c, nil
+}
+
+// While deprecated dir is supported, to add extra protection around #69015
+// we will explicitly blacklist kubernetes.io directory.
+func (w *Watcher) containsBlacklistedDir(path string) bool {
+	return strings.HasPrefix(path, w.deprecatedPath+"/kubernetes.io/") ||
+		path == w.deprecatedPath+"/kubernetes.io"
+}
+
+func (w *Watcher) foundInDeprecatedDir(socketPath string) bool {
+	if len(w.deprecatedPath) != 0 {
+		if socketPath == w.deprecatedPath {
+			return true
+		}
+
+		deprecatedPath := w.deprecatedPath
+		if !strings.HasSuffix(deprecatedPath, "/") {
+			deprecatedPath = deprecatedPath + "/"
+		}
+		if strings.HasPrefix(socketPath, deprecatedPath) {
+			return true
+		}
+	}
+	return false
 }

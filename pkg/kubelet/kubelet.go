@@ -789,7 +789,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, err
 	}
 	if klet.enablePluginsWatcher {
-		klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsRegistrationDir())
+		klet.pluginWatcher = pluginwatcher.NewWatcher(
+			klet.getPluginsRegistrationDir(), /* sockDir */
+			klet.getPluginsDir(),             /* deprecatedSockDir */
+		)
 	}
 
 	// If the experimentalMounterPathFlag is set, we do not want to
