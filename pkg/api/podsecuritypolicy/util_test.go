@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/features"
@@ -34,10 +35,7 @@ func TestDropAlphaProcMountType(t *testing.T) {
 	}
 
 	// Enable alpha feature ProcMountType
-	err1 := utilfeature.DefaultFeatureGate.Set("ProcMountType=true")
-	if err1 != nil {
-		t.Fatalf("Failed to enable feature gate for ProcMountType: %v", err1)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
 
 	// now test dropping the fields - should not be dropped
 	DropDisabledAlphaFields(&psp.Spec)
@@ -51,10 +49,7 @@ func TestDropAlphaProcMountType(t *testing.T) {
 	}
 
 	// Disable alpha feature ProcMountType
-	err := utilfeature.DefaultFeatureGate.Set("ProcMountType=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for ProcMountType: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, false)()
 
 	// now test dropping the fields
 	DropDisabledAlphaFields(&psp.Spec)
