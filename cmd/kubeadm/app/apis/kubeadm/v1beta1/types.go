@@ -111,6 +111,9 @@ type ClusterConfiguration struct {
 
 	// The cluster name
 	ClusterName string `json:"clusterName,omitempty"`
+
+	// Comma-separated list of supported TLS cipher suites
+	CipherSuites string `json:"cipherSuites,omitempty"`
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster

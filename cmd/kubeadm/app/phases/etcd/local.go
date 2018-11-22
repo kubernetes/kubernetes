@@ -155,6 +155,11 @@ func getEtcdCommand(cfg *kubeadmapi.InitConfiguration, initialCluster []etcdutil
 		"peer-trusted-ca-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
 		"peer-client-cert-auth":       "true",
 		"snapshot-count":              "10000",
+		"cipher-suites":               cfg.CipherSuites,
+	}
+
+	if cfg.CipherSuites != "" {
+		defaultArguments["cipher-suites"] = cfg.CipherSuites
 	}
 
 	if len(initialCluster) == 0 {

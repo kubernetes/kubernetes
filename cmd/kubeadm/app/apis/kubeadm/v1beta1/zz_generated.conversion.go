@@ -404,6 +404,7 @@ func autoConvert_v1beta1_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	out.CipherSuites = in.CipherSuites
 	return nil
 }
 
@@ -440,6 +441,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	out.CipherSuites = in.CipherSuites
 	return nil
 }
 

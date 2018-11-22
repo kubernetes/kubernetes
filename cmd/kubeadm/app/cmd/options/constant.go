@@ -84,3 +84,6 @@ const CSROnly = "csr-only"
 
 // CSRDir flag sets the location for CSRs and flags to be output
 const CSRDir = "csr-dir"
+
+// TLSCipherSuites flag sets the suites for kubelet, apiserver and etcd
+const TLSCipherSuites = "tls-cipher-suites"

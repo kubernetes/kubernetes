@@ -120,6 +120,9 @@ type ClusterConfiguration struct {
 
 	// The cluster name
 	ClusterName string `json:"clusterName,omitempty"`
+
+	// Comma-separated list of supported TLS cipher suites
+	CipherSuites string `json:"cipherSuites,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -53,6 +53,13 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.InitConfiguration, registerTaint
 		return err
 	}
 
+	if cfg.CipherSuites != "" {
+		if cfg.NodeRegistration.KubeletExtraArgs == nil {
+			cfg.NodeRegistration.KubeletExtraArgs = make(map[string]string)
+		}
+		cfg.NodeRegistration.KubeletExtraArgs["tls-cipher-suites"] = cfg.CipherSuites
+	}
+
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              &cfg.NodeRegistration,
 		featureGates:             cfg.FeatureGates,

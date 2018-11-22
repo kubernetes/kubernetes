@@ -316,6 +316,7 @@ func autoConvert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(i
 	// WARNING: in.AuditPolicyConfiguration requires manual conversion: does not exist in peer-type
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	out.CipherSuites = in.CipherSuites
 	return nil
 }
 
@@ -339,6 +340,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
 	// WARNING: in.UseHyperKubeImage requires manual conversion: does not exist in peer-type
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	out.CipherSuites = in.CipherSuites
 	return nil
 }
 

@@ -144,6 +144,10 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		"proxy-client-key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName),
 	}
 
+	if cfg.CipherSuites != "" {
+		defaultArguments["cipher-suites"] = cfg.CipherSuites
+	}
+
 	command := []string{"kube-apiserver"}
 
 	// If the user set endpoints for an external etcd cluster
