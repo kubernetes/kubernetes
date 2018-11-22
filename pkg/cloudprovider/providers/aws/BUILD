@@ -88,6 +88,7 @@ go_test(
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/ec2:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/elb:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/service/elbv2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
