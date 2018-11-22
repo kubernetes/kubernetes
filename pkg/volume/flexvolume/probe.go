@@ -64,11 +64,8 @@ func (prober *flexVolumeProber) Init() error {
 	if err := prober.createPluginDir(); err != nil {
 		return err
 	}
-	if err := prober.initWatcher(); err != nil {
-		return err
-	}
 
-	return nil
+	return proper.initWatcher()
 }
 
 // If probeAllNeeded is true, probe all pluginDir

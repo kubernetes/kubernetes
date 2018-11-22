@@ -34,11 +34,7 @@ func (f *mounterDefaults) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	if err := doMount(f.mounter, src, dir, "auto", []string{"bind"}); err != nil {
-		return err
-	}
-
-	return nil
+	return doMount(f.mounter, src, dir, "auto", []string{"bind"})
 }
 
 // Returns the default volume attributes.

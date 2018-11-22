@@ -204,6 +204,7 @@ func PathExists(path string) (bool, error) {
 	} else {
 		return false, err
 	}
+	return false, err
 }
 
 // IsCorruptedMnt return true if err is about corrupted mount point
