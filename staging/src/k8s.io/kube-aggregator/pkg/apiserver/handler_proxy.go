@@ -60,6 +60,8 @@ type proxyHandlingInfo struct {
 	// local indicates that this APIService is locally satisfied
 	local bool
 
+	// name is the name of the APIService
+	name string
 	// restConfig holds the information for building a roundtripper
 	restConfig *restclient.Config
 	// transportBuildingError is an error produced while building the transport.  If this
@@ -91,7 +93,8 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !handlingInfo.serviceAvailable {
+	if !handlingInfo.local && !handlingInfo.serviceAvailable {
+		unavailableRequestCounter.WithLabelValues(handlingInfo.name)
 		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -114,6 +117,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		if !handlingInfo.local {
+			unavailableRequestCounter.WithLabelValues(handlingInfo.name)
+		}
 		return
 	}
 	location.Host = rloc.Host
@@ -195,6 +201,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 	}
 
 	newInfo := proxyHandlingInfo{
+		name: apiService.Name,
 		restConfig: &restclient.Config{
 			TLSClientConfig: restclient.TLSClientConfig{
 				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
