@@ -32,8 +32,8 @@ rules:
   resources:
   - "endpoints"
   resourceNames:
-  - "vertical-pod-autoscaler-recommender"
-  - "vertical-pod-autoscaler-updater"
+  - "vpa-recommender"
+  - "vpa-updater"
   verbs:
   - "get"
   - "update"
