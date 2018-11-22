@@ -249,10 +249,6 @@ func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
 func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
 	klog.V(2).Infof("Got Plugin %s at endpoint %s with versions %v", pluginName, endpoint, versions)
 
-	if foundInDeprecatedDir {
-		return fmt.Errorf("device plugin socket was found in a directory that is no longer supported")
-	}
-
 	if !m.isVersionCompatibleWithPlugin(versions) {
 		return fmt.Errorf("manager version, %s, is not among plugin supported versions %v", pluginapi.Version, versions)
 	}
