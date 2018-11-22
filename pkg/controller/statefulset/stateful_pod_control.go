@@ -44,7 +44,7 @@ type StatefulPodControlInterface interface {
 	// storage this method is a no-op. If the Pod must be mutated to conform to the Set, it is mutated and updated.
 	// pod is an in-out parameter, and any updates made to the pod are reflected as mutations to this parameter. If
 	// the create is successful, the returned error is nil.
-	UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
+	UpdateStatefulPod(updateSet *apps.StatefulSet, currentSet *apps.StatefulSet, pod *v1.Pod) error
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
 	// the returned error is nil.
 	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
@@ -86,26 +86,34 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 	return err
 }
 
-func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *realStatefulPodControl) UpdateStatefulPod(updateSet *apps.StatefulSet, currentSet *apps.StatefulSet, pod *v1.Pod) error {
 	attemptedUpdate := false
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
 		// if the Pod does not conform to its identity, update the identity and dirty the Pod
-		if !identityMatches(set, pod) {
-			updateIdentity(set, pod)
+		if !identityMatches(updateSet, pod) {
+			updateIdentity(updateSet, pod)
 			consistent = false
 		}
 		// if the Pod does not conform to the StatefulSet's storage requirements, update the Pod's PVC's,
 		// dirty the Pod, and create any missing PVCs
-		if !storageMatches(set, pod) {
-			updateStorage(set, pod)
+		if !storageMatches(updateSet, pod) {
+			updateStorage(updateSet, pod)
 			consistent = false
-			if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
-				spc.recordPodEvent("update", set, pod, err)
+			if err := spc.createPersistentVolumeClaims(updateSet, pod); err != nil {
+				spc.recordPodEvent("update", updateSet, pod, err)
 				return err
 			}
 		}
+
+		if !storageRequestMatches(updateSet, currentSet) {
+			if err := spc.updatePersistentVolumeClaims(updateSet, pod); err != nil {
+				spc.recordPodEvent("update", updateSet, pod, err)
+				return err
+			}
+		}
+
 		// if the Pod is not dirty, do nothing
 		if consistent {
 			return nil
@@ -113,22 +121,22 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
-		_, updateErr := spc.client.CoreV1().Pods(set.Namespace).Update(pod)
+		_, updateErr := spc.client.CoreV1().Pods(updateSet.Namespace).Update(pod)
 		if updateErr == nil {
 			return nil
 		}
 
-		if updated, err := spc.podLister.Pods(set.Namespace).Get(pod.Name); err == nil {
+		if updated, err := spc.podLister.Pods(updateSet.Namespace).Get(pod.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
 			pod = updated.DeepCopy()
 		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated Pod %s/%s from lister: %v", set.Namespace, pod.Name, err))
+			utilruntime.HandleError(fmt.Errorf("error getting updated Pod %s/%s from lister: %v", updateSet.Namespace, pod.Name, err))
 		}
 
 		return updateErr
 	})
 	if attemptedUpdate {
-		spc.recordPodEvent("update", set, pod, err)
+		spc.recordPodEvent("update", updateSet, pod, err)
 	}
 	return err
 }
@@ -194,6 +202,30 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 			spc.recordClaimEvent("create", set, pod, &claim, err)
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
+	}
+	return errorutils.NewAggregate(errs)
+}
+
+func (spc *realStatefulPodControl) updatePersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
+	var errs []error
+	for _, updatedClaim := range getPersistentVolumeClaims(set, pod) {
+		currentClaim, err := spc.pvcLister.PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", currentClaim.Name, err))
+			continue
+		}
+
+		currentStorageRequest := currentClaim.Spec.Resources.Requests[v1.ResourceStorage]
+		updatedStorageRequest := updatedClaim.Spec.Resources.Requests[v1.ResourceStorage]
+		if updatedStorageRequest.Cmp(currentStorageRequest) != 0 {
+			currentClaim.Spec.Resources.Requests[v1.ResourceStorage] = updatedStorageRequest
+			_, err = spc.client.CoreV1().PersistentVolumeClaims(currentClaim.Namespace).Update(currentClaim)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("Failed to update PVC %s: %s", currentClaim.Name, err))
+				spc.recordClaimEvent("update", set, pod, currentClaim, err)
+			}
+			// Add wait for the FileSystemResizePending condition? So pods are restarted after underlying volume has expanded
+		}
 	}
 	return errorutils.NewAggregate(errs)
 }

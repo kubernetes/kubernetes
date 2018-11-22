@@ -434,12 +434,12 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
-		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
+		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && storageRequestMatches(updateSet, currentSet) {
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
 		replica := replicas[i].DeepCopy()
-		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
+		if err := ssc.podControl.UpdateStatefulPod(updateSet, currentSet, replica); err != nil {
 			return &status, err
 		}
 	}

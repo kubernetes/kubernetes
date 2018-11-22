@@ -138,6 +138,18 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return true
 }
 
+func storageRequestMatches(currentSet *apps.StatefulSet, updateSet *apps.StatefulSet) bool {
+	for index, currentClaim := range currentSet.Spec.VolumeClaimTemplates {
+		updatedClaim := updateSet.Spec.VolumeClaimTemplates[index]
+		currentStorageRequest := currentClaim.Spec.Resources.Requests[v1.ResourceStorage]
+		updatedStorageRequest := updatedClaim.Spec.Resources.Requests[v1.ResourceStorage]
+		if currentStorageRequest.Cmp(updatedStorageRequest) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
 // returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
 // by getPersistentVolumeClaimName.
@@ -296,8 +308,10 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
+	volumeClaimTemplates := spec["volumeClaimTemplates"].([]interface{})
 	specCopy["template"] = template
 	template["$patch"] = "replace"
+	specCopy["volumeClaimTemplates"] = volumeClaimTemplates
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err

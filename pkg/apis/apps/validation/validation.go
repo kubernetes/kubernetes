@@ -153,12 +153,27 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	restoreStrategy := statefulSet.Spec.UpdateStrategy
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
+	restoreVolumeClaimTemplates := make([]api.PersistentVolumeClaim, len(statefulSet.Spec.VolumeClaimTemplates))
+	if len(oldStatefulSet.Spec.VolumeClaimTemplates) == len(statefulSet.Spec.VolumeClaimTemplates) {
+		for index, oldVolumeClaimTemplate := range oldStatefulSet.Spec.VolumeClaimTemplates {
+			oldStorageRequest := oldVolumeClaimTemplate.Spec.Resources.Requests[api.ResourceStorage]
+			newStorageRequest := statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage]
+			if newStorageRequest.Cmp(oldStorageRequest) < 0 {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeClaimTemplates", fmt.Sprint(index), "spec", "resources", "requests", "storage"), "storage request can not be less than previous value"))
+			}
+
+			restoreVolumeClaimTemplates[index] = *statefulSet.Spec.VolumeClaimTemplates[index].DeepCopy()
+			statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage] = oldStorageRequest
+		}
+	}
+
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template' ,'updateStrategy' and 'volumeClaimTemplate.Spec.Resources.Requests[storage]' are forbidden"))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
+	statefulSet.Spec.VolumeClaimTemplates = restoreVolumeClaimTemplates
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	return allErrs
