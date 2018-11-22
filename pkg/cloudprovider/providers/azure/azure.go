@@ -213,6 +213,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
+	if config.RouteTableResourceGroup == "" {
+		config.RouteTableResourceGroup = config.ResourceGroup
+	}
+
 	if config.VMType == "" {
 		// default to standard vmType if not set.
 		config.VMType = vmTypeStandard
@@ -269,10 +273,6 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	// Do not add master nodes to standard LB by default.
 	if config.ExcludeMasterFromStandardLB == nil {
 		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
-	}
-
-	if config.RouteTableResourceGroup == "" {
-		config.RouteTableResourceGroup = config.ResourceGroup
 	}
 
 	azClientConfig := &azClientConfig{

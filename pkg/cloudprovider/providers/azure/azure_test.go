@@ -1554,7 +1554,8 @@ aadClientSecret: --aad-client-secret--
 	validateEmptyConfig(t, config)
 }
 
-// Test Configuration deserialization (yaml)
+// Test Configuration deserialization (yaml) without
+// specific resource group for the route table
 func TestNewCloudFromYAML(t *testing.T) {
 	config := `
 tenantId: --tenant-id--
@@ -1583,6 +1584,106 @@ cloudProviderRateLimitBucket: 5
 }
 
 func validateConfig(t *testing.T, config string) {
+	azureCloud := getCloudFromConfig(t, config)
+
+	if azureCloud.TenantID != "--tenant-id--" {
+		t.Errorf("got incorrect value for TenantID")
+	}
+	if azureCloud.SubscriptionID != "--subscription-id--" {
+		t.Errorf("got incorrect value for SubscriptionID")
+	}
+	if azureCloud.AADClientID != "--aad-client-id--" {
+		t.Errorf("got incorrect value for AADClientID")
+	}
+	if azureCloud.AADClientSecret != "--aad-client-secret--" {
+		t.Errorf("got incorrect value for AADClientSecret")
+	}
+	if azureCloud.AADClientCertPath != "--aad-client-cert-path--" {
+		t.Errorf("got incorrect value for AADClientCertPath")
+	}
+	if azureCloud.AADClientCertPassword != "--aad-client-cert-password--" {
+		t.Errorf("got incorrect value for AADClientCertPassword")
+	}
+	if azureCloud.ResourceGroup != "--resource-group--" {
+		t.Errorf("got incorrect value for ResourceGroup")
+	}
+	if azureCloud.Location != "--location--" {
+		t.Errorf("got incorrect value for Location")
+	}
+	if azureCloud.SubnetName != "--subnet-name--" {
+		t.Errorf("got incorrect value for SubnetName")
+	}
+	if azureCloud.SecurityGroupName != "--security-group-name--" {
+		t.Errorf("got incorrect value for SecurityGroupName")
+	}
+	if azureCloud.VnetName != "--vnet-name--" {
+		t.Errorf("got incorrect value for VnetName")
+	}
+	if azureCloud.RouteTableName != "--route-table-name--" {
+		t.Errorf("got incorrect value for RouteTableName")
+	}
+	if azureCloud.RouteTableResourceGroup != "--resource-group--" {
+		t.Errorf("got incorrect value for RouteTableResourceGroup")
+	}
+	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
+		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
+	}
+	if azureCloud.CloudProviderBackoff != true {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+	if azureCloud.CloudProviderBackoffRetries != 6 {
+		t.Errorf("got incorrect value for CloudProviderBackoffRetries")
+	}
+	if azureCloud.CloudProviderBackoffExponent != 1.5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffExponent")
+	}
+	if azureCloud.CloudProviderBackoffDuration != 5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffDuration")
+	}
+	if azureCloud.CloudProviderBackoffJitter != 1.0 {
+		t.Errorf("got incorrect value for CloudProviderBackoffJitter")
+	}
+	if azureCloud.CloudProviderRateLimit != true {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+	if azureCloud.CloudProviderRateLimitQPS != 0.5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
+	}
+	if azureCloud.CloudProviderRateLimitBucket != 5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	}
+}
+
+// Test Configuration deserialization (yaml)
+func TestNewCloudFromYAMLWithRouteTableResourceGroup(t *testing.T) {
+	config := `
+tenantId: --tenant-id--
+subscriptionId: --subscription-id--
+aadClientId: --aad-client-id--
+aadClientSecret: --aad-client-secret--
+aadClientCertPath: --aad-client-cert-path--
+aadClientCertPassword: --aad-client-cert-password--
+resourceGroup: --resource-group--
+location: --location--
+subnetName: --subnet-name--
+securityGroupName: --security-group-name--
+vnetName: --vnet-name--
+routeTableName: --route-table-name--
+routeTableResourceGroup: --route-table-resource-group--
+primaryAvailabilitySetName: --primary-availability-set-name--
+cloudProviderBackoff: true
+cloudProviderBackoffRetries: 6
+cloudProviderBackoffExponent: 1.5
+cloudProviderBackoffDuration: 5
+cloudProviderBackoffJitter: 1.0
+cloudProviderRatelimit: true
+cloudProviderRateLimitQPS: 0.5
+cloudProviderRateLimitBucket: 5
+`
+	validateConfigWithRouteTableResourceGroup(t, config)
+}
+
+func validateConfigWithRouteTableResourceGroup(t *testing.T, config string) {
 	azureCloud := getCloudFromConfig(t, config)
 
 	if azureCloud.TenantID != "--tenant-id--" {

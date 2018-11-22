@@ -210,11 +210,12 @@ func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
 	cloud := &Cloud{
 		RouteTablesClient: fake,
 		Config: Config{
-			ResourceGroup:  "foo",
 			RouteTableName: "bar",
 			Location:       "location",
 		},
 	}
+	cloud.RouteTableResourceGroup = "foo"
+
 	cache, _ := cloud.newRouteTableCache()
 	cloud.rtCache = cache
 
@@ -229,7 +230,7 @@ func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
 		t.FailNow()
 	}
 
-	table := fake.FakeStore[cloud.ResourceGroup][cloud.RouteTableName]
+	table := fake.FakeStore[cloud.RouteTableResourceGroup][cloud.RouteTableName]
 	if *table.Location != *expectedTable.Location {
 		t.Errorf("mismatch: %s vs %s", *table.Location, *expectedTable.Location)
 	}
@@ -246,11 +247,12 @@ func TestCreateRouteTable(t *testing.T) {
 	cloud := &Cloud{
 		RouteTablesClient: fake,
 		Config: Config{
-			ResourceGroup:  "foo",
 			RouteTableName: "bar",
 			Location:       "location",
 		},
 	}
+	cloud.RouteTableResourceGroup = "foo"
+
 	cache, _ := cloud.newRouteTableCache()
 	cloud.rtCache = cache
 
