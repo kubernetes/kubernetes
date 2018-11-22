@@ -396,6 +396,12 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 		}
 		needValidUsed := true
 		if b.accessModes != nil {
+			for _, v := range b.accessModes {
+				// If we not support rwx, we should report err in there
+				if b.accessModes[0] == v1.ReadWriteMany {
+					return "", fmt.Errorf("rbd not support for accessModes RWX")
+				}
+			}
 			// If accessModes only contains ReadOnlyMany, we don't need check rbd status of being used.
 			if len(b.accessModes) == 1 && b.accessModes[0] == v1.ReadOnlyMany {
 				needValidUsed = false
