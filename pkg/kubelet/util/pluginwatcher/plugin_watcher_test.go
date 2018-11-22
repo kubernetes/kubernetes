@@ -27,7 +27,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
+	"k8s.io/klog"
+	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 )
 
 var (
@@ -39,6 +40,7 @@ var (
 func init() {
 	var logLevel string
 
+	klog.InitFlags(flag.CommandLine)
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	flag.StringVar(&logLevel, "logLevel", "6", "test")
 	flag.Lookup("v").Value.Set(logLevel)

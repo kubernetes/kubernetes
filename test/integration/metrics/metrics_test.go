@@ -30,9 +30,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	prometheuspb "github.com/prometheus/client_model/go"
+	"k8s.io/klog"
 )
 
 const scrapeRequestHeader = "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=compact-text"
@@ -66,7 +66,7 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 		if err := proto.UnmarshalText(scanner.Text(), &metric); err != nil {
 			return nil, fmt.Errorf("Failed to unmarshal line of metrics response: %v", err)
 		}
-		glog.V(4).Infof("Got metric %q", metric.GetName())
+		klog.V(4).Infof("Got metric %q", metric.GetName())
 		metrics = append(metrics, &metric)
 	}
 	return metrics, nil

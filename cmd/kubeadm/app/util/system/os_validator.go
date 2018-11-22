@@ -17,7 +17,6 @@ limitations under the License.
 package system
 
 import (
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -45,7 +44,7 @@ func (o *OSValidator) Validate(spec SysSpec) (error, error) {
 func (o *OSValidator) validateOS(os, specOS string) error {
 	if os != specOS {
 		o.Reporter.Report("OS", os, bad)
-		return fmt.Errorf("unsupported operating system: %s", os)
+		return errors.Errorf("unsupported operating system: %s", os)
 	}
 	o.Reporter.Report("OS", os, good)
 	return nil

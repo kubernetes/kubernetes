@@ -34,6 +34,7 @@ var class2Parameters = map[string]string{
 	"param2": "value2",
 }
 var deleteReclaimPolicy = v1.PersistentVolumeReclaimDelete
+var modeImmediate = storage.VolumeBindingImmediate
 var storageClasses = []*storage.StorageClass{
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -44,9 +45,10 @@ var storageClasses = []*storage.StorageClass{
 			Name: "gold",
 		},
 
-		Provisioner:   mockPluginName,
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       mockPluginName,
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -55,9 +57,10 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "silver",
 		},
-		Provisioner:   mockPluginName,
-		Parameters:    class2Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       mockPluginName,
+		Parameters:        class2Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -66,9 +69,10 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "external",
 		},
-		Provisioner:   "vendor.com/my-volume",
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       "vendor.com/my-volume",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -77,9 +81,10 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "unknown-internal",
 		},
-		Provisioner:   "kubernetes.io/unknown",
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       "kubernetes.io/unknown",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -88,10 +93,11 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "unsupported-mountoptions",
 		},
-		Provisioner:   mockPluginName,
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
-		MountOptions:  []string{"foo"},
+		Provisioner:       mockPluginName,
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		MountOptions:      []string{"foo"},
+		VolumeBindingMode: &modeImmediate,
 	},
 }
 

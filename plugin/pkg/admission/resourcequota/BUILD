@@ -44,18 +44,22 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/hashicorp/golang-lru:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["admission_test.go"],
+    srcs = [
+        "admission_test.go",
+        "main_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/quota/v1/generic:go_default_library",
         "//pkg/quota/v1/install:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
@@ -65,6 +69,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",

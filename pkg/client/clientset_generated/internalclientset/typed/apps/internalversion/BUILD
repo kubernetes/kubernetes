@@ -10,14 +10,16 @@ go_library(
     srcs = [
         "apps_client.go",
         "controllerrevision.go",
+        "daemonset.go",
+        "deployment.go",
         "doc.go",
         "generated_expansion.go",
+        "replicaset.go",
         "statefulset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion",
     deps = [
         "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

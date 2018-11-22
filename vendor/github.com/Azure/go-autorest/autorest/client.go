@@ -147,6 +147,7 @@ type Client struct {
 	PollingDelay time.Duration
 
 	// PollingDuration sets the maximum polling time after which an error is returned.
+	// Setting this to zero will use the provided context to control the duration.
 	PollingDuration time.Duration
 
 	// RetryAttempts sets the default number of retry attempts for client.

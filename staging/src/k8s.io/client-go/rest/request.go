@@ -32,7 +32,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +43,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
 )
 
 var (
@@ -114,7 +114,7 @@ type Request struct {
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter, timeout time.Duration) *Request {
 	if backoff == nil {
-		glog.V(2).Infof("Not implementing request backoff strategy.")
+		klog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
 
@@ -527,7 +527,7 @@ func (r *Request) tryThrottle() {
 		r.throttle.Accept()
 	}
 	if latency := time.Since(now); latency > longThrottleLatency {
-		glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		klog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 }
 
@@ -683,7 +683,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}()
 
 	if r.err != nil {
-		glog.V(4).Infof("Error in request: %v", r.err)
+		klog.V(4).Infof("Error in request: %v", r.err)
 		return r.err
 	}
 
@@ -770,13 +770,13 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
 					_, err := seeker.Seek(0, 0)
 					if err != nil {
-						glog.V(4).Infof("Could not retry request, can't Seek() back to beginning of body for %T", r.body)
+						klog.V(4).Infof("Could not retry request, can't Seek() back to beginning of body for %T", r.body)
 						fn(req, resp)
 						return true
 					}
 				}
 
-				glog.V(4).Infof("Got a Retry-After %ds response for attempt %d to %v", seconds, retries, url)
+				klog.V(4).Infof("Got a Retry-After %ds response for attempt %d to %v", seconds, retries, url)
 				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
 			}
@@ -844,13 +844,13 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			// 2. Apiserver sends back the headers and then part of the body
 			// 3. Apiserver closes connection.
 			// 4. client-go should catch this and return an error.
-			glog.V(2).Infof("Stream error %#v when reading response body, may be caused by closed connection.", err)
+			klog.V(2).Infof("Stream error %#v when reading response body, may be caused by closed connection.", err)
 			streamErr := fmt.Errorf("Stream error %#v when reading response body, may be caused by closed connection. Please retry.", err)
 			return Result{
 				err: streamErr,
 			}
 		default:
-			glog.Errorf("Unexpected error when reading response body: %#v", err)
+			klog.Errorf("Unexpected error when reading response body: %#v", err)
 			unexpectedErr := fmt.Errorf("Unexpected error %#v when reading response body. Please retry.", err)
 			return Result{
 				err: unexpectedErr,
@@ -914,11 +914,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
-	case bool(glog.V(10)):
+	case bool(klog.V(10)):
 		return body
-	case bool(glog.V(9)):
+	case bool(klog.V(9)):
 		max = 10240
-	case bool(glog.V(8)):
+	case bool(klog.V(8)):
 		max = 1024
 	}
 
@@ -933,13 +933,13 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if glog.V(8) {
+	if klog.V(8) {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
-			glog.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
+			klog.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
 		} else {
-			glog.Infof("%s: %s", prefix, truncateBody(string(body)))
+			klog.Infof("%s: %s", prefix, truncateBody(string(body)))
 		}
 	}
 }
@@ -1141,7 +1141,7 @@ func (r Result) Error() error {
 	// to be backwards compatible with old servers that do not return a version, default to "v1"
 	out, _, err := r.decoder.Decode(r.body, &schema.GroupVersionKind{Version: "v1"}, nil)
 	if err != nil {
-		glog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
+		klog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
 		return r.err
 	}
 	switch t := out.(type) {

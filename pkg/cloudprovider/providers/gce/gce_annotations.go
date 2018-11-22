@@ -19,12 +19,13 @@ package gce
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
+// LoadBalancerType defines a specific type for holding load balancer types (eg. Internal)
 type LoadBalancerType string
 
 const (
@@ -33,23 +34,30 @@ const (
 	// Currently, only "internal" is supported.
 	ServiceAnnotationLoadBalancerType = "cloud.google.com/load-balancer-type"
 
+	// LBTypeInternal is the constant for the official internal type.
 	LBTypeInternal LoadBalancerType = "Internal"
+
 	// Deprecating the lowercase spelling of Internal.
 	deprecatedTypeInternalLowerCase LoadBalancerType = "internal"
 
-	// ServiceAnnotationInternalBackendShare is annotated on a service with "true" when users
+	// ServiceAnnotationILBBackendShare is annotated on a service with "true" when users
 	// want to share GCP Backend Services for a set of internal load balancers.
 	// ALPHA feature - this may be removed in a future release.
 	ServiceAnnotationILBBackendShare = "alpha.cloud.google.com/load-balancer-backend-share"
+
 	// This annotation did not correctly specify "alpha", so both annotations will be checked.
 	deprecatedServiceAnnotationILBBackendShare = "cloud.google.com/load-balancer-backend-share"
 
 	// NetworkTierAnnotationKey is annotated on a Service object to indicate which
 	// network tier a GCP LB should use. The valid values are "Standard" and
 	// "Premium" (default).
-	NetworkTierAnnotationKey      = "cloud.google.com/network-tier"
+	NetworkTierAnnotationKey = "cloud.google.com/network-tier"
+
+	// NetworkTierAnnotationStandard is an annotation to indicate the Service is on the Standard network tier
 	NetworkTierAnnotationStandard = cloud.NetworkTierStandard
-	NetworkTierAnnotationPremium  = cloud.NetworkTierPremium
+
+	// NetworkTierAnnotationPremium is an annotation to indicate the Service is on the Premium network tier
+	NetworkTierAnnotationPremium = cloud.NetworkTierPremium
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.
@@ -82,7 +90,7 @@ func GetLoadBalancerAnnotationBackendShare(service *v1.Service) bool {
 
 	// Check for deprecated annotation key
 	if l, exists := service.Annotations[deprecatedServiceAnnotationILBBackendShare]; exists && l == "true" {
-		glog.Warningf("Annotation %q is deprecated and replaced with an alpha-specific key: %q", deprecatedServiceAnnotationILBBackendShare, ServiceAnnotationILBBackendShare)
+		klog.Warningf("Annotation %q is deprecated and replaced with an alpha-specific key: %q", deprecatedServiceAnnotationILBBackendShare, ServiceAnnotationILBBackendShare)
 		return true
 	}
 

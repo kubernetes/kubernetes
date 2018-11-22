@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -44,7 +44,7 @@ func (plugin *cinderPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeNam
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	klog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 
 	globalMapPath := filepath.Dir(globalMapPathUUID)
 	if len(globalMapPath) <= 1 {

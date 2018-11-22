@@ -56,6 +56,7 @@ type pausePodConfig struct {
 	Ports                             []v1.ContainerPort
 	OwnerReferences                   []metav1.OwnerReference
 	PriorityClassName                 string
+	DeletionGracePeriodSeconds        *int64
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -630,6 +631,9 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
+	}
+	if conf.DeletionGracePeriodSeconds != nil {
+		pod.ObjectMeta.DeletionGracePeriodSeconds = conf.DeletionGracePeriodSeconds
 	}
 	return pod
 }

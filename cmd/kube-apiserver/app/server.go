@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -50,23 +49,20 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	openapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -80,13 +76,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
-
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
+	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 const etcdRetryLimit = 60
@@ -144,7 +139,7 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", version.Get())
 
 	server, err := CreateServerChain(completeOptions, stopCh)
 	if err != nil {
@@ -167,7 +162,8 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	}
 
 	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount)
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount,
+		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -281,9 +277,8 @@ func CreateKubeAPIServerConfig(
 ) {
 	var genericConfig *genericapiserver.Config
 	var storageFactory *serverstorage.DefaultStorageFactory
-	var sharedInformers informers.SharedInformerFactory
 	var versionedInformers clientgoinformers.SharedInformerFactory
-	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
+	genericConfig, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if lastErr != nil {
 		return
 	}
@@ -320,50 +315,6 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-	var (
-		issuer        serviceaccount.TokenGenerator
-		apiAudiences  []string
-		maxExpiration time.Duration
-	)
-
-	if s.ServiceAccountSigningKeyFile != "" ||
-		s.Authentication.ServiceAccounts.Issuer != "" ||
-		len(s.Authentication.APIAudiences) > 0 {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-			lastErr = fmt.Errorf("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --service-account-api-audiences flags were passed")
-			return
-		}
-		if s.ServiceAccountSigningKeyFile == "" ||
-			s.Authentication.ServiceAccounts.Issuer == "" ||
-			len(s.Authentication.APIAudiences) == 0 ||
-			len(s.Authentication.ServiceAccounts.KeyFiles) == 0 {
-			lastErr = fmt.Errorf("service-account-signing-key-file, service-account-issuer, service-account-api-audiences and service-account-key-file should be specified together")
-			return
-		}
-		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
-			return
-		}
-		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
-			lowBound := time.Hour
-			upBound := time.Duration(1<<32) * time.Second
-			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
-				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
-				lastErr = fmt.Errorf("the serviceaccount max expiration is out of range, must be between 1 hour to 2^32 seconds")
-				return
-			}
-		}
-
-		issuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to build token generator: %v", err)
-			return
-		}
-		apiAudiences = s.Authentication.APIAudiences
-		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
-	}
-
 	config = &master.Config{
 		GenericConfig: genericConfig,
 		ExtraConfig: master.ExtraConfig{
@@ -395,11 +346,9 @@ func CreateKubeAPIServerConfig(
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,
 
-			ServiceAccountIssuer:        issuer,
-			APIAudiences:                apiAudiences,
-			ServiceAccountMaxExpiration: maxExpiration,
+			ServiceAccountIssuer:        s.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration: s.ServiceAccountTokenMaxExpiration,
 
-			InternalInformers:  sharedInformers,
 			VersionedInformers: versionedInformers,
 		},
 	}
@@ -418,7 +367,6 @@ func buildGenericConfig(
 	proxyTransport *http.Transport,
 ) (
 	genericConfig *genericapiserver.Config,
-	sharedInformers informers.SharedInformerFactory,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	insecureServingInfo *genericapiserver.DeprecatedInsecureServingInfo,
 	serviceResolver aggregatorapiserver.ServiceResolver,
@@ -441,9 +389,6 @@ func buildGenericConfig(
 		return
 	}
 	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
-		return
-	}
-	if lastErr = s.Audit.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
@@ -486,14 +431,7 @@ func buildGenericConfig(
 	// set it in kube-apiserver.
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
-	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to create clientset: %v", err)
-		return
-	}
-
 	kubeClientConfig := genericConfig.LoopbackClientConfig
-	sharedInformers = informers.NewSharedInformerFactory(client, 10*time.Minute)
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
@@ -516,12 +454,28 @@ func buildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	admissionConfig := &kubeapiserveradmission.AdmissionConfig{
+	admissionConfig := &kubeapiserveradmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
 		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+
+	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.LoopbackClientConfig)
+
+	lastErr = s.Audit.ApplyTo(
+		genericConfig,
+		genericConfig.LoopbackClientConfig,
+		versionedInformers,
+		serveroptions.NewProcessInfo("kube-apiserver", "kube-system"),
+		&serveroptions.WebhookOptions{
+			AuthInfoResolverWrapper: authInfoResolverWrapper,
+			ServiceResolver:         serviceResolver,
+		},
+	)
+	if lastErr != nil {
+		return
+	}
 
 	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)
 	if err != nil {
@@ -596,7 +550,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 				return options, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
-		glog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
+		klog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
@@ -612,13 +566,34 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
 				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 			} else {
-				glog.Warning("No TLS key provided, service account token authentication disabled")
+				klog.Warning("No TLS key provided, service account token authentication disabled")
 			}
 		}
 	}
 
+	if s.ServiceAccountSigningKeyFile != "" && s.Authentication.ServiceAccounts.Issuer != "" {
+		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
+		if err != nil {
+			return options, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
+		}
+		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
+			lowBound := time.Hour
+			upBound := time.Duration(1<<32) * time.Second
+			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
+				return options, fmt.Errorf("the serviceaccount max expiration must be between 1 hour to 2^32 seconds")
+			}
+		}
+
+		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		if err != nil {
+			return options, fmt.Errorf("failed to build token generator: %v", err)
+		}
+		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
+	}
+
 	if s.Etcd.EnableWatchCache {
-		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		klog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		if userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err == nil {
 			for resource, size := range userSpecified {

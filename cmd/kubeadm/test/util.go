@@ -28,8 +28,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
@@ -58,15 +58,15 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: InitConfiguration
 		apiEndpoint:
-		  advertiseAddress: {{.APIEndpoint.AdvertiseAddress}}
-		  bindPort: {{.APIEndpoint.BindPort}}
+		  advertiseAddress: {{.LocalAPIEndpoint.AdvertiseAddress}}
+		  bindPort: {{.LocalAPIEndpoint.BindPort}}
 		nodeRegistration:
 		  name: {{.NodeRegistration.Name}}
 		---
 		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: v1.11.0
+		kubernetesVersion: v1.12.0
 		`)))
 
 	f, err := os.Create(cfgPath)

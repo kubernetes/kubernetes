@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -44,7 +44,7 @@ func (plugin *azureDataDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID, vo
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("constructing block volume spec from globalMapPathUUID: %s", globalMapPathUUID)
+	klog.V(5).Infof("constructing block volume spec from globalMapPathUUID: %s", globalMapPathUUID)
 
 	globalMapPath := filepath.Dir(globalMapPathUUID)
 	if len(globalMapPath) <= 1 {
@@ -63,7 +63,7 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath, volumeName string) (*volume.S
 	if len(diskName) <= 1 {
 		return nil, fmt.Errorf("failed to get diskName from global path=%s", globalMapPath)
 	}
-	glog.V(5).Infof("got diskName(%s) from globalMapPath: %s", globalMapPath, diskName)
+	klog.V(5).Infof("got diskName(%s) from globalMapPath: %s", globalMapPath, diskName)
 	block := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

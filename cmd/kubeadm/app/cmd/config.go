@@ -23,11 +23,11 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -188,7 +188,7 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 func getDefaultComponentConfigAPIObjectBytes(apiObject string) ([]byte, error) {
 	registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
 	if !ok {
-		return []byte{}, fmt.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigAPIObjects())
+		return []byte{}, errors.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigAPIObjects())
 	}
 	return getDefaultComponentConfigBytes(registration)
 }
@@ -208,7 +208,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 		// Is this a component config?
 		registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
 		if !ok {
-			return []byte{}, fmt.Errorf("--api-object needs to be one of %v", getAllAPIObjectNames())
+			return []byte{}, errors.Errorf("--api-object needs to be one of %v", getAllAPIObjectNames())
 		}
 		return getDefaultComponentConfigBytes(registration)
 	}
@@ -243,7 +243,7 @@ func getAllAPIObjectNames() []string {
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{
 		// TODO: Probably move to getDefaultedClusterConfig?
-		APIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
@@ -277,7 +277,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 		Discovery: kubeadmapiv1beta1.Discovery{
 			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
-				APIServerEndpoints:       []string{"kube-apiserver:6443"},
+				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
@@ -339,7 +339,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 				fmt.Fprint(out, string(outputBytes))
 			} else {
 				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
-					kubeadmutil.CheckErr(fmt.Errorf("failed to write the new configuration to the file %q: %v", newCfgPath, err))
+					kubeadmutil.CheckErr(errors.Wrapf(err, "failed to write the new configuration to the file %q", newCfgPath))
 				}
 			}
 		},
@@ -373,7 +373,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
-			glog.V(1).Infoln("[config] retrieving ClientSet from file")
+			klog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
@@ -383,7 +383,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	}
 }
 
-// NewCmdConfigUploadFromFile verifies given kubernetes config file and returns cobra.Command for
+// NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
 // "kubeadm config upload from-file" command
 func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	var cfgPath string
@@ -402,15 +402,15 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 				kubeadmutil.CheckErr(errors.New("The --config flag is mandatory"))
 			}
 
-			glog.V(1).Infoln("[config] retrieving ClientSet from file")
+			klog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			// The default configuration is empty; everything should come from the file on disk
-			glog.V(1).Infoln("[config] creating empty default configuration")
+			klog.V(1).Infoln("[config] creating empty default configuration")
 			defaultcfg := &kubeadmapiv1beta1.InitConfiguration{}
 			// Upload the configuration using the file; don't care about the defaultcfg really
-			glog.V(1).Infof("[config] uploading configuration")
+			klog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, cfgPath, defaultcfg)
 			kubeadmutil.CheckErr(err)
 		},
@@ -438,17 +438,17 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			glog.V(1).Infoln("[config] creating new FeatureGates")
+			klog.V(1).Infoln("[config] creating new FeatureGates")
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
-			glog.V(1).Infoln("[config] retrieving ClientSet from file")
+			klog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			// Default both statically and dynamically, convert to internal API type, and validate everything
 			// The cfgPath argument is unset here as we shouldn't load a config file from disk, just go with cfg
-			glog.V(1).Infof("[config] uploading configuration")
+			klog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, "", cfg)
 			kubeadmutil.CheckErr(err)
 		},
@@ -460,7 +460,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 // RunConfigView gets the configuration persisted in the cluster
 func RunConfigView(out io.Writer, client clientset.Interface) error {
 
-	glog.V(1).Infoln("[config] getting the cluster configuration")
+	klog.V(1).Infoln("[config] getting the cluster configuration")
 	cfgConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -478,7 +478,7 @@ func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg 
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
-	glog.V(1).Infoln("[config] converting to internal API type")
+	klog.V(1).Infoln("[config] converting to internal API type")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
 	if err != nil {
 		return err
@@ -545,7 +545,7 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 func (ip *ImagesPull) PullAll() error {
 	for _, image := range ip.images {
 		if err := ip.runtime.PullImage(image); err != nil {
-			return fmt.Errorf("failed to pull image %q: %v", image, err)
+			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
@@ -559,7 +559,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 	var cfgPath, featureGatesString string
 	var err error
 
-	// This just sets the kubernetes version for unit testing so kubeadm won't try to
+	// This just sets the Kubernetes version for unit testing so kubeadm won't try to
 	// lookup the latest release from the internet.
 	if mockK8sVersion != nil {
 		externalcfg.KubernetesVersion = *mockK8sVersion

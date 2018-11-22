@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,17 +52,17 @@ func init() {
 // is invoked to serve the request.
 func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences) http.Handler {
 	if auth == nil {
-		glog.Warningf("Authentication is disabled")
+		klog.Warningf("Authentication is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if len(apiAuds) > 0 {
-			req = req.WithContext(genericapirequest.WithAudiences(req.Context(), apiAuds))
+			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
 		if err != nil || !ok {
 			if err != nil {
-				glog.Errorf("Unable to authenticate the request due to an error: %v", err)
+				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
 			}
 			failed.ServeHTTP(w, req)
 			return

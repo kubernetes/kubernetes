@@ -274,7 +274,7 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 
 	name := gtr.prefix + "-server"
 	return &v1.PersistentVolumeSource{
-		Glusterfs: &v1.GlusterfsVolumeSource{
+		Glusterfs: &v1.GlusterfsPersistentVolumeSource{
 			EndpointsName: name,
 			// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 			Path:     "test_vol",

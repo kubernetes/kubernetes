@@ -65,6 +65,10 @@ func getProtocols(spec corev1.PodSpec) map[string]string {
 	result := make(map[string]string)
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
+			// Empty protocol must be defaulted (TCP)
+			if len(port.Protocol) == 0 {
+				port.Protocol = corev1.ProtocolTCP
+			}
 			result[strconv.Itoa(int(port.ContainerPort))] = string(port.Protocol)
 		}
 	}
@@ -75,6 +79,10 @@ func getProtocols(spec corev1.PodSpec) map[string]string {
 func getServiceProtocols(spec corev1.ServiceSpec) map[string]string {
 	result := make(map[string]string)
 	for _, servicePort := range spec.Ports {
+		// Empty protocol must be defaulted (TCP)
+		if len(servicePort.Protocol) == 0 {
+			servicePort.Protocol = corev1.ProtocolTCP
+		}
 		result[strconv.Itoa(int(servicePort.Port))] = string(servicePort.Protocol)
 	}
 	return result

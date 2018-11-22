@@ -19,8 +19,8 @@ package set
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -171,7 +171,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 
 			// record this change (for rollout history)
 			if err := o.Recorder.Record(patch.Info.Object); err != nil {
-				glog.V(4).Infof("error recording current command: %v", err)
+				klog.V(4).Infof("error recording current command: %v", err)
 			}
 
 			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)

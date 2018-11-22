@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -42,7 +42,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Con
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable
-	glog.Infof("allocatable: %v", allocatable)
+	klog.Infof("allocatable: %v", allocatable)
 	outputPod := pod.DeepCopy()
 	for idx := range outputPod.Spec.Containers {
 		resource.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)

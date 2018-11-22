@@ -625,7 +625,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -1642,7 +1642,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -2845,7 +2845,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -4234,7 +4234,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -5623,7 +5623,7 @@
         "paramType": "body",
         "name": "body",
         "description": "",
-        "required": true,
+        "required": false,
         "allowMultiple": false
        },
        {
@@ -6576,7 +6576,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
     "required": [
      "apiVersion",
      "kind",
@@ -8227,7 +8227,7 @@
       "items": {
        "$ref": "v1.VolumeDevice"
       },
-      "description": "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future."
+      "description": "volumeDevices is the list of block devices to be used by the container. This is a beta feature."
      },
      "livenessProbe": {
       "$ref": "v1.Probe",
@@ -9800,7 +9800,7 @@
      },
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
-      "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future."
+      "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is a beta feature."
      },
      "dataSource": {
       "$ref": "v1.TypedLocalObjectReference",

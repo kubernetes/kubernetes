@@ -26,7 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/util/env"
 )
@@ -69,11 +69,11 @@ func startEtcd() (func(), error) {
 	etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
 	if err == nil {
-		glog.Infof("etcd already running at %s", etcdURL)
+		klog.Infof("etcd already running at %s", etcdURL)
 		conn.Close()
 		return func() {}, nil
 	}
-	glog.V(1).Infof("could not connect to etcd: %v", err)
+	klog.V(1).Infof("could not connect to etcd: %v", err)
 
 	// TODO: Check for valid etcd version.
 	etcdPath, err := getEtcdPath()
@@ -86,13 +86,13 @@ func startEtcd() (func(), error) {
 		return nil, fmt.Errorf("could not get a port: %v", err)
 	}
 	etcdURL = fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
-	glog.Infof("starting etcd on %s", etcdURL)
+	klog.Infof("starting etcd on %s", etcdURL)
 
 	etcdDataDir, err := ioutil.TempDir(os.TempDir(), "integration_test_etcd_data")
 	if err != nil {
 		return nil, fmt.Errorf("unable to make temp etcd data dir: %v", err)
 	}
-	glog.Infof("storing etcd data in: %v", etcdDataDir)
+	klog.Infof("storing etcd data in: %v", etcdDataDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(
@@ -112,10 +112,10 @@ func startEtcd() (func(), error) {
 	stop := func() {
 		cancel()
 		err := cmd.Wait()
-		glog.Infof("etcd exit status: %v", err)
+		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
-			glog.Warningf("error during etcd cleanup: %v", err)
+			klog.Warningf("error during etcd cleanup: %v", err)
 		}
 	}
 
@@ -129,7 +129,7 @@ func startEtcd() (func(), error) {
 func EtcdMain(tests func() int) {
 	stop, err := startEtcd()
 	if err != nil {
-		glog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
+		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
 	result := tests()
 	stop() // Don't defer this. See os.Exit documentation.

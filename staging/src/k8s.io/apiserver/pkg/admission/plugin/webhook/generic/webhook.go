@@ -164,6 +164,7 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
+	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 
 	var relevantHooks []*v1beta1.Webhook

@@ -23,4 +23,4 @@ ignored = ["github.com/davecgh/go-spew*","github.com/google/gofuzz*","github.com
 
 [[constraint]]
   name = "github.com/modern-go/reflect2"
-  version = "1.0.0"
+  version = "1.0.1"

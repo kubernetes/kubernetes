@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // thinLsClient knows how to run a thin_ls very specific to CoW usage for
@@ -53,7 +53,7 @@ var _ thinLsClient = &defaultThinLsClient{}
 
 func (c *defaultThinLsClient) ThinLs(deviceName string) (map[string]uint64, error) {
 	args := []string{"--no-headers", "-m", "-o", "DEV,EXCLUSIVE_BYTES", deviceName}
-	glog.V(4).Infof("running command: thin_ls %v", strings.Join(args, " "))
+	klog.V(4).Infof("running command: thin_ls %v", strings.Join(args, " "))
 
 	output, err := exec.Command(c.thinLsPath, args...).Output()
 	if err != nil {
@@ -80,7 +80,7 @@ func parseThinLsOutput(output []byte) map[string]uint64 {
 		deviceID := fields[0]
 		usage, err := strconv.ParseUint(fields[1], 10, 64)
 		if err != nil {
-			glog.Warningf("unexpected error parsing thin_ls output: %v", err)
+			klog.Warningf("unexpected error parsing thin_ls output: %v", err)
 			continue
 		}
 

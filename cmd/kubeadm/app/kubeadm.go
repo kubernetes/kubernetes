@@ -20,8 +20,8 @@ import (
 	"flag"
 	"os"
 
-	_ "github.com/golang/glog"
 	"github.com/spf13/pflag"
+	_ "k8s.io/klog"
 
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"

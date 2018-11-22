@@ -459,7 +459,7 @@ func TestGetAPIEndpoint(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			cfg := &kubeadmapi.InitConfiguration{}
-			err := getAPIEndpoint(rt.configMap.data, nodeName, &cfg.APIEndpoint)
+			err := getAPIEndpoint(rt.configMap.data, nodeName, &cfg.LocalAPIEndpoint)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getInitConfigurationFromCluster: %v", err)
 				return
@@ -468,7 +468,7 @@ func TestGetAPIEndpoint(t *testing.T) {
 				return
 			}
 
-			if cfg.APIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.APIEndpoint.BindPort != 1234 {
+			if cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234 {
 				t.Errorf("invalid cfg.APIEndpoint")
 			}
 		})
@@ -757,14 +757,102 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			if cfg.ClusterConfiguration.KubernetesVersion != k8sVersionString {
 				t.Errorf("invalid ClusterConfiguration.KubernetesVersion")
 			}
-			if !rt.newControlPlane && (cfg.APIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.APIEndpoint.BindPort != 1234) {
-				t.Errorf("invalid cfg.APIEndpoint")
+			if !rt.newControlPlane && (cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234) {
+				t.Errorf("invalid cfg.LocalAPIEndpoint")
 			}
 			if cfg.ComponentConfigs.Kubelet == nil {
 				t.Errorf("invalid cfg.ComponentConfigs.Kubelet")
 			}
 			if cfg.ComponentConfigs.KubeProxy == nil {
 				t.Errorf("invalid cfg.ComponentConfigs.KubeProxy")
+			}
+		})
+	}
+}
+
+func TestGetGetClusterStatus(t *testing.T) {
+	var tests = []struct {
+		name              string
+		configMaps        []fakeConfigMap
+		expectedEndpoints int
+		expectedError     bool
+	}{
+		{
+			name:              "invalid missing config map",
+			expectedEndpoints: 0,
+		},
+		{
+			name: "valid v1beta1",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{
+						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1beta1"]),
+					},
+				},
+			},
+			expectedEndpoints: 1,
+		},
+		{
+			name: "valid v1alpha3",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{
+						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1alpha3"]),
+					},
+				},
+			},
+			expectedEndpoints: 1,
+		},
+		{
+			name: "invalid missing ClusterStatusConfigMapKey in the config map",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid wrong value in the config map",
+			configMaps: []fakeConfigMap{
+				{
+					name: kubeadmconstants.KubeadmConfigConfigMap,
+					data: map[string]string{
+						kubeadmconstants.ClusterStatusConfigMapKey: "not a kubeadm type",
+					},
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+
+			for _, c := range rt.configMaps {
+				err := c.create(client)
+				if err != nil {
+					t.Errorf("couldn't create ConfigMap %s", c.name)
+					return
+				}
+			}
+
+			clusterStatus, err := GetClusterStatus(client)
+			if rt.expectedError != (err != nil) {
+				t.Errorf("unexpected return err from GetClusterStatus: %v", err)
+				return
+			}
+			if rt.expectedError {
+				return
+			}
+
+			// Test expected values in clusterStatus
+			if len(clusterStatus.APIEndpoints) != rt.expectedEndpoints {
+				t.Errorf("unexpected ClusterStatus return value")
 			}
 		})
 	}

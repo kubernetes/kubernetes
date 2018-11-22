@@ -34,9 +34,17 @@
       "httpGet": {
         "host": "127.0.0.1",
         "port": 8080,
-        "path": "/healthz"
+        "path": "/healthz?exclude=etcd"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
+      "timeoutSeconds": 15
+    },
+    "readinessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
+      },
       "timeoutSeconds": 15
     },
     "ports":[

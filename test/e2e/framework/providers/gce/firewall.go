@@ -401,7 +401,7 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	return nil
 }
 
-func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
+func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
 	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall
 	var err error

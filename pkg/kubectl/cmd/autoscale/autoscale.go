@@ -19,8 +19,8 @@ package autoscale
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,7 +42,7 @@ var (
 	autoscaleLong = templates.LongDesc(i18n.T(`
 		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
-		Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
+		Looks up a Deployment, ReplicaSet, StatefulSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
 		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`))
 
 	autoscaleExample = templates.Examples(i18n.T(`
@@ -159,7 +159,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 				CPUPercent:         o.CpuPercent,
 				ScaleRefName:       name,
 				ScaleRefKind:       mapping.GroupVersionKind.Kind,
-				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
+				ScaleRefAPIVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}, nil
 		default:
 			return nil, cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", o.Generator)
@@ -234,7 +234,7 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		if err := o.Recorder.Record(hpa); err != nil {
-			glog.V(4).Infof("error recording current command: %v", err)
+			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if o.dryRun {

@@ -19,10 +19,10 @@ package util
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 
-	"github.com/ghodss/yaml"
+	pkgerrors "github.com/pkg/errors"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,7 +45,7 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	mediaType := "application/yaml"
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
-		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
+		return []byte{}, pkgerrors.Errorf("unsupported media type %q", mediaType)
 	}
 
 	encoder := codecs.EncoderForVersion(info.Serializer, gv)
@@ -64,7 +64,7 @@ func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs se
 	mediaType := "application/yaml"
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
-		return nil, fmt.Errorf("unsupported media type %q", mediaType)
+		return nil, pkgerrors.Errorf("unsupported media type %q", mediaType)
 	}
 
 	decoder := codecs.DecoderToVersion(info.Serializer, gv)
@@ -97,12 +97,12 @@ func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, e
 		}
 		// Require TypeMeta information to be present
 		if len(typeMetaInfo.APIVersion) == 0 || len(typeMetaInfo.Kind) == 0 {
-			errs = append(errs, fmt.Errorf("invalid configuration: kind and apiVersion is mandatory information that needs to be specified in all YAML documents"))
+			errs = append(errs, pkgerrors.New("invalid configuration: kind and apiVersion is mandatory information that needs to be specified in all YAML documents"))
 			continue
 		}
 		// Check whether the kind has been registered before. If it has, throw an error
 		if known := knownKinds[typeMetaInfo.Kind]; known {
-			errs = append(errs, fmt.Errorf("invalid configuration: kind %q is specified twice in YAML file", typeMetaInfo.Kind))
+			errs = append(errs, pkgerrors.Errorf("invalid configuration: kind %q is specified twice in YAML file", typeMetaInfo.Kind))
 			continue
 		}
 		knownKinds[typeMetaInfo.Kind] = true
@@ -110,7 +110,7 @@ func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, e
 		// Build a GroupVersionKind object from the deserialized TypeMeta object
 		gv, err := schema.ParseGroupVersion(typeMetaInfo.APIVersion)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("unable to parse apiVersion: %v", err))
+			errs = append(errs, pkgerrors.Wrap(err, "unable to parse apiVersion"))
 			continue
 		}
 		gvk := gv.WithKind(typeMetaInfo.Kind)

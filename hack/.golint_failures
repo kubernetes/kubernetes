@@ -88,7 +88,6 @@ pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
 pkg/cloudprovider/providers/fake
-pkg/cloudprovider/providers/gce
 pkg/cloudprovider/providers/gce/cloud
 pkg/cloudprovider/providers/ovirt
 pkg/cloudprovider/providers/photon
@@ -135,14 +134,9 @@ pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher
 pkg/features
 pkg/kubeapiserver
-pkg/kubeapiserver/admission
-pkg/kubeapiserver/authenticator
-pkg/kubeapiserver/authorizer
-pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
 pkg/kubectl
 pkg/kubectl/apps
-pkg/kubectl/cmd
 pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apiresources
 pkg/kubectl/cmd/apply
@@ -187,11 +181,10 @@ pkg/kubectl/cmd/util/openapi
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/version
 pkg/kubectl/cmd/wait
+pkg/kubectl/describe/versioned
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
-pkg/kubectl/util
-pkg/kubectl/util/slice
 pkg/kubectl/util/templates
 pkg/kubelet
 pkg/kubelet/apis
@@ -380,7 +373,6 @@ pkg/util/env
 pkg/util/file
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem
-pkg/util/ipconfig
 pkg/util/iptables
 pkg/util/iptables/testing
 pkg/util/labels
@@ -391,7 +383,6 @@ pkg/util/oom
 pkg/util/parsers
 pkg/util/procfs
 pkg/util/removeall
-pkg/util/resourcecontainer
 pkg/util/rlimit
 pkg/util/selinux
 pkg/util/sysctl
@@ -403,8 +394,6 @@ pkg/version/verflag
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
-pkg/volume/cephfs
-pkg/volume/configmap
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/host_path
@@ -415,7 +404,6 @@ pkg/volume/photon_pd
 pkg/volume/portworx
 pkg/volume/rbd
 pkg/volume/scaleio
-pkg/volume/secret
 pkg/volume/storageos
 pkg/volume/testing
 pkg/volume/util/fs
@@ -666,7 +654,6 @@ staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
 staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
-staging/src/k8s.io/client-go/util/cert/triple
 staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
 staging/src/k8s.io/client-go/util/integer
@@ -778,4 +765,3 @@ test/integration/scheduler
 test/integration/scheduler_perf
 test/integration/volume
 test/utils
-test/utils/image

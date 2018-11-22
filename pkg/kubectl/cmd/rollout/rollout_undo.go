@@ -162,7 +162,7 @@ func (o *UndoOptions) RunUndo() error {
 			return err
 		}
 
-		return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+		return printer.PrintObj(info.Object, o.Out)
 	})
 
 	return err

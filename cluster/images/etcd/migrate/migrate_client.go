@@ -29,7 +29,7 @@ import (
 
 	clientv2 "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // CombinedEtcdClient provides an implementation of EtcdMigrateClient using a combination of the etcd v2 client, v3 client
@@ -202,13 +202,13 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 	if err != nil {
 		return fmt.Errorf("Error while creating lease: %v", err)
 	}
-	glog.Infof("Lease with TTL: %v created", lease.TTL)
+	klog.Infof("Lease with TTL: %v created", lease.TTL)
 
-	glog.Infof("Attaching lease to %d entries", len(objectsResp.Kvs))
+	klog.Infof("Attaching lease to %d entries", len(objectsResp.Kvs))
 	for _, kv := range objectsResp.Kvs {
 		putResp, err := v3client.KV.Put(ctx, string(kv.Key), string(kv.Value), clientv3.WithLease(lease.ID), clientv3.WithPrevKV())
 		if err != nil {
-			glog.Errorf("Error while attaching lease to: %s", string(kv.Key))
+			klog.Errorf("Error while attaching lease to: %s", string(kv.Key))
 		}
 		if bytes.Compare(putResp.PrevKv.Value, kv.Value) != 0 {
 			return fmt.Errorf("concurrent access to key detected when setting lease on %s, expected previous value of %s but got %s",

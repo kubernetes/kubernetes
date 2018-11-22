@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -105,7 +105,7 @@ func NewFromFile(path string) (policyList, error) {
 	}
 
 	if unversionedLines > 0 {
-		glog.Warningf("Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", path)
+		klog.Warningf("Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", path)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -227,7 +227,7 @@ func (pl policyList) Authorize(a authorizer.Attributes) (authorizer.Decision, st
 			return authorizer.DecisionAllow, "", nil
 		}
 	}
-	return authorizer.DecisionNoOpinion, "no ABAC policy matched", nil
+	return authorizer.DecisionNoOpinion, "No policy matched.", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.

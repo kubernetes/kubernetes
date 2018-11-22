@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 	"sync"
@@ -115,8 +116,8 @@ func token2Cfg(token *azureToken) map[string]string {
 	cfg[cfgClientID] = token.clientID
 	cfg[cfgTenantID] = token.tenantID
 	cfg[cfgApiserverID] = token.apiserverID
-	cfg[cfgExpiresIn] = token.token.ExpiresIn
-	cfg[cfgExpiresOn] = token.token.ExpiresOn
+	cfg[cfgExpiresIn] = string(token.token.ExpiresIn)
+	cfg[cfgExpiresOn] = string(token.token.ExpiresOn)
 	return cfg
 }
 
@@ -125,8 +126,8 @@ func newFackeAzureToken(accessToken string, expiresOn string) adal.Token {
 		AccessToken:  accessToken,
 		RefreshToken: "fake",
 		ExpiresIn:    "3600",
-		ExpiresOn:    expiresOn,
-		NotBefore:    expiresOn,
+		ExpiresOn:    json.Number(expiresOn),
+		NotBefore:    json.Number(expiresOn),
 		Resource:     "fake",
 		Type:         "fake",
 	}

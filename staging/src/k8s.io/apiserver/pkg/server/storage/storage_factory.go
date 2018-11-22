@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -282,7 +282,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	if err != nil {
 		return nil, err
 	}
-	glog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
+	klog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
 
 	return &storageConfig, nil
 }
@@ -302,14 +302,14 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	if len(s.StorageConfig.CertFile) > 0 && len(s.StorageConfig.KeyFile) > 0 {
 		cert, err := tls.LoadX509KeyPair(s.StorageConfig.CertFile, s.StorageConfig.KeyFile)
 		if err != nil {
-			glog.Errorf("failed to load key pair while getting backends: %s", err)
+			klog.Errorf("failed to load key pair while getting backends: %s", err)
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
 	if len(s.StorageConfig.CAFile) > 0 {
 		if caCert, err := ioutil.ReadFile(s.StorageConfig.CAFile); err != nil {
-			glog.Errorf("failed to read ca file while getting backends: %s", err)
+			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()
 			caPool.AppendCertsFromPEM(caCert)

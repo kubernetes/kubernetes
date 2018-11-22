@@ -27,7 +27,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
@@ -71,7 +71,7 @@ func (ds *dockerService) ListContainers(_ context.Context, r *runtimeapi.ListCon
 
 		converted, err := toRuntimeAPIContainer(&c)
 		if err != nil {
-			glog.V(4).Infof("Unable to convert docker to runtime API container: %v", err)
+			klog.V(4).Infof("Unable to convert docker to runtime API container: %v", err)
 			continue
 		}
 
@@ -191,7 +191,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	}
 
 	if path == "" {
-		glog.V(5).Infof("Container %s log path isn't specified, will not create the symlink", containerID)
+		klog.V(5).Infof("Container %s log path isn't specified, will not create the symlink", containerID)
 		return nil
 	}
 
@@ -199,7 +199,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 		// Only create the symlink when container log path is specified and log file exists.
 		// Delete possibly existing file first
 		if err = ds.os.Remove(path); err == nil {
-			glog.Warningf("Deleted previously existing symlink file: %q", path)
+			klog.Warningf("Deleted previously existing symlink file: %q", path)
 		}
 		if err = ds.os.Symlink(realPath, path); err != nil {
 			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
@@ -208,14 +208,14 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	} else {
 		supported, err := ds.IsCRISupportedLogDriver()
 		if err != nil {
-			glog.Warningf("Failed to check supported logging driver by CRI: %v", err)
+			klog.Warningf("Failed to check supported logging driver by CRI: %v", err)
 			return nil
 		}
 
 		if supported {
-			glog.Warningf("Cannot create symbolic link because container log file doesn't exist!")
+			klog.Warningf("Cannot create symbolic link because container log file doesn't exist!")
 		} else {
-			glog.V(5).Infof("Unsupported logging driver by CRI")
+			klog.V(5).Infof("Unsupported logging driver by CRI")
 		}
 	}
 

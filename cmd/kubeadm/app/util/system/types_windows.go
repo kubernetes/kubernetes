@@ -49,7 +49,7 @@ type KernelValidatorHelperImpl struct{}
 
 var _ KernelValidatorHelper = &KernelValidatorHelperImpl{}
 
-// GetKernelRelease returns the windows release version (ex. 10.0.14393) as a string
+// GetKernelReleaseVersion returns the windows release version (ex. 10.0.14393) as a string
 func (o *KernelValidatorHelperImpl) GetKernelReleaseVersion() (string, error) {
 	args := []string{"(Get-CimInstance Win32_OperatingSystem).Version"}
 	releaseVersion, err := exec.Command("powershell", args...).Output()

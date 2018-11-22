@@ -24,10 +24,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -113,14 +113,14 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bto.TokenStr = args[0]
 			}
-			glog.V(1).Infoln("[token] validating mixed arguments")
+			klog.V(1).Infoln("[token] validating mixed arguments")
 			err := validation.ValidateMixedArguments(tokenCmd.Flags())
 			kubeadmutil.CheckErr(err)
 
 			err = bto.ApplyTo(cfg)
 			kubeadmutil.CheckErr(err)
 
-			glog.V(1).Infoln("[token] getting Clientsets from KubeConfig file")
+			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
@@ -170,7 +170,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
 			if len(args) < 1 {
-				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
+				kubeadmutil.CheckErr(errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
 			}
 			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
@@ -215,13 +215,13 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 	phaseutil.SetKubernetesVersion(cfg)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-	glog.V(1).Infoln("[token] loading configurations")
+	klog.V(1).Infoln("[token] loading configurations")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
 		return err
 	}
 
-	glog.V(1).Infoln("[token] creating token")
+	klog.V(1).Infoln("[token] creating token")
 	if err := tokenphase.CreateNewTokens(client, internalcfg.BootstrapTokens); err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 
 // RunGenerateToken just generates a random token for the user
 func RunGenerateToken(out io.Writer) error {
-	glog.V(1).Infoln("[token] generating random token")
+	klog.V(1).Infoln("[token] generating random token")
 	token, err := bootstraputil.GenerateBootstrapToken()
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func RunGenerateToken(out io.Writer) error {
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) error {
 	// First, build our selector for bootstrap tokens only
-	glog.V(1).Infoln("[token] preparing selector for bootstrap token")
+	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
 			// TODO: We hard-code "type" here until `field_constants.go` that is
@@ -269,7 +269,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 		FieldSelector: tokenSelector.String(),
 	}
 
-	glog.V(1).Infoln("[token] retrieving list of bootstrap tokens")
+	klog.V(1).Infoln("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
 		return errors.Wrap(err, "failed to list bootstrap tokens")
@@ -298,18 +298,19 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken string) error {
 	// Assume the given first argument is a token id and try to parse it
 	tokenID := tokenIDOrToken
-	glog.V(1).Infoln("[token] parsing token ID")
+	klog.V(1).Infoln("[token] parsing token ID")
 	if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 		// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tokenIDOrToken)
 		if err != nil {
-			return fmt.Errorf("given token or token id %q didn't match pattern %q or %q", tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+			return errors.Errorf("given token or token id %q didn't match pattern %q or %q",
+				tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
 		}
 		tokenID = bts.ID
 	}
 
 	tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
-	glog.V(1).Infoln("[token] deleting token")
+	klog.V(1).Infoln("[token] deleting token")
 	if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return errors.Wrap(err, "failed to delete bootstrap token")
 	}

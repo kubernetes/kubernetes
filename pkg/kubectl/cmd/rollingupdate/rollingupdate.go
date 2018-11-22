@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -292,7 +292,7 @@ func (o *RollingUpdateOptions) Run() error {
 
 		uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(infos[0].Object, corev1.SchemeGroupVersion)
 		if err != nil {
-			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
+			klog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
 			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 		switch t := uncastVersionedObj.(type) {
@@ -301,7 +301,7 @@ func (o *RollingUpdateOptions) Run() error {
 			newRc = t
 		}
 		if newRc == nil {
-			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
+			klog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
 			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 	}
@@ -403,10 +403,10 @@ func (o *RollingUpdateOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(oldRc, nil), oldRcData); err != nil {
+			if err := printer.PrintObj(oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), newRcData); err != nil {
+			if err := printer.PrintObj(newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -455,7 +455,7 @@ func (o *RollingUpdateOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), o.Out)
+	return printer.PrintObj(newRc, o.Out)
 }
 
 func findNewName(args []string, oldRc *corev1.ReplicationController) string {

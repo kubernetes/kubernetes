@@ -201,6 +201,10 @@ func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *auth
 	}
 }
 
+func (f *fakeVolumeHost) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {}
+}
+
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 	if f.nodeLabels == nil {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
@@ -246,6 +250,10 @@ type FakeVolumePlugin struct {
 	LimitKey               string
 	ProvisionDelaySeconds  int
 
+	// Add callbacks as needed
+	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
+	UnmountDeviceHook func(globalMountPath string) error
+
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
 	Attachers            []*FakeVolume
@@ -262,9 +270,13 @@ var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeVolumePlugin{}
 var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
+var _ FSResizableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
-	volume := &FakeVolume{}
+	volume := &FakeVolume{
+		WaitForAttachHook: plugin.WaitForAttachHook,
+		UnmountDeviceHook: plugin.UnmountDeviceHook,
+	}
 	*list = append(*list, volume)
 	return volume
 }
@@ -480,6 +492,10 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 	return true
 }
 
+func (plugin *FakeVolumePlugin) ExpandFS(spec *Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
+	return nil
+}
+
 func (plugin *FakeVolumePlugin) GetVolumeLimits() (map[string]int64, error) {
 	return plugin.VolumeLimits, plugin.VolumeLimitsError
 }
@@ -541,6 +557,10 @@ type FakeVolume struct {
 	VolName string
 	Plugin  *FakeVolumePlugin
 	MetricsNil
+
+	// Add callbacks as needed
+	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
+	UnmountDeviceHook func(globalMountPath string) error
 
 	SetUpCallCount              int
 	TearDownCallCount           int
@@ -715,6 +735,9 @@ func (fv *FakeVolume) WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, 
 	fv.Lock()
 	defer fv.Unlock()
 	fv.WaitForAttachCallCount++
+	if fv.WaitForAttachHook != nil {
+		return fv.WaitForAttachHook(spec, devicePath, pod, spectimeout)
+	}
 	return "/dev/sdb", nil
 }
 
@@ -767,6 +790,9 @@ func (fv *FakeVolume) UnmountDevice(globalMountPath string) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.UnmountDeviceCallCount++
+	if fv.UnmountDeviceHook != nil {
+		return fv.UnmountDeviceHook(globalMountPath)
+	}
 	return nil
 }
 

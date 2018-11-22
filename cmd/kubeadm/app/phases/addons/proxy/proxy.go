@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -48,7 +49,7 @@ const (
 // EnsureProxyAddon creates the kube-proxy addons
 func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
-		return fmt.Errorf("error when creating kube-proxy service account: %v", err)
+		return errors.Wrap(err, "error when creating kube-proxy service account")
 	}
 
 	// Generate Master Enpoint kubeconfig file
@@ -59,7 +60,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interf
 
 	proxyBytes, err := componentconfigs.Known[componentconfigs.KubeProxyConfigurationKind].Marshal(cfg.ComponentConfigs.KubeProxy)
 	if err != nil {
-		return fmt.Errorf("error when marshaling: %v", err)
+		return errors.Wrap(err, "error when marshaling")
 	}
 	var prefixBytes bytes.Buffer
 	apiclient.PrintBytesWithLinePrefix(&prefixBytes, proxyBytes, "    ")
@@ -77,21 +78,21 @@ func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interf
 			ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
 		})
 	if err != nil {
-		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
+		return errors.Wrap(err, "error when parsing kube-proxy configmap template")
 	}
 	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
-		Image:             images.GetKubeControlPlaneImage(constants.KubeProxy, &cfg.ClusterConfiguration),
+		Image:             images.GetKubernetesImage(constants.KubeProxy, &cfg.ClusterConfiguration),
 		ProxyConfigMap:    constants.KubeProxyConfigMap,
 		ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
 	})
 	if err != nil {
-		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
+		return errors.Wrap(err, "error when parsing kube-proxy daemonset template")
 	}
 	if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
 		return err
 	}
 	if err := CreateRBACRules(client); err != nil {
-		return fmt.Errorf("error when creating kube-proxy RBAC rules: %v", err)
+		return errors.Wrap(err, "error when creating kube-proxy RBAC rules")
 	}
 
 	fmt.Println("[addons] Applied essential addon: kube-proxy")
@@ -117,7 +118,7 @@ func CreateRBACRules(client clientset.Interface) error {
 func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
 	kubeproxyConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
-		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
+		return errors.Wrap(err, "unable to decode kube-proxy configmap")
 	}
 
 	// Create the ConfigMap for kube-proxy or update it in case it already exists
@@ -127,7 +128,7 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 
 	kubeproxyDaemonSet := &apps.DaemonSet{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
-		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
+		return errors.Wrap(err, "unable to decode kube-proxy daemonset")
 	}
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists

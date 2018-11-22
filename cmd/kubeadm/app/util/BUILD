@@ -34,10 +34,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -63,6 +63,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 
@@ -83,6 +84,7 @@ filegroup(
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
         "//cmd/kubeadm/app/util/etcd:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
+        "//cmd/kubeadm/app/util/pkiutil:all-srcs",
         "//cmd/kubeadm/app/util/pubkeypin:all-srcs",
         "//cmd/kubeadm/app/util/runtime:all-srcs",
         "//cmd/kubeadm/app/util/staticpod:all-srcs",

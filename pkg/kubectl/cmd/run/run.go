@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/docker/distribution/reference"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -316,7 +316,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case corev1.RestartPolicyAlways:
-			generatorName = generateversioned.DeploymentAppsV1Beta1GeneratorName
+			generatorName = generateversioned.DeploymentAppsV1GeneratorName
 		case corev1.RestartPolicyOnFailure:
 			generatorName = generateversioned.JobV1GeneratorName
 		case corev1.RestartPolicyNever:
@@ -674,7 +674,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	if err := o.Recorder.Record(obj); err != nil {
-		glog.V(4).Infof("error recording current command: %v", err)
+		klog.V(4).Infof("error recording current command: %v", err)
 	}
 
 	actualObj := obj
@@ -691,7 +691,6 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 			return nil, err
 		}
 	}
-	actualObj = cmdutil.AsDefaultVersionedOrOriginal(actualObj, mapping)
 
 	return &RunObject{
 		Object:  actualObj,

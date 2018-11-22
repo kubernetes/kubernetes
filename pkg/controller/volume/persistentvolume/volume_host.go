@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -106,6 +107,12 @@ func (ctrl *PersistentVolumeController) GetConfigMapFunc() func(namespace, name 
 func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 		return nil, fmt.Errorf("GetServiceAccountToken unsupported in PersistentVolumeController")
+	}
+}
+
+func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {
+		klog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
 }
 

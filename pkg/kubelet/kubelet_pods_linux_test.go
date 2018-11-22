@@ -23,7 +23,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -247,12 +246,6 @@ func TestMakeMounts(t *testing.T) {
 					HostNetwork: true,
 				},
 			}
-			// test makeMounts with enabled mount propagation
-			err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-			if err != nil {
-				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-				return
-			}
 
 			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
 
@@ -270,24 +263,6 @@ func TestMakeMounts(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
-
-			// test makeMounts with disabled mount propagation
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
-			if err != nil {
-				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-				return
-			}
-			mounts, _, err = makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, nil)
-			if !tc.expectErr {
-				expectedPrivateMounts := []kubecontainer.Mount{}
-				for _, mount := range tc.expectedMounts {
-					// all mounts are expected to be private when mount
-					// propagation is disabled
-					mount.Propagation = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
-					expectedPrivateMounts = append(expectedPrivateMounts, mount)
-				}
-				assert.Equal(t, expectedPrivateMounts, mounts, "mounts of container %+v", tc.container)
-			}
 		})
 	}
 }

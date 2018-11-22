@@ -271,6 +271,7 @@ items:
   - apiGroups:
     - apps
     resources:
+    - controllerrevisions
     - daemonsets
     - deployments
     - deployments/scale
@@ -881,7 +882,6 @@ items:
     resources:
     - nodes
     verbs:
-    - delete
     - patch
     - update
   - apiGroups:

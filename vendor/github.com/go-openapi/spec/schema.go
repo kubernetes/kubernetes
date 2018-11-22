@@ -203,6 +203,7 @@ func (r *SchemaURL) fromMap(v map[string]interface{}) error {
 // 	return nil
 // }
 
+// SchemaProps describes a JSON schema (draft 4)
 type SchemaProps struct {
 	ID                   string            `json:"id,omitempty"`
 	Ref                  Ref               `json:"-"`
@@ -240,6 +241,7 @@ type SchemaProps struct {
 	Definitions          Definitions       `json:"definitions,omitempty"`
 }
 
+// SwaggerSchemaProps are additional properties supported by swagger schemas, but not JSON-schema (draft 4)
 type SwaggerSchemaProps struct {
 	Discriminator string                 `json:"discriminator,omitempty"`
 	ReadOnly      bool                   `json:"readOnly,omitempty"`
@@ -604,8 +606,8 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	sch.Ref.fromMap(d)
-	sch.Schema.fromMap(d)
+	_ = sch.Ref.fromMap(d)
+	_ = sch.Schema.fromMap(d)
 
 	delete(d, "$ref")
 	delete(d, "$schema")

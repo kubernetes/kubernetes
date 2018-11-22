@@ -21,32 +21,23 @@ filegroup(
     tags = ["automanaged"],
 )
 
-# ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
-container_image(
-    name = "busybox-with-nsswitch",
-    base = "@official_busybox//image",
-    directory = "/etc",
-    files = ["nsswitch.conf"],
-    mode = "0644",
-)
-
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-amd64//image",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-amd64//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-amd64//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": ":busybox-with-nsswitch",
+        "base": "@debian-base-amd64//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {

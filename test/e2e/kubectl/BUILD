@@ -35,11 +35,11 @@ go_library(
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

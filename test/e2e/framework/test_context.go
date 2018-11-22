@@ -23,13 +23,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
 	"github.com/pkg/errors"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -145,6 +145,9 @@ type TestContextType struct {
 
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
+
+	// The DNS Domain of the cluster.
+	ClusterDNSDomain string
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -248,11 +251,12 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, ubuntu, gci, coreos, or custom).")
 	flag.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "standalone", "The monitoring solution that is used in the cluster.")
 	flag.BoolVar(&TestContext.EnablePrometheusMonitoring, "prometheus-monitoring", false, "Separate Prometheus monitoring deployed in cluster.")
+	flag.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE ApiEndpoint being used, if applicable")
+	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
@@ -351,11 +355,11 @@ func AfterReadingAllFlags(t *TestContextType) {
 				kubeConfig := createKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
-				glog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
+				klog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
 			}
 		}
 		if len(t.KubeConfig) == 0 {
-			glog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
+			klog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
 			t.Host = defaultHost
 		}
 	}
@@ -378,7 +382,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	// TODO (https://github.com/kubernetes/kubernetes/issues/70200):
 	// - remove the fallback for unknown providers
 	// - proper error message instead of Failf (which panics)
-	glog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
+	klog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig("skeleton")
 	if err != nil {
 		Failf("Failed to setup fallback skeleton provider config: %v", err)

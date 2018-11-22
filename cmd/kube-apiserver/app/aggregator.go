@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,7 +167,7 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 	if !ok {
 		// if we aren't found, then we shouldn't register ourselves because it could result in a CRD group version
 		// being permanently stuck in the APIServices list.
-		glog.Infof("Skipping APIService creation for %v", gv)
+		klog.Infof("Skipping APIService creation for %v", gv)
 		return nil
 	}
 	return &apiregistration.APIService{
@@ -270,6 +270,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "scheduling.k8s.io", Version: "v1beta1"}:             {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
 	{Group: "coordination.k8s.io", Version: "v1beta1"}:           {group: 16500, version: 9},
+	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:     {group: 16400, version: 1},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

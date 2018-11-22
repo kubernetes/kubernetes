@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var nodeAddressesRetryPeriod = 5 * time.Second
@@ -85,7 +85,7 @@ func (manager *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, erro
 	for {
 		nodeAddresses, err := manager.getNodeAddressSafe()
 		if len(nodeAddresses) == 0 && err == nil {
-			glog.V(5).Infof("Waiting for %v for cloud provider to provide node addresses", nodeAddressesRetryPeriod)
+			klog.V(5).Infof("Waiting for %v for cloud provider to provide node addresses", nodeAddressesRetryPeriod)
 			time.Sleep(nodeAddressesRetryPeriod)
 			continue
 		}
@@ -94,7 +94,7 @@ func (manager *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, erro
 }
 
 func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Context, nodeName types.NodeName) {
-	glog.V(5).Infof("Requesting node addresses from cloud provider for node %q", nodeName)
+	klog.V(5).Infof("Requesting node addresses from cloud provider for node %q", nodeName)
 
 	instances, ok := manager.cloud.Instances()
 	if !ok {
@@ -110,10 +110,10 @@ func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Contex
 	nodeAddresses, err := instances.NodeAddresses(ctx, nodeName)
 	if err != nil {
 		manager.setNodeAddressSafe(nil, fmt.Errorf("failed to get node address from cloud provider: %v", err))
-		glog.V(2).Infof("Node addresses from cloud provider for node %q not collected", nodeName)
+		klog.V(2).Infof("Node addresses from cloud provider for node %q not collected", nodeName)
 	} else {
 		manager.setNodeAddressSafe(nodeAddresses, nil)
-		glog.V(5).Infof("Node addresses from cloud provider for node %q collected", nodeName)
+		klog.V(5).Infof("Node addresses from cloud provider for node %q collected", nodeName)
 	}
 }
 

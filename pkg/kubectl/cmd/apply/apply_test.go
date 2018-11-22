@@ -103,19 +103,24 @@ const (
 	filenameWidgetServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
 )
 
-func readConfigMapList(t *testing.T, filename string) []byte {
+func readConfigMapList(t *testing.T, filename string) [][]byte {
 	data := readBytesFromFile(t, filename)
 	cmList := corev1.ConfigMapList{}
 	if err := runtime.DecodeInto(codec, data, &cmList); err != nil {
 		t.Fatal(err)
 	}
 
-	cmListBytes, err := runtime.Encode(codec, &cmList)
-	if err != nil {
-		t.Fatal(err)
+	var listCmBytes [][]byte
+
+	for _, cm := range cmList.Items {
+		cmBytes, err := runtime.Encode(codec, &cm)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listCmBytes = append(listCmBytes, cmBytes)
 	}
 
-	return cmListBytes
+	return listCmBytes
 }
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -270,7 +275,7 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 
 func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
-	cmBytes := readConfigMapList(t, filenameCM)
+	configMapList := readConfigMapList(t, filenameCM)
 	pathCM := "/namespaces/test/configmaps"
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -280,12 +285,21 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, pathCM) && m != "GET":
-				pod := ioutil.NopCloser(bytes.NewReader(cmBytes))
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: pod}, nil
-			case strings.HasPrefix(p, pathCM) && m != "PATCH":
-				pod := ioutil.NopCloser(bytes.NewReader(cmBytes))
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: pod}, nil
+			case strings.HasPrefix(p, pathCM) && m == "GET":
+				fallthrough
+			case strings.HasPrefix(p, pathCM) && m == "PATCH":
+				var body io.ReadCloser
+
+				switch p {
+				case pathCM + "/test0":
+					body = ioutil.NopCloser(bytes.NewReader(configMapList[0]))
+				case pathCM + "/test1":
+					body = ioutil.NopCloser(bytes.NewReader(configMapList[1]))
+				default:
+					t.Errorf("unexpected request to %s", p)
+				}
+
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -305,6 +319,16 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmList := corev1.List{}
 	if err := runtime.DecodeInto(codec, buf.Bytes(), &cmList); err != nil {
 		t.Fatal(err)
+	}
+
+	if len(cmList.Items) != 2 {
+		t.Fatalf("Expected 2 items in the result; got %d", len(cmList.Items))
+	}
+	if !strings.Contains(string(cmList.Items[0].Raw), "key1") {
+		t.Fatalf("Did not get first ConfigMap at the first position")
+	}
+	if !strings.Contains(string(cmList.Items[1].Raw), "key2") {
+		t.Fatalf("Did not get second ConfigMap at the second position")
 	}
 }
 

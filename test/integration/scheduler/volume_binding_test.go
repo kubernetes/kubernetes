@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -99,7 +99,7 @@ func TestVolumeBinding(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, true)
 	defer config.teardown()
 
 	cases := map[string]struct {
@@ -191,7 +191,7 @@ func TestVolumeBinding(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		glog.Infof("Running test %v", name)
+		klog.Infof("Running test %v", name)
 
 		// Create two StorageClasses
 		suffix := rand.String(4)
@@ -272,7 +272,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling-", 2, features, 0, 0, true)
 	defer config.teardown()
 
 	storageClassName := "local-storage"
@@ -335,7 +335,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		glog.Infof("Running test %v", name)
+		klog.Infof("Running test %v", name)
 
 		if test.pod == nil {
 			t.Fatal("pod is required for this test")
@@ -363,7 +363,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		}
 
 		// Wait for pod is unschedulable.
-		glog.Infof("Waiting for pod is unschedulable")
+		klog.Infof("Waiting for pod is unschedulable")
 		if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
 			t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
 		}
@@ -373,12 +373,12 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 
 		// Wait for pod is scheduled or unscheduable.
 		if !test.shouldFail {
-			glog.Infof("Waiting for pod is scheduled")
+			klog.Infof("Waiting for pod is scheduled")
 			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
 				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
 			}
 		} else {
-			glog.Infof("Waiting for pod is unschedulable")
+			klog.Infof("Waiting for pod is unschedulable")
 			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
 				t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
 			}
@@ -418,7 +418,7 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-binding-stress-", 1, features, schedulerResyncPeriod, provisionDelaySeconds, false)
+	config := setupCluster(t, "volume-binding-stress-", 1, features, schedulerResyncPeriod, provisionDelaySeconds, true)
 	defer config.teardown()
 
 	// Set max volume limit to the number of PVCs the test will create
@@ -625,7 +625,7 @@ func TestPVAffinityConflict(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling-", 3, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling-", 3, features, 0, 0, true)
 	defer config.teardown()
 
 	pv := makePV("local-pv", classImmediate, "", "", node1)
@@ -688,7 +688,7 @@ func TestVolumeProvision(t *testing.T) {
 		"VolumeScheduling":       true,
 		"PersistentLocalVolumes": true,
 	}
-	config := setupCluster(t, "volume-scheduling", 1, features, 0, 0, false)
+	config := setupCluster(t, "volume-scheduling", 1, features, 0, 0, true)
 	defer config.teardown()
 
 	cases := map[string]struct {
@@ -715,12 +715,6 @@ func TestVolumeProvision(t *testing.T) {
 			boundPvcs:       []*testPVC{{"pvc-w-canbind", classWait, ""}},
 			provisionedPvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
 		},
-		"one immediate pvc prebound, one wait provisioned": {
-			pod:             makePod("pod-i-pvc-prebound-w-provisioned", config.ns, []string{"pvc-i-prebound", "pvc-canprovision"}),
-			pvs:             []*testPV{{"pv-i-pvc-prebound", classImmediate, "", node1}},
-			boundPvcs:       []*testPVC{{"pvc-i-prebound", classImmediate, "pv-i-pvc-prebound"}},
-			provisionedPvcs: []*testPVC{{"pvc-canprovision", classWait, ""}},
-		},
 		"one immediate pv prebound, one wait provisioned": {
 			pod:             makePod("pod-i-pv-prebound-w-provisioned", config.ns, []string{"pvc-i-pv-prebound", "pvc-canprovision"}),
 			pvs:             []*testPV{{"pv-i-prebound", classImmediate, "pvc-i-pv-prebound", node1}},
@@ -743,7 +737,7 @@ func TestVolumeProvision(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		glog.Infof("Running test %v", name)
+		klog.Infof("Running test %v", name)
 
 		// Create StorageClasses
 		suffix := rand.String(4)
@@ -907,9 +901,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	// Set feature gates
 	utilfeature.DefaultFeatureGate.SetFromMap(features)
 
-	controllerCh := make(chan struct{})
-
-	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), controllerCh, false, nil, false, disableEquivalenceCache, resyncPeriod)
+	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), false, nil, false, disableEquivalenceCache, resyncPeriod)
 
 	clientset := context.clientSet
 	ns := context.ns.Name
@@ -918,10 +910,10 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(controllerCh)
+	go ctrl.Run(context.stopCh)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(controllerCh)
-	informerFactory.WaitForCacheSync(controllerCh)
+	informerFactory.Start(context.stopCh)
+	informerFactory.WaitForCacheSync(context.stopCh)
 
 	// Create shared objects
 	// Create nodes
@@ -942,7 +934,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   controllerCh,
+		stop:   context.stopCh,
 		teardown: func() {
 			deleteTestObjects(clientset, ns, nil)
 			cleanupTest(t, context)

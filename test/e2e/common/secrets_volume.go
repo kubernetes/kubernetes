@@ -364,6 +364,26 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-3"))
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/secret-volumes/delete/data-1"))
 	})
+
+	//The secret is in pending during volume creation until the secret objects are available
+	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timout exception unless it is marked optional.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/secret-volumes"
+		podName := "pod-secrets-" + string(uuid.NewUUID())
+		err := createNonOptionalSecretPod(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+	})
+
+	//Secret object defined for the pod, If a key is specified which is not present in the secret,
+	// the volume setup will error unless it is marked optional, during the pod creation.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/secret-volumes"
+		podName := "pod-secrets-" + string(uuid.NewUUID())
+		err := createNonOptionalSecretPodWithSecret(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+	})
 })
 
 func secretForTest(namespace, name string) *v1.Secret {
@@ -520,4 +540,113 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 	}
 
 	f.TestContainerOutput("consume secrets", pod, 0, expectedOutput)
+}
+
+func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName string) error {
+	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+	falseValue := false
+
+	createName := "s-test-opt-create-" + string(uuid.NewUUID())
+	createContainerName := "creates-volume-test"
+	createVolumeName := "creates-volume"
+
+	//creating a pod without secret object created, by mentioning the secret volume source reference name
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: createVolumeName,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: createName,
+							Optional:   &falseValue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    createContainerName,
+					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
+					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      createVolumeName,
+							MountPath: path.Join(volumeMountPath, "create"),
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By("Creating the pod")
+	pod = f.PodClient().Create(pod)
+	return f.WaitForPodRunning(pod.Name)
+}
+
+func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPath, podName string) error {
+	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+	falseValue := false
+
+	createName := "s-test-opt-create-" + string(uuid.NewUUID())
+	createContainerName := "creates-volume-test"
+	createVolumeName := "creates-volume"
+
+	secret := secretForTest(f.Namespace.Name, createName)
+
+	By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+	var err error
+	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+	}
+	//creating a pod with secret object, with the key which is not present in secret object.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: createVolumeName,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: createName,
+							Items: []v1.KeyToPath{
+								{
+									Key:  "data_4",
+									Path: "value-4\n",
+								},
+							},
+							Optional: &falseValue,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    createContainerName,
+					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
+					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      createVolumeName,
+							MountPath: path.Join(volumeMountPath, "create"),
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By("Creating the pod")
+	pod = f.PodClient().Create(pod)
+	return f.WaitForPodRunning(pod.Name)
 }

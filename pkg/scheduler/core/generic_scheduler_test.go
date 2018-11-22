@@ -706,15 +706,15 @@ func TestZeroRequest(t *testing.T) {
 
 			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 
-			mataDataProducer := algorithmpriorities.NewPriorityMetadataFactory(
+			metaDataProducer := algorithmpriorities.NewPriorityMetadataFactory(
 				schedulertesting.FakeServiceLister([]*v1.Service{}),
 				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
 				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
-			mataData := mataDataProducer(test.pod, nodeNameToInfo)
+			metaData := metaDataProducer(test.pod, nodeNameToInfo)
 
 			list, err := PrioritizeNodes(
-				test.pod, nodeNameToInfo, mataData, priorityConfigs,
+				test.pod, nodeNameToInfo, metaData, priorityConfigs,
 				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -960,6 +960,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
 			}
 			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
+			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
+			// doesn't have it yet.
+			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
+			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
+			nodes = append(nodes, newnode)
 			nodeToPods, err := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
 			if err != nil {
 				t.Error(err)

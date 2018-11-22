@@ -321,7 +321,7 @@ var map_Container = map[string]string{
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
 	"resources":                "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Cannot be updated.",
-	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future.",
+	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container. This is a beta feature.",
 	"livenessProbe":            "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"readinessProbe":           "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"lifecycle":                "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
@@ -693,6 +693,18 @@ var map_GitRepoVolumeSource = map[string]string{
 
 func (GitRepoVolumeSource) SwaggerDoc() map[string]string {
 	return map_GitRepoVolumeSource
+}
+
+var map_GlusterfsPersistentVolumeSource = map[string]string{
+	"":                   "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
+	"endpoints":          "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+	"path":               "Path is the Glusterfs volume path. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+	"readOnly":           "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+	"endpointsNamespace": "EndpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+}
+
+func (GlusterfsPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_GlusterfsPersistentVolumeSource
 }
 
 var map_GlusterfsVolumeSource = map[string]string{
@@ -1210,7 +1222,7 @@ var map_PersistentVolumeClaimSpec = map[string]string{
 	"resources":        "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
 	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
 	"storageClassName": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
-	"volumeMode":       "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
+	"volumeMode":       "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is a beta feature.",
 	"dataSource":       "This field requires the VolumeSnapshotDataSource alpha feature gate to be enabled and currently VolumeSnapshot is the only supported data source. If the provisioner can support VolumeSnapshot data source, it will create a new volume and data will be restored to the volume at the same time. If the provisioner does not support VolumeSnapshot data source, volume will not be created and the failure will be reported as an event. In the future, we plan to support more data source types and the behavior of the provisioner may change.",
 }
 
@@ -1288,7 +1300,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
 	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 	"mountOptions":                  "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
-	"volumeMode":                    "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",
+	"volumeMode":                    "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is a beta feature.",
 	"nodeAffinity":                  "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
 }
 

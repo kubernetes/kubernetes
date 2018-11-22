@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -47,7 +47,7 @@ var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	errorMsg := fmt.Sprintf("Internal Server Error: %#v", r.RequestURI)
 	http.Error(w, errorMsg, http.StatusInternalServerError)
-	glog.Errorf(err.Error())
+	klog.Errorf(err.Error())
 }
 
 // requestWatermark is used to trak maximal usage of inflight requests.

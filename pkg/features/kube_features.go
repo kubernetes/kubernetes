@@ -49,6 +49,7 @@ const (
 	// owner: @vishh
 	// alpha: v1.5
 	//
+	// DEPRECATED - This feature is deprecated by Pod Priority and Preemption as of Kubernetes 1.13.
 	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
 	// and also prevents them from being evicted from a node.
 	// Note: This feature is not supported for `BestEffort` pods.
@@ -139,6 +140,7 @@ const (
 	// owner: @jsafrane
 	// GA: v1.12
 	//
+	// Note: This feature gate is unconditionally enabled in v1.13 and will be removed in v1.14.
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
 
@@ -186,14 +188,13 @@ const (
 	MountContainers utilfeature.Feature = "MountContainers"
 
 	// owner: @msau42
-	// alpha: v1.9
+	// GA: v1.13
 	//
 	// Extend the default scheduler to be aware of PV topology and handle PV binding
-	// Before moving to beta, resolve Kubernetes issue #56180
 	VolumeScheduling utilfeature.Feature = "VolumeScheduling"
 
 	// owner: @vladimirvivien
-	// beta: v1.10
+	// GA: v1.13
 	//
 	// Enable mount/attachment of Container Storage Interface (CSI) backed PVs
 	CSIPersistentVolume utilfeature.Feature = "CSIPersistentVolume"
@@ -216,6 +217,7 @@ const (
 
 	// owner: @screeley44
 	// alpha: v1.9
+	// beta: v1.13
 	//
 	// Enable Block volume support in containers.
 	BlockVolume utilfeature.Feature = "BlockVolume"
@@ -268,6 +270,14 @@ const (
 	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
 	TokenRequestProjection utilfeature.Feature = "TokenRequestProjection"
 
+	// owner: @mikedanese
+	// alpha: v1.13
+	//
+	// Migrate ServiceAccount volumes to use a projected volume consisting of a
+	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
+	// to the API server.
+	BoundServiceAccountTokenVolume utilfeature.Feature = "BoundServiceAccountTokenVolume"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -275,7 +285,7 @@ const (
 	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
 
 	// owner: @verult
-	// beta: v1.10
+	// GA: v1.13
 	//
 	// Enables the regional PD feature on GCE.
 	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
@@ -322,7 +332,7 @@ const (
 	VolumeSubpathEnvExpansion utilfeature.Feature = "VolumeSubpathEnvExpansion"
 
 	// owner: @vikaschoudhary16
-	// alpha: v1.11
+	// GA: v1.13
 	//
 	//
 	// Enable probe based plugin watcher utility for discovering Kubelet plugins
@@ -377,6 +387,12 @@ const (
 	//
 	// Allow TTL controller to clean up Pods and Jobs after they finish.
 	TTLAfterFinished utilfeature.Feature = "TTLAfterFinished"
+
+	// owner: @dashpole
+	// alpha: v1.13
+	//
+	// Enables the kubelet's pod resources grpc endpoint
+	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
 )
 
 func init() {
@@ -413,28 +429,29 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
-	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
+	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.GA},
+	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA},
 	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
-	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	BlockVolume:                                 {Default: true, PreRelease: utilfeature.Beta},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
-	ResourceLimitsPriorityFunction:              {Default: true, PreRelease: utilfeature.Beta},
+	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
+	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
+	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.Beta},
+	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA},
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
@@ -443,11 +460,13 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
+	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
+	genericfeatures.DynamicAuditing:         {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
@@ -455,8 +474,9 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation:   {Default: true, PreRelease: utilfeature.Beta},
-	apiextensionsfeatures.CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: utilfeature.Beta},
+	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: false, PreRelease: utilfeature.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

@@ -34,9 +34,9 @@ import (
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog"
 )
 
 type TopPodOptions struct {
@@ -95,15 +95,9 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 		Long:                  topPodLong,
 		Example:               topPodExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, cmd, args); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := o.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
-			}
-			if err := o.RunTopPod(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunTopPod())
 		},
 		Aliases: []string{"pods", "po"},
 	}
@@ -262,10 +256,10 @@ func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		glog.Warningf(message)
+		klog.Warningf(message)
 		return errors.New(message)
 	} else {
-		glog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
+		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
 		return nil
 	}
 }

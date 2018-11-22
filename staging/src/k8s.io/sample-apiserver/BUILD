@@ -20,7 +20,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/cmd/server:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

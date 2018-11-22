@@ -17,9 +17,15 @@ limitations under the License.
 package kubeadm
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func runKubeadmInit(args ...string) (string, string, error) {
@@ -40,18 +46,16 @@ func TestCmdInitToken(t *testing.T) {
 		args     string
 		expected bool
 	}{
-		/*
-			{
-				name:     "invalid token size",
-				args:     "--token=abcd:1234567890abcd",
-				expected: false,
-			},
-			{
-				name:     "invalid token non-lowercase",
-				args:     "--token=Abcdef:1234567890abcdef",
-				expected: false,
-			},
-		*/
+		{
+			name:     "invalid token size",
+			args:     "--token=abcd:1234567890abcd",
+			expected: false,
+		},
+		{
+			name:     "invalid token non-lowercase",
+			args:     "--token=Abcdef:1234567890abcdef",
+			expected: false,
+		},
 		{
 			name:     "valid token is accepted",
 			args:     "--token=abcdef.0123456789abcdef",
@@ -98,7 +102,7 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		},
 		{
 			name:     "valid version is accepted",
-			args:     "--kubernetes-version=1.11.0",
+			args:     "--kubernetes-version=1.12.0",
 			expected: true,
 		},
 	}
@@ -188,6 +192,71 @@ func TestCmdInitConfig(t *testing.T) {
 					rt.expected,
 					(err == nil),
 				)
+			}
+		})
+	}
+}
+
+func TestCmdInitCertPhaseCSR(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	tests := []struct {
+		name          string
+		baseName      string
+		expectedError string
+	}{
+		{
+			name:     "generate CSR",
+			baseName: certs.KubeadmCertKubeletClient.BaseName,
+		},
+		{
+			name:          "fails on CSR",
+			baseName:      certs.KubeadmCertRootCA.BaseName,
+			expectedError: "unknown flag: --csr-only",
+		},
+		{
+			name:          "fails on all",
+			baseName:      "all",
+			expectedError: "unknown flag: --csr-only",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			csrDir := testutil.SetupTempDir(t)
+			cert := &certs.KubeadmCertKubeletClient
+			kubeadmPath := getKubeadmPath()
+			_, stderr, err := RunCmd(kubeadmPath,
+				"init",
+				"phase",
+				"certs",
+				test.baseName,
+				"--csr-only",
+				"--csr-dir="+csrDir,
+			)
+
+			if test.expectedError != "" {
+				cause := errors.Cause(err)
+				_, ok := cause.(*exec.ExitError)
+				if !ok {
+					t.Fatalf("expected exitErr: got %T (%v)", cause, err)
+				}
+
+				if !strings.Contains(stderr, test.expectedError) {
+					t.Errorf("expected %q to contain %q", stderr, test.expectedError)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("couldn't run kubeadm: %v", err)
+			}
+
+			if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, cert.BaseName); err != nil {
+				t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
 			}
 		})
 	}

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -303,42 +304,32 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 	}
 
 	// Enable alpha feature BlockVolume
-	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err1 != nil {
-		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err1)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// now test dropping the fields - should not be dropped
 	DropDisabledAlphaFields(&testPod.Spec)
 
 	// check to make sure VolumeDevices is still present
 	// if featureset is set to true
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if testPod.Spec.Containers[0].VolumeDevices == nil {
-			t.Error("VolumeDevices in Container should not have been dropped based on feature-gate")
-		}
-		if testPod.Spec.InitContainers[0].VolumeDevices == nil {
-			t.Error("VolumeDevices in InitContainers should not have been dropped based on feature-gate")
-		}
+	if testPod.Spec.Containers[0].VolumeDevices == nil {
+		t.Error("VolumeDevices in Container should not have been dropped based on feature-gate")
+	}
+	if testPod.Spec.InitContainers[0].VolumeDevices == nil {
+		t.Error("VolumeDevices in InitContainers should not have been dropped based on feature-gate")
 	}
 
 	// Disable alpha feature BlockVolume
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 
 	// now test dropping the fields
 	DropDisabledAlphaFields(&testPod.Spec)
 
 	// check to make sure VolumeDevices is nil
 	// if featureset is set to false
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if testPod.Spec.Containers[0].VolumeDevices != nil {
-			t.Error("DropDisabledAlphaFields for Containers failed")
-		}
-		if testPod.Spec.InitContainers[0].VolumeDevices != nil {
-			t.Error("DropDisabledAlphaFields for InitContainers failed")
-		}
+	if testPod.Spec.Containers[0].VolumeDevices != nil {
+		t.Error("DropDisabledAlphaFields for Containers failed")
+	}
+	if testPod.Spec.InitContainers[0].VolumeDevices != nil {
+		t.Error("DropDisabledAlphaFields for InitContainers failed")
 	}
 }

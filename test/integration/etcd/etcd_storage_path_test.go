@@ -99,6 +99,10 @@ func TestEtcdStoragePath(t *testing.T) {
 				if input, err = jsonToMetaObject([]byte(testData.Stub)); err != nil || input.isEmpty() {
 					t.Fatalf("invalid test data for %s: %v", gvResource, err)
 				}
+				// unset type meta fields - we only set these in the CRD test data and it makes
+				// any CRD test with an expectedGVK override fail the DeepDerivative test
+				input.Kind = ""
+				input.APIVersion = ""
 			}
 
 			all := &[]cleanupData{}

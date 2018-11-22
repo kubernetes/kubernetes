@@ -21,6 +21,7 @@ import (
 	"io"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,28 +33,34 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
-// DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
-const DefaultServiceAccountName = "default"
+const (
+	// DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
+	DefaultServiceAccountName = "default"
 
-// EnforceMountableSecretsAnnotation is a default annotation that indicates that a service account should enforce mountable secrets.
-// The value must be true to have this annotation take effect
-const EnforceMountableSecretsAnnotation = "kubernetes.io/enforce-mountable-secrets"
+	// EnforceMountableSecretsAnnotation is a default annotation that indicates that a service account should enforce mountable secrets.
+	// The value must be true to have this annotation take effect
+	EnforceMountableSecretsAnnotation = "kubernetes.io/enforce-mountable-secrets"
 
-// DefaultAPITokenMountPath is the path that ServiceAccountToken secrets are automounted to.
-// The token file would then be accessible at /var/run/secrets/kubernetes.io/serviceaccount
-const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+	ServiceAccountVolumeName = "kube-api-access"
 
-// PluginName is the name of this admission plugin
-const PluginName = "ServiceAccount"
+	// DefaultAPITokenMountPath is the path that ServiceAccountToken secrets are automounted to.
+	// The token file would then be accessible at /var/run/secrets/kubernetes.io/serviceaccount
+	DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	// PluginName is the name of this admission plugin
+	PluginName = "ServiceAccount"
+)
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -79,6 +86,10 @@ type serviceAccount struct {
 
 	serviceAccountLister corev1listers.ServiceAccountLister
 	secretLister         corev1listers.SecretLister
+
+	generateName func(string) string
+
+	featureGate utilfeature.FeatureGate
 }
 
 var _ admission.MutationInterface = &serviceAccount{}
@@ -101,6 +112,10 @@ func NewServiceAccount() *serviceAccount {
 		MountServiceAccountToken: true,
 		// Reject pod creation until a service account token is available
 		RequireAPIToken: true,
+
+		generateName: names.SimpleNameGenerator.GenerateName,
+
+		featureGate: utilfeature.DefaultFeatureGate,
 	}
 }
 
@@ -434,7 +449,8 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *corev1.Service
 	allVolumeNames := sets.NewString()
 	for _, volume := range pod.Spec.Volumes {
 		allVolumeNames.Insert(volume.Name)
-		if volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken {
+		if (!s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) && volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken) ||
+			(s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) && strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-")) {
 			tokenVolumeName = volume.Name
 			hasTokenVolume = true
 			break
@@ -443,10 +459,14 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *corev1.Service
 
 	// Determine a volume name for the ServiceAccountTokenSecret in case we need it
 	if len(tokenVolumeName) == 0 {
-		// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
-		tokenVolumeName = serviceAccountToken
-		if allVolumeNames.Has(tokenVolumeName) {
-			tokenVolumeName = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
+		if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+			tokenVolumeName = s.generateName(ServiceAccountVolumeName + "-")
+		} else {
+			// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
+			tokenVolumeName = serviceAccountToken
+			if allVolumeNames.Has(tokenVolumeName) {
+				tokenVolumeName = s.generateName(fmt.Sprintf("%s-", serviceAccountToken))
+			}
 		}
 	}
 
@@ -490,15 +510,61 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *corev1.Service
 
 	// Add the volume if a container needs it
 	if !hasTokenVolume && needsTokenVolume {
-		volume := api.Volume{
+		pod.Spec.Volumes = append(pod.Spec.Volumes, s.createVolume(tokenVolumeName, serviceAccountToken))
+	}
+	return nil
+}
+
+func (s *serviceAccount) createVolume(tokenVolumeName, secretName string) api.Volume {
+	if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+		return api.Volume{
 			Name: tokenVolumeName,
 			VolumeSource: api.VolumeSource{
-				Secret: &api.SecretVolumeSource{
-					SecretName: serviceAccountToken,
+				Projected: &api.ProjectedVolumeSource{
+					Sources: []api.VolumeProjection{
+						{
+							ServiceAccountToken: &api.ServiceAccountTokenProjection{
+								Path:              "token",
+								ExpirationSeconds: 60 * 60,
+							},
+						},
+						{
+							ConfigMap: &api.ConfigMapProjection{
+								LocalObjectReference: api.LocalObjectReference{
+									Name: "kube-root-ca.crt",
+								},
+								Items: []api.KeyToPath{
+									{
+										Key:  "ca.crt",
+										Path: "ca.crt",
+									},
+								},
+							},
+						},
+						{
+							DownwardAPI: &api.DownwardAPIProjection{
+								Items: []api.DownwardAPIVolumeFile{
+									{
+										Path: "namespace",
+										FieldRef: &api.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "metadata.namespace",
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		}
-		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 	}
-	return nil
+	return api.Volume{
+		Name: tokenVolumeName,
+		VolumeSource: api.VolumeSource{
+			Secret: &api.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
 }

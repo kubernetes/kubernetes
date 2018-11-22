@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -288,7 +288,7 @@ func (o *LabelOptions) RunLabel() error {
 				return err
 			}
 			if err := o.Recorder.Record(obj); err != nil {
-				glog.V(4).Infof("error recording current command: %v", err)
+				klog.V(4).Infof("error recording current command: %v", err)
 			}
 			newObj, err := json.Marshal(obj)
 			if err != nil {
@@ -298,7 +298,7 @@ func (o *LabelOptions) RunLabel() error {
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
-				glog.V(2).Infof("couldn't compute patch: %v", err)
+				klog.V(2).Infof("couldn't compute patch: %v", err)
 			}
 
 			mapping := info.ResourceMapping()

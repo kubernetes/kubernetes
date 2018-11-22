@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,271 +17,91 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
 	"os"
-	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-	"k8s.io/kubernetes/pkg/util/node"
-
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
-// phaseTestK8sVersion is a fake kubernetes version to use when testing
-const phaseTestK8sVersion = "v1.11.0"
+type testCertsData struct {
+	cfg *kubeadmapi.InitConfiguration
+}
 
-func TestCertsSubCommandsHasFlags(t *testing.T) {
+func (t *testCertsData) Cfg() *kubeadmapi.InitConfiguration { return t.cfg }
+func (t *testCertsData) ExternalCA() bool                   { return false }
+func (t *testCertsData) CertificateDir() string             { return t.cfg.CertificatesDir }
+func (t *testCertsData) CertificateWriteDir() string        { return t.cfg.CertificatesDir }
 
-	subCmds := getCertsSubCommands(phaseTestK8sVersion)
+func TestCertsWithCSRs(t *testing.T) {
+	csrDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(csrDir)
+	certDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(certDir)
+	cert := &certs.KubeadmCertAPIServer
 
-	commonFlags := []string{
-		"cert-dir",
-		"config",
+	certsData := &testCertsData{
+		cfg: testutil.GetDefaultInternalConfig(t),
+	}
+	certsData.cfg.CertificatesDir = certDir
+
+	// global vars
+	csrOnly = true
+	csrDir = certDir
+	defer func() {
+		csrOnly = false
+	}()
+
+	phase := NewCertsPhase()
+	// find the api cert phase
+	var apiServerPhase *workflow.Phase
+	for _, phase := range phase.Phases {
+		if phase.Name == cert.Name {
+			apiServerPhase = &phase
+			break
+		}
 	}
 
-	var tests = []struct {
-		command         string
-		additionalFlags []string
-	}{
-		{
-			command: "all",
-			additionalFlags: []string{
-				"apiserver-advertise-address",
-				"apiserver-cert-extra-sans",
-				"service-cidr",
-				"service-dns-domain",
-			},
-		},
-		{
-			command: "ca",
-		},
-		{
-			command: "apiserver",
-			additionalFlags: []string{
-				"apiserver-advertise-address",
-				"apiserver-cert-extra-sans",
-				"service-cidr",
-				"service-dns-domain",
-			},
-		},
-		{
-			command: "apiserver-kubelet-client",
-		},
-		{
-			command: "etcd-ca",
-		},
-		{
-			command: "etcd-server",
-		},
-		{
-			command: "etcd-peer",
-		},
-		{
-			command: "etcd-healthcheck-client",
-		},
-		{
-			command: "apiserver-etcd-client",
-		},
-		{
-			command: "sa",
-		},
-		{
-			command: "front-proxy-ca",
-		},
-		{
-			command: "front-proxy-client",
-		},
+	if apiServerPhase == nil {
+		t.Fatalf("couldn't find apiserver phase")
 	}
 
-	for _, test := range tests {
-		expectedFlags := append(commonFlags, test.additionalFlags...)
-		cmdtestutil.AssertSubCommandHasFlags(t, subCmds, test.command, expectedFlags...)
+	err := apiServerPhase.Run(certsData)
+	if err != nil {
+		t.Fatalf("couldn't run API server phase: %v", err)
+	}
+
+	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, cert.BaseName); err != nil {
+		t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
 	}
 }
 
-func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
-
-	subCmds := getCertsSubCommands(phaseTestK8sVersion)
-
-	var tests = []struct {
-		subCmds       []string
-		expectedFiles []string
-	}{
-		{
-			subCmds: []string{"all"},
-			expectedFiles: []string{
-				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
-				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
-				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
-				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
-				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
-				kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName,
-			},
-		},
-		{
-			subCmds:       []string{"ca", "apiserver", "apiserver-kubelet-client"},
-			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
-		},
-		{
-			subCmds: []string{"etcd-ca", "etcd-server", "etcd-peer", "etcd-healthcheck-client", "apiserver-etcd-client"},
-			expectedFiles: []string{
-				kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName,
-				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
-				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
-				kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
-				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
-			},
-		},
-		{
-			subCmds:       []string{"sa"},
-			expectedFiles: []string{kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName},
-		},
-		{
-			subCmds:       []string{"front-proxy-ca", "front-proxy-client"},
-			expectedFiles: []string{kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName, kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(strings.Join(test.subCmds, ","), func(t *testing.T) {
-			// Create temp folder for the test case
+func TestCreateSparseCerts(t *testing.T) {
+	for _, test := range certstestutil.GetSparseCertTestCases(t) {
+		t.Run(test.Name, func(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
-			// executes given sub commands
-			for _, subCmdName := range test.subCmds {
-				fmt.Printf("running command %q\n", subCmdName)
-				certDirFlag := fmt.Sprintf("--cert-dir=%s", tmpdir)
-				cmdtestutil.RunSubCommand(t, subCmds, subCmdName, certDirFlag)
+			certstestutil.WritePKIFiles(t, tmpdir, test.Files)
+
+			r := workflow.NewRunner()
+			r.AppendPhase(NewCertsPhase())
+			r.SetDataInitializer(func(*cobra.Command) (workflow.RunData, error) {
+				certsData := &testCertsData{
+					cfg: testutil.GetDefaultInternalConfig(t),
+				}
+				certsData.cfg.CertificatesDir = tmpdir
+				return certsData, nil
+			})
+
+			if err := r.Run(); (err != nil) != test.ExpectError {
+				t.Fatalf("expected error to be %t, got %t (%v)", test.ExpectError, (err != nil), err)
 			}
-
-			// verify expected files are there
-			testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
-		})
-	}
-}
-
-func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
-
-	subCmds := getCertsSubCommands(phaseTestK8sVersion)
-
-	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-
-	// creates ca cert
-	certDirFlag := fmt.Sprintf("--cert-dir=%s", tmpdir)
-	cmdtestutil.RunSubCommand(t, subCmds, "ca", certDirFlag)
-
-	// creates apiserver cert
-	apiserverFlags := []string{
-		fmt.Sprintf("--cert-dir=%s", tmpdir),
-		"--apiserver-cert-extra-sans=foo,boo",
-		"--service-cidr=10.0.0.0/24",
-		"--service-dns-domain=mycluster.local",
-		"--apiserver-advertise-address=1.2.3.4",
-	}
-	cmdtestutil.RunSubCommand(t, subCmds, "apiserver", apiserverFlags...)
-
-	// asserts created cert has values from CLI flags
-	APIserverCert, err := pkiutil.TryLoadCertFromDisk(tmpdir, kubeadmconstants.APIServerCertAndKeyBaseName)
-	if err != nil {
-		t.Fatalf("Error loading API server certificate: %v", err)
-	}
-
-	hostname, err := node.GetHostname("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i, name := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.mycluster.local"} {
-		if APIserverCert.DNSNames[i] != name {
-			t.Errorf("APIserverCert.DNSNames[%d] is %s instead of %s", i, APIserverCert.DNSNames[i], name)
-		}
-	}
-	for i, ip := range []string{"10.0.0.1", "1.2.3.4"} {
-		if APIserverCert.IPAddresses[i].String() != ip {
-			t.Errorf("APIserverCert.IPAddresses[%d] is %s instead of %s", i, APIserverCert.IPAddresses[i], ip)
-		}
-	}
-}
-
-func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
-
-	subCmds := getCertsSubCommands(phaseTestK8sVersion)
-
-	var tests = []struct {
-		subCmds       []string
-		expectedFiles []string
-	}{
-		{
-			subCmds: []string{"all"},
-			expectedFiles: []string{
-				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
-				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
-				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
-				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
-				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
-				kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName,
-			},
-		},
-		{
-			subCmds: []string{"ca", "apiserver", "apiserver-kubelet-client"},
-			expectedFiles: []string{
-				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
-				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
-				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
-			},
-		},
-		{
-			subCmds: []string{"etcd-ca", "etcd-server", "etcd-peer", "etcd-healthcheck-client", "apiserver-etcd-client"},
-			expectedFiles: []string{
-				kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName,
-				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
-				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
-				kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
-				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
-			},
-		},
-		{
-			subCmds:       []string{"front-proxy-ca", "front-proxy-client"},
-			expectedFiles: []string{kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName, kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName},
-		},
-		{
-			subCmds:       []string{"sa"},
-			expectedFiles: []string{kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(strings.Join(test.subCmds, ","), func(t *testing.T) {
-
-			// Create temp folder for the test case
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
-
-			cfg := &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					CertificatesDir: tmpdir,
-				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
-			}
-			configPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)
-
-			// executes given sub commands
-			for _, subCmdName := range test.subCmds {
-				t.Logf("running subcommand %q", subCmdName)
-				configFlag := fmt.Sprintf("--config=%s", configPath)
-				cmdtestutil.RunSubCommand(t, subCmds, subCmdName, configFlag)
-			}
-
-			// verify expected files are there
-			testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
 		})
 	}
 }

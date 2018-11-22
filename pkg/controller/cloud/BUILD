@@ -43,13 +43,14 @@ go_library(
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = [
+        "main_test.go",
         "node_controller_test.go",
         "pvlcontroller_test.go",
     ],
@@ -58,6 +59,7 @@ go_test(
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/testutil:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -68,14 +70,15 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

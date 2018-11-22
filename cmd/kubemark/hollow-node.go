@@ -23,9 +23,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -138,18 +138,18 @@ func newHollowNodeCommand() *cobra.Command {
 
 func run(config *HollowNodeConfig) {
 	if !knownMorphs.Has(config.Morph) {
-		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
 	clientConfig, err := config.createClientConfigFromFile()
 	if err != nil {
-		glog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+		klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+		klog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
 	}
 
 	if config.Morph == "kubelet" {
@@ -181,7 +181,7 @@ func run(config *HollowNodeConfig) {
 	if config.Morph == "proxy" {
 		client, err := clientset.NewForConfig(clientConfig)
 		if err != nil {
-			glog.Fatalf("Failed to create API Server client: %v", err)
+			klog.Fatalf("Failed to create API Server client: %v", err)
 		}
 		iptInterface := fakeiptables.NewFake()
 		sysctl := fakesysctl.NewFake()
@@ -203,7 +203,7 @@ func run(config *HollowNodeConfig) {
 			config.ProxierMinSyncPeriod,
 		)
 		if err != nil {
-			glog.Fatalf("Failed to create hollowProxy instance: %v", err)
+			klog.Fatalf("Failed to create hollowProxy instance: %v", err)
 		}
 		hollowProxy.Run()
 	}

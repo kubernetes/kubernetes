@@ -19,7 +19,6 @@ package v1beta1
 import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -50,8 +49,6 @@ type ScaleStatus struct {
 	TargetSelector string `json:"targetSelector,omitempty" protobuf:"bytes,3,opt,name=targetSelector"`
 }
 
-// +genclient
-// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // represents a scaling request for a resource.
@@ -75,29 +72,6 @@ type Scale struct {
 // Dummy definition
 type ReplicationControllerDummy struct {
 	metav1.TypeMeta `json:",inline"`
-}
-
-// Alpha-level support for Custom Metrics in HPA (as annotations).
-type CustomMetricTarget struct {
-	// Custom Metric name.
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// Custom Metric value (average).
-	TargetValue resource.Quantity `json:"value" protobuf:"bytes,2,opt,name=value"`
-}
-
-type CustomMetricTargetList struct {
-	Items []CustomMetricTarget `json:"items" protobuf:"bytes,1,rep,name=items"`
-}
-
-type CustomMetricCurrentStatus struct {
-	// Custom Metric name.
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// Custom Metric value (average).
-	CurrentValue resource.Quantity `json:"value" protobuf:"bytes,2,opt,name=value"`
-}
-
-type CustomMetricCurrentStatusList struct {
-	Items []CustomMetricCurrentStatus `json:"items" protobuf:"bytes,1,rep,name=items"`
 }
 
 // +genclient

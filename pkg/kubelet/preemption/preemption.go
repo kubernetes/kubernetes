@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -96,7 +96,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	glog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
+	klog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -110,7 +110,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		if err != nil {
 			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
 		}
-		glog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
+		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
 	return nil
 }

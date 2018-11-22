@@ -43,7 +43,7 @@ import (
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
@@ -220,7 +220,7 @@ func (m *EtcdTestServer) waitUntilUp() error {
 	for start := time.Now(); time.Since(start) < wait.ForeverTestTimeout; time.Sleep(10 * time.Millisecond) {
 		members, err := membersAPI.List(context.TODO())
 		if err != nil {
-			glog.Errorf("Error when getting etcd cluster members")
+			klog.Errorf("Error when getting etcd cluster members")
 			continue
 		}
 		if len(members) == 1 && len(members[0].ClientURLs) > 0 {

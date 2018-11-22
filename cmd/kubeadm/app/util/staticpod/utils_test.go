@@ -28,8 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -57,26 +55,8 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "default apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
-				},
-			},
-			component: kubeadmconstants.KubeAPIServer,
-			port:      1,
-			path:      "foo",
-			scheme:    v1.URISchemeHTTP,
-			expected:  "127.0.0.1",
-		},
-		{
-			name: "default apiserver advertise address with http",
-			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
-					AdvertiseAddress: "1.2.3.4",
-				},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						features.SelfHosting: true,
-					},
 				},
 			},
 			component: kubeadmconstants.KubeAPIServer,
@@ -88,7 +68,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "default apiserver advertise address with https",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
 				},
 			},
@@ -101,7 +81,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "valid ipv4 apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 			},
@@ -114,7 +94,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "valid ipv6 apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "2001:db8::1",
 				},
 			},
@@ -128,7 +108,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv4 controller-manager probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
+					ControllerManager: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "1.2.3.4"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -141,7 +123,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv6 controller-manager probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
+					ControllerManager: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "2001:db8::1"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -154,7 +138,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv4 scheduler probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
+					Scheduler: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "1.2.3.4"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -167,7 +153,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv6 scheduler probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
+					Scheduler: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "2001:db8::1"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -381,7 +369,6 @@ func TestComponentPod(t *testing.T) {
 					},
 					PriorityClassName: "system-cluster-critical",
 					HostNetwork:       true,
-					DNSPolicy:         v1.DNSClusterFirstWithHostNet,
 					Volumes:           []v1.Volume{},
 				},
 			},

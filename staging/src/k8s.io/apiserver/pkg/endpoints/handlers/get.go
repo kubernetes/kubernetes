@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -74,7 +74,9 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		}
 
 		trace.Step("About to write a response")
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		trace.Step("Transformed response object")
 	}
 }
 
@@ -242,7 +244,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
-			glog.V(3).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+			klog.V(3).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
 
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
@@ -279,6 +281,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 		}
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}

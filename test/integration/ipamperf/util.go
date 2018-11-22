@@ -19,7 +19,6 @@ package ipamperf
 import (
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 )
 
 const (
@@ -54,7 +54,7 @@ var (
 )
 
 func deleteNodes(apiURL string, config *Config) {
-	glog.Info("Deleting nodes")
+	klog.Info("Deleting nodes")
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
@@ -63,7 +63,7 @@ func deleteNodes(apiURL string, config *Config) {
 	})
 	noGrace := int64(0)
 	if err := clientSet.CoreV1().Nodes().DeleteCollection(&metav1.DeleteOptions{GracePeriodSeconds: &noGrace}, metav1.ListOptions{}); err != nil {
-		glog.Errorf("Error deleting node: %v", err)
+		klog.Errorf("Error deleting node: %v", err)
 	}
 }
 
@@ -74,22 +74,22 @@ func createNodes(apiURL string, config *Config) error {
 		QPS:           float32(config.CreateQPS),
 		Burst:         config.CreateQPS,
 	})
-	glog.Infof("Creating %d nodes", config.NumNodes)
+	klog.Infof("Creating %d nodes", config.NumNodes)
 	for i := 0; i < config.NumNodes; i++ {
 		var err error
 		for j := 0; j < maxCreateRetries; j++ {
 			if _, err = clientSet.CoreV1().Nodes().Create(baseNodeTemplate); err != nil && errors.IsServerTimeout(err) {
-				glog.Infof("Server timeout creating nodes, retrying after %v", retryDelay)
+				klog.Infof("Server timeout creating nodes, retrying after %v", retryDelay)
 				time.Sleep(retryDelay)
 				continue
 			}
 			break
 		}
 		if err != nil {
-			glog.Errorf("Error creating nodes: %v", err)
+			klog.Errorf("Error creating nodes: %v", err)
 			return err
 		}
 	}
-	glog.Infof("%d nodes created", config.NumNodes)
+	klog.Infof("%d nodes created", config.NumNodes)
 	return nil
 }

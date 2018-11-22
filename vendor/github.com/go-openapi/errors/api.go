@@ -18,8 +18,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 )
+
+// DefaultHTTPCode is used when the error Code cannot be used as an HTTP code.
+var DefaultHTTPCode = 422
 
 // Error represents a error interface all swagger framework errors implement
 type Error interface {
@@ -111,33 +115,52 @@ func MethodNotAllowed(requested string, allow []string) Error {
 	return &MethodNotAllowedError{code: http.StatusMethodNotAllowed, Allowed: allow, message: msg}
 }
 
-// ServeError the error handler interface implemenation
+const head = "HEAD"
+
+// ServeError the error handler interface implementation
 func ServeError(rw http.ResponseWriter, r *http.Request, err error) {
+	rw.Header().Set("Content-Type", "application/json")
 	switch e := err.(type) {
 	case *CompositeError:
 		er := flattenComposite(e)
-		ServeError(rw, r, er.Errors[0])
+		// strips composite errors to first element only
+		if len(er.Errors) > 0 {
+			ServeError(rw, r, er.Errors[0])
+		} else {
+			// guard against empty CompositeError (invalid construct)
+			ServeError(rw, r, nil)
+		}
 	case *MethodNotAllowedError:
 		rw.Header().Add("Allow", strings.Join(err.(*MethodNotAllowedError).Allowed, ","))
-		rw.WriteHeader(int(e.Code()))
-		if r == nil || r.Method != "HEAD" {
+		rw.WriteHeader(asHTTPCode(int(e.Code())))
+		if r == nil || r.Method != head {
 			rw.Write(errorAsJSON(e))
 		}
 	case Error:
-		if e == nil {
+		value := reflect.ValueOf(e)
+		if value.Kind() == reflect.Ptr && value.IsNil() {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write(errorAsJSON(New(http.StatusInternalServerError, "Unknown error")))
 			return
 		}
-		rw.WriteHeader(int(e.Code()))
-		if r == nil || r.Method != "HEAD" {
+		rw.WriteHeader(asHTTPCode(int(e.Code())))
+		if r == nil || r.Method != head {
 			rw.Write(errorAsJSON(e))
 		}
+	case nil:
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write(errorAsJSON(New(http.StatusInternalServerError, "Unknown error")))
 	default:
 		rw.WriteHeader(http.StatusInternalServerError)
-		if r == nil || r.Method != "HEAD" {
+		if r == nil || r.Method != head {
 			rw.Write(errorAsJSON(New(http.StatusInternalServerError, err.Error())))
 		}
 	}
+}
 
+func asHTTPCode(input int) int {
+	if input >= 600 {
+		return DefaultHTTPCode
+	}
+	return input
 }

@@ -40,3 +40,8 @@ func LockAndCheckSubPath(volumePath, subPath string) ([]uintptr, error) {
 // UnlockPath empty implementation
 func UnlockPath(fileHandles []uintptr) {
 }
+
+// LocalEndpoint empty implementation
+func LocalEndpoint(path, file string) string {
+	return ""
+}

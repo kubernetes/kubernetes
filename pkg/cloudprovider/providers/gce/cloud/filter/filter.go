@@ -34,7 +34,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var (
@@ -221,7 +221,7 @@ func (fp *filterPredicate) String() string {
 
 func (fp *filterPredicate) match(o interface{}) bool {
 	v, err := extractValue(fp.fieldName, o)
-	glog.V(6).Infof("extractValue(%q, %#v) = %v, %v", fp.fieldName, o, v, err)
+	klog.V(6).Infof("extractValue(%q, %#v) = %v, %v", fp.fieldName, o, v, err)
 	if err != nil {
 		return false
 	}
@@ -234,7 +234,7 @@ func (fp *filterPredicate) match(o interface{}) bool {
 		}
 		re, err := regexp.Compile(*fp.s)
 		if err != nil {
-			glog.Errorf("Match regexp %q is invalid: %v", *fp.s, err)
+			klog.Errorf("Match regexp %q is invalid: %v", *fp.s, err)
 			return false
 		}
 		match = re.Match([]byte(x))

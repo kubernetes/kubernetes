@@ -19,7 +19,7 @@ package node
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -86,7 +86,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 	}
 	if len(nodeName) == 0 {
 		// reject requests from unidentifiable nodes
-		glog.V(2).Infof("NODE DENY: unknown node for user %q", attrs.GetUser().GetName())
+		klog.V(2).Infof("NODE DENY: unknown node for user %q", attrs.GetUser().GetName())
 		return authorizer.DecisionNoOpinion, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
 	}
 
@@ -144,12 +144,12 @@ func (r *NodeAuthorizer) authorizeStatusUpdate(nodeName string, startingType ver
 	case "update", "patch":
 		// ok
 	default:
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get/update/patch this type", nil
 	}
 
 	if attrs.GetSubresource() != "status" {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only update status subresource", nil
 	}
 
@@ -159,11 +159,11 @@ func (r *NodeAuthorizer) authorizeStatusUpdate(nodeName string, startingType ver
 // authorizeGet authorizes "get" requests to objects of the specified type if they are related to the specified node
 func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attrs.GetVerb() != "get" {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get individual resources of this type", nil
 	}
 	if len(attrs.GetSubresource()) > 0 {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot get subresource", nil
 	}
 	return r.authorize(nodeName, startingType, attrs)
@@ -173,15 +173,15 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 // specified types if they are related to the specified node.
 func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attrs.GetVerb() != "get" && attrs.GetVerb() != "list" && attrs.GetVerb() != "watch" {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read resources of this type", nil
 	}
 	if len(attrs.GetSubresource()) > 0 {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot read subresource", nil
 	}
 	if len(attrs.GetNamespace()) == 0 {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read namespaced object of this type", nil
 	}
 	return r.authorize(nodeName, startingType, attrs)
@@ -189,17 +189,17 @@ func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, starting
 
 func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if len(attrs.GetName()) == 0 {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "No Object name found", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
-		glog.V(2).Infof("NODE DENY: %v", err)
+		klog.V(2).Infof("NODE DENY: %v", err)
 		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
 	if !ok {
-		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
 	return authorizer.DecisionAllow, "", nil
@@ -209,22 +209,22 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 // subresource of pods running on a node
 func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attrs.GetVerb() != "create" || len(attrs.GetName()) == 0 {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only create tokens for individual service accounts", nil
 	}
 
 	if attrs.GetSubresource() != "token" {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only create token subresource of serviceaccount", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
-		glog.V(2).Infof("NODE DENY: %v", err)
+		klog.V(2).Infof("NODE DENY: %v", err)
 		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
 	if !ok {
-		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
 	return authorizer.DecisionAllow, "", nil
@@ -239,13 +239,13 @@ func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attrib
 		verb != "update" &&
 		verb != "patch" &&
 		verb != "delete" {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a node lease", nil
 	}
 
 	// the request must be against the system namespace reserved for node leases
 	if attrs.GetNamespace() != api.NamespaceNodeLease {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, fmt.Sprintf("can only access leases in the %q system namespace", api.NamespaceNodeLease), nil
 	}
 
@@ -253,7 +253,7 @@ func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attrib
 	// note we skip this check for create, since the authorizer doesn't know the name on create
 	// the noderestriction admission plugin is capable of performing this check at create time
 	if verb != "create" && attrs.GetName() != nodeName {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only access node lease with the same name as the requesting node", nil
 	}
 
@@ -269,12 +269,12 @@ func (r *NodeAuthorizer) authorizeCSINodeInfo(nodeName string, attrs authorizer.
 		verb != "update" &&
 		verb != "patch" &&
 		verb != "delete" {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINodeInfo", nil
 	}
 
 	if len(attrs.GetSubresource()) > 0 {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot authorize CSINodeInfo subresources", nil
 	}
 
@@ -282,7 +282,7 @@ func (r *NodeAuthorizer) authorizeCSINodeInfo(nodeName string, attrs authorizer.
 	// note we skip this check for create, since the authorizer doesn't know the name on create
 	// the noderestriction admission plugin is capable of performing this check at create time
 	if verb != "create" && attrs.GetName() != nodeName {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only access CSINodeInfo with the same name as the requesting node", nil
 	}
 

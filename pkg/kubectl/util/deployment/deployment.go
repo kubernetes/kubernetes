@@ -33,6 +33,16 @@ import (
 const (
 	// RevisionAnnotation is the revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	// RevisionHistoryAnnotation maintains the history of all old revisions that a replica set has served for a deployment.
+	RevisionHistoryAnnotation = "deployment.kubernetes.io/revision-history"
+	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
+	// in its replica sets. Helps in separating scaling events from the rollout process and for
+	// determining if the new replica set for a deployment is really saturated.
+	DesiredReplicasAnnotation = "deployment.kubernetes.io/desired-replicas"
+	// MaxReplicasAnnotation is the maximum replicas a deployment can have at a given point, which
+	// is deployment.spec.replicas + maxSurge. Used by the underlying replica sets to estimate their
+	// proportions in case the deployment has surge replicas.
+	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
 	// RollbackRevisionNotFound is not found rollback event reason
 	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
 	// RollbackTemplateUnchanged is the template unchanged rollback event reason

@@ -21,7 +21,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -97,7 +97,7 @@ func openLocalPort(hp *hostport) (closeable, error) {
 	default:
 		return nil, fmt.Errorf("unknown protocol %q", hp.protocol)
 	}
-	glog.V(3).Infof("Opened local port %s", hp.String())
+	klog.V(3).Infof("Opened local port %s", hp.String())
 	return socket, nil
 }
 
@@ -111,7 +111,7 @@ func portMappingToHostport(portMapping *PortMapping) hostport {
 
 // ensureKubeHostportChains ensures the KUBE-HOSTPORTS chain is setup correctly
 func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName string) error {
-	glog.V(4).Info("Ensuring kubelet hostport chains")
+	klog.V(4).Info("Ensuring kubelet hostport chains")
 	// Ensure kubeHostportChain
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
 		return fmt.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeHostportsChain, err)

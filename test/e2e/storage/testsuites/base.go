@@ -66,12 +66,12 @@ func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
 }
 
 // RunTestSuite runs all testpatterns of all testSuites for a driver
-func RunTestSuite(f *framework.Framework, config framework.VolumeTestConfig, driver drivers.TestDriver, tsInits []func() TestSuite) {
+func RunTestSuite(f *framework.Framework, config framework.VolumeTestConfig, driver drivers.TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
 	for _, testSuiteInit := range tsInits {
 		suite := testSuiteInit()
-		tsInfo := suite.getTestSuiteInfo()
+		patterns := tunePatternFunc(suite.getTestSuiteInfo().testPatterns)
 
-		for _, pattern := range tsInfo.testPatterns {
+		for _, pattern := range patterns {
 			suite.execTest(driver, pattern)
 		}
 	}
@@ -164,7 +164,7 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
-			claimSize := "2Gi"
+			claimSize := "5Gi"
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)

@@ -24,9 +24,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -69,7 +69,7 @@ func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (
 			if strings.Contains(name, fcPath) {
 				if disk, err1 := io.EvalSymlinks(devPath + name); err1 == nil {
 					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
-					glog.Infof("fc: find disk: %v, dm: %v", disk, dm)
+					klog.Infof("fc: find disk: %v, dm: %v", disk, dm)
 					return disk, dm
 				}
 			}
@@ -97,23 +97,23 @@ func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) 
 			if name == fcPath {
 				disk, err := io.EvalSymlinks(devID + name)
 				if err != nil {
-					glog.V(2).Infof("fc: failed to find a corresponding disk from symlink[%s], error %v", devID+name, err)
+					klog.V(2).Infof("fc: failed to find a corresponding disk from symlink[%s], error %v", devID+name, err)
 					return "", ""
 				}
 				dm := deviceUtil.FindMultipathDeviceForDevice(disk)
-				glog.Infof("fc: find disk: %v, dm: %v", disk, dm)
+				klog.Infof("fc: find disk: %v, dm: %v", disk, dm)
 				return disk, dm
 			}
 		}
 	}
-	glog.V(2).Infof("fc: failed to find a disk [%s]", devID+fcPath)
+	klog.V(2).Infof("fc: failed to find a disk [%s]", devID+fcPath)
 	return "", ""
 }
 
 // Removes a scsi device based upon /dev/sdX name
 func removeFromScsiSubsystem(deviceName string, io ioHandler) {
 	fileName := "/sys/block/" + deviceName + "/device/delete"
-	glog.V(4).Infof("fc: remove device from scsi-subsystem: path: %s", fileName)
+	klog.V(4).Infof("fc: remove device from scsi-subsystem: path: %s", fileName)
 	data := []byte("1")
 	io.WriteFile(fileName, data, 0666)
 }
@@ -218,7 +218,7 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		// If the volumeMode is 'Block', plugin don't have to format the volume.
 		// The globalPDPath will be created by operationexecutor. Just return devicePath here.
-		glog.V(5).Infof("fc: AttachDisk volumeMode: %s, devicePath: %s", b.volumeMode, devicePath)
+		klog.V(5).Infof("fc: AttachDisk volumeMode: %s, devicePath: %s", b.volumeMode, devicePath)
 		if b.volumeMode == v1.PersistentVolumeBlock {
 			return devicePath, nil
 		}
@@ -235,7 +235,7 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 		return devicePath, fmt.Errorf("Heuristic determination of mount point failed:%v", err)
 	}
 	if !noMnt {
-		glog.Infof("fc: %s already mounted", globalPDPath)
+		klog.Infof("fc: %s already mounted", globalPDPath)
 		return devicePath, nil
 	}
 
@@ -262,17 +262,17 @@ func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 		// Add single devicepath to devices
 		devices = append(devices, dstPath)
 	}
-	glog.V(4).Infof("fc: DetachDisk devicePath: %v, dstPath: %v, devices: %v", devicePath, dstPath, devices)
+	klog.V(4).Infof("fc: DetachDisk devicePath: %v, dstPath: %v, devices: %v", devicePath, dstPath, devices)
 	var lastErr error
 	for _, device := range devices {
 		err := util.detachFCDisk(c.io, device)
 		if err != nil {
-			glog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
+			klog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 		}
 	}
 	if lastErr != nil {
-		glog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
+		klog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
 		return lastErr
 	}
 	return nil
@@ -301,7 +301,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	} else {
 		// TODO: FC plugin can't obtain the devicePath from kubelet because devicePath
 		// in volume object isn't updated when volume is attached to kubelet node.
-		glog.Infof("fc: devicePath is empty. Try to retrieve FC configuration from global map path: %v", mapPath)
+		klog.Infof("fc: devicePath is empty. Try to retrieve FC configuration from global map path: %v", mapPath)
 	}
 
 	// Check if global map path is valid
@@ -332,7 +332,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	for _, fi := range fis {
 		if strings.Contains(fi.Name(), volumeInfo) {
 			devicePath = path.Join(searchPath, fi.Name())
-			glog.V(5).Infof("fc: updated devicePath: %s", devicePath)
+			klog.V(5).Infof("fc: updated devicePath: %s", devicePath)
 			break
 		}
 	}
@@ -343,7 +343,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if err != nil {
 		return err
 	}
-	glog.V(4).Infof("fc: find destination device path from symlink: %v", dstPath)
+	klog.V(4).Infof("fc: find destination device path from symlink: %v", dstPath)
 
 	var devices []string
 	dm := c.deviceUtil.FindMultipathDeviceForDevice(dstPath)
@@ -363,12 +363,12 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	for _, device := range devices {
 		err = util.detachFCDisk(c.io, device)
 		if err != nil {
-			glog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
+			klog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 		}
 	}
 	if lastErr != nil {
-		glog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
+		klog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
 		return lastErr
 	}
 	return nil
@@ -378,7 +378,7 @@ func checkPathExists(path string) (bool, error) {
 	if pathExists, pathErr := volumeutil.PathExists(path); pathErr != nil {
 		return pathExists, fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
+		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
 		return pathExists, nil
 	}
 	return true, nil
