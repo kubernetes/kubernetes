@@ -138,9 +138,13 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 	case httpStatus == http.StatusNotFound || returnSpec == nil:
 		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exists")
 	case httpStatus == http.StatusOK:
+		downloadCounter.WithLabelValues(key).Inc()
+
+		start := time.Now()
 		if err := c.openAPIAggregationManager.UpdateAPIServiceSpec(key, returnSpec, newEtag); err != nil {
 			return syncRequeueRateLimited, err
 		}
+		openapiMergeDuration.WithLabelValues().Observe(time.Since(start).Seconds())
 	}
 	return syncRequeue, nil
 }
