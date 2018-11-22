@@ -1,0 +1,26 @@
+--- Godeps/Godeps.json	2018-11-22 07:58:38.000000000 -0500
++++ /private/var/folders/8r/m13mcmf15z3d0dq7d412rnph0000gn/T/gopath.XXXXXX.Ex8rkpab/src/k8s.io/kubernetes/Godeps/Godeps.json	2018-11-22 10:56:27.000000000 -0500
+@@ -1798,6 +1798,11 @@
+ 			"Rev": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9"
+ 		},
+ 		{
++			"ImportPath": "github.com/golang/protobuf/descriptor",
++			"Comment": "v1.1.0",
++			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
++		},
++		{
+ 			"ImportPath": "github.com/golang/protobuf/jsonpb",
+ 			"Comment": "v1.1.0",
+ 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+@@ -1807,11 +1812,6 @@
+ 			"Comment": "v1.1.0",
+ 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+ 		},
+-                {
+-                        "ImportPath": "github.com/golang/protobuf/descriptor",
+-                        "Comment": "v1.1.0",
+-                        "Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+-                },
+ 		{
+ 			"ImportPath": "github.com/golang/protobuf/protoc-gen-go/descriptor",
+ 			"Comment": "v1.1.0",

@@ -1798,6 +1798,11 @@
 			"Rev": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9"
 		},
 		{
+			"ImportPath": "github.com/golang/protobuf/descriptor",
+			"Comment": "v1.1.0",
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+		},
+		{
 			"ImportPath": "github.com/golang/protobuf/jsonpb",
 			"Comment": "v1.1.0",
 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
@@ -1807,11 +1812,6 @@
 			"Comment": "v1.1.0",
 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
-                {
-                        "ImportPath": "github.com/golang/protobuf/descriptor",
-                        "Comment": "v1.1.0",
-                        "Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-                },
 		{
 			"ImportPath": "github.com/golang/protobuf/protoc-gen-go/descriptor",
 			"Comment": "v1.1.0",
