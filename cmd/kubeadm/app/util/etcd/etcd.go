@@ -126,38 +126,41 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	// The first case should be dropped in v1.14 when support for v1.12 clusters can be removed from the codebase.
 
 	// Detect which type of etcd we are dealing with
+	// Please note that this test can be executed only on master nodes during upgrades;
+	// For nodes where we are joining a new control plane node instead we should tolerate that the etcd manifest does not
+	// exists and try to connect to etcd using API server advertise address; as described above this will lead to a know isse
+	// for cluster created with v1.12, but a documented workaround will be provided
 	oldManifest := false
 	klog.V(1).Infoln("checking etcd manifest")
 
 	etcdManifestFile := constants.GetStaticPodFilepath(constants.Etcd, constants.GetStaticPodDirectory())
 	etcdPod, err := staticpod.ReadStaticPodFromDisk(etcdManifestFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "error reading etcd manifest file")
-	}
-	etcdContainer := etcdPod.Spec.Containers[0]
-	for _, arg := range etcdContainer.Command {
-		if arg == "--listen-client-urls=https://127.0.0.1:2379" {
-			klog.V(1).Infoln("etcd manifest created by kubeadm v1.12")
-			oldManifest = true
-		}
-	}
-
-	// if etcd is listening on localhost only
-	if oldManifest == true {
-		// etcd cluster has a single member "by design"
-		endpoints := []string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)}
-
-		etcdClient, err := New(
-			endpoints,
-			filepath.Join(certificatesDir, constants.EtcdCACertName),
-			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
-			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
-		)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error creating etcd client for %v endpoint", endpoints)
+	if err == nil {
+		etcdContainer := etcdPod.Spec.Containers[0]
+		for _, arg := range etcdContainer.Command {
+			if arg == "--listen-client-urls=https://127.0.0.1:2379" {
+				klog.V(1).Infoln("etcd manifest created by kubeadm v1.12")
+				oldManifest = true
+			}
 		}
 
-		return etcdClient, nil
+		// if etcd is listening on localhost only
+		if oldManifest == true {
+			// etcd cluster has a single member "by design"
+			endpoints := []string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)}
+
+			etcdClient, err := New(
+				endpoints,
+				filepath.Join(certificatesDir, constants.EtcdCACertName),
+				filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
+				filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
+			)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error creating etcd client for %v endpoint", endpoints)
+			}
+
+			return etcdClient, nil
+		}
 	}
 
 	// etcd is listening on localhost and API server advertise address, and
