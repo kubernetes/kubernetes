@@ -424,6 +424,10 @@ func (o *ApplyOptions) Run() error {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
+			if metadata.GetDeletionTimestamp() != nil {
+				fmt.Fprintf(o.ErrOut,"Warning: applying \"%s\": the object %s/%s is being deleted\n", info.Source, strings.ToLower(info.Object.GetObjectKind().GroupVersionKind().Kind), info.Name)
+			}
+
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &Patcher{
 				Mapping:       info.Mapping,
