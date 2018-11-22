@@ -21,14 +21,22 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
+	"strings"
 
+	"time"
+
+	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"time"
+
+	"github.com/golang/protobuf/descriptor"
+	"github.com/golang/protobuf/proto"
+	descr "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 const (
@@ -139,4 +147,55 @@ func hasReadWriteOnce(modes []api.PersistentVolumeAccessMode) bool {
 		}
 	}
 	return false
+}
+
+// SanitizeMsg scans proto message for map[string]string marked with csi_secret
+// amd replaces key's value with "* * * Sanitized * * *"
+func SanitizeMsg(pb interface{}) string {
+	if _, ok := pb.(descriptor.Message); !ok {
+		return ""
+	}
+
+	_, md := descriptor.ForMessage(pb.(descriptor.Message))
+	fields := md.GetField()
+	if fields == nil {
+		return ""
+	}
+	sanitizeFields := []descr.FieldDescriptorProto{}
+	for _, field := range fields {
+		opt, err := proto.GetExtension(field.Options, csipb.E_CsiSecret)
+		if err == nil {
+			_, ok := opt.(*bool)
+			if ok {
+				sanitizeFields = append(sanitizeFields, *field)
+				break
+			}
+		}
+	}
+	if len(sanitizeFields) == 0 {
+		return ""
+	}
+	msg, ok := pb.(proto.Message)
+	if !ok {
+		return ""
+	}
+	for _, field := range sanitizeFields {
+		fieldName := field.GetName()
+		fieldName = strings.ToUpper(fieldName[:1]) + fieldName[1:]
+		s := reflect.ValueOf(msg)
+		m, ok := reflect.Indirect(s).FieldByName(fieldName).Interface().(map[string]string)
+		if !ok {
+			return ""
+		}
+		for key := range m {
+			m[key] = "* * * Sanitized * * *"
+		}
+		if s.Elem().FieldByName(fieldName).CanSet() {
+			s.Elem().FieldByName(fieldName).Set(reflect.ValueOf(m))
+		} else {
+			return ""
+		}
+	}
+
+	return fmt.Sprintf("%v", msg)
 }
