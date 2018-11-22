@@ -378,6 +378,11 @@ func (in *ClientIPConfig) DeepCopyInto(out *ClientIPConfig) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.SourceIP != nil {
+		in, out := &in.SourceIP, &out.SourceIP
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

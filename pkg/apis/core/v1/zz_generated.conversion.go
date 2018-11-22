@@ -2466,6 +2466,7 @@ func Convert_core_CinderVolumeSource_To_v1_CinderVolumeSource(in *core.CinderVol
 
 func autoConvert_v1_ClientIPConfig_To_core_ClientIPConfig(in *v1.ClientIPConfig, out *core.ClientIPConfig, s conversion.Scope) error {
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
+	out.SourceIP = (*string)(unsafe.Pointer(in.SourceIP))
 	return nil
 }
 
@@ -2476,6 +2477,7 @@ func Convert_v1_ClientIPConfig_To_core_ClientIPConfig(in *v1.ClientIPConfig, out
 
 func autoConvert_core_ClientIPConfig_To_v1_ClientIPConfig(in *core.ClientIPConfig, out *v1.ClientIPConfig, s conversion.Scope) error {
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
+	out.SourceIP = (*string)(unsafe.Pointer(in.SourceIP))
 	return nil
 }
 

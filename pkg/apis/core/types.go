@@ -3046,6 +3046,9 @@ type ClientIPConfig struct {
 	// Default value is 10800(for 3 hours).
 	// +optional
 	TimeoutSeconds *int32
+	// SourceIP is set for Session affinity source IP.
+	// +optional
+	SourceIP *string
 }
 
 // Service Type string describes ingress methods for a service

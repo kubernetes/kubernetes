@@ -46,6 +46,7 @@ type BaseServiceInfo struct {
 	LoadBalancerStatus       v1.LoadBalancerStatus
 	SessionAffinityType      v1.ServiceAffinity
 	StickyMaxAgeSeconds      int
+	SessionAffinityClientIP  string
 	ExternalIPs              []string
 	LoadBalancerSourceRanges []string
 	HealthCheckNodePort      int
@@ -80,9 +81,13 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		onlyNodeLocalEndpoints = true
 	}
 	var stickyMaxAgeSeconds int
+	var clientIp string
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+		if service.Spec.SessionAffinityConfig.ClientIP.SourceIP != nil {
+			clientIp = string(*service.Spec.SessionAffinityConfig.ClientIP.SourceIP)
+		}
 	}
 	info := &BaseServiceInfo{
 		ClusterIP: net.ParseIP(service.Spec.ClusterIP),
@@ -90,10 +95,11 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		Protocol:  port.Protocol,
 		NodePort:  int(port.NodePort),
 		// Deep-copy in case the service instance changes
-		LoadBalancerStatus:     *service.Status.LoadBalancer.DeepCopy(),
-		SessionAffinityType:    service.Spec.SessionAffinity,
-		StickyMaxAgeSeconds:    stickyMaxAgeSeconds,
-		OnlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
+		LoadBalancerStatus:      *service.Status.LoadBalancer.DeepCopy(),
+		SessionAffinityType:     service.Spec.SessionAffinity,
+		StickyMaxAgeSeconds:     stickyMaxAgeSeconds,
+		SessionAffinityClientIP: clientIp,
+		OnlyNodeLocalEndpoints:  onlyNodeLocalEndpoints,
 	}
 
 	if sct.isIPv6Mode == nil {

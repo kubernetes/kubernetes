@@ -360,6 +360,10 @@ message ClientIPConfig {
   // Default value is 10800(for 3 hours).
   // +optional
   optional int32 timeoutSeconds = 1;
+
+  // SourceIP specifies the source ip for Session affinity.
+  // +optional
+  optional string sourceIP = 2;
 }
 
 // Information about the condition of a component.

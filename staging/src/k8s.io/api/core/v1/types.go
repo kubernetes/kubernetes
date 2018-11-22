@@ -3379,6 +3379,9 @@ type ClientIPConfig struct {
 	// Default value is 10800(for 3 hours).
 	// +optional
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,1,opt,name=timeoutSeconds"`
+	// SourceIP specifies the source ip for Session affinity.
+	// +optional
+	SourceIP *string `json:"sourceIP,omitempty" protobuf:"bytes,2,opt,name=sourceIP"`
 }
 
 // Service Type string describes ingress methods for a service

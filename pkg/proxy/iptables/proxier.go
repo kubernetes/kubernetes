@@ -1150,7 +1150,15 @@ func (proxier *Proxier) syncProxyRules() {
 				"-j", string(KubeMarkMasqChain))...)
 			// Update client-affinity lists.
 			if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
-				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
+				if svcInfo.SessionAffinityClientIP != "" {
+					writeLine(proxier.natRules,
+						"-A", string(endpointChain),
+						"-s", string(svcInfo.SessionAffinityClientIP),
+						"-m", "recent", "--name", string(endpointChain), "--set",
+						"-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", endpoints[i].Endpoint)
+				} else {
+					args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
+				}
 			}
 			// DNAT to final destination.
 			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", endpoints[i].Endpoint)
