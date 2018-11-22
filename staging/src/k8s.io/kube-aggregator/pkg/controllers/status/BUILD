@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["available_controller.go"],
+    srcs = [
+        "available_controller.go",
+        "metrics.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers/status",
     importpath = "k8s.io/kube-aggregator/pkg/controllers/status",
     deps = [
@@ -16,7 +19,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -30,6 +32,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
