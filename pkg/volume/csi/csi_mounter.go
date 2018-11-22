@@ -55,18 +55,18 @@ var (
 )
 
 type csiMountMgr struct {
-	csiClient    csiClient
-	k8s          kubernetes.Interface
-	plugin       *csiPlugin
-	driverName   string
-	volumeID     string
-	specVolumeID string
-	readOnly     bool
-	spec         *volume.Spec
-	pod          *api.Pod
-	podUID       types.UID
-	options      volume.VolumeOptions
-	volumeInfo   map[string]string
+	csiClient      csiClient
+	k8s            kubernetes.Interface
+	plugin         *csiPlugin
+	driverName     csiDriverName
+	volumeID       string
+	specVolumeID   string
+	readOnly       bool
+	spec           *volume.Spec
+	pod            *api.Pod
+	podUID         types.UID
+	options        volume.VolumeOptions
+	publishContext map[string]string
 	volume.MetricsNil
 }
 
@@ -121,7 +121,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 	deviceMountPath := ""
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
 		klog.Error(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
 		return err
@@ -135,9 +135,9 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
-	if c.volumeInfo == nil {
+	if c.publishContext == nil {
 		nodeName := string(c.plugin.host.GetNodeName())
-		c.volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, c.volumeID, c.driverName, nodeName)
+		c.publishContext, err = c.plugin.getPublishContext(c.k8s, c.volumeID, string(c.driverName), nodeName)
 		if err != nil {
 			return err
 		}
@@ -191,7 +191,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		deviceMountPath,
 		dir,
 		accessMode,
-		c.volumeInfo,
+		c.publishContext,
 		attribs,
 		nodePublishSecrets,
 		fsType,
@@ -239,7 +239,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		return nil, errors.New("CSIDriver lister does not exist")
 	}
 
-	csiDriver, err := c.plugin.csiDriverLister.Get(c.driverName)
+	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))

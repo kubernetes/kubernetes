@@ -40,7 +40,7 @@ type csiBlockMapper struct {
 	k8s        kubernetes.Interface
 	csiClient  csiClient
 	plugin     *csiPlugin
-	driverName string
+	driverName csiDriverName
 	specName   string
 	volumeID   string
 	readOnly   bool
@@ -96,7 +96,7 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 	klog.V(4).Infof(log("blockMapper.stageVolumeForBlock stagingPath set [%s]", stagingPath))
 
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
 		klog.Error(log("blockMapper.stageVolumeForBlock failed to check STAGE_UNSTAGE_VOLUME capability: %v", err))
 		return "", err
@@ -287,7 +287,7 @@ func (m *csiBlockMapper) unpublishVolumeForBlock(ctx context.Context, csi csiCli
 // unstageVolumeForBlock unstages a block volume from stagingPath
 func (m *csiBlockMapper) unstageVolumeForBlock(ctx context.Context, csi csiClient, stagingPath string) error {
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
 		klog.Error(log("blockMapper.unstageVolumeForBlock failed to check STAGE_UNSTAGE_VOLUME capability: %v", err))
 		return err

@@ -248,7 +248,7 @@ func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName 
 }
 
 func setupPluginWatcher(pluginSocketName string, m Manager) *pluginwatcher.Watcher {
-	w := pluginwatcher.NewWatcher(filepath.Dir(pluginSocketName))
+	w := pluginwatcher.NewWatcher(filepath.Dir(pluginSocketName), "" /* deprecatedSockDir */)
 	w.AddHandler(watcherapi.DevicePlugin, m.GetWatcherHandler())
 	w.Start()
 

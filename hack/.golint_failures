@@ -394,6 +394,7 @@ pkg/version/verflag
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
+pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/host_path

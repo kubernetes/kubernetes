@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -49,7 +48,7 @@ type testcase struct {
 	existingNode        *v1.Node
 	existingNodeInfo    *csiv1alpha1.CSINodeInfo
 	inputNodeID         string
-	inputTopology       *csi.Topology
+	inputTopology       map[string]string
 	inputVolumeLimit    int64
 	expectedNodeIDMap   map[string]string
 	expectedTopologyMap map[string]sets.String
@@ -71,10 +70,8 @@ func TestInstallCSIDriver(t *testing.T) {
 			driverName:   "com.example.csi/driver1",
 			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
 			inputNodeID:  "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
 			},
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1": "com.example.csi/csi-node1",
@@ -104,10 +101,8 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
 			},
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1": "com.example.csi/csi-node1",
@@ -134,10 +129,8 @@ func TestInstallCSIDriver(t *testing.T) {
 				nil, /* topologyKeys */
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
 			},
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1": "com.example.csi/csi-node1",
@@ -168,10 +161,8 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "zoneA",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "zoneA",
 			},
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1":          "com.example.csi/csi-node1",
@@ -205,10 +196,8 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			),
 			inputNodeID: "com.example.csi/csi-node1",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/zone": "other-zone",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/zone": "other-zone",
 			},
 			expectFail: true,
 		},
@@ -231,10 +220,8 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			),
 			inputNodeID: "com.example.csi/other-node",
-			inputTopology: &csi.Topology{
-				Segments: map[string]string{
-					"com.example.csi/rack": "rack1",
-				},
+			inputTopology: map[string]string{
+				"com.example.csi/rack": "rack1",
 			},
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1": "com.example.csi/other-node",

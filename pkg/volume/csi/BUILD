@@ -16,6 +16,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csi/csiv0:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -23,6 +24,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -86,6 +88,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/volume/csi/csiv0:all-srcs",
         "//pkg/volume/csi/fake:all-srcs",
         "//pkg/volume/csi/nodeinfomanager:all-srcs",
     ],
