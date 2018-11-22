@@ -597,7 +597,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom cloudprovider for v1.12.0-beta.2",
+			name: "custom cluster-cidr for v1.12.0-beta.2",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				CertificatesDir:   testCertsDir,
@@ -700,7 +700,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom cloudprovider for v1.11.3",
+			name: "custom cluster-cidr for v1.11.3",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				CertificatesDir:   testCertsDir,
