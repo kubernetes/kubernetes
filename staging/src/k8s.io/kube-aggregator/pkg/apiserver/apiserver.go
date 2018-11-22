@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
@@ -252,12 +253,17 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 		serviceResolver: s.serviceResolver,
 	}
 	proxyHandler.updateAPIService(apiService)
+
+	var proxyHandlerWithMetrics http.Handler = http.HandlerFunc(proxyHandler.ServeHTTP)
+	if s.delegateHandler == nil {
+		proxyHandlerWithMetrics = metrics.InstrumentHandlerFuncFromContextWithProbes(requestMetrics, []string{apiService.Name}, proxyHandler.ServeHTTP)
+	}
 	if s.openAPIAggregationController != nil {
-		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
+		s.openAPIAggregationController.AddAPIService(proxyHandlerWithMetrics, apiService)
 	}
 	s.proxyHandlers[apiService.Name] = proxyHandler
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandlerWithMetrics)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandlerWithMetrics)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {

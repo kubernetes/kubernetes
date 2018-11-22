@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"net/http"
 	"regexp"
@@ -27,7 +28,9 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,48 +43,88 @@ type resettableCollector interface {
 	Reset()
 }
 
-var (
+type RequestMetrics struct {
+	register sync.Once
+
+	requestCounter                  *prometheus.CounterVec
+	requestLatencies, responseSizes *prometheus.HistogramVec
+	requestLatenciesSummary         *prometheus.SummaryVec
+}
+
+var requestMetrics = NewRequestMetrics("apiserver").Register().MakeResettableViaAPI()
+
+// NewRequestMetrics returns a set of default request probes for the given component name (lower-case).
+func NewRequestMetrics(component string, additionalLabels ...string) *RequestMetrics {
+	ret := &RequestMetrics{}
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
 	// the upstream library supports it.
-	requestCounter = prometheus.NewCounterVec(
+	ret.requestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "apiserver_request_count",
-			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response contentType and code.",
+			Name: fmt.Sprintf("%s_request_count", component),
+			Help: fmt.Sprintf("Counter of %s requests broken out for each verb, API resource, client, and HTTP response contentType and code.", component),
 		},
-		[]string{"verb", "resource", "subresource", "scope", "client", "contentType", "code"},
+		append([]string{"verb", "resource", "subresource", "scope", "client", "contentType", "code"}, additionalLabels...),
 	)
-	longRunningRequestGauge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "apiserver_longrunning_gauge",
-			Help: "Gauge of all active long-running apiserver requests broken out by verb, API resource, and scope. Not all requests are tracked this way.",
-		},
-		[]string{"verb", "resource", "subresource", "scope"},
-	)
-	requestLatencies = prometheus.NewHistogramVec(
+	ret.requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "apiserver_request_latencies",
+			Name: fmt.Sprintf("%s_request_latencies", component),
 			Help: "Response latency distribution in microseconds for each verb, resource and subresource.",
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		append([]string{"verb", "resource", "subresource", "scope"}, additionalLabels...),
 	)
-	requestLatenciesSummary = prometheus.NewSummaryVec(
+	ret.requestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
-			Name: "apiserver_request_latencies_summary",
+			Name: fmt.Sprintf("%s_request_latencies_summary", component),
 			Help: "Response latency summary in microseconds for each verb, resource and subresource.",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on our SLI definition (medium term).
 			MaxAge: 5 * time.Hour,
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		append([]string{"verb", "resource", "subresource", "scope"}, additionalLabels...),
 	)
-	responseSizes = prometheus.NewHistogramVec(
+	ret.responseSizes = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "apiserver_response_sizes",
+			Name: fmt.Sprintf("%s_response_sizes", component),
 			Help: "Response size distribution in bytes for each verb, resource, subresource and scope (namespace/cluster).",
 			// Use buckets ranging from 1000 bytes (1KB) to 10^9 bytes (1GB).
 			Buckets: prometheus.ExponentialBuckets(1000, 10.0, 7),
+		},
+		append([]string{"verb", "resource", "subresource", "scope"}, additionalLabels...),
+	)
+	return ret
+}
+
+func (p *RequestMetrics) Register() *RequestMetrics {
+	p.register.Do(func() {
+		prometheus.MustRegister(p.requestCounter)
+		prometheus.MustRegister(p.requestLatencies)
+		prometheus.MustRegister(p.responseSizes)
+		prometheus.MustRegister(p.requestLatenciesSummary)
+	})
+	return p
+}
+
+func (p *RequestMetrics) MakeResettableViaAPI() *RequestMetrics {
+	resettableMetrics = append(resettableMetrics, p.requestCounter, p.requestLatencies, p.responseSizes, p.requestLatenciesSummary)
+	return p
+}
+
+var (
+	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
+	// it reports maximal usage during the last second.
+	currentInflightRequests = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_current_inflight_requests",
+			Help: "Maximal mumber of currently used inflight request limit of this apiserver per request kind in last second.",
+		},
+		[]string{"requestKind"},
+	)
+	longRunningRequestGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_longrunning_gauge",
+			Help: "Gauge of all active long-running apiserver requests broken out by verb, API resource, and scope. Not all requests are tracked this way.",
 		},
 		[]string{"verb", "resource", "subresource", "scope"},
 	)
@@ -101,23 +144,10 @@ var (
 		},
 		[]string{"group", "version", "kind"},
 	)
-	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
-	// it reports maximal usage during the last second.
-	currentInflightRequests = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "apiserver_current_inflight_requests",
-			Help: "Maximal mumber of currently used inflight request limit of this apiserver per request kind in last second.",
-		},
-		[]string{"requestKind"},
-	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
-	metrics = []resettableCollector{
-		requestCounter,
+	resettableMetrics = []resettableCollector{
 		longRunningRequestGauge,
-		requestLatencies,
-		requestLatenciesSummary,
-		responseSizes,
 		DroppedRequests,
 		RegisteredWatchers,
 		currentInflightRequests,
@@ -136,15 +166,16 @@ var registerMetrics sync.Once
 // Register all metrics.
 func Register() {
 	registerMetrics.Do(func() {
-		for _, metric := range metrics {
-			prometheus.MustRegister(metric)
-		}
+		prometheus.MustRegister(longRunningRequestGauge)
+		prometheus.MustRegister(DroppedRequests)
+		prometheus.MustRegister(RegisteredWatchers)
+		prometheus.MustRegister(currentInflightRequests)
 	})
 }
 
 // Reset all metrics.
 func Reset() {
-	for _, metric := range metrics {
+	for _, metric := range resettableMetrics {
 		metric.Reset()
 	}
 }
@@ -163,9 +194,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, contentType str
 	}
 	scope := CleanScope(requestInfo)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, scope, contentType, code, responseSizeInBytes, elapsed)
+		MonitorRequest(requestMetrics, req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, scope, contentType, code, responseSizeInBytes, elapsed, nil)
 	} else {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, scope, contentType, code, responseSizeInBytes, elapsed)
+		MonitorRequest(requestMetrics, req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, scope, contentType, code, responseSizeInBytes, elapsed, nil)
 	}
 }
 
@@ -190,16 +221,16 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, fn f
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(req *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
+func MonitorRequest(probes *RequestMetrics, req *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration, additionalLabels []string) {
 	reportedVerb := cleanVerb(verb, req)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
-	requestCounter.WithLabelValues(reportedVerb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
-	requestLatenciesSummary.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
+	probes.requestCounter.WithLabelValues(append([]string{reportedVerb, resource, subresource, scope, client, contentType, codeToString(httpCode)}, additionalLabels...)...).Inc()
+	probes.requestLatencies.WithLabelValues(append([]string{reportedVerb, resource, subresource, scope}, additionalLabels...)...).Observe(elapsedMicroseconds)
+	probes.requestLatenciesSummary.WithLabelValues(append([]string{reportedVerb, resource, subresource, scope}, additionalLabels...)...).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
-		responseSizes.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(float64(respSize))
+		probes.responseSizes.WithLabelValues(append([]string{reportedVerb, resource, subresource, scope}, additionalLabels...)...).Observe(float64(respSize))
 	}
 }
 
@@ -224,7 +255,7 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 
 		routeFunc(request, response)
 
-		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
+		MonitorRequest(requestMetrics, request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now), nil)
 	})
 }
 
@@ -246,7 +277,36 @@ func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler ht
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
+		MonitorRequest(requestMetrics, req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now), nil)
+	}
+}
+
+// InstrumentHandlerFuncFromContextWithProbes works like Prometheus' InstrumentHandlerFunc but adds some Kubernetes endpoint specific information and extracts the request info from context.
+func InstrumentHandlerFuncFromContextWithProbes(probes *RequestMetrics, additionalLabels []string, handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		now := time.Now()
+
+		delegate := &ResponseWriterDelegator{ResponseWriter: w}
+
+		_, cn := w.(http.CloseNotifier)
+		_, fl := w.(http.Flusher)
+		_, hj := w.(http.Hijacker)
+		if cn && fl && hj {
+			w = &fancyResponseWriterDelegator{delegate}
+		} else {
+			w = delegate
+		}
+
+		ctx := req.Context()
+		info, ok := genericapirequest.RequestInfoFrom(ctx)
+		if !ok {
+			responsewriters.InternalError(w, req, fmt.Errorf("no RequestInfo found in the context"))
+			return
+		}
+
+		handler(w, req)
+
+		MonitorRequest(probes, req, info.Verb, info.Resource, info.Subresource, CleanScope(info), delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now), additionalLabels)
 	}
 }
 
