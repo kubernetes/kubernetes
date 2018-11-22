@@ -1664,6 +1664,11 @@ func (in *ISCSIPersistentVolumeSource) DeepCopyInto(out *ISCSIPersistentVolumeSo
 		*out = new(string)
 		**out = **in
 	}
+	if in.ReplacementTimeout != nil {
+		in, out := &in.ReplacementTimeout, &out.ReplacementTimeout
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
@@ -1693,6 +1698,11 @@ func (in *ISCSIVolumeSource) DeepCopyInto(out *ISCSIVolumeSource) {
 	if in.InitiatorName != nil {
 		in, out := &in.InitiatorName, &out.InitiatorName
 		*out = new(string)
+		**out = **in
+	}
+	if in.ReplacementTimeout != nil {
+		in, out := &in.ReplacementTimeout, &out.ReplacementTimeout
+		*out = new(int32)
 		**out = **in
 	}
 	return

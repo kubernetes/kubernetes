@@ -604,8 +604,6 @@ type GCEPersistentDiskVolumeSource struct {
 	ReadOnly bool
 }
 
-// +k8s:deepcopy-gen
-
 // Represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
@@ -662,8 +660,6 @@ type ISCSIVolumeSource struct {
 	// +optional
 	ReplacementTimeout *int32
 }
-
-// +k8s:deepcopy-gen
 
 // ISCSIPersistentVolumeSource represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.

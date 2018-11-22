@@ -1136,8 +1136,6 @@ type NFSVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
-// +k8s:deepcopy-gen
-
 // Represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
@@ -1190,10 +1188,8 @@ type ISCSIVolumeSource struct {
 	// If the ReplacementTimeout field is not provided or empty then it remains with
 	// default value i.e 120 seconds.
 	// +optional
-	ReplacementTimeout *int32 `json:"replacementTimeout,omitempty"`
+	ReplacementTimeout *int32 `json:"replacementTimeout,omitempty" protobuf:"varint,13,opt,name=replacementTimeout"`
 }
-
-// +k8s:deepcopy-gen
 
 // ISCSIPersistentVolumeSource represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
@@ -1247,7 +1243,7 @@ type ISCSIPersistentVolumeSource struct {
 	// If the ReplacementTimeout field is not provided or empty then it remains with
 	// default value i.e 120 seconds.
 	// +optional
-	ReplacementTimeout *int32 `json:"replacementTimeout,omitempty"`
+	ReplacementTimeout *int32 `json:"replacementTimeout,omitempty" protobuf:"varint,13,opt,name=replacementTimeout"`
 }
 
 // Represents a Fibre Channel volume.
