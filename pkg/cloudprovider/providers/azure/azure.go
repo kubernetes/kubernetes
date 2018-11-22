@@ -271,6 +271,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
 	}
 
+	if config.RouteTableResourceGroup == "" {
+		config.RouteTableResourceGroup = config.ResourceGroup
+	}
+
 	azClientConfig := &azClientConfig{
 		subscriptionID:          config.SubscriptionID,
 		resourceManagerEndpoint: env.ResourceManagerEndpoint,

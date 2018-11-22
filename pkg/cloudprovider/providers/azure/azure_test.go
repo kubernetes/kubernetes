@@ -1621,6 +1621,9 @@ func validateConfig(t *testing.T, config string) {
 	if azureCloud.RouteTableName != "--route-table-name--" {
 		t.Errorf("got incorrect value for RouteTableName")
 	}
+	if azureCloud.RouteTableResourceGroup != "--route-table-resource-group--" {
+		t.Errorf("got incorrect value for RouteTableResourceGroup")
+	}
 	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
 		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
 	}
