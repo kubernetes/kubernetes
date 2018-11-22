@@ -3515,7 +3515,6 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 
 		if staleLoadBalancer != nil {
-			// TODO: anything else to clean up?
 			err = c.deleteLoadBalancer(loadBalancerName, apiService)
 
 			if err != nil {
@@ -3777,7 +3776,6 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	}
 
 	if staleLoadBalancer != nil {
-		// TODO: anything else to clean up?
 		err = c.deleteLoadBalancerv2(loadBalancerName)
 
 		if err != nil {

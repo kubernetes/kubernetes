@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ type MockedFakeEC2 struct {
 	mock.Mock
 }
 
-func (m *MockedFakeEC2) expectDescribeSecurityGroups(clusterID, groupName string) {
+func (m *MockedFakeEC2) expectDescribeSecurityGroupsForAnnotationExtraction(clusterID, groupName string) {
 	tags := []*ec2.Tag{
 		{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(clusterID)},
 		{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, clusterID)), Value: aws.String(ResourceLifecycleOwned)},
@@ -59,6 +60,15 @@ func (m *MockedFakeEC2) expectDescribeSecurityGroups(clusterID, groupName string
 	}}).Return([]*ec2.SecurityGroup{{Tags: tags}})
 }
 
+func (m *MockedFakeEC2) expectDescribeSecurityGroupsForLoadBalancerRemoval(clusterID string) {
+	tags := []*ec2.Tag{
+		{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(clusterID)},
+		{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, clusterID)), Value: aws.String(ResourceLifecycleOwned)},
+	}
+
+	m.On("DescribeSecurityGroups", mock.Anything).Return([]*ec2.SecurityGroup{{Tags: tags}})
+}
+
 func (m *MockedFakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
 	args := m.Called(request)
 	return args.Get(0).([]*ec2.Volume), nil
@@ -67,6 +77,20 @@ func (m *MockedFakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*e
 func (m *MockedFakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
 	args := m.Called(request)
 	return args.Get(0).([]*ec2.SecurityGroup), nil
+}
+
+func (m *MockedFakeEC2) DeleteSecurityGroup(input *ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
+	args := m.Called(input)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*ec2.DeleteSecurityGroupOutput), args.Error(1)
+}
+
+func (m *MockedFakeEC2) expectDeleteSecurityGroup() {
+	call := m.On("DeleteSecurityGroup", mock.Anything)
+	call.Return(&ec2.DeleteSecurityGroupOutput{}, nil)
 }
 
 func (m *MockedFakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, error) {
@@ -84,10 +108,29 @@ func (m *MockedFakeELB) DescribeLoadBalancers(input *elb.DescribeLoadBalancersIn
 	return args.Get(0).(*elb.DescribeLoadBalancersOutput), nil
 }
 
-func (m *MockedFakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
+func (m *MockedFakeELB) expectDescribeLoadBalancers(loadBalancerName string, securityGroups []*string) {
 	m.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
-		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{}},
+		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{LoadBalancerName: aws.String(loadBalancerName), SecurityGroups: securityGroups}},
 	})
+}
+
+func (m *MockedFakeELB) DeleteLoadBalancer(input *elb.DeleteLoadBalancerInput) (*elb.DeleteLoadBalancerOutput, error) {
+	args := m.Called(input)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*elb.DeleteLoadBalancerOutput), args.Error(1)
+}
+
+func (m *MockedFakeELB) expectDeleteLoadBalancer(loadBalancerName *string, returnErr error) {
+	expected := &elb.DeleteLoadBalancerInput{LoadBalancerName: loadBalancerName}
+	call := m.On("DeleteLoadBalancer", expected)
+	if returnErr != nil {
+		call.Return(nil, returnErr)
+	} else {
+		call.Return(&elb.DeleteLoadBalancerOutput{}, nil)
+	}
 }
 
 func (m *MockedFakeELB) AddTags(input *elb.AddTagsInput) (*elb.AddTagsOutput, error) {
@@ -111,6 +154,55 @@ func (m *MockedFakeELB) expectConfigureHealthCheck(loadBalancerName *string, exp
 	} else {
 		call.Return(&elb.ConfigureHealthCheckOutput{}, nil)
 	}
+}
+
+type MockedFakeELBV2 struct {
+	*FakeELBV2
+	mock.Mock
+}
+
+func (m *MockedFakeELBV2) DescribeLoadBalancers(input *elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeLoadBalancersOutput), nil
+}
+
+func (m *MockedFakeELBV2) expectDescribeLoadBalancers(loadBalancerName string, securityGroups []*string, loadBalancerTypeEnum *string, loadBalancerArn *string) {
+	m.On("DescribeLoadBalancers", &elbv2.DescribeLoadBalancersInput{Names: []*string{aws.String(loadBalancerName)}}).Return(&elbv2.DescribeLoadBalancersOutput{
+		LoadBalancers: []*elbv2.LoadBalancer{{LoadBalancerName: aws.String(loadBalancerName), SecurityGroups: securityGroups, Type: loadBalancerTypeEnum, LoadBalancerArn: loadBalancerArn}},
+	})
+}
+
+func (m *MockedFakeELBV2) DeleteLoadBalancer(input *elbv2.DeleteLoadBalancerInput) (*elbv2.DeleteLoadBalancerOutput, error) {
+	args := m.Called(input)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*elbv2.DeleteLoadBalancerOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBV2) expectDeleteLoadBalancer(loadBalancerArn *string, returnErr error) {
+	expected := &elbv2.DeleteLoadBalancerInput{LoadBalancerArn: loadBalancerArn}
+	call := m.On("DeleteLoadBalancer", expected)
+	if returnErr != nil {
+		call.Return(nil, returnErr)
+	} else {
+		call.Return(&elbv2.DeleteLoadBalancerOutput{}, nil)
+	}
+}
+
+func (m *MockedFakeELBV2) DescribeTargetGroups(input *elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error) {
+	args := m.Called(input)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*elbv2.DescribeTargetGroupsOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBV2) expectDescribeTargetGroups(loadBalancerArn *string) {
+	expected := &elbv2.DescribeTargetGroupsInput{LoadBalancerArn: loadBalancerArn}
+	m.On("DescribeTargetGroups", expected).Return(&elbv2.DescribeTargetGroupsOutput{}, nil)
 }
 
 func TestReadAWSCloudConfig(t *testing.T) {
@@ -1291,7 +1383,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterID)
 	c, _ := newAWSCloud(CloudConfig{}, awsServices)
-	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
+	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid", nil)
 
 	c.EnsureLoadBalancerDeleted(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
@@ -1299,7 +1391,7 @@ func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterID)
 	c, _ := newAWSCloud(CloudConfig{}, awsServices)
-	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
+	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid", nil)
 
 	c.UpdateLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
@@ -1307,7 +1399,7 @@ func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 func TestDescribeLoadBalancerOnGet(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterID)
 	c, _ := newAWSCloud(CloudConfig{}, awsServices)
-	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
+	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid", nil)
 
 	c.GetLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
@@ -1315,7 +1407,7 @@ func TestDescribeLoadBalancerOnGet(t *testing.T) {
 func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterID)
 	c, _ := newAWSCloud(CloudConfig{}, awsServices)
-	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
+	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid", nil)
 
 	c.EnsureLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
@@ -1564,7 +1656,7 @@ func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
 		{"Multiple SGs specified", sg3, []string{sg1[ServiceAnnotationLoadBalancerExtraSecurityGroups], sg2[ServiceAnnotationLoadBalancerExtraSecurityGroups]}},
 	}
 
-	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroups(TestClusterID, "k8s-elb-aid")
+	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroupsForAnnotationExtraction(TestClusterID, "k8s-elb-aid")
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1597,7 +1689,7 @@ func TestLBSecurityGroupsAnnotation(t *testing.T) {
 		{"Multiple SGs specified", sg3, []string{sg1[ServiceAnnotationLoadBalancerSecurityGroups], sg2[ServiceAnnotationLoadBalancerSecurityGroups]}},
 	}
 
-	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroups(TestClusterID, "k8s-elb-aid")
+	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroupsForAnnotationExtraction(TestClusterID, "k8s-elb-aid")
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1751,6 +1843,51 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 	})
 }
 
+func TestDeleteLoadBalancer(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	assert.Nil(t, err, "Error building aws cloud: %v", err)
+
+	lbName := "aws_loadbalancer_name"
+	securityGroup1 := "sg123"
+	securityGroup2 := "s234"
+	securityGroups := []*string{&securityGroup1, &securityGroup2}
+
+	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers(lbName, securityGroups)
+	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroupsForLoadBalancerRemoval(TestClusterID)
+	awsServices.ec2.(*MockedFakeEC2).expectDeleteSecurityGroup()
+	awsServices.elb.(*MockedFakeELB).expectDeleteLoadBalancer(&lbName, nil)
+
+	err = c.deleteLoadBalancer(lbName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
+	require.Nil(t, err)
+
+	awsServices.elb.(*MockedFakeELB).AssertExpectations(t)
+}
+
+func TestDeleteLoadBalancerv2(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	assert.Nil(t, err, "Error building aws cloud: %v", err)
+
+	lbName := "aws_loadbalancer_name"
+	lbArn := "arn:aws:elasticloadbalancing:us-west-2:348134392524"
+	securityGroup1 := "sg123"
+	securityGroup2 := "s234"
+	securityGroups := []*string{&securityGroup1, &securityGroup2}
+	loadBalancerTypeEnum := "network"
+
+	awsServices.elbv2.(*MockedFakeELBV2).expectDescribeLoadBalancers(lbName, securityGroups, &loadBalancerTypeEnum, &lbArn)
+	awsServices.elbv2.(*MockedFakeELBV2).expectDescribeTargetGroups(&lbArn)
+	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroupsForLoadBalancerRemoval(TestClusterID)
+	awsServices.ec2.(*MockedFakeEC2).expectDeleteSecurityGroup()
+	awsServices.elbv2.(*MockedFakeELBV2).expectDeleteLoadBalancer(&lbArn, nil)
+
+	err = c.deleteLoadBalancerv2(lbName)
+	require.Nil(t, err)
+
+	awsServices.elbv2.(*MockedFakeELBV2).AssertExpectations(t)
+}
+
 func TestFindSecurityGroupForInstance(t *testing.T) {
 	groups := map[string]*ec2.SecurityGroup{"sg123": {GroupId: aws.String("sg123")}}
 	id, err := findSecurityGroupForInstance(&ec2.Instance{SecurityGroups: []*ec2.GroupIdentifier{{GroupId: aws.String("sg123"), GroupName: aws.String("my_group")}}}, groups)
@@ -1810,5 +1947,6 @@ func newMockedFakeAWSServices(id string) *FakeAWSServices {
 	s := NewFakeAWSServices(id)
 	s.ec2 = &MockedFakeEC2{FakeEC2Impl: s.ec2.(*FakeEC2Impl)}
 	s.elb = &MockedFakeELB{FakeELB: s.elb.(*FakeELB)}
+	s.elbv2 = &MockedFakeELBV2{FakeELBV2: s.elbv2.(*FakeELBV2)}
 	return s
 }
