@@ -36,6 +36,7 @@ go_library(
         "apiservice_controller.go",
         "handler_apis.go",
         "handler_proxy.go",
+        "metrics.go",
         "resolvers.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apiserver",
@@ -55,6 +56,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
@@ -79,6 +81,7 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/status:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/rest:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
