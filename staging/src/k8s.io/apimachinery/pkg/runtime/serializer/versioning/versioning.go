@@ -171,7 +171,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
-	switch obj := obj.(type) {
+	switch obj.(type) {
 	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
 
