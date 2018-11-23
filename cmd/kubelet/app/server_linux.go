@@ -17,7 +17,7 @@ limitations under the License.
 package app
 
 import (
-	"golang.org/x/exp/inotify"
+	"github.com/sigma/go-inotify"
 	"k8s.io/klog"
 )
 
