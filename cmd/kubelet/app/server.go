@@ -142,125 +142,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		// `args` arg to Run, without Cobra's interference.
 		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			// initial flag parse, since we disable cobra's flag parsing
-			if err := cleanFlagSet.Parse(args); err != nil {
-				cmd.Usage()
-				klog.Fatal(err)
-			}
-
-			// check if there are non-flag arguments in the command line
-			cmds := cleanFlagSet.Args()
-			if len(cmds) > 0 {
-				cmd.Usage()
-				klog.Fatalf("unknown command: %s", cmds[0])
-			}
-
-			// short-circuit on help
-			help, err := cleanFlagSet.GetBool("help")
-			if err != nil {
-				klog.Fatal(`"help" flag is non-bool, programmer error, please correct`)
-			}
-			if help {
-				cmd.Help()
-				return
-			}
-
-			// short-circuit on verflag
-			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cleanFlagSet)
-
-			// set feature gates from initial flags-based config
-			if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-				klog.Fatal(err)
-			}
-
-			// validate the initial KubeletFlags
-			if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
-				klog.Fatal(err)
-			}
-
-			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
-				klog.Warning("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
-			}
-
-			// load kubelet config file, if provided
-			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
-				kubeletConfig, err = loadConfigFile(configFile)
-				if err != nil {
-					klog.Fatal(err)
-				}
-				// We must enforce flag precedence by re-parsing the command line into the new object.
-				// This is necessary to preserve backwards-compatibility across binary upgrades.
-				// See issue #56171 for more details.
-				if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
-					klog.Fatal(err)
-				}
-				// update feature gates based on new config
-				if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-					klog.Fatal(err)
-				}
-			}
-
-			// We always validate the local configuration (command line + config file).
-			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
-			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
-				klog.Fatal(err)
-			}
-
-			// use dynamic kubelet config, if enabled
-			var kubeletConfigController *dynamickubeletconfig.Controller
-			if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
-				var dynamicKubeletConfig *kubeletconfiginternal.KubeletConfiguration
-				dynamicKubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(dynamicConfigDir,
-					func(kc *kubeletconfiginternal.KubeletConfiguration) error {
-						// Here, we enforce flag precedence inside the controller, prior to the controller's validation sequence,
-						// so that we get a complete validation at the same point where we can decide to reject dynamic config.
-						// This fixes the flag-precedence component of issue #63305.
-						// See issue #56171 for general details on flag precedence.
-						return kubeletConfigFlagPrecedence(kc, args)
-					})
-				if err != nil {
-					klog.Fatal(err)
-				}
-				// If we should just use our existing, local config, the controller will return a nil config
-				if dynamicKubeletConfig != nil {
-					kubeletConfig = dynamicKubeletConfig
-					// Note: flag precedence was already enforced in the controller, prior to validation,
-					// by our above transform function. Now we simply update feature gates from the new config.
-					if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-						klog.Fatal(err)
-					}
-				}
-			}
-
-			// construct a KubeletServer from kubeletFlags and kubeletConfig
-			kubeletServer := &options.KubeletServer{
-				KubeletFlags:         *kubeletFlags,
-				KubeletConfiguration: *kubeletConfig,
-			}
-
-			// use kubeletServer to construct the default KubeletDeps
-			kubeletDeps, err := UnsecuredDependencies(kubeletServer)
-			if err != nil {
-				klog.Fatal(err)
-			}
-
-			// add the kubelet config controller to kubeletDeps
-			kubeletDeps.KubeletConfigController = kubeletConfigController
-
-			// start the experimental docker shim, if enabled
-			if kubeletServer.KubeletFlags.ExperimentalDockershim {
-				if err := RunDockershim(&kubeletServer.KubeletFlags, kubeletConfig, stopCh); err != nil {
-					klog.Fatal(err)
-				}
-				return
-			}
-
-			// run the kubelet
-			klog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
-			if err := Run(kubeletServer, kubeletDeps, stopCh); err != nil {
-				klog.Fatal(err)
-			}
+			runCommand(cmd, args, cleanFlagSet, kubeletFlags, kubeletConfig, stopCh)
 		},
 	}
 
@@ -281,6 +163,141 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	})
 
 	return cmd
+}
+
+// runCommand runs the kubelet.
+func runCommand(cmd *cobra.Command, args []string, cleanFlagSet *pflag.FlagSet, kubeletFlags *options.KubeletFlags, kubeletConfig *kubeletconfiginternal.KubeletConfiguration, stopCh <-chan struct{}) {
+	//handle cleanFlagSet, initial, check
+	if isReturn := handleCleanFlagSet(cmd, args, cleanFlagSet); isReturn {
+		return
+	}
+
+	// short-circuit on verflag
+	verflag.PrintAndExitIfRequested()
+	utilflag.PrintFlags(cleanFlagSet)
+
+	// set feature gates from initial flags-based config
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+		klog.Fatal(err)
+	}
+
+	// validate the initial KubeletFlags
+	if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
+		klog.Fatal(err)
+	}
+
+	if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
+		klog.Warning("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
+	}
+
+	// load kubelet config file, if provided
+	if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
+		var err error
+		kubeletConfig, err = loadConfigFile(configFile)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		// We must enforce flag precedence by re-parsing the command line into the new object.
+		// This is necessary to preserve backwards-compatibility across binary upgrades.
+		// See issue #56171 for more details.
+		if err := kubeletConfigFlagPrecedence(kubeletConfig, args); err != nil {
+			klog.Fatal(err)
+		}
+		// update feature gates based on new config
+		if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+			klog.Fatal(err)
+		}
+	}
+
+	// We always validate the local configuration (command line + config file).
+	// This is the default "last-known-good" config for dynamic config, and must always remain valid.
+	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
+		klog.Fatal(err)
+	}
+
+	// use dynamic kubelet config, if enabled
+	var kubeletConfigController *dynamickubeletconfig.Controller
+	if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
+		var dynamicKubeletConfig *kubeletconfiginternal.KubeletConfiguration
+		var err error
+		dynamicKubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(dynamicConfigDir,
+			func(kc *kubeletconfiginternal.KubeletConfiguration) error {
+				// Here, we enforce flag precedence inside the controller, prior to the controller's validation sequence,
+				// so that we get a complete validation at the same point where we can decide to reject dynamic config.
+				// This fixes the flag-precedence component of issue #63305.
+				// See issue #56171 for general details on flag precedence.
+				return kubeletConfigFlagPrecedence(kc, args)
+			})
+		if err != nil {
+			klog.Fatal(err)
+		}
+		// If we should just use our existing, local config, the controller will return a nil config
+		if dynamicKubeletConfig != nil {
+			kubeletConfig = dynamicKubeletConfig
+			// Note: flag precedence was already enforced in the controller, prior to validation,
+			// by our above transform function. Now we simply update feature gates from the new config.
+			if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
+				klog.Fatal(err)
+			}
+		}
+	}
+
+	// construct a KubeletServer from kubeletFlags and kubeletConfig
+	kubeletServer := &options.KubeletServer{
+		KubeletFlags:         *kubeletFlags,
+		KubeletConfiguration: *kubeletConfig,
+	}
+
+	// use kubeletServer to construct the default KubeletDeps
+	kubeletDeps, err := UnsecuredDependencies(kubeletServer)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	// add the kubelet config controller to kubeletDeps
+	kubeletDeps.KubeletConfigController = kubeletConfigController
+
+	// start the experimental docker shim, if enabled
+	if kubeletServer.KubeletFlags.ExperimentalDockershim {
+		if err := RunDockershim(&kubeletServer.KubeletFlags, kubeletConfig, stopCh); err != nil {
+			klog.Fatal(err)
+		}
+		return
+	}
+
+	// run the kubelet
+	klog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
+	if err := Run(kubeletServer, kubeletDeps, stopCh); err != nil {
+		klog.Fatal(err)
+	}
+}
+
+//handleCleanFlagSet handle cleanFlagSet, initial, check, etc
+//if cleanFlag is help return true, else return false
+func handleCleanFlagSet(cmd *cobra.Command, args []string, cleanFlagSet *pflag.FlagSet) bool {
+	// initial flag parse, since we disable cobra's flag parsing
+	if err := cleanFlagSet.Parse(args); err != nil {
+		cmd.Usage()
+		klog.Fatal(err)
+	}
+
+	// check if there are non-flag arguments in the command line
+	cmds := cleanFlagSet.Args()
+	if len(cmds) > 0 {
+		cmd.Usage()
+		klog.Fatalf("unknown command: %s", cmds[0])
+	}
+
+	// short-circuit on help
+	help, err := cleanFlagSet.GetBool("help")
+	if err != nil {
+		klog.Fatal(`"help" flag is non-bool, programmer error, please correct`)
+	}
+	if help {
+		cmd.Help()
+		return true
+	}
+	return false
 }
 
 // newFlagSetWithGlobals constructs a new pflag.FlagSet with global flags registered
