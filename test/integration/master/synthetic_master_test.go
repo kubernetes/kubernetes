@@ -309,7 +309,7 @@ func TestObjectSizeResponses(t *testing.T) {
 	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
 	expectedMsgFor1_5MB := `etcdserver: request is too large`
-	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = grpc: trying to send message larger than max`
+	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
 	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
 
 	deployment1 := constructBody(labelString, Deployment1_5MegabyteSize, "labels", t) // >1.5 MB file
