@@ -207,7 +207,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 
 	if client != nil {
 		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
-		if err == nil {
+		if err == nil && cfg.Etcd.Local != nil {
 			return cfg.Etcd.Local.DataDir, nil
 		}
 		klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap, using etcd pod spec as fallback: %v", err)
