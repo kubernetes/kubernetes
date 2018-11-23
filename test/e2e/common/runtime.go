@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -272,15 +273,21 @@ while true; do sleep 1; done
 					waiting:     true,
 				},
 				{
+					// TODO(claudiub): Add a Windows equivalent test.
 					description: "should be able to pull image from gcr.io [LinuxOnly]",
 					image:       "gcr.io/google-containers/debian-base:0.4.1",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 				{
-					// TODO(claudiub): Remove the [LinuxOnly] tag when a Windows-friendly image is used instead of alpine.
 					description: "should be able to pull image from docker hub [LinuxOnly]",
 					image:       "alpine:3.7",
+					phase:       v1.PodRunning,
+					waiting:     false,
+				},
+				{
+					description: "should be able to pull image from docker hub [WindowsOnly]",
+					image:       "e2eteam/busybox:1.29",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
@@ -300,6 +307,9 @@ while true; do sleep 1; done
 			} {
 				testCase := testCase
 				It(testCase.description+" [NodeConformance]", func() {
+					if strings.Contains(testCase.description, "[WindowsOnly]") {
+						framework.SkipUnlessNodeOSDistroIs("windows")
+					}
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{
