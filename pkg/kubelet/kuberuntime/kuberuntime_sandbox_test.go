@@ -85,7 +85,6 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 			id, _, err := m.createPodSandbox(pod, 1)
 			if test.expectError {
 				assert.Error(t, err)
-				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
 			} else {
 				assert.NoError(t, err)
 				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
