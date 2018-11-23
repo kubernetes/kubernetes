@@ -164,7 +164,7 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 
 func (e *transformTest) getEncryptionOptions() []string {
 	if e.transformerConfig != "" {
-		return []string{"--experimental-encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName)}
+		return []string{"--encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName)}
 	}
 
 	return nil

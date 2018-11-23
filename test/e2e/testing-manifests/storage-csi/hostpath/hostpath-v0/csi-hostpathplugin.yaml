@@ -15,11 +15,11 @@ spec:
       hostNetwork: true
       containers:
         - name: driver-registrar
-          image: gcr.io/gke-release/csi-driver-registrar:v1.0.1-gke.0
+          image: gcr.io/gke-release/csi-driver-registrar:v0.4.1-gke.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath-v0/csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -33,7 +33,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.0.0
+          image: quay.io/k8scsi/hostpathplugin:v0.4.1
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -57,7 +57,7 @@ spec:
               name: mountpoint-dir
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins/csi-hostpath
+            path: /var/lib/kubelet/plugins/csi-hostpath-v0
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:
@@ -65,6 +65,6 @@ spec:
             type: DirectoryOrCreate
           name: mountpoint-dir
         - hostPath:
-            path: /var/lib/kubelet/plugins_registry
+            path: /var/lib/kubelet/plugins
             type: Directory
           name: registration-dir

@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/klog"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -342,14 +341,18 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}()
 
 	if c.csiClient == nil {
-		c.csiClient = newCsiDriverClient(csiSource.Driver)
+		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
+		if err != nil {
+			klog.Errorf(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
+			return err
+		}
 	}
 	csi := c.csiClient
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
 		return err
 	}
@@ -361,7 +364,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Start MountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
-	publishVolumeInfo, err := c.plugin.getPublishVolumeInfo(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
+	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
 	nodeStageSecrets := map[string]string{}
 	if csiSource.NodeStageSecretRef != nil {
@@ -382,7 +385,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	fsType := csiSource.FSType
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
-		publishVolumeInfo,
+		publishContext,
 		deviceMountPath,
 		fsType,
 		accessMode,
@@ -522,14 +525,18 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if c.csiClient == nil {
-		c.csiClient = newCsiDriverClient(driverName)
+		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName))
+		if err != nil {
+			klog.Errorf(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
+			return err
+		}
 	}
 	csi := c.csiClient
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
 		klog.Errorf(log("attacher.UnmountDevice failed to check whether STAGE_UNSTAGE_VOLUME set: %v", err))
 		return err
@@ -561,24 +568,6 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 
 	klog.V(4).Infof(log("attacher.UnmountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
 	return nil
-}
-
-func hasStageUnstageCapability(ctx context.Context, csi csiClient) (bool, error) {
-	capabilities, err := csi.NodeGetCapabilities(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	stageUnstageSet := false
-	if capabilities == nil {
-		return false, nil
-	}
-	for _, capability := range capabilities {
-		if capability.GetRpc().GetType() == csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
-			stageUnstageSet = true
-		}
-	}
-	return stageUnstageSet, nil
 }
 
 // getAttachmentName returns csi-<sha252(volName,csiDriverName,NodeName>
