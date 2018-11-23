@@ -1012,6 +1012,12 @@ ETCD_CA_KEY: $(yaml-quote ${ETCD_CA_KEY_BASE64:-})
 ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
 ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
 ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
+ETCD_KAS_CA_KEY: $(yaml-quote ${ETCD_KAS_CA_KEY_BASE64:-})
+ETCD_KAS_CA_CERT: $(yaml-quote ${ETCD_KAS_CA_CERT_BASE64:-})
+ETCD_KAS_SERVER_KEY: $(yaml-quote ${ETCD_KAS_SERVER_KEY_BASE64:-})
+ETCD_KAS_SERVER_CERT: $(yaml-quote ${ETCD_KAS_SERVER_CERT_BASE64:-})
+ETCD_KAS_CLIENT_KEY: $(yaml-quote ${ETCD_KAS_CLIENT_KEY_BASE64:-})
+ETCD_KAS_CLIENT_CERT: $(yaml-quote ${ETCD_KAS_CLIENT_CERT_BASE64:-})
 ENCRYPTION_PROVIDER_CONFIG: $(yaml-quote ${ENCRYPTION_PROVIDER_CONFIG:-})
 SERVICEACCOUNT_ISSUER: $(yaml-quote ${SERVICEACCOUNT_ISSUER:-})
 EOF
@@ -2026,11 +2032,10 @@ function delete-subnetworks() {
   fi
 }
 
-# Generates SSL certificates for etcd cluster. Uses cfssl program.
+# Generates SSL certificates for etcd cluster peer to peer communication. Uses cfssl program.
 #
 # Assumed vars:
 #   KUBE_TEMP: temporary directory
-#   NUM_NODES: #nodes in the cluster
 #
 # Args:
 #  $1: host name
@@ -2060,6 +2065,45 @@ function create-etcd-certs {
   ETCD_PEER_CERT_BASE64=$(cat "peer.pem" | gzip | base64 | tr -d '\r\n')
   popd
 }
+
+# Generates SSL certificates for etcd-client and kube-apiserver (kas) communication. Uses cfssl program.
+#
+# Assumed vars:
+#   KUBE_TEMP: temporary directory
+#
+# Args:
+#  $1: host name
+#  $2: CA certificate
+#  $3: CA key
+#
+# If CA cert/key is empty, the function will also generate certs for CA.
+#
+# Vars set:
+#   ETCD_CA_KEY_BASE64
+#   ETCD_CA_CERT_BASE64
+#   ETCD_PEER_KEY_BASE64
+#   ETCD_PEER_CERT_BASE64
+#
+function create-etcd-kas-certs {
+  local hostServer=${1}
+  local hostClient=${2}
+  local etcd_kas_ca_cert=${3:-}
+  local etcd_kas_ca_key=${4:-}
+
+  GEN_ETCD_CA_CERT="${etcd_kas_ca_cert}" GEN_ETCD_CA_KEY="${etcd_kas_ca_key}" \
+    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostServer}" "server" "etcd-kas-server"
+    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostClient}" "client" "etcd-kas-client"
+
+  pushd "${KUBE_TEMP}/cfssl"
+  ETCD_KAS_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
+  ETCD_KAS_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_KAS_SERVER_KEY_BASE64=$(cat "etcd-kas-server-key.pem" | base64 | tr -d '\r\n')
+  ETCD_KAS_SERVER_CERT_BASE64=$(cat "etcd-kas-server.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_KAS_CLIENT_KEY_BASE64=$(cat "etcd-kas-client-key.pem" | base64 | tr -d '\r\n')
+  ETCD_KAS_CLIENT_CERT_BASE64=$(cat "etcd-kas-client.pem" | gzip | base64 | tr -d '\r\n')
+  popd
+}
+
 
 function create-master() {
   echo "Starting master and configuring firewalls"
@@ -2111,6 +2155,7 @@ function create-master() {
 
   create-certs "${MASTER_RESERVED_IP}"
   create-etcd-certs ${MASTER_NAME}
+  create-etcd-kas-certs "etcd-${MASTER_NAME}" ${MASTER_NAME}
 
   if [[ "${NUM_NODES}" -ge "50" ]]; then
     # We block on master creation for large clusters to avoid doing too much

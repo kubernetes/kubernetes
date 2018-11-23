@@ -1120,6 +1120,17 @@ function create-master-etcd-auth {
   fi
 }
 
+function create-master-etcd-kas-auth {
+  if [[ -n "${ETCD_KAS_CA_CERT:-}" && -n "${ETCD_KAS_SERVER_KEY:-}" && -n "${ETCD_KAS_SERVER_CERT:-}" && -n "${ETCD_KAS_CLIENT_KEY:-}" && -n "${ETCD_KAS_CLIENT_CERT:-}" ]]; then
+    local -r auth_dir="/etc/srv/kubernetes"
+    echo "${ETCD_KAS_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-kas-ca.crt"
+    echo "${ETCD_KAS_SERVER_KEY}" | base64 --decode > "${auth_dir}/etcd-kas-server.key"
+    echo "${ETCD_KAS_SERVER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-kas-server.crt"
+    echo "${ETCD_KAS_CLIENT_KEY}" | base64 --decode > "${auth_dir}/etcd-kas-client.key"
+    echo "${ETCD_KAS_CLIENT_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-kas-client.crt"
+  fi
+}
+
 function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -1351,6 +1362,7 @@ function prepare-etcd-manifest {
   local cluster_state="new"
   local etcd_protocol="http"
   local etcd_creds=""
+  local etcd_kas_creds=""
   local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
@@ -1359,6 +1371,10 @@ function prepare-etcd-manifest {
   if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
+  fi
+
+  if [[ -n "${ETCD_KAS_CA_KEY:-}" && -n "${ETCD_KAS_CA_CERT:-}" && -n "${ETCD_KAS_SERVER_KEY:-}" && -n "${ETCD_KAS_SERVER_CERT:-}" ]]; then
+    etcd_kas_creds=" --client-cert-auth --trusted-ca-file /etc/srv/kubernetes/etcd-kas-ca.crt --cert-file /etc/srv/kubernetes/etcd-kas-server.crt --key-file /etc/srv/kubernetes/etcd-kas-server.key "
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
@@ -1406,6 +1422,7 @@ function prepare-etcd-manifest {
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_kas_creds *}}@$etcd_kas_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
@@ -1514,6 +1531,9 @@ function start-kube-apiserver {
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
+  fi
+  if [[ -n "${ETCD_KAS_CA_KEY:-}" && -n "${ETCD_KAS_CA_CERT:-}" && -n "${ETCD_KAS_CLIENT_KEY:-}" && -n "${ETCD_KAS_CLIENT_CERT:-}" ]]; then
+    params+=" --etcd-cafile=/etc/srv/kubernetes/etcd-kas-ca.crt --etcd-certfile=/etc/srv/kubernetes/etcd-kas-client.crt --etcd-keyfile=/etc/srv/kubernetes/etcd-kas-client.key"
   fi
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
@@ -2817,6 +2837,7 @@ function main() {
     create-master-auth
     create-master-kubelet-auth
     create-master-etcd-auth
+    create-master-etcd-kas-auth
     override-pv-recycler
     gke-master-start
   else
