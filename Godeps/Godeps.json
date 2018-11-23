@@ -3423,10 +3423,6 @@
 			"Rev": "de0752318171da717af4ce24d0a2e8626afaeb11"
 		},
 		{
-			"ImportPath": "golang.org/x/exp/inotify",
-			"Rev": "292a51b8d262487dab23a588950e8052d63d9113"
-		},
-		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
