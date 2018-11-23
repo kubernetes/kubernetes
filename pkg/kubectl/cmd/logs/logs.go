@@ -51,7 +51,7 @@ var (
 		kubectl logs nginx --all-containers=true
 
 		# Return snapshot logs from all containers in pods defined by label app=nginx
-		kubectl logs -lapp=nginx --all-containers=true
+		kubectl logs -l app=nginx --all-containers=true
 
 		# Return snapshot of previous terminated ruby container logs from pod web-1
 		kubectl logs -p -c ruby web-1
