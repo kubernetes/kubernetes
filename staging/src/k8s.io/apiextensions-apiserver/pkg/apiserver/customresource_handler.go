@@ -66,6 +66,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/graceful"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 	"k8s.io/apiserver/pkg/util/webhook"
 )
@@ -715,6 +716,9 @@ func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (gen
 	}
 	if t.EnableWatchCache {
 		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
+	}
+	if resource != apiextensions.Resource("customresourcedefinitions") {
+		ret.Decorator = graceful.StorageWithGracefulShutdown(ret.Decorator)
 	}
 	return ret, nil
 }

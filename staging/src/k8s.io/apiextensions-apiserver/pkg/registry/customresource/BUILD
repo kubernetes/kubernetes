@@ -54,6 +54,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource/graceful:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor:all-srcs",
     ],
     tags = ["automanaged"],
