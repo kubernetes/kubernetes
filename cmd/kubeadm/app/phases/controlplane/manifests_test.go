@@ -619,7 +619,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
 				"--allocate-node-cidrs=true",
-				"--cluster-cidr=10.0.1.15/16",
 				"--node-cidr-mask-size=24",
 			},
 		},
