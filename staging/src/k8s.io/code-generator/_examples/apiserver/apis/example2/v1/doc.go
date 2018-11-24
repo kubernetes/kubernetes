@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/code-generator/_examples/apiserver/apis/example2
 // +groupGoName=SecondExample
 
-package v1
+package v1 // import "k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
