@@ -53,6 +53,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	podIPMap := make(map[kubecontainer.ContainerID]string)
 	podIPMap[kubecontainer.ContainerID{ID: "1"}] = "10.245.0.2"
 	podIPMap[kubecontainer.ContainerID{ID: "2"}] = "10.245.0.3"
+	podIPMap[kubecontainer.ContainerID{ID: "3"}] = "2001:db8:10::4"
 
 	testCases := []struct {
 		id          string
@@ -70,9 +71,14 @@ func TestGetPodNetworkStatus(t *testing.T) {
 			false,
 			"10.245.0.3",
 		},
-		//not in podCIDR map
 		{
 			"3",
+			false,
+			"2001:db8:10::4",
+		},
+		//not in podCIDR map
+		{
+			"4",
 			true,
 			"",
 		},

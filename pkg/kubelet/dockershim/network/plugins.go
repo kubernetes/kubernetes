@@ -19,6 +19,7 @@ package network
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -247,18 +248,41 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	return ip, nil
 }
 
+// preferredFamily will determine the preferred IP family, based on the DNS service IP
+// environment variable (DNS_SVC_IP), if set.
+func preferredFamily() string {
+
+	dnsServiceIP := os.Getenv("DNS_SVC_IP")
+	if dnsServiceIP == "" {
+		klog.V(3).Infof("Unable to determine preferred IP family")
+		return ""
+	}
+	klog.V(3).Infof("DNS Service IP is %s", dnsServiceIP)
+	dnsIP := net.ParseIP(dnsServiceIP)
+	if dnsIP == nil {
+		klog.Warningf("Unable to parse DNS_SVC_IP (%s) to determine preferred family", dnsServiceIP)
+		return "-4"
+	}
+	if dnsIP.To4() == nil {
+		klog.V(3).Infof("Using IPv6 as preferred family")
+		return "-6"
+	}
+	klog.V(3).Infof("No preferred family specified - using IPv4")
+	return "-4"
+}
+
 // GetPodIP gets the IP of the pod by inspecting the network info inside the pod's network namespace.
 func GetPodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) (net.IP, error) {
-	ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
-	if err != nil {
-		// Fall back to IPv6 address if no IPv4 address is present
-		ip, err = getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
-	}
-	if err != nil {
-		return nil, err
+	addrType := preferredFamily()
+	if addrType != "" {
+		return getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, addrType)
 	}
 
-	return ip, nil
+	ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
+	if err == nil {
+		return ip, err
+	}
+	return getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
 }
 
 type NoopPortMappingGetter struct{}
