@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -560,7 +560,7 @@ func (g *Cloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	inst, err := g.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			klog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume PD %q is not attached to it.",
@@ -581,7 +581,7 @@ func (g *Cloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, 
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := g.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			klog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume PD %q is not attached to it.",
@@ -613,7 +613,7 @@ func (g *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (m
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := g.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			klog.Warningf(
 				"Instance %q does not exist. DisksAreAttached will assume PD %v are not attached to it.",
@@ -734,7 +734,7 @@ func (g *Cloud) DeleteDisk(diskToDelete string) error {
 		return volume.NewDeletedVolumeInUseError(err.Error())
 	}
 
-	if err == cloudprovider.DiskNotFound {
+	if err == cloudprovider.ErrDiskNotFound {
 		return nil
 	}
 	return err
@@ -914,7 +914,7 @@ func (g *Cloud) getRegionalDiskByName(diskName string) (*Disk, error) {
 
 // GetDiskByNameUnknownZone scans all managed zones to return the GCE PD
 // Prefer getDiskByName, if the zone can be established
-// Return cloudprovider.DiskNotFound if the given disk cannot be found in any zone
+// Return cloudprovider.ErrDiskNotFound if the given disk cannot be found in any zone
 func (g *Cloud) GetDiskByNameUnknownZone(diskName string) (*Disk, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
 		regionalDisk, err := g.getRegionalDiskByName(diskName)
@@ -965,7 +965,7 @@ func (g *Cloud) GetDiskByNameUnknownZone(diskName string) (*Disk, error) {
 	klog.Warningf("GCE persistent disk %q not found in managed zones (%s)",
 		diskName, strings.Join(g.managedZones, ","))
 
-	return nil, cloudprovider.DiskNotFound
+	return nil, cloudprovider.ErrDiskNotFound
 }
 
 // encodeDiskTags encodes requested volume tags into JSON string, as GCE does

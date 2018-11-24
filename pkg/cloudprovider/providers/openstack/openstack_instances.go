@@ -70,7 +70,7 @@ func (i *Instances) CurrentNodeName(ctx context.Context, hostname string) (types
 
 // AddSSHKeyToAllInstances is not implemented for OpenStack
 func (i *Instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // NodeAddresses implements Instances.NodeAddresses
@@ -165,7 +165,7 @@ func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		if err == ErrNotFound {
-			return "", cloudprovider.InstanceNotFound
+			return "", cloudprovider.ErrInstanceNotFound
 		}
 		return "", err
 	}

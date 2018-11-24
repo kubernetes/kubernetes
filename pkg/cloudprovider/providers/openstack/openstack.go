@@ -693,7 +693,7 @@ func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeN
 	srv, err := getServerByName(compute, nodeName)
 	if err != nil {
 		if err == ErrNotFound {
-			return cloudprovider.Zone{}, cloudprovider.InstanceNotFound
+			return cloudprovider.Zone{}, cloudprovider.ErrInstanceNotFound
 		}
 		return cloudprovider.Zone{}, err
 	}

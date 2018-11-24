@@ -106,7 +106,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			existsByProviderID: true,
 			providerIDErr:      nil,
 			hasInstanceID:      false,
-			nodeNameErr:        cloudprovider.InstanceNotFound,
+			nodeNameErr:        cloudprovider.ErrInstanceNotFound,
 			expectedCalls:      []string{"instance-id"},
 			expectedNodeExists: false,
 			node: &v1.Node{
@@ -120,7 +120,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			existsByProviderID: false,
 			providerIDErr:      errors.New("unimplemented"),
 			hasInstanceID:      true,
-			nodeNameErr:        cloudprovider.InstanceNotFound,
+			nodeNameErr:        cloudprovider.ErrInstanceNotFound,
 			expectedCalls:      []string{"instance-exists-by-provider-id"},
 			expectedNodeExists: false,
 			node: &v1.Node{

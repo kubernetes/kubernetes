@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
@@ -147,7 +147,7 @@ func (g *Cloud) instanceByProviderID(providerID string) (*gceInstance, error) {
 	instance, err := g.getInstanceFromProjectInZoneByName(project, zone, name)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil, cloudprovider.InstanceNotFound
+			return nil, cloudprovider.ErrInstanceNotFound
 		}
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (g *Cloud) instanceByProviderID(providerID string) (*gceInstance, error) {
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (g *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
@@ -178,7 +178,7 @@ func (g *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string)
 func (g *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	_, err := g.instanceByProviderID(providerID)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			return false, nil
 		}
 		return false, err
@@ -424,7 +424,7 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 	return mc.Observe(err)
 }
 
-// Gets the named instances, returning cloudprovider.InstanceNotFound if any
+// Gets the named instances, returning cloudprovider.ErrInstanceNotFound if any
 // instance is not found
 func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -481,7 +481,7 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 			}
 		}
 		klog.Errorf("Failed to retrieve instances: %v", failed)
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 
 	var ret []*gceInstance
@@ -492,7 +492,7 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	return ret, nil
 }
 
-// Gets the named instance, returning cloudprovider.InstanceNotFound if the instance is not found
+// Gets the named instance, returning cloudprovider.ErrInstanceNotFound if the instance is not found
 func (g *Cloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range g.managedZones {
@@ -507,7 +507,7 @@ func (g *Cloud) getInstanceByName(name string) (*gceInstance, error) {
 		return instance, nil
 	}
 
-	return nil, cloudprovider.InstanceNotFound
+	return nil, cloudprovider.ErrInstanceNotFound
 }
 
 func (g *Cloud) getInstanceFromProjectInZoneByName(project, zone, name string) (*gceInstance, error) {

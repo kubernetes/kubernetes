@@ -61,6 +61,7 @@ type Interface interface {
 	HasClusterID() bool
 }
 
+// InformerUser allows setting informers.
 type InformerUser interface {
 	// SetInformers sets the informer on the cloud object.
 	SetInformers(informerFactory informers.SharedInformerFactory)
@@ -74,11 +75,12 @@ type Clusters interface {
 	Master(ctx context.Context, clusterName string) (string, error)
 }
 
-// (DEPRECATED) DefaultLoadBalancerName is the default load balancer name that is called from
-// LoadBalancer.GetLoadBalancerName. Use this method to maintain backward compatible names for
-// LoadBalancers that were created prior to Kubernetes v1.12. In the future, each provider should
-// replace this method call in GetLoadBalancerName with a provider-specific implementation that
-// is less cryptic than the Service's UUID.
+// DefaultLoadBalancerName is the default load balancer name that is called from
+// LoadBalancer.GetLoadBalancerName. Only use this method to maintain backward compatible names for
+// LoadBalancers that were created prior to Kubernetes v1.12.
+//
+// Deprecated: Each provider should replace this method call in GetLoadBalancerName with a
+// provider-specific implementation is less cryptic than the Service's UUID.
 func DefaultLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
@@ -104,8 +106,8 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 }
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
+// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 type LoadBalancer interface {
-	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
 	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
@@ -149,8 +151,8 @@ type Instances interface {
 	// services cannot be used in this method to obtain nodeaddresses
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
-	// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
-	// cloudprovider.InstanceNotFound should NOT be returned for instances that exist but are stopped/sleeping
+	// Note that if the instance does not exist, we must return ("", cloudprovider.ErrInstanceNotFound)
+	// cloudprovider.ErrInstanceNotFound should NOT be returned for instances that exist but are stopped/sleeping
 	InstanceID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(ctx context.Context, name types.NodeName) (string, error)
@@ -199,9 +201,12 @@ type Routes interface {
 }
 
 var (
-	InstanceNotFound = errors.New("instance not found")
-	DiskNotFound     = errors.New("disk is not found")
-	NotImplemented   = errors.New("unimplemented")
+	// ErrInstanceNotFound an error when an instance is not found.
+	ErrInstanceNotFound = errors.New("instance not found")
+	// ErrDiskNotFound an error when a disk is not found.
+	ErrDiskNotFound = errors.New("disk is not found")
+	// ErrNotImplemented an error when functionality is so far unimplemented.
+	ErrNotImplemented = errors.New("unimplemented")
 )
 
 // Zone represents the location of a particular machine.

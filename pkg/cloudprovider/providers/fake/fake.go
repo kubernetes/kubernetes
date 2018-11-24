@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 )
 
 const defaultProviderName = "fake"
@@ -201,7 +201,7 @@ func (f *FakeCloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName s
 }
 
 func (f *FakeCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // Implementation of Instances.CurrentNodeName

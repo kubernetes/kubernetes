@@ -26,7 +26,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -783,7 +783,7 @@ func (manager *FakeServiceManager) GetDiskFromCloudProvider(
 	zone string, diskName string) (*Disk, error) {
 
 	if manager.zonalDisks[zone] == "" {
-		return nil, cloudprovider.DiskNotFound
+		return nil, cloudprovider.ErrDiskNotFound
 	}
 
 	if manager.resourceInUse {
@@ -808,7 +808,7 @@ func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*Disk, error) {
 
 	if _, ok := manager.regionalDisks[diskName]; !ok {
-		return nil, cloudprovider.DiskNotFound
+		return nil, cloudprovider.ErrDiskNotFound
 	}
 
 	if manager.resourceInUse {

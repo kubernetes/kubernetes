@@ -36,7 +36,7 @@ func (cs *CSCloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1
 	)
 	if err != nil {
 		if count == 0 {
-			return nil, cloudprovider.InstanceNotFound
+			return nil, cloudprovider.ErrInstanceNotFound
 		}
 		return nil, fmt.Errorf("error retrieving node addresses: %v", err)
 	}
@@ -52,7 +52,7 @@ func (cs *CSCloud) NodeAddressesByProviderID(ctx context.Context, providerID str
 	)
 	if err != nil {
 		if count == 0 {
-			return nil, cloudprovider.InstanceNotFound
+			return nil, cloudprovider.ErrInstanceNotFound
 		}
 		return nil, fmt.Errorf("error retrieving node addresses: %v", err)
 	}
@@ -92,7 +92,7 @@ func (cs *CSCloud) InstanceID(ctx context.Context, name types.NodeName) (string,
 	)
 	if err != nil {
 		if count == 0 {
-			return "", cloudprovider.InstanceNotFound
+			return "", cloudprovider.ErrInstanceNotFound
 		}
 		return "", fmt.Errorf("error retrieving instance ID: %v", err)
 	}
@@ -108,7 +108,7 @@ func (cs *CSCloud) InstanceType(ctx context.Context, name types.NodeName) (strin
 	)
 	if err != nil {
 		if count == 0 {
-			return "", cloudprovider.InstanceNotFound
+			return "", cloudprovider.ErrInstanceNotFound
 		}
 		return "", fmt.Errorf("error retrieving instance type: %v", err)
 	}
@@ -124,7 +124,7 @@ func (cs *CSCloud) InstanceTypeByProviderID(ctx context.Context, providerID stri
 	)
 	if err != nil {
 		if count == 0 {
-			return "", cloudprovider.InstanceNotFound
+			return "", cloudprovider.ErrInstanceNotFound
 		}
 		return "", fmt.Errorf("error retrieving instance type: %v", err)
 	}
@@ -134,7 +134,7 @@ func (cs *CSCloud) InstanceTypeByProviderID(ctx context.Context, providerID stri
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (cs *CSCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
@@ -160,5 +160,5 @@ func (cs *CSCloud) InstanceExistsByProviderID(ctx context.Context, providerID st
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (cs *CSCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }

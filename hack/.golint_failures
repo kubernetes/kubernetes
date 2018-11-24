@@ -661,7 +661,6 @@ staging/src/k8s.io/client-go/util/jsonpath
 staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
 staging/src/k8s.io/client-go/util/workqueue
-staging/src/k8s.io/cloud-provider
 staging/src/k8s.io/code-generator/cmd/client-gen/args
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/fake
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme

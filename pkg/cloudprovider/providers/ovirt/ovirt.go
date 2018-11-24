@@ -33,7 +33,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -196,7 +196,7 @@ func (v *Cloud) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]v
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (v *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, cloudprovider.NotImplemented
+	return []v1.NodeAddress{}, cloudprovider.ErrNotImplemented
 }
 
 // mapNodeNameToInstanceName maps from a k8s NodeName to an ovirt instance name (the hostname)
@@ -208,12 +208,12 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (v *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (v *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
@@ -232,7 +232,7 @@ func (v *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (v *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	return "", cloudprovider.NotImplemented
+	return "", cloudprovider.ErrNotImplemented
 }
 
 // InstanceType returns the type of the specified instance.
@@ -322,5 +322,5 @@ func (v *Cloud) CurrentNodeName(ctx context.Context, hostname string) (types.Nod
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (v *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
