@@ -561,6 +561,15 @@ func TestRuntimeSorter(t *testing.T) {
 		expectError string
 	}{
 		{
+			name:  "ensure sorter works with an empty object list",
+			field: "metadata.name",
+			objs:  []runtime.Object{},
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				return nil
+			},
+			expect: "",
+		},
+		{
 			name:  "ensure sorter returns original position",
 			field: "metadata.name",
 			objs:  sortTestData(),
