@@ -374,6 +374,10 @@ func (kl *Kubelet) updateNodeStatus() error {
 	klog.V(5).Infof("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
+			if apierrors.IsNotFound(err) {
+				kl.registrationCompleted = false
+				return fmt.Errorf("can't find node %s, will re-register", kl.nodeName)
+			}
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
@@ -400,7 +404,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	}
 	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {
-		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
+		return err
 	}
 
 	originalNode := node.DeepCopy()
