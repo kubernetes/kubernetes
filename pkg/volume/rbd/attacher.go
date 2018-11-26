@@ -19,6 +19,7 @@ package rbd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -214,12 +215,26 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 	klog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
 
-	klog.V(4).Infof("rbd: detaching device %s", devicePath)
-	err = detacher.manager.DetachDisk(detacher.plugin, deviceMountPath, devicePath)
-	if err != nil {
-		return err
+	if devicePath == "" {
+		deviceMountedPathSeps := strings.Split(deviceMountPath, "-image-")
+		if len(deviceMountedPathSeps) != 2 {
+			return fmt.Errorf("Can't found devicePath for %s ", deviceMountPath)
+		}
+		found := false
+		devicePath, found = getRbdDevFromImageAndPool(deviceMountedPathSeps[0], deviceMountedPathSeps[1])
+		if !found {
+			klog.Warningf("Can't found devicePath for %v. Device is already unmounted, Image %v, Pool %v", deviceMountPath, deviceMountedPathSeps[0], deviceMountedPathSeps[1])
+		}
 	}
-	klog.V(3).Infof("rbd: successfully detach device %s", devicePath)
+
+	if devicePath != "" {
+		klog.V(4).Infof("rbd: detaching device %s", devicePath)
+		err = detacher.manager.DetachDisk(detacher.plugin, deviceMountPath, devicePath)
+		if err != nil {
+			return err
+		}
+		klog.V(3).Infof("rbd: successfully detach device %s", devicePath)
+	}
 	err = os.Remove(deviceMountPath)
 	if err != nil {
 		return err
