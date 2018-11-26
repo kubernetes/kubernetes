@@ -35,7 +35,7 @@ func TestSanitizaMsg(t *testing.T) {
 			msg: &csipb.CreateVolumeRequest{
 				Secrets: map[string]string{"secret1": "secret1", "secret2": "secret2"},
 			},
-			expected: "secrets:<key:\"secret1\" value:\"* * * Sanitized * * *\" > secrets:<key:\"secret2\" value:\"* * * Sanitized * * *\" > ",
+			expected: " Name:  CapacityRange:<nil>  VolumeCapabilities:[]  Parameters:map[]  Secrets:map[secret1:* * * Sanitized * * * secret2:* * * Sanitized * * *]  VolumeContentSource:<nil>  AccessibilityRequirements:<nil>  XXX_NoUnkeyedLiteral:{}  XXX_unrecognized:[]  XXX_sizecache:0 ",
 		},
 		{
 			name: "test_without_csi_secret",
@@ -43,14 +43,14 @@ func TestSanitizaMsg(t *testing.T) {
 				Name:       "test-volume",
 				Parameters: map[string]string{"param1": "param1", "param2": "param2"},
 			},
-			expected: "name:\"test-volume\" parameters:<key:\"param1\" value:\"param1\" > parameters:<key:\"param2\" value:\"param2\" > ",
+			expected: " Name:test-volume  CapacityRange:<nil>  VolumeCapabilities:[]  Parameters:map[param1:param1 param2:param2]  Secrets:map[]  VolumeContentSource:<nil>  AccessibilityRequirements:<nil>  XXX_NoUnkeyedLiteral:{}  XXX_unrecognized:[]  XXX_sizecache:0 ",
 		},
 	}
 
 	for _, test := range tests {
 		result := SanitizeMsg(test.msg)
 		if c := strings.Compare(test.expected, result); c != 0 {
-			t.Fatalf("Test %s failed, expected: %s got: %s, c: %d", test.name, test.expected, result, c)
+			t.Errorf("Test %s failed, expected: \"%s\" got: \"%s\"", test.name, test.expected, result)
 		}
 	}
 }

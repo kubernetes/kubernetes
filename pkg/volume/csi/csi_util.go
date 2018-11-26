@@ -155,7 +155,6 @@ func SanitizeMsg(pb interface{}) string {
 	if _, ok := pb.(descriptor.Message); !ok {
 		return ""
 	}
-
 	_, md := descriptor.ForMessage(pb.(descriptor.Message))
 	fields := md.GetField()
 	if fields == nil {
@@ -172,30 +171,43 @@ func SanitizeMsg(pb interface{}) string {
 			}
 		}
 	}
-	if len(sanitizeFields) == 0 {
-		return ""
-	}
+
 	msg, ok := pb.(proto.Message)
 	if !ok {
 		return ""
 	}
-	for _, field := range sanitizeFields {
-		fieldName := field.GetName()
-		fieldName = strings.ToUpper(fieldName[:1]) + fieldName[1:]
-		s := reflect.ValueOf(msg)
-		m, ok := reflect.Indirect(s).FieldByName(fieldName).Interface().(map[string]string)
-		if !ok {
-			return ""
+	var sMsg, sElem string
+	var sanitized bool
+
+	msgValue := reflect.ValueOf(msg)
+	msgElem := msgValue.Elem()
+	msgType := msgElem.Type()
+	for n := 0; n < msgElem.NumField(); n++ {
+		f := msgElem.Field(n)
+		for _, s := range sanitizeFields {
+			fieldName := s.GetName()
+			fieldName = strings.ToUpper(fieldName[:1]) + fieldName[1:]
+			if fieldName == msgType.Field(n).Name {
+				// Need to sanitize
+				m, ok := reflect.Indirect(msgValue).FieldByName(fieldName).Interface().(map[string]string)
+				if !ok {
+					continue
+				}
+				sanitized = true
+				sm := map[string]string{}
+				for key := range m {
+					sm[key] = "* * * Sanitized * * *"
+				}
+				sElem = fmt.Sprintf(" %s:%v ", msgType.Field(n).Name, sm)
+			}
 		}
-		for key := range m {
-			m[key] = "* * * Sanitized * * *"
-		}
-		if s.Elem().FieldByName(fieldName).CanSet() {
-			s.Elem().FieldByName(fieldName).Set(reflect.ValueOf(m))
+		if sanitized {
+			sMsg += sElem
+			sanitized = false
 		} else {
-			return ""
+			sMsg += fmt.Sprintf(" %s:%v ", msgType.Field(n).Name, f.Interface())
 		}
 	}
 
-	return fmt.Sprintf("%v", msg)
+	return sMsg
 }
