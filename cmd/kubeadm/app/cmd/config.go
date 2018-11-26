@@ -85,7 +85,6 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 	cmd.AddCommand(NewCmdConfigPrint(out))
-	cmd.AddCommand(NewCmdConfigPrintDefault(out))
 	cmd.AddCommand(NewCmdConfigMigrate(out))
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
@@ -142,7 +141,7 @@ func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, conf
 
 	allBytes := [][]byte{initialConfig}
 	for _, componentConfig := range componentConfigs {
-		cfgBytes, err := getDefaultComponentConfigAPIObjectBytes(componentConfig)
+		cfgBytes, err := getDefaultComponentConfigBytes(componentConfig)
 		kubeadmutil.CheckErr(err)
 		allBytes = append(allBytes, cfgBytes)
 	}
@@ -150,68 +149,23 @@ func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, conf
 	fmt.Fprint(out, string(bytes.Join(allBytes, []byte(constants.YAMLDocumentSeparator))))
 }
 
-// NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
-func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
-	apiObjects := []string{}
-	cmd := &cobra.Command{
-		Use:     "print-default",
-		Aliases: []string{"print-defaults"},
-		Short:   "Print the default values for a kubeadm configuration object.",
-		Long: fmt.Sprintf(dedent.Dedent(`
-			This command prints objects such as the default InitConfiguration that is used for 'kubeadm init' and 'kubeadm upgrade',
-			and the default JoinConfiguration object that is used for 'kubeadm join'.
-
-			For documentation visit: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3
-
-			Note that sensitive values like the Bootstrap Token fields are replaced with placeholder values like %q in order to pass validation but
-			not perform the real computation for creating a token.
-		`), placeholderToken),
-		Deprecated: "Please, use `kubeadm config print` instead.",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(apiObjects) == 0 {
-				apiObjects = getSupportedAPIObjects()
-			}
-			allBytes := [][]byte{}
-			for _, apiObject := range apiObjects {
-				cfgBytes, err := getDefaultAPIObjectBytes(apiObject)
-				kubeadmutil.CheckErr(err)
-				allBytes = append(allBytes, cfgBytes)
-			}
-			fmt.Fprint(out, string(bytes.Join(allBytes, []byte(constants.YAMLDocumentSeparator))))
-		},
-	}
-	cmd.Flags().StringSliceVar(&apiObjects, "api-objects", apiObjects,
-		fmt.Sprintf("A comma-separated list for API objects to print the default values for. Available values: %v. This flag unset means 'print all known objects'", getAllAPIObjectNames()))
-	return cmd
-}
-
-func getDefaultComponentConfigAPIObjectBytes(apiObject string) ([]byte, error) {
+func getDefaultComponentConfigBytes(apiObject string) ([]byte, error) {
 	registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
 	if !ok {
 		return []byte{}, errors.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigAPIObjects())
 	}
-	return getDefaultComponentConfigBytes(registration)
-}
 
-func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
-	switch apiObject {
-	case constants.InitConfigurationKind:
-		return getDefaultInitConfigBytesByKind(constants.InitConfigurationKind)
-
-	case constants.ClusterConfigurationKind:
-		return getDefaultInitConfigBytesByKind(constants.ClusterConfigurationKind)
-
-	case constants.JoinConfigurationKind:
-		return getDefaultNodeConfigBytes()
-
-	default:
-		// Is this a component config?
-		registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
-		if !ok {
-			return []byte{}, errors.Errorf("--api-object needs to be one of %v", getAllAPIObjectNames())
-		}
-		return getDefaultComponentConfigBytes(registration)
+	defaultedInitConfig, err := getDefaultedInitConfig()
+	if err != nil {
+		return []byte{}, err
 	}
+
+	realObj, ok := registration.GetFromInternalConfig(&defaultedInitConfig.ClusterConfiguration)
+	if !ok {
+		return []byte{}, errors.New("GetFromInternalConfig failed")
+	}
+
+	return registration.Marshal(realObj)
 }
 
 // getSupportedComponentConfigAPIObjects returns all currently supported component config API object names
@@ -220,23 +174,6 @@ func getSupportedComponentConfigAPIObjects() []string {
 	for componentType := range componentconfigs.Known {
 		objects = append(objects, string(componentType))
 	}
-	return objects
-}
-
-// getSupportedAPIObjects returns all currently supported API object names
-func getSupportedAPIObjects() []string {
-	baseObjects := []string{constants.InitConfigurationKind, constants.ClusterConfigurationKind, constants.JoinConfigurationKind}
-	objects := getSupportedComponentConfigAPIObjects()
-	objects = append(objects, baseObjects...)
-	return objects
-}
-
-// getAllAPIObjectNames returns currently supported API object names and their historical aliases
-// NB. currently there is no historical supported API objects, but we keep this function for future changes
-func getAllAPIObjectNames() []string {
-	historicAPIObjectAliases := []string{}
-	objects := getSupportedAPIObjects()
-	objects = append(objects, historicAPIObjectAliases...)
 	return objects
 }
 
@@ -260,18 +197,6 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 	return configutil.MarshalKubeadmConfigObject(internalcfg)
 }
 
-func getDefaultInitConfigBytesByKind(kind string) ([]byte, error) {
-	b, err := getDefaultInitConfigBytes()
-	if err != nil {
-		return []byte{}, err
-	}
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
-	if err != nil {
-		return []byte{}, err
-	}
-	return gvkmap[kubeadmapiv1beta1.SchemeGroupVersion.WithKind(kind)], nil
-}
-
 func getDefaultNodeConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
 		Discovery: kubeadmapiv1beta1.Discovery{
@@ -287,20 +212,6 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 	}
 
 	return configutil.MarshalKubeadmConfigObject(internalcfg)
-}
-
-func getDefaultComponentConfigBytes(registration componentconfigs.Registration) ([]byte, error) {
-	defaultedInitConfig, err := getDefaultedInitConfig()
-	if err != nil {
-		return []byte{}, err
-	}
-
-	realobj, ok := registration.GetFromInternalConfig(&defaultedInitConfig.ClusterConfiguration)
-	if !ok {
-		return []byte{}, errors.New("GetFromInternalConfig failed")
-	}
-
-	return registration.Marshal(realobj)
 }
 
 // NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
