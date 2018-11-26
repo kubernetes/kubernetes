@@ -68,9 +68,9 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 		By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 		volumeSource := v1.VolumeSource{
 			FlexVolume: &v1.FlexVolumeSource{
 				Driver: "k8s/" + driverInstallAs,
@@ -84,9 +84,16 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 
+		By("waiting for volumes to be attached to node")
+		err = waitForVolumesAttached(cs, node.Name, uniqueVolumeName)
+		Expect(err).NotTo(HaveOccurred(), "while waiting for volume to attach to %s node", node.Name)
+
 		By("waiting for volume-in-use on the node after pod creation")
 		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
 		Expect(err).NotTo(HaveOccurred(), "while waiting for volume in use")
+
+		By("waiting for kubelet to start mounting the volume")
+		time.Sleep(20 * time.Second)
 
 		By("Deleting the flexvolume pod")
 		err = framework.DeletePodWithWait(f, cs, pod)
@@ -131,6 +138,22 @@ func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName str
 			}
 		}
 		return true, nil
+	})
+}
+
+func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName string) error {
+	return wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
+		}
+		volumeAttached := node.Status.VolumesAttached
+		for _, volume := range volumeAttached {
+			if string(volume.Name) == volumeName {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }
 
