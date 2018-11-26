@@ -300,7 +300,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 
 	if !mounted {
 		klog.V(4).Info(log("unmounter.Teardown skipping unmount, dir not mounted [%s]", dir))
-		return nil
+		return removeMountDir(c.plugin, dir)
 	}
 
 	volID := c.volumeID
@@ -375,21 +375,24 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir
 func removeMountDir(plug *csiPlugin, mountPath string) error {
 	klog.V(4).Info(log("removing mount path [%s]", mountPath))
+	notMount := false
 	if pathExists, pathErr := util.PathExists(mountPath); pathErr != nil {
 		klog.Error(log("failed while checking mount path stat [%s]", pathErr))
 		return pathErr
 	} else if !pathExists {
-		klog.Warning(log("skipping mount dir removal, path does not exist [%v]", mountPath))
-		return nil
+		klog.Warning(log("mount dir removal, path does not exist [%v]", mountPath))
+		notMount = true
+	} else {
+		mounter := plug.host.GetMounter(plug.GetPluginName())
+		notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
+		if err != nil {
+			klog.Error(log("mount dir removal failed [%s]: %v", mountPath, err))
+			return err
+		}
+		notMount = notMnt
 	}
 
-	mounter := plug.host.GetMounter(plug.GetPluginName())
-	notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
-	if err != nil {
-		klog.Error(log("mount dir removal failed [%s]: %v", mountPath, err))
-		return err
-	}
-	if notMnt {
+	if notMount {
 		klog.V(4).Info(log("dir not mounted, deleting it [%s]", mountPath))
 		if err := os.Remove(mountPath); err != nil && !os.IsNotExist(err) {
 			klog.Error(log("failed to remove dir [%s]: %v", mountPath, err))
@@ -409,6 +412,9 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 			klog.Error(log("failed to delete volume path [%s]: %v", volPath, err))
 			return err
 		}
+	} else {
+		klog.Error(log("mount path [%s] still mounted, can't delete it", mountPath))
+		return fmt.Errorf("mount path [%s] still mounted, can't delete it", mountPath)
 	}
 	return nil
 }

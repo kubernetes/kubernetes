@@ -426,6 +426,9 @@ func TestUnmounterTeardown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to make a new Unmounter: %v", err)
 	}
+	if err := diskMounter.Unmount(dir); err != nil {
+		t.Errorf("failed to unmount dir [%s]: %v", dir, err)
+	}
 
 	csiUnmounter := unmounter.(*csiMountMgr)
 	csiUnmounter.csiClient = setupClient(t, true)
