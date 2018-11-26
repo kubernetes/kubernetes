@@ -1496,10 +1496,12 @@ func eventOccurred(c clientset.Interface, podName, namespace, eventSelector, msg
 		if err != nil {
 			return false, fmt.Errorf("got error while getting pod events: %s", err)
 		}
-		if len(events.Items) == 0 {
-			return false, nil // no events have occurred yet
+		for _, event := range events.Items {
+			if strings.Contains(event.Message, msg) {
+				return true, nil
+			}
 		}
-		return strings.Contains(events.Items[0].Message, msg), nil
+		return false, nil
 	}
 }
 
