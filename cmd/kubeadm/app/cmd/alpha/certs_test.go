@@ -30,6 +30,7 @@ import (
 
 	"github.com/spf13/cobra"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
@@ -217,5 +218,18 @@ func TestRunRenewCommands(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestRenewUsingCSR(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	cert := &certs.KubeadmCertEtcdServer
+
+	renewCmds := getRenewSubCommands()
+	cmdtestutil.RunSubCommand(t, renewCmds, cert.Name, "--csr-only", "--csr-dir="+tmpDir)
+
+	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.BaseName); err != nil {
+		t.Fatalf("couldn't load certificate %q: %v", cert.BaseName, err)
 	}
 }

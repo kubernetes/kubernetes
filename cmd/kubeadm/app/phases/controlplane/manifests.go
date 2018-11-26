@@ -167,7 +167,7 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 
 		// Apply user configurations for local etcd
 		if cfg.Etcd.Local != nil {
-			if value, ok := cfg.Etcd.Local.ExtraArgs["listen-client-urls"]; ok {
+			if value, ok := cfg.Etcd.Local.ExtraArgs["advertise-client-urls"]; ok {
 				defaultArguments["etcd-servers"] = value
 			}
 		}

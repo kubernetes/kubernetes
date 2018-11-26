@@ -276,15 +276,22 @@ type LocalEtcd struct {
 	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
 }
 
-// ExternalEtcd describes an external etcd cluster
+// ExternalEtcd describes an external etcd cluster.
+// Kubeadm has no knowledge of where certificate files live and they must be supplied.
 type ExternalEtcd struct {
 	// Endpoints of etcd members. Required for ExternalEtcd.
 	Endpoints []string `json:"endpoints"`
+
 	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
+	// Required if using a TLS connection.
 	CAFile string `json:"caFile"`
+
 	// CertFile is an SSL certification file used to secure etcd communication.
+	// Required if using a TLS connection.
 	CertFile string `json:"certFile"`
+
 	// KeyFile is an SSL key file used to secure etcd communication.
+	// Required if using a TLS connection.
 	KeyFile string `json:"keyFile"`
 }
 

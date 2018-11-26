@@ -62,7 +62,7 @@ func (c *logMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	for _, ps := range podStats {
 		for _, c := range ps.Containers {
-			if c.Logs.UsedBytes != nil {
+			if c.Logs != nil && c.Logs.UsedBytes != nil {
 				ch <- prometheus.MustNewConstMetric(
 					descLogSize,
 					prometheus.GaugeValue,

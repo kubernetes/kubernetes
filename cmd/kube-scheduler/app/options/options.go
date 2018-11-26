@@ -286,6 +286,8 @@ func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElec
 		LeaseDuration: config.LeaseDuration.Duration,
 		RenewDeadline: config.RenewDeadline.Duration,
 		RetryPeriod:   config.RetryPeriod.Duration,
+		WatchDog:      leaderelection.NewLeaderHealthzAdaptor(time.Second * 20),
+		Name:          "kube-scheduler",
 	}, nil
 }
 

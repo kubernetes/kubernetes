@@ -173,7 +173,7 @@ type provisioningTestInput struct {
 }
 
 func testProvisioning(input *provisioningTestInput) {
-	It("should provision storage", func() {
+	It("should provision storage with defaults", func() {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
@@ -186,7 +186,7 @@ func testProvisioning(input *provisioningTestInput) {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
-	It("should create and delete block persistent volumes [Feature:BlockVolume]", func() {
+	It("should create and delete block persistent volumes", func() {
 		if !input.dInfo.IsBlockSupported {
 			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
 		}

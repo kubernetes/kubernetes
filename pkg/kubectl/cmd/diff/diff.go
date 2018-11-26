@@ -26,11 +26,13 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -59,6 +61,9 @@ var (
 		# Diff file read from stdin
 		cat service.yaml | kubectl diff -f -`))
 )
+
+// Number of times we try to diff before giving-up
+const maxRetries = 4
 
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
@@ -228,6 +233,7 @@ type InfoObject struct {
 	Info     *resource.Info
 	Encoder  runtime.Encoder
 	OpenAPI  openapi.Resources
+	Force    bool
 }
 
 var _ Object = &InfoObject{}
@@ -251,6 +257,16 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		)
 	}
 
+	var resourceVersion *string
+	if !obj.Force {
+		accessor, err := meta.Accessor(obj.Info.Object)
+		if err != nil {
+			return nil, err
+		}
+		str := accessor.GetResourceVersion()
+		resourceVersion = &str
+	}
+
 	modified, err := kubectl.GetModifiedConfiguration(obj.LocalObj, false, unstructured.UnstructuredJSONScheme)
 	if err != nil {
 		return nil, err
@@ -259,12 +275,13 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// This is using the patcher from apply, to keep the same behavior.
 	// We plan on replacing this with server-side apply when it becomes available.
 	patcher := &apply.Patcher{
-		Mapping:       obj.Info.Mapping,
-		Helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
-		Overwrite:     true,
-		BackOff:       clockwork.NewRealClock(),
-		ServerDryRun:  true,
-		OpenapiSchema: obj.OpenAPI,
+		Mapping:         obj.Info.Mapping,
+		Helper:          resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Overwrite:       true,
+		BackOff:         clockwork.NewRealClock(),
+		ServerDryRun:    true,
+		OpenapiSchema:   obj.OpenAPI,
+		ResourceVersion: resourceVersion,
 	}
 
 	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
@@ -317,6 +334,10 @@ func (d *Differ) Run(diff *DiffProgram) error {
 func (d *Differ) TearDown() {
 	d.From.Dir.Delete() // Ignore error
 	d.To.Dir.Delete()   // Ignore error
+}
+
+func isConflict(err error) bool {
+	return err != nil && errors.IsConflict(err)
 }
 
 // RunDiff uses the factory to parse file arguments, find the version to
@@ -376,21 +397,36 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		}
 
 		local := info.Object.DeepCopyObject()
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return err
+		for i := 1; i <= maxRetries; i++ {
+			if err = info.Get(); err != nil {
+				if !errors.IsNotFound(err) {
+					return err
+				}
+				info.Object = nil
 			}
-			info.Object = nil
-		}
 
-		obj := InfoObject{
-			LocalObj: local,
-			Info:     info,
-			Encoder:  scheme.DefaultJSONEncoder(),
-			OpenAPI:  schema,
-		}
+			force := i == maxRetries
+			if force {
+				klog.Warningf(
+					"Object (%v: %v) keeps changing, diffing without lock",
+					info.Object.GetObjectKind().GroupVersionKind(),
+					info.Name,
+				)
+			}
+			obj := InfoObject{
+				LocalObj: local,
+				Info:     info,
+				Encoder:  scheme.DefaultJSONEncoder(),
+				OpenAPI:  schema,
+				Force:    force,
+			}
 
-		return differ.Diff(obj, printer)
+			err = differ.Diff(obj, printer)
+			if !isConflict(err) {
+				break
+			}
+		}
+		return err
 	})
 	if err != nil {
 		return err

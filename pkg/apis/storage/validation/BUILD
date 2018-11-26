@@ -26,13 +26,18 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["validation_test.go"],
+    srcs = [
+        "main_test.go",
+        "validation_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
+        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
     ],
 )
 

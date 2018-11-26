@@ -48,8 +48,9 @@ func NewMarkControlPlanePhase() workflow.Phase {
 		Name:    "mark-control-plane",
 		Short:   "Mark a node as a control-plane",
 		Example: markControlPlaneExample,
-		CmdFlags: []string{
+		InheritFlags: []string{
 			options.NodeName,
+			options.CfgPath,
 		},
 		Run: runMarkControlPlane,
 	}

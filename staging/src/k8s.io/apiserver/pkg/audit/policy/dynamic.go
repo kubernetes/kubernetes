@@ -19,6 +19,7 @@ package policy
 import (
 	"k8s.io/api/auditregistration/v1alpha1"
 	"k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // ConvertDynamicPolicyToInternal constructs an internal policy type from a
@@ -36,4 +37,18 @@ func ConvertDynamicPolicyToInternal(p *v1alpha1.Policy) *audit.Policy {
 		},
 		OmitStages: InvertStages(stages),
 	}
+}
+
+// NewDynamicChecker returns a new dynamic policy checker
+func NewDynamicChecker() Checker {
+	return &dynamicPolicyChecker{}
+}
+
+type dynamicPolicyChecker struct{}
+
+// LevelAndStages returns returns a fixed level of the full event, this is so that the downstream policy
+// can be applied per sink.
+// TODO: this needs benchmarking before the API moves to beta to determine the effect this has on the apiserver
+func (d *dynamicPolicyChecker) LevelAndStages(authorizer.Attributes) (audit.Level, []audit.Stage) {
+	return audit.LevelRequestResponse, []audit.Stage{}
 }

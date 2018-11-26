@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"k8s.io/api/core/v1"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
@@ -59,5 +60,10 @@ func (h *ManagerStub) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 
 // GetWatcherHandler returns plugin watcher interface
 func (h *ManagerStub) GetWatcherHandler() pluginwatcher.PluginHandler {
+	return nil
+}
+
+// GetDevices returns nil
+func (h *ManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	return nil
 }

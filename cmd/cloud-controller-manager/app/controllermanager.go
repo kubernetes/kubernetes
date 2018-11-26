@@ -25,19 +25,22 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/globalflag"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
+	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
@@ -85,6 +88,9 @@ the cloud specific control loops shipped with Kubernetes.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
+	verflag.AddFlags(namedFlagSets.FlagSet("global"))
+	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	cmoptions.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -131,16 +137,24 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		klog.Errorf("unable to register configz: %c", err)
 	}
 
+	// Setup any healthz checks we will want to use.
+	var checks []healthz.HealthzChecker
+	var electionChecker *leaderelection.HealthzAdaptor
+	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
+		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
+		checks = append(checks, electionChecker)
+	}
+
 	// Start the controller manager HTTP server
 	if c.SecureServing != nil {
-		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging)
+		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.InsecureServing != nil {
-		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging)
+		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		insecureSuperuserAuthn := server.AuthenticationInfo{Authenticator: &server.InsecureSuperuser{}}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, nil, &insecureSuperuserAuthn)
 		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -192,6 +206,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 				klog.Fatalf("leaderelection lost")
 			},
 		},
+		WatchDog: electionChecker,
+		Name:     "cloud-controller-manager",
 	})
 	panic("unreachable")
 }

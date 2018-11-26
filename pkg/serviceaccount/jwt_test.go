@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	certutil "k8s.io/client-go/util/cert"
@@ -275,16 +276,18 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
+		auds := authenticator.Audiences{"api"}
 		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
-		authenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		authn := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
 
 		// An invalid, non-JWT token should always fail
-		if _, ok, err := authenticator.AuthenticateToken(context.Background(), "invalid token"); err != nil || ok {
+		ctx := authenticator.WithAudiences(context.Background(), auds)
+		if _, ok, err := authn.AuthenticateToken(ctx, "invalid token"); err != nil || ok {
 			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
 			continue
 		}
 
-		resp, ok, err := authenticator.AuthenticateToken(context.Background(), tc.Token)
+		resp, ok, err := authn.AuthenticateToken(ctx, tc.Token)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
 			continue

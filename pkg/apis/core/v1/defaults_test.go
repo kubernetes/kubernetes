@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// enforce that all types are installed
@@ -803,6 +805,7 @@ func TestSetDefaultSecret(t *testing.T) {
 }
 
 func TestSetDefaultPersistentVolume(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 	pv := &v1.PersistentVolume{}
 	obj2 := roundTrip(t, runtime.Object(pv))
 	pv2 := obj2.(*v1.PersistentVolume)
@@ -822,10 +825,7 @@ func TestSetDefaultPersistentVolume(t *testing.T) {
 	}
 
 	// When feature gate is enabled, field should be defaulted
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 	obj3 := roundTrip(t, runtime.Object(pv)).(*v1.PersistentVolume)
 	outputMode3 := obj3.Spec.VolumeMode
 
@@ -834,15 +834,10 @@ func TestSetDefaultPersistentVolume(t *testing.T) {
 	} else if *outputMode3 != defaultMode {
 		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: %+v", defaultMode, outputMode3)
 	}
-
-	err = utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
-	}
-
 }
 
 func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 	pvc := &v1.PersistentVolumeClaim{}
 	obj2 := roundTrip(t, runtime.Object(pvc))
 	pvc2 := obj2.(*v1.PersistentVolumeClaim)
@@ -859,10 +854,7 @@ func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
 	}
 
 	// When feature gate is enabled, field should be defaulted
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 	obj3 := roundTrip(t, runtime.Object(pvc)).(*v1.PersistentVolumeClaim)
 	outputMode3 := obj3.Spec.VolumeMode
 
@@ -870,11 +862,6 @@ func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
 		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: nil", defaultMode)
 	} else if *outputMode3 != defaultMode {
 		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: %+v", defaultMode, outputMode3)
-	}
-
-	err = utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
 	}
 }
 

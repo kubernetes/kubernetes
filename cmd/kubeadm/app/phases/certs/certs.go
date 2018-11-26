@@ -130,6 +130,25 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 	)
 }
 
+// NewCSR will generate a new CSR and accompanying key
+func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
+	certConfig, err := certSpec.GetConfig(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve cert configuration: %v", err)
+	}
+
+	return pkiutil.NewCSRAndKey(certConfig)
+}
+
+// CreateCSR creates a certificate signing request
+func CreateCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration, path string) error {
+	csr, key, err := NewCSR(certSpec, cfg)
+	if err != nil {
+		return err
+	}
+	return writeCSRFilesIfNotExist(path, certSpec.BaseName, csr, key)
+}
+
 // CreateCertAndKeyFilesWithCA loads the given certificate authority from disk, then generates and writes out the given certificate and key.
 // The certSpec and caCertSpec should both be one of the variables from this package.
 func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
@@ -270,6 +289,33 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 
 		if err := pkiutil.WritePublicKey(pkiDir, baseName, &key.PublicKey); err != nil {
 			return errors.Wrapf(err, "failure while saving %s public key", baseName)
+		}
+	}
+
+	return nil
+}
+
+// writeCertificateAuthorithyFilesIfNotExist write a new CSR to the given path.
+// If there already is a CSR file at the given path; kubeadm tries to load it and check if it's a valid certificate.
+// otherwise this function returns an error.
+func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.CertificateRequest, key *rsa.PrivateKey) error {
+	if pkiutil.CSROrKeyExist(csrDir, baseName) {
+		_, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, baseName)
+		if err != nil {
+			return errors.Wrapf(err, "%s CSR existed but it could not be loaded properly", baseName)
+		}
+
+		fmt.Printf("[certs] Using the existing %q CSR\n", baseName)
+	} else {
+		// Write .key and .csr files to disk
+		fmt.Printf("[certs] Generating %q key and CSR\n", baseName)
+
+		if err := pkiutil.WriteKey(csrDir, baseName, key); err != nil {
+			return errors.Wrapf(err, "failure while saving %s key", baseName)
+		}
+
+		if err := pkiutil.WriteCSR(csrDir, baseName, csr); err != nil {
+			return errors.Wrapf(err, "failure while saving %s CSR", baseName)
 		}
 	}
 

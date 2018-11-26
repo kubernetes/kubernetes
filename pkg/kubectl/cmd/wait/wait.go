@@ -249,6 +249,9 @@ func (o *WaitOptions) RunWait() error {
 func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
 	for {
+		if len(info.Name) == 0 {
+			return info.Object, false, fmt.Errorf("resource name must be provided")
+		}
 		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return info.Object, true, nil
@@ -334,6 +337,9 @@ type ConditionalWait struct {
 func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
 	for {
+		if len(info.Name) == 0 {
+			return info.Object, false, fmt.Errorf("resource name must be provided")
+		}
 		resourceVersion := ""
 		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
 		switch {

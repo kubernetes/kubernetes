@@ -441,3 +441,45 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 
 	}
 }
+
+func CheckVolumeModeOfPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+	if volMode == v1.PersistentVolumeBlock {
+		// Check if block exists
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("test -b %s", path))
+
+		// Double check that it's not directory
+		VerifyExecInPodFail(pod, fmt.Sprintf("test -d %s", path), 1)
+	} else {
+		// Check if directory exists
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("test -d %s", path))
+
+		// Double check that it's not block
+		VerifyExecInPodFail(pod, fmt.Sprintf("test -b %s", path), 1)
+	}
+}
+
+func CheckReadWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+	if volMode == v1.PersistentVolumeBlock {
+		// random -> file1
+		VerifyExecInPodSucceed(pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
+		// file1 -> dev (write to dev)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
+		// dev -> file2 (read from dev)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
+		// file1 == file2 (check contents)
+		VerifyExecInPodSucceed(pod, "diff /tmp/file1 /tmp/file2")
+		// Clean up temp files
+		VerifyExecInPodSucceed(pod, "rm -f /tmp/file1 /tmp/file2")
+
+		// Check that writing file to block volume fails
+		VerifyExecInPodFail(pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
+	} else {
+		// text -> file1 (write to file)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
+		// grep file1 (read from file and check contents)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path))
+
+		// Check that writing to directory as block volume fails
+		VerifyExecInPodFail(pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
+	}
+}

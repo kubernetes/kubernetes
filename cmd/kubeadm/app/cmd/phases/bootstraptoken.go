@@ -64,7 +64,7 @@ func NewBootstrapTokenPhase() workflow.Phase {
 		Short:   "Generates bootstrap tokens used to join a node to a cluster",
 		Example: bootstrapTokenExamples,
 		Long:    bootstrapTokenLongDesc,
-		CmdFlags: []string{
+		InheritFlags: []string{
 			options.CfgPath,
 			options.KubeconfigDir,
 			options.SkipTokenPrint,

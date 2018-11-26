@@ -50,8 +50,12 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
-		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("apiextensions-apiserver", "kube-system"),
+		),
+		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: errOut,

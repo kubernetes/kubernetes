@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,8 +37,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/globalflag"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -48,7 +49,9 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
+	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller"
@@ -111,6 +114,9 @@ controller, and serviceaccounts controller.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
+	verflag.AddFlags(namedFlagSets.FlagSet("global"))
+	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	cmoptions.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -150,18 +156,26 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Errorf("unable to register configz: %c", err)
 	}
 
+	// Setup any healthz checks we will want to use.
+	var checks []healthz.HealthzChecker
+	var electionChecker *leaderelection.HealthzAdaptor
+	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
+		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
+		checks = append(checks, electionChecker)
+	}
+
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.InsecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		insecureSuperuserAuthn := server.AuthenticationInfo{Authenticator: &server.InsecureSuperuser{}}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, nil, &insecureSuperuserAuthn)
 		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -240,6 +254,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				klog.Fatalf("leaderelection lost")
 			},
 		},
+		WatchDog: electionChecker,
+		Name:     "kube-controller-manager",
 	})
 	panic("unreachable")
 }

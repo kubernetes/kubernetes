@@ -200,10 +200,16 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
 	}
 
+	// Setup healthz checks.
+	var checks []healthz.HealthzChecker
+	if cc.ComponentConfig.LeaderElection.LeaderElect {
+		checks = append(checks, cc.LeaderElection.WatchDog)
+	}
+
 	// Start up the healthz server.
 	if cc.InsecureServing != nil {
 		separateMetrics := cc.InsecureMetricsServing != nil
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics), nil, nil)
+		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics, checks...), nil, nil)
 		if err := cc.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return fmt.Errorf("failed to start healthz server: %v", err)
 		}
@@ -215,7 +221,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		}
 	}
 	if cc.SecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
+		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
 		if err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start healthz server: %v", err)
@@ -313,9 +319,9 @@ func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) h
 // newHealthzServer creates a healthz server from the config, and will also
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
-func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool) http.Handler {
+func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, checks ...healthz.HealthzChecker) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
-	healthz.InstallHandler(pathRecorderMux)
+	healthz.InstallHandler(pathRecorderMux, checks...)
 	if !separateMetrics {
 		installMetricHandler(pathRecorderMux)
 	}

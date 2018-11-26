@@ -399,6 +399,26 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-3"))
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-secret-volumes/delete/data-1"))
 	})
+
+	//The secret is in pending during volume creation until the secret objects are available
+	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timout exception unless it is marked optional.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/projected-secret-volumes"
+		podName := "pod-secrets-" + string(uuid.NewUUID())
+		err := createNonOptionalSecretPod(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+	})
+
+	//Secret object defined for the pod, If a key is specified which is not present in the secret,
+	// the volume setup will error unless it is marked optional, during the pod creation.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/secret-volumes"
+		podName := "pod-secrets-" + string(uuid.NewUUID())
+		err := createNonOptionalSecretPodWithSecret(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+	})
 })
 
 func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32,

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/context"
 	"k8s.io/klog"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -38,11 +39,14 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -62,6 +66,10 @@ var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
 	defaultNodeAllocatableCgroup = "kubepods"
+	// defaultPodResourcesPath is the path to the local endpoint serving the podresources GRPC service.
+	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
+	defaultPodResourcesTimeout = 10 * time.Second
+	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
 )
 
 func getNodeSummary() (*stats.Summary, error) {
@@ -90,6 +98,22 @@ func getNodeSummary() (*stats.Summary, error) {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
 	return &summary, nil
+}
+
+func getNodeDevices() (*podresourcesapi.ListPodResourcesResponse, error) {
+	endpoint := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	client, conn, err := podresources.GetClient(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting grpc client: %v", err)
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := client.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("%v.Get(_) = _, %v", client, err)
+	}
+	return resp, nil
 }
 
 // Returns the current KubeletConfiguration

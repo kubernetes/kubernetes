@@ -1815,7 +1815,7 @@ function start-kube-apiserver {
 # Sets-up etcd encryption.
 # Configuration of etcd level encryption consists of the following steps:
 # 1. Writing encryption provider config to disk
-# 2. Adding experimental-encryption-provider-config flag to kube-apiserver
+# 2. Adding encryption-provider-config flag to kube-apiserver
 # 3. Add kms-socket-vol and kms-socket-vol-mnt to enable communication with kms-plugin (if requested)
 #
 # Expects parameters:
@@ -1855,7 +1855,7 @@ function setup-etcd-encryption {
   encryption_provider_config_path=${ENCRYPTION_PROVIDER_CONFIG_PATH:-/etc/srv/kubernetes/encryption-provider-config.yml}
 
   echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
-  kube_api_server_params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
+  kube_api_server_params+=" --encryption-provider-config=${encryption_provider_config_path}"
 
   default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64 | tr -d '\r\n')
   default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64 | tr -d '\r\n')
@@ -2232,14 +2232,14 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd &
 }
 
-# Update {{ container-runtime }} with actual container runtime name,
-# and {{ container-runtime-endpoint }} with actual container runtime
+# Update {{ fluentd_container_runtime_service }} with actual container runtime name,
+# and {{ container_runtime_endpoint }} with actual container runtime
 # endpoint.
 function update-container-runtime {
   local -r file="$1"
   local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}"
   sed -i \
-    -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" \
+    -e "s@{{ *fluentd_container_runtime_service *}}@${FLUENTD_CONTAINER_RUNTIME_SERVICE:-${CONTAINER_RUNTIME_NAME:-docker}}@g" \
     -e "s@{{ *container_runtime_endpoint *}}@${container_runtime_endpoint#unix://}@g" \
     "${file}"
 }
@@ -2321,10 +2321,10 @@ function setup-fluentd {
     fluentd_gcp_configmap_name="fluentd-gcp-config-old"
   fi
   sed -i -e "s@{{ fluentd_gcp_configmap_name }}@${fluentd_gcp_configmap_name}@g" "${fluentd_gcp_yaml}"
-  fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.1.0}"
+  fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.2.0}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_yaml}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
-  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.5-1.5.36-1-k8s}"
+  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
   update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}

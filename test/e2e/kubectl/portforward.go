@@ -47,6 +47,11 @@ const (
 	podName = "pfpod"
 )
 
+const (
+	podCheckInterval     = 1 * time.Second
+	postStartWaitTimeout = 2 * time.Minute
+)
+
 // TODO support other ports besides 80
 var (
 	portForwardRegexp = regexp.MustCompile("Forwarding from (127.0.0.1|\\[::1\\]):([0-9]+) -> 80")
@@ -202,14 +207,6 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	if err := f.WaitForPodReady(pod.Name); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
-	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-		if err != nil {
-			framework.Logf("Error getting pod log: %v", err)
-		} else {
-			framework.Logf("Pod log:\n%s", logs)
-		}
-	}()
 
 	By("Running 'kubectl port-forward'")
 	cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -241,12 +238,12 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	}
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-	if err != nil {
-		framework.Failf("Error retrieving pod logs: %v", err)
-	}
-	verifyLogMessage(logOutput, "Accepted client connection")
-	verifyLogMessage(logOutput, "Done")
+	Eventually(func() (string, error) {
+		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	}, postStartWaitTimeout, podCheckInterval).Should(SatisfyAll(
+		ContainSubstring("Accepted client connection"),
+		ContainSubstring("Done"),
+	))
 }
 
 func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
@@ -258,14 +255,6 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	if err := f.WaitForPodReady(pod.Name); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
-	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-		if err != nil {
-			framework.Logf("Error getting pod log: %v", err)
-		} else {
-			framework.Logf("Pod log:\n%s", logs)
-		}
-	}()
 
 	By("Running 'kubectl port-forward'")
 	cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -286,12 +275,12 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	}
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-	if err != nil {
-		framework.Failf("Error retrieving pod logs: %v", err)
-	}
-	verifyLogMessage(logOutput, "Accepted client connection")
-	verifyLogMessage(logOutput, "Expected to read 3 bytes from client, but got 0 instead")
+	Eventually(func() (string, error) {
+		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	}, postStartWaitTimeout, podCheckInterval).Should(SatisfyAll(
+		ContainSubstring("Accepted client connection"),
+		ContainSubstring("Expected to read 3 bytes from client, but got 0 instead"),
+	))
 }
 
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
@@ -303,14 +292,6 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	if err := f.WaitForPodReady(pod.Name); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
-	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-		if err != nil {
-			framework.Logf("Error getting pod log: %v", err)
-		} else {
-			framework.Logf("Pod log:\n%s", logs)
-		}
-	}()
 
 	By("Running 'kubectl port-forward'")
 	cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -352,13 +333,13 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	}
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-	if err != nil {
-		framework.Failf("Error retrieving pod logs: %v", err)
-	}
-	verifyLogMessage(logOutput, "^Accepted client connection$")
-	verifyLogMessage(logOutput, "^Received expected client data$")
-	verifyLogMessage(logOutput, "^Done$")
+	Eventually(func() (string, error) {
+		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	}, postStartWaitTimeout, podCheckInterval).Should(SatisfyAll(
+		ContainSubstring("Accepted client connection"),
+		ContainSubstring("Received expected client data"),
+		ContainSubstring("Done"),
+	))
 }
 
 func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
@@ -373,14 +354,6 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	if err := f.WaitForPodReady(pod.Name); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
-	defer func() {
-		logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-		if err != nil {
-			framework.Logf("Error getting pod log: %v", err)
-		} else {
-			framework.Logf("Pod log:\n%s", logs)
-		}
-	}()
 
 	req := f.ClientSet.CoreV1().RESTClient().Get().
 		Namespace(f.Namespace.Name).
@@ -449,12 +422,12 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	}, time.Minute, 10*time.Second).Should(BeNil())
 
 	By("Verifying logs")
-	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
-	if err != nil {
-		framework.Failf("Error retrieving pod logs: %v", err)
-	}
-	verifyLogMessage(logOutput, "^Accepted client connection$")
-	verifyLogMessage(logOutput, "^Received expected client data$")
+	Eventually(func() (string, error) {
+		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+	}, postStartWaitTimeout, podCheckInterval).Should(SatisfyAll(
+		ContainSubstring("Accepted client connection"),
+		ContainSubstring("Received expected client data"),
+	))
 }
 
 var _ = SIGDescribe("Kubectl Port forwarding", func() {
@@ -503,17 +476,6 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 		})
 	})
 })
-
-func verifyLogMessage(log, expected string) {
-	re := regexp.MustCompile(expected)
-	lines := strings.Split(log, "\n")
-	for i := range lines {
-		if re.MatchString(lines[i]) {
-			return
-		}
-	}
-	framework.Failf("Missing %q from log: %s", expected, log)
-}
 
 func wsRead(conn *websocket.Conn) (byte, []byte, error) {
 	for {

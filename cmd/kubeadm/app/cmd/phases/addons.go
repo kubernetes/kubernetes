@@ -23,6 +23,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -47,23 +48,29 @@ type addonData interface {
 // NewAddonPhase returns the addon Cobra command
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:     "addon",
-		Short:    "Installs required addons for passing Conformance tests",
-		CmdFlags: getAddonPhaseFlags("all"),
+		Name:  "addon",
+		Short: "Installs required addons for passing Conformance tests",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
-				Name:     "coredns",
-				Short:    "Installs the CoreDNS addon to a Kubernetes cluster",
-				Long:     coreDNSAddonLongDesc,
-				CmdFlags: getAddonPhaseFlags("coredns"),
-				Run:      runCoreDNSAddon,
+				Name:           "all",
+				Short:          "Installs all the addons",
+				InheritFlags:   getAddonPhaseFlags("all"),
+				RunAllSiblings: true,
 			},
 			{
-				Name:     "kube-proxy",
-				Short:    "Installs the kube-proxy addon to a Kubernetes cluster",
-				Long:     kubeProxyAddonLongDesc,
-				CmdFlags: getAddonPhaseFlags("kube-proxy"),
-				Run:      runKubeProxyAddon,
+				Name:         "coredns",
+				Short:        "Installs the CoreDNS addon to a Kubernetes cluster",
+				Long:         coreDNSAddonLongDesc,
+				InheritFlags: getAddonPhaseFlags("coredns"),
+				Run:          runCoreDNSAddon,
+			},
+			{
+				Name:         "kube-proxy",
+				Short:        "Installs the kube-proxy addon to a Kubernetes cluster",
+				Long:         kubeProxyAddonLongDesc,
+				InheritFlags: getAddonPhaseFlags("kube-proxy"),
+				Run:          runKubeProxyAddon,
 			},
 		},
 	}

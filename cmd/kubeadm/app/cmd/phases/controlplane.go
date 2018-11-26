@@ -19,9 +19,11 @@ package phases
 import (
 	"errors"
 	"fmt"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -69,26 +71,31 @@ func getPhaseDescription(component string) string {
 // NewControlPlanePhase creates a kubeadm workflow phase that implements bootstrapping the control plane.
 func NewControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:    "control-plane",
-		Short:   "Generates all static Pod manifest files necessary to establish the control plane",
-		Example: controlPlaneExample,
+		Name:  "control-plane",
+		Short: "Generates all static Pod manifest files necessary to establish the control plane",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Generates all static Pod manifest files",
+				InheritFlags:   getControlPlanePhaseFlags("all"),
+				RunAllSiblings: true,
+			},
 			newControlPlaneSubPhase(kubeadmconstants.KubeAPIServer),
 			newControlPlaneSubPhase(kubeadmconstants.KubeControllerManager),
 			newControlPlaneSubPhase(kubeadmconstants.KubeScheduler),
 		},
-		Run:      runControlPlanePhase,
-		CmdFlags: getControlPlanePhaseFlags("all"),
+		Run: runControlPlanePhase,
 	}
 	return phase
 }
 
 func newControlPlaneSubPhase(component string) workflow.Phase {
 	phase := workflow.Phase{
-		Name:     controlPlanePhaseProperties[component].name,
-		Short:    controlPlanePhaseProperties[component].short,
-		Run:      runControlPlaneSubPhase(component),
-		CmdFlags: getControlPlanePhaseFlags(component),
+		Name:         controlPlanePhaseProperties[component].name,
+		Short:        controlPlanePhaseProperties[component].short,
+		Run:          runControlPlaneSubPhase(component),
+		InheritFlags: getControlPlanePhaseFlags(component),
 	}
 	return phase
 }
@@ -98,6 +105,7 @@ func getControlPlanePhaseFlags(name string) []string {
 		options.CfgPath,
 		options.CertificatesDir,
 		options.KubernetesVersion,
+		options.ImageRepository,
 	}
 	if name == "all" || name == kubeadmconstants.KubeAPIServer {
 		flags = append(flags,

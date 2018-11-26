@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -122,6 +123,11 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
 		})
 	})
+
+	It("should fail to create configMap in volume due to empty configmap key", func() {
+		configMap, err := newConfigMapWithEmptyKey(f)
+		Expect(err).To(HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
+	})
 })
 
 func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
@@ -136,4 +142,20 @@ func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 			"data_3": "value-3",
 		},
 	}
+}
+
+func newConfigMapWithEmptyKey(f *framework.Framework) (*v1.ConfigMap, error) {
+	name := "configmap-test-emptyKey-" + string(uuid.NewUUID())
+	configMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"": "value-1",
+		},
+	}
+
+	By(fmt.Sprintf("Creating configMap that has name %s", configMap.Name))
+	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
 }

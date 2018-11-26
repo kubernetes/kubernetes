@@ -86,11 +86,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/openapi:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/builder:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/util:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

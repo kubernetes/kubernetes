@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -61,6 +63,8 @@ const (
 	csiResyncPeriod = time.Minute
 )
 
+var deprecatedSocketDirVersions = []string{"0.1.0", "0.2.0", "0.3.0", "0.4.0"}
+
 type csiPlugin struct {
 	host              volume.VolumeHost
 	blockEnabled      bool
@@ -81,8 +85,9 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 var _ volume.VolumePlugin = &csiPlugin{}
 
 type csiDriver struct {
-	driverName     string
-	driverEndpoint string
+	driverName              string
+	driverEndpoint          string
+	highestSupportedVersion *utilversion.Version
 }
 
 type csiDriversStore struct {
@@ -107,16 +112,34 @@ var PluginHandler = &RegistrationHandler{}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Infof(log("Trying to register a new plugin with name: %s endpoint: %s versions: %s",
-		pluginName, endpoint, strings.Join(versions, ",")))
+func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+	klog.Infof(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s, foundInDeprecatedDir: %v",
+		pluginName, endpoint, strings.Join(versions, ","), foundInDeprecatedDir))
 
-	return nil
+	if foundInDeprecatedDir {
+		// CSI 0.x drivers used /var/lib/kubelet/plugins as the socket dir.
+		// This was deprecated as the socket dir for kubelet drivers, in lieu of a dedicated dir /var/lib/kubelet/plugins_registry
+		// The deprecated dir will only be allowed for a whitelisted set of old versions.
+		// CSI 1.x drivers should use the /var/lib/kubelet/plugins_registry
+		if !isDeprecatedSocketDirAllowed(versions) {
+			err := fmt.Errorf("socket for CSI driver %q versions %v was found in a deprecated dir. Drivers implementing CSI 1.x+ must use the new dir", pluginName, versions)
+			klog.Error(err)
+			return err
+		}
+	}
+
+	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
+	return err
 }
 
 // RegisterPlugin is called when a plugin can be registered
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string) error {
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
 	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
+
+	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
+	if err != nil {
+		return err
+	}
 
 	func() {
 		// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
@@ -127,11 +150,15 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 		// updated in the rest of the function.
 		csiDrivers.Lock()
 		defer csiDrivers.Unlock()
-		csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
+		csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint, highestSupportedVersion: highestSupportedVersion}
 	}()
 
 	// Get node info from the driver.
-	csi := newCsiDriverClient(pluginName)
+	csi, err := newCsiDriverClient(csiDriverName(pluginName))
+	if err != nil {
+		return err
+	}
+
 	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
@@ -157,6 +184,41 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 	}
 
 	return nil
+}
+
+func (h *RegistrationHandler) validateVersions(callerName, pluginName string, endpoint string, versions []string) (*utilversion.Version, error) {
+	if len(versions) == 0 {
+		err := fmt.Errorf("%s for CSI driver %q failed. Plugin returned an empty list for supported versions", callerName, pluginName)
+		klog.Error(err)
+		return nil, err
+	}
+
+	// Validate version
+	newDriverHighestVersion, err := highestSupportedVersion(versions)
+	if err != nil {
+		err := fmt.Errorf("%s for CSI driver %q failed. None of the versions specified %q are supported. err=%v", callerName, pluginName, versions, err)
+		klog.Error(err)
+		return nil, err
+	}
+
+	// Check for existing drivers with the same name
+	var existingDriver csiDriver
+	driverExists := false
+	func() {
+		csiDrivers.RLock()
+		defer csiDrivers.RUnlock()
+		existingDriver, driverExists = csiDrivers.driversMap[pluginName]
+	}()
+
+	if driverExists {
+		if !existingDriver.highestSupportedVersion.LessThan(newDriverHighestVersion) {
+			err := fmt.Errorf("%s for CSI driver %q failed. Another driver with the same name is already registered with a higher supported version: %q", callerName, pluginName, existingDriver.highestSupportedVersion)
+			klog.Error(err)
+			return nil, err
+		}
+	}
+
+	return newDriverHighestVersion, nil
 }
 
 // DeRegisterPlugin is called when a plugin removed its socket, signaling
@@ -240,7 +302,10 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
-	csi := newCsiDriverClient(pvSource.Driver)
+	csi, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
+	if err != nil {
+		return nil, err
+	}
 
 	mounter := &csiMountMgr{
 		plugin:       p,
@@ -248,7 +313,7 @@ func (p *csiPlugin) NewMounter(
 		spec:         spec,
 		pod:          pod,
 		podUID:       pod.UID,
-		driverName:   pvSource.Driver,
+		driverName:   csiDriverName(pvSource.Driver),
 		volumeID:     pvSource.VolumeHandle,
 		specVolumeID: spec.Name(),
 		csiClient:    csi,
@@ -307,9 +372,12 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 		klog.Error(log("unmounter failed to load volume data file [%s]: %v", dir, err))
 		return nil, err
 	}
-	unmounter.driverName = data[volDataKey.driverName]
+	unmounter.driverName = csiDriverName(data[volDataKey.driverName])
 	unmounter.volumeID = data[volDataKey.volHandle]
-	unmounter.csiClient = newCsiDriverClient(unmounter.driverName)
+	unmounter.csiClient, err = newCsiDriverClient(unmounter.driverName)
+	if err != nil {
+		return nil, err
+	}
 
 	return unmounter, nil
 }
@@ -421,7 +489,10 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	}
 
 	klog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client := newCsiDriverClient(pvSource.Driver)
+	client, err := newCsiDriverClient(csiDriverName(pvSource.Driver))
+	if err != nil {
+		return nil, err
+	}
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -434,7 +505,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		k8s:        k8s,
 		plugin:     p,
 		volumeID:   pvSource.VolumeHandle,
-		driverName: pvSource.Driver,
+		driverName: csiDriverName(pvSource.Driver),
 		readOnly:   readOnly,
 		spec:       spec,
 		specName:   spec.Name(),
@@ -492,9 +563,12 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 		klog.Error(log("unmapper failed to load volume data file [%s]: %v", dataDir, err))
 		return nil, err
 	}
-	unmapper.driverName = data[volDataKey.driverName]
+	unmapper.driverName = csiDriverName(data[volDataKey.driverName])
 	unmapper.volumeID = data[volDataKey.volHandle]
-	unmapper.csiClient = newCsiDriverClient(unmapper.driverName)
+	unmapper.csiClient, err = newCsiDriverClient(unmapper.driverName)
+	if err != nil {
+		return nil, err
+	}
 
 	return unmapper, nil
 }
@@ -555,7 +629,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
 	skip, err := p.skipAttach(driver)
 	if err != nil {
 		return nil, err
@@ -592,4 +666,70 @@ func unregisterDriver(driverName string) error {
 	}
 
 	return nil
+}
+
+// Return the highest supported version
+func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
+	if len(versions) == 0 {
+		return nil, fmt.Errorf("CSI driver reporting empty array for supported versions")
+	}
+
+	// Sort by lowest to highest version
+	sort.Slice(versions, func(i, j int) bool {
+		parsedVersionI, err := utilversion.ParseGeneric(versions[i])
+		if err != nil {
+			// Push bad values to the bottom
+			return true
+		}
+
+		parsedVersionJ, err := utilversion.ParseGeneric(versions[j])
+		if err != nil {
+			// Push bad values to the bottom
+			return false
+		}
+
+		return parsedVersionI.LessThan(parsedVersionJ)
+	})
+
+	for i := len(versions) - 1; i >= 0; i-- {
+		highestSupportedVersion, err := utilversion.ParseGeneric(versions[i])
+		if err != nil {
+			return nil, err
+		}
+
+		if highestSupportedVersion.Major() <= 1 {
+			return highestSupportedVersion, nil
+		}
+	}
+
+	return nil, fmt.Errorf("None of the CSI versions reported by this driver are supported")
+}
+
+// Only CSI 0.x drivers are allowed to use deprecated socket dir.
+func isDeprecatedSocketDirAllowed(versions []string) bool {
+	for _, version := range versions {
+		if !isV0Version(version) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isV0Version(version string) bool {
+	parsedVersion, err := utilversion.ParseGeneric(version)
+	if err != nil {
+		return false
+	}
+
+	return parsedVersion.Major() == 0
+}
+
+func isV1Version(version string) bool {
+	parsedVersion, err := utilversion.ParseGeneric(version)
+	if err != nil {
+		return false
+	}
+
+	return parsedVersion.Major() == 1
 }

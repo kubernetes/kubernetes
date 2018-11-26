@@ -56,7 +56,11 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 		}
 
 		ev.Stage = auditinternal.StageRequestReceived
-		processAuditEvent(sink, ev, omitStages)
+		if processed := processAuditEvent(sink, ev, omitStages); !processed {
+			audit.ApiserverAuditDroppedCounter.Inc()
+			responsewriters.InternalError(w, req, errors.New("failed to store audit event"))
+			return
+		}
 
 		// intercept the status code
 		var longRunningSink audit.Sink
@@ -137,10 +141,10 @@ func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker
 	return req, ev, omitStages, nil
 }
 
-func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) {
+func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {
 	for _, stage := range omitStages {
 		if ev.Stage == stage {
-			return
+			return true
 		}
 	}
 
@@ -150,7 +154,7 @@ func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []au
 		ev.StageTimestamp = metav1.NewMicroTime(time.Now())
 	}
 	audit.ObserveEvent()
-	sink.ProcessEvents(ev)
+	return sink.ProcessEvents(ev)
 }
 
 func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink, omitStages []auditinternal.Stage) http.ResponseWriter {

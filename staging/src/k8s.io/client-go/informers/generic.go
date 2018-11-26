@@ -262,6 +262,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=storage.k8s.io, Version=v1
 	case storagev1.SchemeGroupVersion.WithResource("storageclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().StorageClasses().Informer()}, nil
+	case storagev1.SchemeGroupVersion.WithResource("volumeattachments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().VolumeAttachments().Informer()}, nil
 
 		// Group=storage.k8s.io, Version=v1alpha1
 	case storagev1alpha1.SchemeGroupVersion.WithResource("volumeattachments"):

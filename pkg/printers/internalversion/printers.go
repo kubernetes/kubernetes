@@ -1965,3 +1965,33 @@ func printPriorityClassList(list *scheduling.PriorityClassList, options printers
 	}
 	return rows, nil
 }
+
+func printBoolPtr(value *bool) string {
+	if value != nil {
+		return printBool(*value)
+	}
+
+	return "<unset>"
+}
+
+func printBool(value bool) string {
+	if value {
+		return "True"
+	}
+
+	return "False"
+}
+
+type SortableResourceNames []api.ResourceName
+
+func (list SortableResourceNames) Len() int {
+	return len(list)
+}
+
+func (list SortableResourceNames) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableResourceNames) Less(i, j int) bool {
+	return list[i] < list[j]
+}
