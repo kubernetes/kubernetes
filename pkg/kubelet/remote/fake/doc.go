@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package fake containers a fake gRPC implementation of internalapi.RuntimeService
 // and internalapi.ImageManagerService.
-package fake
+package fake // import "k8s.io/kubernetes/pkg/kubelet/remote/fake"

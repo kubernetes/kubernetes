@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package images is responsible for managing lifecycle of container images.
-package images
+package images // import "k8s.io/kubernetes/pkg/kubelet/images"

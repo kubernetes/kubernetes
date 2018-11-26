@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Docker integration using pkg/kubelet/apis/cri/runtime/v1alpha2/api.pb.go
-package dockershim
+package dockershim // import "k8s.io/kubernetes/pkg/kubelet/dockershim"

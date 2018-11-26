@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package kuberuntime contains an implementation of kubecontainer.Runtime using
 // the interface in pkg/kubelet/v1.
-package kuberuntime
+package kuberuntime // import "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
