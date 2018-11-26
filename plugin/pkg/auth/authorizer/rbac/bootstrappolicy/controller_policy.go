@@ -353,7 +353,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "root-ca-cert-publisher"},
 			Rules: []rbacv1.PolicyRule{
