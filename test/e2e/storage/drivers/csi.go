@@ -126,7 +126,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 		OldDriverName:            h.driverInfo.Name,
 		NewDriverName:            testsuites.GetUniqueDriverName(h),
 		DriverContainerName:      "hostpath",
-		DriverContainerArguments: []string{"--drivername=csi-mock-" + f.UniqueName},
+		DriverContainerArguments: []string{"--drivername=csi-hostpath-" + f.UniqueName},
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 nodeName,
 	}
