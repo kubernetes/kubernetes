@@ -87,7 +87,7 @@ function generate_vertical_pod_autoscaler_admission_controller_certs {
   local certs_dir="/etc/tls-certs" #TODO: what is the best place for certs?
   echo "Generating certs for the VPA Admission Controller in ${certs_dir}."
   mkdir -p ${certs_dir}
-  if [[ -n "$VPA_AC_CA_CERT" ]] && [[ -n "$VPA_AC_KEY" ]] && [[ -n "$VPA_AC_CERT" ]]; then
+  if [[ -n "${VPA_AC_CA_CERT:-}" ]] && [[ -n "${VPA_AC_KEY:-}" ]] && [[ -n "${VPA_AC_CERT:-}" ]]; then
     base64_decode_or_die "VPA_AC_CA_CERT" ${certs_dir}/caCert.pem
     base64_decode_or_die "VPA_AC_KEY" ${certs_dir}/serverKey.pem
     base64_decode_or_die "VPA_AC_CERT" ${certs_dir}/serverCert.pem
