@@ -587,8 +587,6 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
-	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
-	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 
 	By("Checking for subpath error event")
 	selector := fields.Set{
