@@ -21,6 +21,8 @@ syntax = 'proto2';
 
 package k8s.io.apimachinery.pkg.runtime;
 
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
+
 // Package-wide variables from generator "generated".
 option go_package = "runtime";
 

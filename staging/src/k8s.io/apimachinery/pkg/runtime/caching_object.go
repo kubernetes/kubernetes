@@ -104,7 +104,7 @@ func (o *CachingVersionedObject) serialization(mediaType *string) *serialization
 
 // FIXME: Add comment.
 func (o *CachingVersionedObject) SetObject(f func() (Object, error)) {
-	o.Once.Do(func () {
+	o.Once.Do(func() {
 		obj, err := f()
 		if err != nil {
 			// TODO: How to handle it better?
