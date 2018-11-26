@@ -20,11 +20,15 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/json"
 	clientset "k8s.io/client-go/kubernetes"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
@@ -40,6 +44,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+)
+
+const (
+	// Name of node annotation that contains JSON map of driver names to node
+	annotationKeyNodeID = "csi.volume.kubernetes.io/nodeid"
 )
 
 // List of testDrivers to be executed in below loop
@@ -141,6 +150,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			})
 
 			testsuites.RunTestSuite(f, config, driver, csiTestSuites, csiTunePattern)
+			testCSIDriverUpdate(f, driver)
 		})
 	}
 
@@ -213,7 +223,8 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					ExpectedSize: "1Gi",
 					NodeName:     nodeName,
 				}
-				class, claim, pod := startPausePod(cs, scTest, ns.Name)
+				// Use exec to kill the pod quickly
+				class, claim, pod := startPod(cs, scTest, ns.Name, "exec sleep 6000")
 				if class != nil {
 					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
 				}
@@ -289,7 +300,7 @@ func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) st
 	return pv.Spec.CSI.VolumeHandle
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func startPod(cs clientset.Interface, t testsuites.StorageClassTest, ns string, cmdline string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
 	class, err := cs.StorageV1().StorageClasses().Create(class)
 	framework.ExpectNoError(err, "Failed to create class : %v", err)
@@ -298,6 +309,17 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(claim)
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
+	pod := getTestPod(t, claim, cmdline)
+
+	if len(t.NodeName) != 0 {
+		pod.Spec.NodeName = t.NodeName
+	}
+	pod, err = cs.CoreV1().Pods(ns).Create(pod)
+	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	return class, claim, pod
+}
+
+func getTestPod(t testsuites.StorageClassTest, claim *v1.PersistentVolumeClaim, cmdline string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
@@ -305,8 +327,9 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  "volume-tester",
-					Image: imageutils.GetE2EImage(imageutils.Pause),
+					Name:    "volume-tester",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"/bin/sh", "-c", cmdline},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
@@ -333,7 +356,120 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 	if len(t.NodeName) != 0 {
 		pod.Spec.NodeName = t.NodeName
 	}
-	pod, err = cs.CoreV1().Pods(ns).Create(pod)
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
-	return class, claim, pod
+	return pod
+}
+
+func testCSIDriverUpdate(f *framework.Framework, driver drivers.TestDriver) {
+	// NOTE: this test assumes that all CSI drivers in csiTestDrivers deploy exactly one DaemonSet.
+	It("should work after update", func() {
+		cs := f.ClientSet
+
+		By("Checking the driver works before update")
+		var sc *storagev1.StorageClass
+		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
+			sc = dDriver.GetDynamicProvisionStorageClass("")
+		}
+		nodeName := driver.GetDriverInfo().Config.ClientNodeName
+		scTest := testsuites.StorageClassTest{
+			Name:         driver.GetDriverInfo().Name,
+			Provisioner:  sc.Provisioner,
+			Parameters:   sc.Parameters,
+			ClaimSize:    "1Gi",
+			ExpectedSize: "1Gi",
+			NodeName:     nodeName,
+		}
+		class, claim, pod := startPod(cs, scTest, f.Namespace.Name, "echo 'test' > /mnt/test/data")
+
+		if class != nil {
+			defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
+		}
+		if claim != nil {
+			defer cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(claim.Name, nil)
+		}
+		if pod != nil {
+			// Fully delete (=unmount) the pod before deleting CSI driver
+			defer framework.DeletePodWithWait(f, cs, pod)
+		}
+		if pod == nil {
+			return
+		}
+		err := framework.WaitForPodSuccessInNamespace(cs, pod.Name, pod.Namespace)
+		framework.ExpectNoError(err, "Failed to start pod")
+		err = framework.DeletePodWithWait(f, cs, pod)
+
+		By("Finding CSI driver deployment")
+		ds, err := getDriverDaemonSet(f)
+		framework.ExpectNoError(err, "Failed to get driver DaemonSets")
+
+		By("Updating the driver")
+		ds, err = cs.AppsV1().DaemonSets(f.Namespace.Name).Get(ds.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get DaemonSet")
+
+		expectedUpdatedPods := ds.Status.DesiredNumberScheduled
+		framework.Logf("DaemonSet with driver has %d scheduled pods", expectedUpdatedPods)
+		// For debugging:
+		framework.Logf("DaemonSet status: %+v", ds.Status)
+
+		ds, err = framework.UpdateDaemonSetWithRetries(cs, f.Namespace.Name, ds.Name, func(ds *appsv1.DaemonSet) {
+			// Simulate driver update by adding a new label in DaemonSet template. This issues rolling update.
+			if ds.Spec.Template.Labels == nil {
+				ds.Spec.Template.Labels = map[string]string{}
+			}
+			ds.Spec.Template.Labels[f.UniqueName] = ""
+		})
+		framework.ExpectNoError(err, "Failed to update DaemonSet")
+
+		By("Waiting for the update to complete")
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{f.UniqueName: ""}))
+		_, err = framework.WaitForPodsWithLabelRunningReady(cs, f.Namespace.Name, selector, int(expectedUpdatedPods), framework.PodStartTimeout)
+		framework.ExpectNoError(err, "Failed to wait for updated DaemonSet")
+
+		By("Checking the driver works after update with the same claim")
+		pod2 := getTestPod(scTest, claim, "grep test < /mnt/test/data")
+		pod2, err = cs.CoreV1().Pods(f.Namespace.Name).Create(pod2)
+		framework.ExpectNoError(err, "Failed to create pod")
+		defer framework.DeletePodWithWait(f, cs, pod2)
+
+		err = framework.WaitForPodSuccessInNamespace(cs, pod2.Name, pod2.Namespace)
+		framework.ExpectNoError(err, "Failed to start pod2")
+		pod2, err = cs.CoreV1().Pods(pod2.Namespace).Get(pod2.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get pod")
+		nodeName = pod2.Spec.NodeName
+		err = framework.DeletePodWithWait(f, cs, pod2)
+		framework.ExpectNoError(err, "Failed to delete pod2")
+
+		// #71424: check that NodeID annotation is set after update
+		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to read node")
+		ann, found := node.Annotations[annotationKeyNodeID]
+		Expect(found).To(BeTrue(), "annotation with NodeID not found")
+		var nodeIDs map[string]string
+		err = json.Unmarshal([]byte(ann), &nodeIDs)
+		framework.ExpectNoError(err, "Failed to parse NodeID json")
+		_, ok := nodeIDs[class.Provisioner]
+		Expect(ok).To(BeTrue(), "NodeID of driver not found")
+
+		// By waiting for PVC deletion we make sure that the volume is detached, since most cloud providers
+		// wait for detach + we have finalizer on PVC.
+		claim, err = cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(claim.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get PVC")
+		cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(claim.Name, nil)
+		err = framework.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, 5*time.Second, 20*time.Minute)
+		framework.ExpectNoError(err, "Timed out waiting for PV to delete")
+	})
+}
+
+// getDriverDaemonSet finds *any* DaemonSet in framework's namespace and returns it.
+// It must be called just after driver installation, where the only DaemonSet in the
+// namespace must be the driver.
+func getDriverDaemonSet(f *framework.Framework) (*appsv1.DaemonSet, error) {
+	By("Finding CSI driver DaemonSet")
+	daemonSets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if len(daemonSets.Items) != 1 {
+		return nil, fmt.Errorf("Got %d DaemonSets in the namespace when only 1 was expected", len(daemonSets.Items))
+	}
+	return &daemonSets.Items[0], nil
 }
