@@ -532,6 +532,14 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - csi.storage.k8s.io
+    resources:
+    - csinodeinfos
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -971,6 +979,42 @@ items:
     - volumeattachments
     verbs:
     - get
+  - apiGroups:
+    - csi.storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - csi.storage.k8s.io
+    resources:
+    - csinodeinfos
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
+  - apiGroups:
+    - node.k8s.io
+    resources:
+    - runtimeclasses
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

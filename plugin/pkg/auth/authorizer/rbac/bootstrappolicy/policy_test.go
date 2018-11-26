@@ -19,8 +19,10 @@ package bootstrappolicy_test
 import (
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"sigs.k8s.io/yaml"
@@ -31,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -116,6 +120,7 @@ func TestEditViewRelationship(t *testing.T) {
 }
 
 func TestBootstrapNamespaceRoles(t *testing.T) {
+	defer turnOnAllFeatureGates(t)()
 	list := &api.List{}
 	names := sets.NewString()
 	roles := map[string]runtime.Object{}
@@ -138,6 +143,7 @@ func TestBootstrapNamespaceRoles(t *testing.T) {
 }
 
 func TestBootstrapNamespaceRoleBindings(t *testing.T) {
+	defer turnOnAllFeatureGates(t)()
 	list := &api.List{}
 	names := sets.NewString()
 	roleBindings := map[string]runtime.Object{}
@@ -160,6 +166,7 @@ func TestBootstrapNamespaceRoleBindings(t *testing.T) {
 }
 
 func TestBootstrapClusterRoles(t *testing.T) {
+	defer turnOnAllFeatureGates(t)()
 	list := &api.List{}
 	names := sets.NewString()
 	roles := map[string]runtime.Object{}
@@ -176,6 +183,7 @@ func TestBootstrapClusterRoles(t *testing.T) {
 }
 
 func TestBootstrapClusterRoleBindings(t *testing.T) {
+	defer turnOnAllFeatureGates(t)()
 	list := &api.List{}
 	names := sets.NewString()
 	roleBindings := map[string]runtime.Object{}
@@ -192,6 +200,7 @@ func TestBootstrapClusterRoleBindings(t *testing.T) {
 }
 
 func TestBootstrapControllerRoles(t *testing.T) {
+	defer turnOnAllFeatureGates(t)()
 	list := &api.List{}
 	names := sets.NewString()
 	roles := map[string]runtime.Object{}
@@ -208,6 +217,7 @@ func TestBootstrapControllerRoles(t *testing.T) {
 }
 
 func TestBootstrapControllerRoleBindings(t *testing.T) {
+	defer turnOnAllFeatureGates(t)()
 	list := &api.List{}
 	names := sets.NewString()
 	roleBindings := map[string]runtime.Object{}
@@ -283,6 +293,29 @@ func TestClusterRoleLabel(t *testing.T) {
 		}
 		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+}
+
+func turnOnAllFeatureGates(t *testing.T) func() {
+	cmd := "grep --include=*.go  --exclude=*_test.go -rw . -e 'DefaultFeatureGate.Enabled' --no-filename|awk 'BEGIN {FS=\"DefaultFeatureGate.Enabled\\(features.|\\)\"} {print $2}'"
+	str, err := exec.Command("sh", "-c", cmd).Output()
+	if err != nil {
+		return func() {}
+	}
+
+	recoverFuncs := []func(){}
+	for _, featureStr := range strings.Split(string(str), "\n") {
+		if featureStr == "" {
+			continue
+		}
+		feature := utilfeature.Feature(featureStr)
+		recoverFuncs = append(recoverFuncs, utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true))
+	}
+
+	return func() {
+		for _, rf := range recoverFuncs {
+			rf()
 		}
 	}
 }
