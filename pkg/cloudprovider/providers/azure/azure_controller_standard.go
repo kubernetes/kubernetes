@@ -71,7 +71,8 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s)", as.resourceGroup, vmName, diskName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	if _, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, as.resourceGroup, vmName, newVM); err != nil {
+	_, err = as.VirtualMachinesClient.CreateOrUpdate(ctx, as.resourceGroup, vmName, newVM)
+	if err != nil {
 		glog.Errorf("azureDisk - attach disk(%s) failed, err: %v", diskName, err)
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
@@ -127,7 +128,8 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s)", as.resourceGroup, vmName, diskName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	if _, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, as.resourceGroup, vmName, newVM); err != nil {
+	_, err = as.VirtualMachinesClient.CreateOrUpdate(ctx, as.resourceGroup, vmName, newVM)
+	if err != nil {
 		glog.Errorf("azureDisk - detach disk(%s) failed, err: %v", diskName, err)
 	} else {
 		glog.V(2).Infof("azureDisk - detach disk(%s) succeeded", diskName)
