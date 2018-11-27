@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -271,6 +272,18 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	}
 	defer backendConn.Close()
 
+	// determine the http response code from the backend by reading from rawResponse+backendConn
+	backendHTTPResponse, headerBytes, err := getResponse(io.MultiReader(bytes.NewReader(rawResponse), backendConn))
+	if err != nil {
+		klog.V(6).Infof("Proxy connection error: %v", err)
+		h.Responder.Error(w, req, err)
+		return true
+	}
+	if len(headerBytes) > len(rawResponse) {
+		// we read beyond the bytes stored in rawResponse, update rawResponse to the full set of bytes read from the backend
+		rawResponse = headerBytes
+	}
+
 	// Once the connection is hijacked, the ErrorResponder will no longer work, so
 	// hijacking should be the last step in the upgrade.
 	requestHijacker, ok := w.(http.Hijacker)
@@ -286,6 +299,22 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		return true
 	}
 	defer requestHijackedConn.Close()
+
+	if backendHTTPResponse.StatusCode != http.StatusSwitchingProtocols {
+		// If the backend did not upgrade the request, echo the response from the backend to the client and return, closing the connection.
+		klog.V(6).Infof("Proxy upgrade error, status code %d", backendHTTPResponse.StatusCode)
+		// set read/write deadlines
+		deadline := time.Now().Add(10 * time.Second)
+		backendConn.SetReadDeadline(deadline)
+		requestHijackedConn.SetWriteDeadline(deadline)
+		// write the response to the client
+		err := backendHTTPResponse.Write(requestHijackedConn)
+		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			klog.Errorf("Error proxying data from backend to client: %v", err)
+		}
+		// Indicate we handled the request
+		return true
+	}
 
 	// Forward raw response bytes back to client.
 	if len(rawResponse) > 0 {
@@ -354,6 +383,19 @@ func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, error
 		return nil, err
 	}
 	return dial(updatedReq, h.UpgradeTransport)
+}
+
+// getResponseCode reads a http response from the given reader, returns the response,
+// the bytes read from the reader, and any error encountered
+func getResponse(r io.Reader) (*http.Response, []byte, error) {
+	rawResponse := bytes.NewBuffer(make([]byte, 0, 256))
+	// Save the bytes read while reading the response headers into the rawResponse buffer
+	resp, err := http.ReadResponse(bufio.NewReader(io.TeeReader(r, rawResponse)), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	// return the http response and the raw bytes consumed from the reader in the process
+	return resp, rawResponse.Bytes(), nil
 }
 
 // dial dials the backend at req.URL and writes req to it.

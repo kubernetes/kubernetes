@@ -84,9 +84,16 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 
+		By("waiting for volumes to be attached to node")
+		err = waitForVolumesAttached(cs, node.Name, uniqueVolumeName)
+		Expect(err).NotTo(HaveOccurred(), "while waiting for volume to attach to %s node", node.Name)
+
 		By("waiting for volume-in-use on the node after pod creation")
 		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
 		Expect(err).NotTo(HaveOccurred(), "while waiting for volume in use")
+
+		By("waiting for kubelet to start mounting the volume")
+		time.Sleep(20 * time.Second)
 
 		By("Deleting the flexvolume pod")
 		err = framework.DeletePodWithWait(f, cs, pod)
@@ -131,6 +138,22 @@ func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName str
 			}
 		}
 		return true, nil
+	})
+}
+
+func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName string) error {
+	return wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
+		}
+		volumeAttached := node.Status.VolumesAttached
+		for _, volume := range volumeAttached {
+			if string(volume.Name) == volumeName {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }
 
