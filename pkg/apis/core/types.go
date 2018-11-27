@@ -1921,6 +1921,10 @@ type Probe struct {
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +optional
 	FailureThreshold int32
+	// Maximum number of failures allowed for the probe to be considered failed during initialization (i.e. before having succeeded once).
+	// Defaults to FailureThreshold if unspecified or smaller than FailureThreshold.
+	// +optional
+	InitializationFailureThreshold int32
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

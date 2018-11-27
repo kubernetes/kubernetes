@@ -2023,6 +2023,10 @@ type Probe struct {
 	// Defaults to 3. Minimum value is 1.
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+	// Maximum number of failures allowed for the probe to be considered failed during initialization (i.e. before having succeeded once).
+	// Defaults to FailureThreshold if unspecified or smaller than FailureThreshold.
+	// +optional
+	InitializationFailureThreshold int32 `json:"initializationFailureThreshold,omitempty" protobuf:"varint,7,opt,name=initializationFailureThreshold"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

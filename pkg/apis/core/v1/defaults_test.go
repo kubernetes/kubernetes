@@ -1332,11 +1332,12 @@ func TestSetDefaultLimitRangeItem(t *testing.T) {
 func TestSetDefaultProbe(t *testing.T) {
 	originalProbe := v1.Probe{}
 	expectedProbe := v1.Probe{
-		InitialDelaySeconds: 0,
-		TimeoutSeconds:      1,
-		PeriodSeconds:       10,
-		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		InitialDelaySeconds:            0,
+		TimeoutSeconds:                 1,
+		PeriodSeconds:                  10,
+		SuccessThreshold:               1,
+		FailureThreshold:               3,
+		InitializationFailureThreshold: 3,
 	}
 
 	pod := &v1.Pod{

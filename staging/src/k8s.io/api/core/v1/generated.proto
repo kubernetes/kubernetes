@@ -3416,6 +3416,11 @@ message Probe {
   // Defaults to 3. Minimum value is 1.
   // +optional
   optional int32 failureThreshold = 6;
+
+  // Maximum number of failures allowed for the probe to be considered failed during initialization (i.e. before having succeeded once).
+  // Defaults to FailureThreshold if unspecified or smaller than FailureThreshold.
+  // +optional
+  optional int32 initializationFailureThreshold = 7;
 }
 
 // Represents a projected volume source

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -72,6 +72,9 @@ type worker struct {
 	proberResultsSuccessfulMetricLabels prometheus.Labels
 	proberResultsFailedMetricLabels     prometheus.Labels
 	proberResultsUnknownMetricLabels    prometheus.Labels
+
+	// Record success to signify end of initial phase.
+	hasInitialized bool
 }
 
 // Creates and starts a new probe worker.
@@ -234,6 +237,9 @@ func (w *worker) doProbe() (keepGoing bool) {
 	switch result {
 	case results.Success:
 		ProberResults.With(w.proberResultsSuccessfulMetricLabels).Inc()
+		if !w.hasInitialized {
+			w.hasInitialized = true
+		}
 	case results.Failure:
 		ProberResults.With(w.proberResultsFailedMetricLabels).Inc()
 	default:
@@ -248,6 +254,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
+		(result == results.Failure && !w.hasInitialized && w.resultRun < int(w.spec.InitializationFailureThreshold)) ||
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		return true

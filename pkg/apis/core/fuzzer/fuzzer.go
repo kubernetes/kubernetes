@@ -299,6 +299,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					f.SetInt(1)
 				}
 			}
+			// Make sure InitializationFailureThreshold equals FailureThreshold if inferior
+			initializationFailureThreshold := v.FieldByName("InitializationFailureThreshold")
+			failureThreshold := v.FieldByName("FailureThreshold")
+			if initializationFailureThreshold.Int() < failureThreshold.Int() {
+				initializationFailureThreshold.SetInt(failureThreshold.Int())
+			}
 		},
 		func(ev *core.EnvVar, c fuzz.Continue) {
 			ev.Name = c.RandString()

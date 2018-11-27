@@ -202,6 +202,9 @@ func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.FailureThreshold == 0 {
 		obj.FailureThreshold = 3
 	}
+	if obj.InitializationFailureThreshold < obj.FailureThreshold {
+		obj.InitializationFailureThreshold = obj.FailureThreshold
+	}
 }
 func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
 	if obj.DefaultMode == nil {

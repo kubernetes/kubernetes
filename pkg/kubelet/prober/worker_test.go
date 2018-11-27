@@ -382,3 +382,129 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be reset to 0")
 	}
 }
+
+func TestInitializationFailureThresholdExceeded(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3, InitializationFailureThreshold: 3})
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+	if w.hasInitialized {
+		t.Errorf("Pod should not be initialized")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg := "Not initialized, probe failure #1, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Not initialized, probe failure #2, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Not initialized, probe failure #3, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+
+	// Here pod is already dead, no success.
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg = "Not initialized, probe success, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+}
+
+func TestInitializationFailureThresholdInitialized(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3, InitializationFailureThreshold: 3})
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg := "Not initialized, probe failure #1, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Not initialized, probe failure #2, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.hasInitialized {
+		t.Errorf("Pod should not be initialized")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg = "Not initialized, probe success, result success, becomes initialized"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if !w.hasInitialized {
+		t.Errorf("Pod should be initialized")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe failure #1, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe failure #2, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe failure #3, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+
+	// Here pod is already dead, no success.
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe success, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+}
+
+func TestInitializationFailureThresholdInitialized2(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3, InitializationFailureThreshold: 10})
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg := "Not initialized, probe failure #1, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Not initialized, probe failure #2, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.hasInitialized {
+		t.Errorf("Pod should not be initialized")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg = "Not initialized, probe success, result success, becomes initialized"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if !w.hasInitialized {
+		t.Errorf("Pod should be initialized")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe failure #1, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe failure #2, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe failure #3, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+
+	// Here pod is already dead, no success.
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "Initialized, probe success, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+}
