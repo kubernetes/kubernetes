@@ -149,7 +149,7 @@ k8s_deb(
     name = "kubelet",
     depends = [
         "iptables (>= 1.4.21)",
-        "kubernetes-cni (>= 0.5.1)",
+        "kubernetes-cni (>= 0.6.0)",
         "iproute2",
         "socat",
         "util-linux",
