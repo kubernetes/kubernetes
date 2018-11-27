@@ -24,7 +24,7 @@ install -p -m 644 -T {kubelet.env} %{buildroot}%{_sysconfdir}/sysconfig/kubelet
 mkdir -p %{buildroot}%{_libexecdir}/modules-load.d
 mkdir -p %{buildroot}%{_sysctldir}
 install -p -m 0644 -t %{buildroot}%{_libexecdir}/modules-load.d/ {kubeadm.conf}
-install -p -m 0644 -t %{buildroot}%{_sysctldir} %{50-kubeadm.conf}
+install -p -m 0644 -t %{buildroot}%{_sysctldir} {50-kubeadm.conf}
 
 %files
 %{_bindir}/kubeadm
