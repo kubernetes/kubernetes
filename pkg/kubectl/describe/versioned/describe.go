@@ -371,10 +371,14 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return "", err
 		}
 	}
-	return describeNamespace(ns, resourceQuotaList, limitRangeList)
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Core().Events(namespace).Search(scheme.Scheme, ns)
+	}
+	return describeNamespace(ns, resourceQuotaList, limitRangeList, events)
 }
 
-func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.ResourceQuotaList, limitRangeList *corev1.LimitRangeList) (string, error) {
+func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.ResourceQuotaList, limitRangeList *corev1.LimitRangeList, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", namespace.Name)
@@ -388,6 +392,9 @@ func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.Re
 		if limitRangeList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeLimitRanges(limitRangeList, w)
+		}
+		if events != nil {
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
