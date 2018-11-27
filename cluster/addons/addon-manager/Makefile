@@ -12,17 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE=staging-k8s.gcr.io/kube-addon-manager
+REGISTRY?=staging-k8s.gcr.io
+
+IMAGE=$(REGISTRY)/kube-addon-manager
 ARCH?=amd64
+ALL_ARCH = amd64 arm arm64 ppc64le
+
+export DOCKER_CLI_EXPERIMENTAL := enabled
+
 TEMP_DIR:=$(shell mktemp -d)
 VERSION=v8.9
 KUBECTL_VERSION?=v1.11.3
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
 
-.PHONY: build push
+.PHONY: build push push-manifest all-push all-push-images all-build all all-push-images all-push push-manifest
 
-all: build
+all: all-build
 
 build:
 	cp ./* $(TEMP_DIR)
@@ -33,12 +39,27 @@ build:
 
 push: build
 	docker push $(IMAGE)-$(ARCH):$(VERSION)
-ifeq ($(ARCH),amd64)
-	# Backward compatibility. TODO: deprecate this image tag
-	docker rmi $(IMAGE):$(VERSION) 2>/dev/null || true
-	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
-	docker push $(IMAGE):$(VERSION)
-endif
+
+sub-build-%:
+	$(MAKE) ARCH=$* build
+
+all-build: $(addprefix sub-build-,$(ALL_ARCH))
+
+sub-push-image-%:
+	$(MAKE) ARCH=$* push
+
+
+all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
+
+
+all-push: all-push-images push-manifest
+
+
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(VERSION) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(VERSION)~g")
+	for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${VERSION} ${IMAGE}-$${arch}:${VERSION}; done
+	docker manifest push --purge ${IMAGE}:${VERSION}
+
 
 clean:
 	docker rmi -f $(IMAGE)-$(ARCH):$(VERSION)

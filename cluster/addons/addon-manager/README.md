@@ -53,6 +53,12 @@ $ make push ARCH=ppc64le
 
 $ make push ARCH=s390x
 # ---> staging-k8s.gcr.io/kube-addon-manager-s390x:VERSION
+
+# Build images for all the architecture and push the manifest image as well
+$ make all-push
+
+# Build images for all the architecture
+$ make all-build
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
