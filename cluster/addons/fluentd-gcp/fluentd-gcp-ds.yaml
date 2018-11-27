@@ -100,8 +100,6 @@ spec:
       nodeSelector:
         beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
-      - key: "node.alpha.kubernetes.io/ismaster"
-        effect: "NoSchedule"
       - operator: "Exists"
         effect: "NoExecute"
       - operator: "Exists"
