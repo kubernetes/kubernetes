@@ -44,6 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
+
+	csiPlugins "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins"
 )
 
 const (
@@ -246,14 +248,82 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	// Initializing csiDrivers map and label management channels
+	// Initializing csiDrivers map, label management channels, and migratedDrivers map
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
-	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
 
-	// TODO(#70514) Init CSINodeInfo object if the CRD exists and create Driver
-	// objects for migrated drivers.
+	var migratedDrivers = map[string](func() bool){
+		csiPlugins.GCEPDDriverName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+		},
+		// TODO(leakingtpan): Add AWS migration feature gates and place them here
+	}
+
+	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedDrivers)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		// This function prevents Kubelet from posting Ready status until CSINodeInfo
+		// is both installed and initialized
+		initializeCSINodeInfo(host)
+	}
 
 	return nil
+}
+
+func initializeCSINodeInfo(host volume.VolumeHost) {
+	kubeClient := host.GetKubeClient()
+	if kubeClient == nil || len(host.GetPodsDir()) == 0 {
+		// If we're NOT on the Kubelet OR KubeClient DOESNT exist
+		klog.V(4).Infof("Skipping CSINodeInfo initialization, not running on Kubelet or KubeClient doesn't exist")
+		return
+	}
+	go func() {
+		host.SetKubeletError(fmt.Errorf("Could not find CSINodeInfo CRD. Please install the CSINodeInfo CRD"))
+		crdTicker := time.NewTicker(30 * time.Second)
+		defer crdTicker.Stop()
+		found := false
+		for {
+			select {
+			case <-crdTicker.C:
+				groupResource, err := kubeClient.Discovery().ServerResourcesForGroupVersion("csi.storage.k8s.io" + "/" + "v1alpha1")
+				if err != nil {
+					klog.Warningf("Failed to get groupResource: %v", err)
+					continue
+				}
+
+				for _, g := range groupResource.APIResources {
+					if g.Name == "csinodeinfos" {
+						klog.V(4).Infof("Found the csinodeinfos CRD installed on API Server")
+						found = true
+					}
+				}
+			}
+			if found {
+				break
+			}
+		}
+
+		host.SetKubeletError(fmt.Errorf("Found CSINodeInfo CRD. Waiting for CSINodeInfo initialization"))
+
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			// No timeout case because this is blocking Kubelet Ready
+			case <-ticker.C:
+				klog.V(4).Infof("Intializing migrated drivers on CSINodeInfo")
+				err := nim.InitializeMigratedDrivers()
+				if err != nil {
+					klog.Warningf("Failed to initialize migrated drivers: %v", err)
+				} else {
+					// Successfully initialized drivers, allow Kubelet to post Ready
+					host.SetKubeletError(nil)
+					return
+				}
+			}
+		}
+	}()
+
 }
 
 func (p *csiPlugin) GetPluginName() string {

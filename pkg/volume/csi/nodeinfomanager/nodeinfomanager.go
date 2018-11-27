@@ -61,8 +61,9 @@ var (
 // nodeInfoManager contains necessary common dependencies to update node info on both
 // the Node and CSINodeInfo objects.
 type nodeInfoManager struct {
-	nodeName   types.NodeName
-	volumeHost volume.VolumeHost
+	nodeName        types.NodeName
+	volumeHost      volume.VolumeHost
+	migratedDrivers map[string](func() bool)
 }
 
 // If no updates is needed, the function must return the same Node object as the input.
@@ -71,6 +72,11 @@ type nodeUpdateFunc func(*v1.Node) (newNode *v1.Node, updated bool, err error)
 // Interface implements an interface for managing labels of a node
 type Interface interface {
 	CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error)
+
+	// InitializeMigratedDrivers will create CSINodeInfo objects for all drivers that are to
+	// be migrated. It will initialize most fields with dummy values. The CSIDriverInfo object
+	// will be initialized with DriverName, ProxyInTreeVolumePlugin, and Available.
+	InitializeMigratedDrivers() error
 
 	// Record in the cluster the given node information from the CSI driver with the given name.
 	// Concurrent calls to InstallCSIDriver() is allowed, but they should not be intertwined with calls
@@ -86,11 +92,122 @@ type Interface interface {
 // NewNodeInfoManager initializes nodeInfoManager
 func NewNodeInfoManager(
 	nodeName types.NodeName,
-	volumeHost volume.VolumeHost) Interface {
+	volumeHost volume.VolumeHost,
+	migratedDrivers map[string](func() bool)) Interface {
 	return &nodeInfoManager{
-		nodeName:   nodeName,
-		volumeHost: volumeHost,
+		nodeName:        nodeName,
+		volumeHost:      volumeHost,
+		migratedDrivers: migratedDrivers,
 	}
+}
+
+// InitializeMigratedDrivers will create CSINodeInfo objects for all drivers that are to
+// be migrated. It will initialize most fields with dummy values. The CSIDriverInfo object
+// will be initialized with DriverName, ProxyInTreeVolumePlugin, and Available.
+func (nim *nodeInfoManager) InitializeMigratedDrivers() error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		klog.Warningf("InitializeMigratedDrivers called but CSINodeInfo or CSIMigration is disabled")
+		return nil
+	}
+
+	var updateErrs []error
+
+	csiKubeClient := nim.volumeHost.GetCSIClient()
+	if csiKubeClient == nil {
+		return fmt.Errorf("error getting CSI client")
+	}
+
+	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
+		nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
+		if nodeInfo == nil || errors.IsNotFound(err) {
+			nodeInfo, err = nim.CreateCSINodeInfo()
+		}
+		if err != nil {
+			updateErrs = append(updateErrs, err)
+			return false, nil
+		}
+		err = nim.tryInitializeMigratedDrivers(nodeInfo)
+		if err != nil {
+			updateErrs = append(updateErrs, err)
+			return false, nil
+		}
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("error updating node: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+	}
+	return nil
+}
+
+func (nim *nodeInfoManager) tryInitializeMigratedDrivers(nodeInfo *csiv1alpha1.CSINodeInfo) error {
+	csiKubeClient := nim.volumeHost.GetCSIClient()
+	if csiKubeClient == nil {
+		return fmt.Errorf("error getting CSI client")
+	}
+
+	existingDrivers := sets.String{}
+
+	// Do existing updates
+	// Clone driver list, omitting the driver that matches the given driverName
+	newDriverSpecs := []csiv1alpha1.CSIDriverInfoSpec{}
+	for _, driverInfoSpec := range nodeInfo.Spec.Drivers {
+		// No need to change any specs
+		newDriverSpecs = append(newDriverSpecs, driverInfoSpec)
+		existingDrivers.Insert(driverInfoSpec.Name)
+	}
+
+	newDriverStatuses := []csiv1alpha1.CSIDriverInfoStatus{}
+	for _, driverInfoStatus := range nodeInfo.Status.Drivers {
+		if _, ok := nim.migratedDrivers[driverInfoStatus.Name]; ok {
+			// If driver is known to migration logic and already exists in Spec
+			// just update volume plugin mechanism
+			driverInfoStatus.VolumePluginMechanism = nim.getVolumePluginMechanism(driverInfoStatus.Name)
+		}
+		newDriverStatuses = append(newDriverStatuses, driverInfoStatus)
+	}
+
+	for driver, _ := range nim.migratedDrivers {
+		if existingDrivers.Has(driver) {
+			// Skip adding new driver because already updated previously
+			continue
+		}
+
+		driverSpec := csiv1alpha1.CSIDriverInfoSpec{
+			Name:         driver,
+			NodeID:       "",
+			TopologyKeys: []string{},
+		}
+
+		volumePluginMechanism := nim.getVolumePluginMechanism(driver)
+		driverStatus := csiv1alpha1.CSIDriverInfoStatus{
+			Name: driver,
+			// We are just adding this driver object it's not installed
+			Available:             false,
+			VolumePluginMechanism: volumePluginMechanism,
+		}
+
+		newDriverSpecs = append(newDriverSpecs, driverSpec)
+		newDriverStatuses = append(newDriverStatuses, driverStatus)
+
+	}
+
+	nodeInfo.Spec.Drivers = newDriverSpecs
+	nodeInfo.Status.Drivers = newDriverStatuses
+
+	_, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
+	return err
+}
+
+func (nim *nodeInfoManager) getVolumePluginMechanism(driverName string) csiv1alpha1.VolumePluginMechanism {
+	volumePluginMechanism := csiv1alpha1.VolumePluginMechanismInTree
+	if migratedFunc, ok := nim.migratedDrivers[driverName]; ok {
+		if migratedFunc() {
+			volumePluginMechanism = csiv1alpha1.VolumePluginMechanismCSI
+		}
+	}
+	return volumePluginMechanism
 }
 
 // InstallCSIDriver updates the node ID annotation in the Node object and CSIDrivers field in the
@@ -441,6 +558,13 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 		topologyKeys.Insert(k)
 	}
 
+	volumePluginMechanism := csiv1alpha1.VolumePluginMechanismInTree
+	if migratedFunc, ok := nim.migratedDrivers[driverName]; ok {
+		if migratedFunc() {
+			volumePluginMechanism = csiv1alpha1.VolumePluginMechanismCSI
+		}
+	}
+
 	specModified := true
 	statusModified := true
 	// Clone driver list, omitting the driver that matches the given driverName
@@ -460,8 +584,7 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	for _, driverInfoStatus := range nodeInfo.Status.Drivers {
 		if driverInfoStatus.Name == driverName {
 			if driverInfoStatus.Available &&
-				/* TODO(https://github.com/kubernetes/enhancements/issues/625): Add actual migration status */
-				driverInfoStatus.VolumePluginMechanism == csiv1alpha1.VolumePluginMechanismInTree {
+				driverInfoStatus.VolumePluginMechanism == volumePluginMechanism {
 				statusModified = false
 			}
 		} else {
@@ -481,10 +604,9 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 		TopologyKeys: topologyKeys.List(),
 	}
 	driverStatus := csiv1alpha1.CSIDriverInfoStatus{
-		Name:      driverName,
-		Available: true,
-		// TODO(https://github.com/kubernetes/enhancements/issues/625): Add actual migration status
-		VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+		Name:                  driverName,
+		Available:             true,
+		VolumePluginMechanism: volumePluginMechanism,
 	}
 
 	newDriverSpecs = append(newDriverSpecs, driverSpec)

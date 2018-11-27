@@ -220,6 +220,10 @@ func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
 	return nil
 }
 
+func (f *fakeVolumeHost) SetKubeletError(err error) {
+	return
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{

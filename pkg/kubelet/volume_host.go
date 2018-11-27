@@ -94,6 +94,11 @@ type kubeletVolumeHost struct {
 	mountPodManager  mountpod.Manager
 }
 
+func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
+	kvh.kubelet.runtimeState.setStorageState(err)
+	return
+}
+
 func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
 	return kvh.kubelet.getVolumeDevicePluginDir(pluginName)
 }

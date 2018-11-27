@@ -44,6 +44,10 @@ func (ctrl *PersistentVolumeController) GetVolumeDevicePluginDir(pluginName stri
 	return ""
 }
 
+func (ctrl *PersistentVolumeController) SetKubeletError(err error) {
+	return
+}
+
 func (ctrl *PersistentVolumeController) GetPodsDir() string {
 	return ""
 }

@@ -390,6 +390,18 @@ const (
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
+	
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the in-tree storage to CSI Plugin migration feature.
+	CSIMigration utilfeature.Feature = "CSIMigration"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
+	CSIMigrationGCE utilfeature.Feature = "CSIMigrationGCE"
 )
 
 func init() {
@@ -400,8 +412,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	AppArmor:             {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig: {Default: true, PreRelease: utilfeature.Beta},
+	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
+	DynamicKubeletConfig:                        {Default: true, PreRelease: utilfeature.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
@@ -429,6 +441,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.GA},
 	CSIDriverRegistry:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CSINodeInfo:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: true, PreRelease: utilfeature.Beta},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},

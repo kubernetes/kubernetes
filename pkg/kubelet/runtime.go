@@ -30,6 +30,7 @@ type runtimeState struct {
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
+	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
 }
@@ -61,6 +62,12 @@ func (s *runtimeState) setNetworkState(err error) {
 	s.networkError = err
 }
 
+func (s *runtimeState) setStorageState(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.storageError = err
+}
+
 func (s *runtimeState) setPodCIDR(cidr string) {
 	s.Lock()
 	defer s.Unlock()
@@ -89,6 +96,16 @@ func (s *runtimeState) runtimeErrors() error {
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func (s *runtimeState) storageErrors() []string {
+	s.RLock()
+	defer s.RUnlock()
+	var ret []string
+	if s.storageError != nil {
+		ret = append(ret, s.storageError.Error())
+	}
+	return ret
 }
 
 func (s *runtimeState) networkErrors() error {

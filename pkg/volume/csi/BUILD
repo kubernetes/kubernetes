@@ -33,6 +33,7 @@ go_library(
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/listers/csi/v1alpha1:go_default_library",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
+        "//vendor/github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

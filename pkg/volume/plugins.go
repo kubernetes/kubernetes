@@ -367,6 +367,9 @@ type VolumeHost interface {
 
 	// Returns the event recorder of kubelet.
 	GetEventRecorder() record.EventRecorder
+
+	// SetKubeletError sets the ready state on the kubelet.
+	SetKubeletError(err error)
 }
 
 // VolumePluginMgr tracks registered plugins.
