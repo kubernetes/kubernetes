@@ -125,6 +125,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 	if err != nil {
 		framework.Failf("deploying csi hostpath driver: %v", err)
 	}
+	waitForAllDriverRegistrarReady(f, h.driverInfo.Framework.Namespace.Name, "csi-hostpathplugin", "driver-registrar")
 }
 
 func (h *hostpathCSIDriver) CleanupDriver() {
@@ -211,6 +212,7 @@ func (h *hostpathV0CSIDriver) CreateDriver() {
 	if err != nil {
 		framework.Failf("deploying csi hostpath v0 driver: %v", err)
 	}
+	waitForAllDriverRegistrarReady(f, h.driverInfo.Framework.Namespace.Name, "csi-hostpathplugin", "driver-registrar")
 }
 
 func (h *hostpathV0CSIDriver) CleanupDriver() {
@@ -302,6 +304,7 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
+	waitForAllDriverRegistrarReady(g.driverInfo.Framework, g.driverInfo.Framework.Namespace.Name, "csi-gce-pd-node", "csi-driver-registrar")
 }
 
 func (g *gcePDCSIDriver) CleanupDriver() {

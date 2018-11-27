@@ -26,13 +26,20 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+)
+
+const (
+	dsRetryPeriod  = 1 * time.Second
+	dsRetryTimeout = 5 * time.Minute
 )
 
 var (
@@ -44,6 +51,7 @@ var (
 		"csi-provisioner":  "v0.4.0",
 		"driver-registrar": "v0.4.0",
 	}
+	driverReadyString = "PluginRegistered:true"
 )
 
 func csiContainerImage(image string) string {
@@ -116,4 +124,57 @@ func createGCESecrets(client clientset.Interface, config framework.VolumeTestCon
 
 	_, err = client.CoreV1().Secrets(config.Namespace).Create(s)
 	framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
+}
+
+func waitForAllPodsInDaemonsetReady(f *framework.Framework, namespace string, dsName string) {
+	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonsetDesiredState(f, namespace, dsName))
+	framework.ExpectNoError(err, "daemonset %s/%s doesn't become ready: %v", namespace, dsName, err)
+}
+
+func checkDaemonsetDesiredState(f *framework.Framework, namespace string, dsName string) func() (bool, error) {
+	return func() (bool, error) {
+		ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("Could not get daemonset %s/%s", namespace, dsName)
+		}
+		framework.Logf("daemonset %s/%s: desired:%d, ready:%d", namespace, dsName, ds.Status.DesiredNumberScheduled, ds.Status.NumberReady)
+		return ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady, nil
+	}
+}
+
+func getAllPodsInDaemonset(f *framework.Framework, namespace string, dsName string) ([]v1.Pod, error) {
+	var pods []v1.Pod
+
+	ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	podList, err := f.ClientSet.CoreV1().Pods(ds.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range podList.Items {
+		if metav1.IsControlledBy(&pod, ds) {
+			pods = append(pods, pod)
+		}
+	}
+
+	return pods, nil
+}
+
+func waitForDriverRegistrarReady(namespace string, podName string, container string) {
+	_, err := framework.LookForStringInLog(namespace, podName, container, driverReadyString, framework.PodStartTimeout)
+	framework.ExpectNoError(err, "Failed to find %q in driver registrar logs: %s", driverReadyString, err)
+}
+
+func waitForAllDriverRegistrarReady(f *framework.Framework, namespace string, dsName string, container string) {
+	waitForAllPodsInDaemonsetReady(f, namespace, dsName)
+
+	pods, err := getAllPodsInDaemonset(f, namespace, dsName)
+	framework.ExpectNoError(err, "Failed to get all pods for driver registrar managed by %s/%s: %v", namespace, dsName, err)
+
+	for _, pod := range pods {
+		waitForDriverRegistrarReady(pod.Namespace, pod.Name, container)
+	}
 }
