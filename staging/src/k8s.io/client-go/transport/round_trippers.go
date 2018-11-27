@@ -210,7 +210,7 @@ const (
 	ImpersonateUserHeader = "Impersonate-User"
 
 	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
-	// It can be repeated multiplied times for multiple groups.
+	// It can be repeated multiple times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
 
 	// ImpersonateUserExtraHeaderPrefix is a prefix for a header used to impersonate an entry in the
