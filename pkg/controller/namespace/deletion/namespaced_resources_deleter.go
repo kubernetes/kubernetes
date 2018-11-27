@@ -19,6 +19,7 @@ package deletion
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 // Interface to delete a namespace with all resources in it.
@@ -42,8 +44,20 @@ type NamespacedResourcesDeleterInterface interface {
 	Delete(nsName string) error
 }
 
+const (
+	failedDiscoveryReason         = "FailedDiscovery"
+	failedDiscoveryMsg            = "Failed to discover resources: %v"
+	failedDiscoverDeletableReason = "FailedDiscoverDeletable"
+	failedDiscoverDeletableMsg    = "Failed to discover deletable resources: %v"
+	failedDeleteReason            = "FailedDelete"
+	failedDeleteMsg               = "Failed to delete all content for %v: %v"
+	estimateInfoReason            = "EstimatePendingDelete"
+	estimateInfoMsg               = "Estimate on pending delete actions: %v"
+)
+
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 	dynamicClient dynamic.Interface, podsGetter v1clientset.PodsGetter,
+	recorder record.EventRecorder,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
 	d := &namespacedResourcesDeleter{
@@ -56,6 +70,7 @@ func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 		discoverResourcesFn:     discoverResourcesFn,
 		finalizerToken:          finalizerToken,
 		deleteNamespaceWhenDone: deleteNamespaceWhenDone,
+		recorder:                recorder,
 	}
 	d.initOpCache()
 	return d
@@ -79,6 +94,8 @@ type namespacedResourcesDeleter struct {
 	finalizerToken v1.FinalizerName
 	// Also delete the namespace when all resources in the namespace have been deleted.
 	deleteNamespaceWhenDone bool
+	// Event recorder helping to discover issues with dangling resources preventing deletion.
+	recorder record.EventRecorder
 }
 
 // Delete deletes all resources in the given namespace.
@@ -133,11 +150,12 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	}
 
 	// there may still be content for us to remove
-	estimate, err := d.deleteAllContent(namespace.Name, *namespace.DeletionTimestamp)
+	estimate, gvrEstimates, err := d.deleteAllContent(namespace)
 	if err != nil {
 		return err
 	}
 	if estimate > 0 {
+		d.recorder.Event(namespace, v1.EventTypeNormal, estimateInfoReason, fmt.Sprintf(estimateInfoMsg, printEstimates(gvrEstimates)))
 		return &ResourcesRemainingError{estimate}
 	}
 
@@ -478,15 +496,18 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
-func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
+func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, map[string]int64, error) {
 	var errs []error
 	estimate := int64(0)
+	gvrEstimates := make(map[string]int64)
+	namespace := ns.Name
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
 
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
+		d.recorder.Event(ns, v1.EventTypeWarning, failedDiscoveryReason, fmt.Sprintf(failedDiscoveryMsg, err))
 	}
 	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
@@ -494,23 +515,28 @@ func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespac
 	if err != nil {
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
+		d.recorder.Event(ns, v1.EventTypeWarning, failedDiscoverDeletableReason, fmt.Sprintf(failedDiscoverDeletableMsg, err))
 	}
 	for gvr := range groupVersionResources {
-		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
+		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, *ns.DeletionTimestamp)
 		if err != nil {
 			// If there is an error, hold on to it but proceed with all the remaining
 			// groupVersionResources.
+			d.recorder.Event(ns, v1.EventTypeWarning, failedDeleteReason, fmt.Sprintf(failedDeleteMsg, gvr.String(), err))
 			errs = append(errs, err)
+		}
+		if gvrEstimate > 0 {
+			gvrEstimates[gvr.String()] = gvrEstimate
 		}
 		if gvrEstimate > estimate {
 			estimate = gvrEstimate
 		}
 	}
 	if len(errs) > 0 {
-		return estimate, utilerrors.NewAggregate(errs)
+		return estimate, gvrEstimates, utilerrors.NewAggregate(errs)
 	}
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
-	return estimate, nil
+	return estimate, gvrEstimates, nil
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
@@ -562,4 +588,12 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns strin
 		}
 	}
 	return estimate, nil
+}
+
+func printEstimates(gvrEstimates map[string]int64) string {
+	arr := make([]string, 0, len(gvrEstimates))
+	for k, v := range gvrEstimates {
+		arr = append(arr, fmt.Sprintf("%v: %ds", k, v))
+	}
+	return strings.Join(arr, ", ")
 }

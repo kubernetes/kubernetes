@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -136,6 +137,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		kubeClientActionSet    sets.String
 		dynamicClientActionSet sets.String
 		gvrError               error
+		expectedEvents         int
 	}{
 		"pending-finalize": {
 			testNamespace: testNamespacePendingFinalize,
@@ -180,11 +182,15 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		fn := func() ([]*metav1.APIResourceList, error) {
 			return resources, nil
 		}
-		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), dynamicClient, mockClient.Core(), fn, v1.FinalizerKubernetes, true)
+		recorder := record.NewFakeRecorder(10)
+		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), dynamicClient, mockClient.Core(), recorder, fn, v1.FinalizerKubernetes, true)
 		if err := d.Delete(testInput.testNamespace.Name); err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
 
+		if len(recorder.Events) != testInput.expectedEvents {
+			t.Errorf("%s: expected %d event, got %v", scenario, testInput.expectedEvents, len(recorder.Events))
+		}
 		// validate traffic from kube client
 		actionSet := sets.NewString()
 		for _, action := range mockClient.Actions() {
@@ -255,11 +261,15 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	fn := func() ([]*metav1.APIResourceList, error) {
 		return testResources(), nil
 	}
+	recorder := record.NewFakeRecorder(10)
 	d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), nil, mockClient.Core(),
-		fn, v1.FinalizerKubernetes, true)
+		recorder, fn, v1.FinalizerKubernetes, true)
 	err := d.Delete(testNamespace.Name)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
+	}
+	if len(recorder.Events) != 0 {
+		t.Errorf("expected 0 events, got %v", len(recorder.Events))
 	}
 	if len(mockClient.Actions()) != 1 {
 		t.Errorf("Expected only one action from controller, but got: %d %v", len(mockClient.Actions()), mockClient.Actions())
