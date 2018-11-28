@@ -1053,6 +1053,11 @@ EOF
 }
 
 function create-node-problem-detector-kubeconfig {
+  local apiserver_address="${1}"
+  if [[ -z "${apiserver_address}" ]]; then
+    echo "Must provide API server address to create node-problem-detector kubeconfig file!"
+    exit 1
+  fi
   echo "Creating node-problem-detector kubeconfig file"
   mkdir -p /var/lib/node-problem-detector
   cat <<EOF >/var/lib/node-problem-detector/kubeconfig
@@ -1065,6 +1070,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://${apiserver_address}
     certificate-authority-data: ${CA_CERT}
 contexts:
 - context:
@@ -1194,7 +1200,7 @@ function start-node-problem-detector {
   local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
   # TODO(random-liu): Handle this for alternative container runtime.
   local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
-  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
+  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
   echo "Using node problem detector binary at ${npd_bin}"
   local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
   flags+=" --logtostderr"
@@ -2713,7 +2719,7 @@ function main() {
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      create-node-problem-detector-kubeconfig
+      create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
     fi
   fi
 
