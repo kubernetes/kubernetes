@@ -56,6 +56,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/tools/leaderelection/example:all-srcs",
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:all-srcs",
     ],
     tags = ["automanaged"],
