@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
@@ -405,7 +406,6 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 		newResources, err := GetQuotableResources(discoveryFunc)
 		if err != nil {
 			utilruntime.HandleError(err)
-
 			if discovery.IsGroupDiscoveryFailedError(err) && len(newResources) > 0 {
 				// In partial discovery cases, don't remove any existing informers, just add new ones
 				for k, v := range oldResources {
@@ -423,24 +423,90 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 			return
 		}
 
-		// Something has changed, so track the new state and perform a sync.
-		klog.V(2).Infof("syncing resource quota controller with updated resources from discovery: %v", newResources)
-		oldResources = newResources
-
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
 		rq.workerLock.Lock()
 		defer rq.workerLock.Unlock()
 
-		// Perform the monitor resync and wait for controllers to report cache sync.
-		if err := rq.resyncMonitors(newResources); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
-			return
-		}
-		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", stopCh, rq.quotaMonitor.IsSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync"))
-		}
+		// Once we get here, we should not unpause workers until we've successfully synced
+		attempt := 0
+		wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+			attempt++
+
+			// On a reattempt, check if available resources have changed
+			if attempt > 1 {
+				// Get the current resource list from discovery.
+				newResources, err = GetQuotableResources(discoveryFunc)
+				if err != nil {
+					utilruntime.HandleError(err)
+					if discovery.IsGroupDiscoveryFailedError(err) && len(newResources) > 0 {
+						// In partial discovery cases, don't remove any existing informers, just add new ones
+						for k, v := range oldResources {
+							newResources[k] = v
+						}
+					} else {
+						// short circuit in non-discovery error cases or if discovery returned zero resources
+						klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+						return false, nil
+					}
+				}
+			}
+
+			// Something has changed, so track the new state and perform a sync.
+			klog.V(2).Infof("syncing resource quota controller with updated resources from discovery (attempt %d): %s", attempt, printDiff(oldResources, newResources))
+
+			// Perform the monitor resync and wait for controllers to report cache sync.
+			if err := rq.resyncMonitors(newResources); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
+				return false, nil
+			}
+			// wait for caches to fill for a while (our sync period).
+			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
+			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
+			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
+			// note that workers stay paused until we successfully resync.
+			if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", waitForStopOrTimeout(stopCh, period), rq.quotaMonitor.IsSynced) {
+				utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync (attempt %d)", attempt))
+				return false, nil
+			}
+
+			// success, break out of the loop
+			return true, nil
+		}, stopCh)
+
+		oldResources = newResources
+		klog.V(2).Infof("synced quota controller")
 	}, period, stopCh)
+}
+
+// printDiff returns a human-readable summary of what resources were added and removed
+func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct{}) string {
+	removed := sets.NewString()
+	for oldResource := range oldResources {
+		if _, ok := newResources[oldResource]; !ok {
+			removed.Insert(fmt.Sprintf("%+v", oldResource))
+		}
+	}
+	added := sets.NewString()
+	for newResource := range newResources {
+		if _, ok := oldResources[newResource]; !ok {
+			added.Insert(fmt.Sprintf("%+v", newResource))
+		}
+	}
+	return fmt.Sprintf("added: %v, removed: %v", added.List(), removed.List())
+}
+
+// waitForStopOrTimeout returns a stop channel that closes when the provided stop channel closes or when the specified timeout is reached
+func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan struct{} {
+	stopChWithTimeout := make(chan struct{})
+	go func() {
+		select {
+		case <-stopCh:
+		case <-time.After(timeout):
+		}
+		close(stopChWithTimeout)
+	}()
+	return stopChWithTimeout
 }
 
 // resyncMonitors starts or stops quota monitors as needed to ensure that all
