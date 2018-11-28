@@ -715,8 +715,17 @@ func TestSyncResourceQuota(t *testing.T) {
 			t.Errorf("test: %s,\nExpected actions:\n%v\n but got:\n%v\nDifference:\n%v", testName, testCase.expectedActionSet, actionSet, testCase.expectedActionSet.Difference(actionSet))
 		}
 
-		lastActionIndex := len(kubeClient.Actions()) - 1
-		usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*v1.ResourceQuota)
+		var usage *v1.ResourceQuota
+		actions := kubeClient.Actions()
+		for i := len(actions) - 1; i >= 0; i-- {
+			if updateAction, ok := actions[i].(core.UpdateAction); ok {
+				usage = updateAction.GetObject().(*v1.ResourceQuota)
+				break
+			}
+		}
+		if usage == nil {
+			t.Errorf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
+		}
 
 		// ensure usage is as expected
 		if len(usage.Status.Hard) != len(testCase.status.Hard) {
