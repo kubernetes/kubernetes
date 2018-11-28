@@ -35,6 +35,7 @@ type serializerType struct {
 	EncodesAsText bool
 
 	Serializer       runtime.Serializer
+	StrictSerializer runtime.Serializer
 	PrettySerializer runtime.Serializer
 
 	AcceptStreamContentTypes []string
@@ -46,8 +47,10 @@ type serializerType struct {
 
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
 	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
+	jsonStrictSerializer := json.NewStrictSerializer(mf, scheme, scheme)
 	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
 	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
+	yamlStrictSerializer := json.NewYAMLStrictSerializer(mf, scheme, scheme)
 
 	serializers := []serializerType{
 		{
@@ -56,6 +59,7 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 			FileExtensions:     []string{"json"},
 			EncodesAsText:      true,
 			Serializer:         jsonSerializer,
+			StrictSerializer:   jsonStrictSerializer,
 			PrettySerializer:   jsonPrettySerializer,
 
 			Framer:           json.Framer,
@@ -67,6 +71,7 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 			FileExtensions:     []string{"yaml"},
 			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
+			StrictSerializer:   yamlStrictSerializer,
 		},
 	}
 
@@ -81,10 +86,11 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 // CodecFactory provides methods for retrieving codecs and serializers for specific
 // versions and content types.
 type CodecFactory struct {
-	scheme      *runtime.Scheme
-	serializers []serializerType
-	universal   runtime.Decoder
-	accepts     []runtime.SerializerInfo
+	scheme          *runtime.Scheme
+	serializers     []serializerType
+	universal       runtime.Decoder
+	universalStrict runtime.Decoder
+	accepts         []runtime.SerializerInfo
 
 	legacySerializer runtime.Serializer
 }
@@ -103,12 +109,20 @@ func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
 // newCodecFactory is a helper for testing that allows a different metafactory to be specified.
 func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) CodecFactory {
 	decoders := make([]runtime.Decoder, 0, len(serializers))
+	decodersStrict := make([]runtime.Decoder, 0, len(serializers))
 	var accepts []runtime.SerializerInfo
 	alreadyAccepted := make(map[string]struct{})
 
 	var legacySerializer runtime.Serializer
 	for _, d := range serializers {
 		decoders = append(decoders, d.Serializer)
+		// If a strict serializer is missing, fall back to a non-strict serializer
+		// so that the 'decoders' and 'decodersStrict' slices are symmetric.
+		if d.StrictSerializer == nil {
+			decodersStrict = append(decodersStrict, d.Serializer)
+		} else {
+			decodersStrict = append(decodersStrict, d.StrictSerializer)
+		}
 		for _, mediaType := range d.AcceptContentTypes {
 			if _, ok := alreadyAccepted[mediaType]; ok {
 				continue
@@ -138,9 +152,10 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 	}
 
 	return CodecFactory{
-		scheme:      scheme,
-		serializers: serializers,
-		universal:   recognizer.NewDecoder(decoders...),
+		scheme:          scheme,
+		serializers:     serializers,
+		universal:       recognizer.NewDecoder(decoders...),
+		universalStrict: recognizer.NewDecoder(decodersStrict...),
 
 		accepts: accepts,
 
@@ -172,6 +187,14 @@ func (f CodecFactory) UniversalDeserializer() runtime.Decoder {
 	return f.universal
 }
 
+// UniversalStrictDeserializer is the same as UniversalDeserializer except that it uses a strict Decoder
+// that also catches unknown and duplicate fields. Such errors are defined as UnknownFieldError
+// and DuplicateFieldError. Once an error is found decoding is interrupted and the output object
+// is not expected to be valid.
+func (f CodecFactory) UniversalStrictDeserializer() runtime.Decoder {
+	return f.universalStrict
+}
+
 // UniversalDecoder returns a runtime.Decoder capable of decoding all known API objects in all known formats. Used
 // by clients that do not need to encode objects but want to deserialize API objects stored on disk. Only decodes
 // objects in groups registered with the scheme. The GroupVersions passed may be used to select alternate
@@ -189,6 +212,20 @@ func (f CodecFactory) UniversalDecoder(versions ...schema.GroupVersion) runtime.
 		versioner = schema.GroupVersions(versions)
 	}
 	return f.CodecForVersions(nil, f.universal, nil, versioner)
+}
+
+// UniversalStrictDecoder is the same as UniversalDecoder except that it uses a strict Decoder
+// that also catches unknown and duplicate fields. Such errors are defined as UnknownFieldError
+// and DuplicateFieldError. Once an error is found decoding is interrupted and the output object
+// is not expected to be valid.
+func (f CodecFactory) UniversalStrictDecoder(versions ...schema.GroupVersion) runtime.Decoder {
+	var versioner runtime.GroupVersioner
+	if len(versions) == 0 {
+		versioner = runtime.InternalGroupVersioner
+	} else {
+		versioner = schema.GroupVersions(versions)
+	}
+	return f.CodecForVersions(nil, f.universalStrict, nil, versioner)
 }
 
 // CodecForVersions creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
