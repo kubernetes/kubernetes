@@ -4026,6 +4026,10 @@
 			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
 		},
 		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
 			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
 		},
