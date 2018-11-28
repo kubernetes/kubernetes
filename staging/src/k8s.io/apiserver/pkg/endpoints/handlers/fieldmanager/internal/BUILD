@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "gvkparser.go",
         "managedfields.go",
+        "pathelement.go",
         "typeconverter.go",
         "versionconverter.go",
     ],
@@ -31,6 +32,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "managedfields_test.go",
+        "pathelement_test.go",
         "typeconverter_test.go",
         "versionconverter_test.go",
     ],

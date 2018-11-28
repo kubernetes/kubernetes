@@ -17,6 +17,7 @@ limitations under the License.
 package value
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"gopkg.in/yaml.v2"
@@ -43,6 +44,21 @@ func FromYAML(input []byte) (Value, error) {
 	if err := yaml.Unmarshal(input, &ms); err == nil {
 		decoded = ms
 	} else if err := yaml.Unmarshal(input, &decoded); err != nil {
+		return Value{}, err
+	}
+
+	v, err := FromUnstructured(decoded)
+	if err != nil {
+		return Value{}, fmt.Errorf("failed to interpret (%v):\n%s", err, input)
+	}
+	return v, nil
+}
+
+// FromJSON is a helper function for reading a JSON document
+func FromJSON(input []byte) (Value, error) {
+	var decoded interface{}
+
+	if err := json.Unmarshal(input, &decoded); err != nil {
 		return Value{}, err
 	}
 
@@ -156,12 +172,12 @@ func FromUnstructured(in interface{}) (Value, error) {
 // preserve order of keys within maps/structs. This is as a convenience to
 // humans keeping YAML documents, not because there is a behavior difference.
 func (v *Value) ToYAML() ([]byte, error) {
-	out := v.ToUnstructured(true)
-	b, err := yaml.Marshal(out)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	return yaml.Marshal(v.ToUnstructured(true))
+}
+
+// ToJSON is a helper function for producing a JSon document.
+func (v *Value) ToJSON() ([]byte, error) {
+	return json.Marshal(v.ToUnstructured(false))
 }
 
 // ToUnstructured will convert the Value into a go-typed object.
