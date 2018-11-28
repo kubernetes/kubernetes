@@ -189,16 +189,18 @@ func SanitizeMsg(pb interface{}) string {
 			fieldName = strings.ToUpper(fieldName[:1]) + fieldName[1:]
 			if fieldName == msgType.Field(n).Name {
 				// Need to sanitize
-				m, ok := reflect.Indirect(msgValue).FieldByName(fieldName).Interface().(map[string]string)
-				if !ok {
-					continue
-				}
+				/*				m, ok := reflect.Indirect(msgValue).FieldByName(fieldName).Interface().(map[string]string)
+								if !ok {
+									continue
+								}
+								sanitized = true
+								sm := map[string]string{}
+								for key := range m {
+									sm[key] = "* * * Sanitized * * *"
+								}
+				*/
 				sanitized = true
-				sm := map[string]string{}
-				for key := range m {
-					sm[key] = "* * * Sanitized * * *"
-				}
-				sElem = fmt.Sprintf(" %s:%v ", msgType.Field(n).Name, sm)
+				sElem = fmt.Sprintf(" %s:%s ", msgType.Field(n).Name, "!!! Sanitized !!!")
 			}
 		}
 		if sanitized {
