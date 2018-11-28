@@ -19,7 +19,8 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../" && pwd -P)"
-LOG_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/logplugin/v1alpha1"
+LOG_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/logplugin"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-kube::protoc::generate_proto ${LOG_PLUGIN_ROOT}
+kube::protoc::generate_proto ${LOG_PLUGIN_ROOT}/v1alpha1
+kube::protoc::generate_proto ${LOG_PLUGIN_ROOT}/v1beta1

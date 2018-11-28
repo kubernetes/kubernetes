@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	logpolicy "k8s.io/kubernetes/pkg/kubelet/log/policy"
+	logapiutil "k8s.io/kubernetes/pkg/kubelet/log/api/util"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -198,7 +198,7 @@ func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool
 }
 
 func visitPodLogPolicyConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
-	for name := range logpolicy.GetPodLogConfigMapNames(pod) {
+	for name := range logapiutil.GetPodLogConfigMapNames(pod) {
 		if !visitor(name) {
 			return false
 		}

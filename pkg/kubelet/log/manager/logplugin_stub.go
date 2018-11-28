@@ -11,7 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1alpha1"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1beta1"
 )
 
 // Stub implementation for LogPlugin.
@@ -57,13 +57,13 @@ func (p *LogPluginStub) Start() error {
 
 	go func() {
 		defer p.wg.Done()
-		p.server.Serve(sock)
+		_ = p.server.Serve(sock)
 	}()
 	_, conn, err := dial(p.socketPath)
 	if err != nil {
 		return err
 	}
-	conn.Close()
+	_ = conn.Close()
 
 	log.Println("starting to serve on", p.socketPath)
 

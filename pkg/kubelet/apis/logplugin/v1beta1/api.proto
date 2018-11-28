@@ -1,0 +1,114 @@
+// To regenerate api.pb.go run hack/update-generated-log-plugin.sh
+syntax = 'proto3';
+
+package logplugin;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+
+// Registration is the service advertised by the Kubelet
+// Only when Kubelet answers with a success code to a Register Request
+// may Log Plugins start their service
+// Registration may fail when log plugin version is not supported by
+// Kubelet. Log plugin is expected to terminate upon registration failure
+service Registration {
+	rpc Register(RegisterRequest) returns (Empty) {}
+}
+
+message RegisterRequest {
+	// Version of the API the Log Plugin was built against
+	string version = 1;
+    // log plugin name
+    string name = 2;
+	// Name of the unix socket the log plugin is listening on
+	// PATH = path.Join(LogPluginPath, endpoint)
+	string endpoint = 3;
+}
+
+message Empty {
+}
+
+// LogPlugin is the service advertised by the Log Plugins
+service LogPlugin {
+	rpc AddConfig(AddConfigRequest) returns (AddConfigResponse) {}
+	rpc DelConfig(DelConfigRequest) returns (DelConfigResponse) {}
+	rpc GetState(GetStateRequest) returns (GetStateResponse) {}
+	rpc ListConfig(Empty) returns (ListConfigResponse) {}
+}
+
+enum LogType {
+	Raw = 0;
+	DockerJsonFile = 1;
+}
+
+message ConfigMeta {
+	// log config name
+	string name = 1;
+	// pod namespace, name and uid
+	string podNamespace = 2;
+	string podName = 3;
+	string podUID = 4;
+	// container name
+	string containerName = 5;
+	// container log policy name
+	string containerLogPolicyName = 6;
+	// line type of log file
+	LogType logType = 7;
+	// real path of log dir
+	string hostPath = 8;
+}
+
+message ConfigSpec {
+	// log plugin config
+	string content = 1;
+}
+
+message Config {
+	ConfigMeta metadata = 1;
+	ConfigSpec spec = 2;
+}
+
+message AddConfigRequest {
+	Config config = 1;
+}
+
+message AddConfigResponse {
+	string name = 1;
+	string hash = 2;
+	bool changed = 3;
+}
+
+message DelConfigRequest {
+	// config
+	string name = 1;
+}
+
+message DelConfigResponse {
+	bool changed = 1;
+}
+
+message GetStateRequest {
+	string name = 1;
+}
+
+message GetStateResponse {
+	State state = 1;
+}
+
+enum State {
+	NotFound = 0;
+	Running = 1;
+	Idle = 2;
+}
+
+message ListConfigResponse {
+	repeated Config configs = 1;
+}

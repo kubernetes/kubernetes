@@ -5,7 +5,7 @@ import (
 
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1alpha1"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1beta1"
 )
 
 type pluginStatusManager struct {
@@ -40,9 +40,6 @@ func (m *pluginStatusManager) getLogConfigNames(podUID k8stypes.UID) sets.String
 }
 
 func (m *pluginStatusManager) updateAllLogConfigs(configs []*pluginapi.Config, pluginName string) {
-	if configs == nil {
-		return
-	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	podLogConfigNames := make(map[k8stypes.UID]sets.String)

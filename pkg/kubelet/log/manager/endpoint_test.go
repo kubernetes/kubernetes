@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1alpha1"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1beta1"
 )
 
 var (
@@ -28,7 +28,7 @@ func setUpEndpoint(t *testing.T, socketPath, name string) (*LogPluginStub, plugi
 }
 
 func cleanUpEndpoint(p *LogPluginStub, ep pluginEndpoint) {
-	p.Stop()
+	_ = p.Stop()
 	ep.stop()
 }
 
@@ -55,7 +55,7 @@ func TestEndpoint(t *testing.T) {
 		Spec: &pluginapi.ConfigSpec{
 			Content:  "",
 			Category: "std",
-			Path:     "test-path",
+			Path:     "-",
 		},
 	}
 	_, err := ep.addConfig(config)

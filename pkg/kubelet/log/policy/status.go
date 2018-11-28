@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/log/api"
 	"sync"
 
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -22,9 +23,9 @@ type LogStatusManager interface {
 	GetAllConfigMapKeys() sets.String
 	GetPodUIDsByConfigMapKey(configMapKey string) sets.String
 
-	UpdateLogPolicy(podUID k8stypes.UID, podLogPolicy *PodLogPolicy)
+	UpdateLogPolicy(podUID k8stypes.UID, podLogPolicy *api.PodLogPolicy)
 	RemoveLogPolicy(podUID k8stypes.UID)
-	GetLogPolicy(podUID k8stypes.UID) (*PodLogPolicy, bool)
+	GetLogPolicy(podUID k8stypes.UID) (*api.PodLogPolicy, bool)
 
 	UpdateLogVolumes(podUID k8stypes.UID, logVolumes LogVolumesMap)
 	RemoveLogVolumes(podUID k8stypes.UID)
@@ -51,7 +52,7 @@ type policyStatusManager struct {
 	mutex sync.RWMutex
 	// pod uid -> podLogPolicy
 	// desired state
-	podLogPolicies map[k8stypes.UID]*PodLogPolicy
+	podLogPolicies map[k8stypes.UID]*api.PodLogPolicy
 	// pod uid -> podLogVolume
 	// desired state
 	podLogVolumes map[k8stypes.UID]LogVolumesMap
@@ -70,7 +71,7 @@ type policyStatusManager struct {
 
 func NewPolicyStatusManager() *policyStatusManager {
 	return &policyStatusManager{
-		podLogPolicies:              make(map[k8stypes.UID]*PodLogPolicy),
+		podLogPolicies:              make(map[k8stypes.UID]*api.PodLogPolicy),
 		podLogVolumes:               make(map[k8stypes.UID]LogVolumesMap),
 		podConfigMaps:               make(map[k8stypes.UID]sets.String),
 		configMapPodUIDs:            make(map[string]sets.String),
@@ -130,7 +131,7 @@ func (m *policyStatusManager) GetPodUIDsByConfigMapKey(configMapKey string) sets
 	return podUIDs
 }
 
-func (m *policyStatusManager) UpdateLogPolicy(podUID k8stypes.UID, podLogPolicy *PodLogPolicy) {
+func (m *policyStatusManager) UpdateLogPolicy(podUID k8stypes.UID, podLogPolicy *api.PodLogPolicy) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.podLogPolicies[podUID] = podLogPolicy
@@ -142,7 +143,7 @@ func (m *policyStatusManager) RemoveLogPolicy(podUID k8stypes.UID) {
 	delete(m.podLogPolicies, podUID)
 }
 
-func (m *policyStatusManager) GetLogPolicy(podUID k8stypes.UID) (*PodLogPolicy, bool) {
+func (m *policyStatusManager) GetLogPolicy(podUID k8stypes.UID) (*api.PodLogPolicy, bool) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	podLogPolicy, exists := m.podLogPolicies[podUID]

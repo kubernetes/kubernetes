@@ -23,7 +23,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
-	logpolicy "k8s.io/kubernetes/pkg/kubelet/log/policy"
+	logapiutil "k8s.io/kubernetes/pkg/kubelet/log/api/util"
 )
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -179,7 +179,7 @@ func visitPodLogPolicyConfigmapNames(pod *api.Pod, visitor Visitor) bool {
 	if err != nil {
 		return false
 	}
-	for name := range logpolicy.GetPodLogConfigMapNames(v1Pod) {
+	for name := range logapiutil.GetPodLogConfigMapNames(v1Pod) {
 		if !visitor(name) {
 			return false
 		}

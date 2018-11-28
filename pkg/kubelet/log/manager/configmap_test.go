@@ -1,4 +1,4 @@
-package util
+package manager
 
 import (
 	"fmt"

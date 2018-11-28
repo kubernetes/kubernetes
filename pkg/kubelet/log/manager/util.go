@@ -26,6 +26,6 @@ func buildLogPolicyDirectory(podUID k8stypes.UID, containerName string, category
 }
 
 func buildLogConfigName(podUID k8stypes.UID, containerName string, category string, filename string) string {
-	// <pod-uid>/<container_name>/<category>/<name>
+	// <pod-uid>/<container_name>/<category>/<filename>
 	return fmt.Sprintf("%s/%s/%s/%s", podUID, containerName, category, filename)
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1alpha1"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/logplugin/v1beta1"
 	"net"
 	"sync"
 	"time"
@@ -99,7 +99,7 @@ func (e *pluginEndpointImpl) stop() {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	if e.clientConn != nil {
-		e.clientConn.Close()
+		_ = e.clientConn.Close()
 	}
 	e.stopTime = time.Now()
 }

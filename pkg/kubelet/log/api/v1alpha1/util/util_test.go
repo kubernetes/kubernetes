@@ -1,4 +1,4 @@
-package policy
+package util
 
 import (
 	"reflect"
@@ -7,12 +7,13 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/log/api/v1alpha1"
 )
 
 var testcases = []struct {
 	pod             *v1.Pod
 	logPolicyExists bool
-	logPolicy       *PodLogPolicy
+	logPolicy       *v1alpha1.PodLogPolicy
 	configMapNames  sets.String
 }{
 	{
@@ -21,12 +22,13 @@ var testcases = []struct {
 				Namespace: "test",
 				Name:      "test-pod-1",
 				Annotations: map[string]string{
-					PodLogPolicyLabelKey: `{
+					v1alpha1.PodLogPolicyLabelKey: `{
   "log_plugin": "logexporter",
   "safe_deletion_enabled": false,
   "container_log_policies": {
     "container1": [{
       "category": "std",
+      "path": "-",
       "plugin_configmap": "container1-stdlog"
     }, {
       "category": "app",
@@ -57,14 +59,15 @@ var testcases = []struct {
 			},
 		},
 		true,
-		&PodLogPolicy{
-			"logexporter",
-			false,
-			map[string]ContainerLogPolicies{
+		&v1alpha1.PodLogPolicy{
+			LogPlugin:           "logexporter",
+			SafeDeletionEnabled: false,
+			ContainerLogPolicies: map[string]v1alpha1.ContainerLogPolicies{
 
 				"container1": {
 					{
 						Category:        "std",
+						Path:            "-",
 						PluginConfigMap: "container1-stdlog",
 					},
 					{
@@ -110,7 +113,7 @@ var testcases = []struct {
 				Namespace: "test",
 				Name:      "test-pod-2",
 				Annotations: map[string]string{
-					PodLogPolicyLabelKey: "invalid json",
+					v1alpha1.PodLogPolicyLabelKey: "invalid json",
 				},
 			},
 		},
@@ -132,7 +135,6 @@ var testcases = []struct {
 }
 
 func TestIsPodLogPolicyExists(t *testing.T) {
-
 	for _, tc := range testcases {
 		actual := IsPodLogPolicyExists(tc.pod)
 		if actual != tc.logPolicyExists {
@@ -142,7 +144,6 @@ func TestIsPodLogPolicyExists(t *testing.T) {
 }
 
 func TestGetPodLogPolicy(t *testing.T) {
-
 	for _, tc := range testcases {
 		actual, _ := GetPodLogPolicy(tc.pod)
 		if !reflect.DeepEqual(actual, tc.logPolicy) {
@@ -152,7 +153,6 @@ func TestGetPodLogPolicy(t *testing.T) {
 }
 
 func TestGetPodLogConfigMapNames(t *testing.T) {
-
 	for _, tc := range testcases {
 		actual := GetPodLogConfigMapNames(tc.pod)
 		if !actual.Equal(tc.configMapNames) {
