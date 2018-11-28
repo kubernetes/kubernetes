@@ -818,6 +818,9 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	if err := os.MkdirAll(kl.getPodPluginsDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
+	if err := os.MkdirAll(kl.getPodVolumeDevicesDir(uid), 0750); err != nil && !os.IsExist(err) {
+		return err
+	}
 	return nil
 }
 
@@ -1679,7 +1682,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 }
 
 // enableHostUserNamespace determines if the host user namespace should be used by the container runtime.
-// Returns true if the pod is using a host pid, pic, or network namespace, the pod is using a non-namespaced
+// Returns true if the pod is using a host pid, ipc, or network namespace, the pod is using a non-namespaced
 // capability, the pod contains a privileged container, or the pod has a host path volume.
 //
 // NOTE: when if a container shares any namespace with another container it must also share the user namespace
