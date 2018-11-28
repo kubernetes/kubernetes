@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure
+package main: azure
 
 import (
 	"context"
 	"fmt"
 	"os"
 	"strings"
+	"testing"
 
 	"k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 )
-
+ 
 const (
 	vmPowerStatePrefix      = "PowerState/"
 	vmPowerStateStopped     = "stopped"
@@ -125,6 +126,15 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 
 	return addressGetter(name)
 }
+
+
+ func TestSum(t *testing.T) {
+ ctx := t.Context()  // Canceled when the test fails or the test function returns.
+ t.Go(func (az *Cloud) NodeAddresses(ctx, t))
+ if t != nil{
+	 t.Errorf("Error occured")}
+}
+
 
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
