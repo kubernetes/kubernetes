@@ -617,7 +617,7 @@ func TestValidatePlugin(t *testing.T) {
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"0.2.0", "v1.0.0"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
@@ -631,7 +631,7 @@ func TestValidatePlugin(t *testing.T) {
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"0.2.0", "v1.2.3"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
@@ -645,7 +645,7 @@ func TestValidatePlugin(t *testing.T) {
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"v1.2.3", "v0.3.0"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
@@ -659,14 +659,14 @@ func TestValidatePlugin(t *testing.T) {
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"v1.2.3", "v0.3.0", "2.0.1"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"v0.3.0", "2.0.1"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
@@ -680,7 +680,7 @@ func TestValidatePlugin(t *testing.T) {
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
@@ -694,7 +694,7 @@ func TestValidatePlugin(t *testing.T) {
 			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
 			versions:             []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
 			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			shouldFail:           false,
 		},
 		{
 			pluginName:           "test.plugin",
