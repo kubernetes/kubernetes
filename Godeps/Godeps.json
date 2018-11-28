@@ -4023,19 +4023,19 @@
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+			"Rev": "d45b5c336b0e2bdd0b58ae4181caba85f24c6257"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
-			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+			"Rev": "d45b5c336b0e2bdd0b58ae4181caba85f24c6257"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
-			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+			"Rev": "d45b5c336b0e2bdd0b58ae4181caba85f24c6257"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+			"Rev": "d45b5c336b0e2bdd0b58ae4181caba85f24c6257"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

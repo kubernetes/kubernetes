@@ -6,6 +6,7 @@ go_library(
         "decode.go",
         "encode.go",
         "gvkparser.go",
+        "pathelement.go",
         "typeconverter.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/apply",
@@ -28,6 +29,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "decode_test.go",
+        "pathelement_test.go",
         "roundtrip_test.go",
         "typeconverter_test.go",
     ],
