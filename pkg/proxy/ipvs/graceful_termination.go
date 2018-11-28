@@ -75,10 +75,10 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 
 	uniqueRS := rs.String()
 	if _, ok := q.list[uniqueRS]; ok {
-		return false
+		delete(q.list, uniqueRS)
+		return true
 	}
-	delete(q.list, uniqueRS)
-	return true
+	return false
 }
 
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
