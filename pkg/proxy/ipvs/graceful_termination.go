@@ -164,7 +164,8 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 	}
 	for _, rs := range rss {
 		if rsToDelete.RealServer.Equal(rs) {
-			if rs.ActiveConn != 0 {
+			// Don't delete TCP RS with Active Connections or UDP RS (ActiveConn is always 0 for UDP)
+			if rs.ActiveConn != 0 || (rsToDelete.VirtualServer.Protocol == "UDP" && rs.InactiveConn != 0) {
 				return false, nil
 			}
 			klog.Infof("Deleting rs: %s", rsToDelete.String())
