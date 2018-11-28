@@ -3,7 +3,6 @@ Version: OVERRIDE_THIS
 Release: 00
 License: ASL 2.0
 Summary: Container Cluster Manager - CNI plugins
-
 URL: https://kubernetes.io
 
 %description
