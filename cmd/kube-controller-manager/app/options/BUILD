@@ -74,7 +74,6 @@ go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
     embed = [":go_default_library"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
