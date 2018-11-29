@@ -171,7 +171,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        0,
 			},
 
-			msg:  "Waiting for daemon set \"foo\" rollout to finish: 0 out of 1 new pods have been updated...\n",
+			msg:  "Waiting for daemonset \"foo\" rollout to finish: 0 out of 1 new pods have been updated...\n",
 			done: false,
 		},
 		{
@@ -184,7 +184,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        1,
 			},
 
-			msg:  "Waiting for daemon set \"foo\" rollout to finish: 1 of 2 updated pods are available...\n",
+			msg:  "Waiting for daemonset \"foo\" rollout to finish: 1 of 2 updated pods are available...\n",
 			done: false,
 		},
 		{
@@ -197,7 +197,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        2,
 			},
 
-			msg:  "daemon set \"foo\" successfully rolled out\n",
+			msg:  "daemonset \"foo\" successfully rolled out\n",
 			done: true,
 		},
 		{
@@ -210,7 +210,7 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				NumberAvailable:        2,
 			},
 
-			msg:  "Waiting for daemon set spec update to be observed...\n",
+			msg:  "Waiting for daemonset spec update to be observed...\n",
 			done: false,
 		},
 	}

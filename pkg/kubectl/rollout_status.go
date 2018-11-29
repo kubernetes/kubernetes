@@ -92,7 +92,7 @@ func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64
 	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
 }
 
-// Status returns a message describing daemon set status, and a bool value indicating if the status is considered done.
+// Status returns a message describing daemonset status, and a bool value indicating if the status is considered done.
 func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
 	//ignoring revision as DaemonSets does not have history yet
 
@@ -107,14 +107,14 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
 		if daemon.Status.UpdatedNumberScheduled < daemon.Status.DesiredNumberScheduled {
-			return fmt.Sprintf("Waiting for daemon set %q rollout to finish: %d out of %d new pods have been updated...\n", daemon.Name, daemon.Status.UpdatedNumberScheduled, daemon.Status.DesiredNumberScheduled), false, nil
+			return fmt.Sprintf("Waiting for daemonset %q rollout to finish: %d out of %d new pods have been updated...\n", daemon.Name, daemon.Status.UpdatedNumberScheduled, daemon.Status.DesiredNumberScheduled), false, nil
 		}
 		if daemon.Status.NumberAvailable < daemon.Status.DesiredNumberScheduled {
-			return fmt.Sprintf("Waiting for daemon set %q rollout to finish: %d of %d updated pods are available...\n", daemon.Name, daemon.Status.NumberAvailable, daemon.Status.DesiredNumberScheduled), false, nil
+			return fmt.Sprintf("Waiting for daemonset %q rollout to finish: %d of %d updated pods are available...\n", daemon.Name, daemon.Status.NumberAvailable, daemon.Status.DesiredNumberScheduled), false, nil
 		}
-		return fmt.Sprintf("daemon set %q successfully rolled out\n", daemon.Name), true, nil
+		return fmt.Sprintf("daemonset %q successfully rolled out\n", daemon.Name), true, nil
 	}
-	return fmt.Sprintf("Waiting for daemon set spec update to be observed...\n"), false, nil
+	return fmt.Sprintf("Waiting for daemonset spec update to be observed...\n"), false, nil
 }
 
 // Status returns a message describing statefulset status, and a bool value indicating if the status is considered done.
