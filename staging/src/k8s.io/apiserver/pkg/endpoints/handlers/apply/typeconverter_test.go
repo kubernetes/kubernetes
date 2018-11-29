@@ -90,4 +90,20 @@ Original object:
 Final object:
 %#v`, obj, newObj)
 	}
+
+	yamlTyped, err := tc.YAMLToTyped([]byte(y))
+	if err != nil {
+		t.Fatalf("Failed to convert yaml to typed: %v", err)
+	}
+	newObj, err = tc.TypedToObject(yamlTyped)
+	if err != nil {
+		t.Fatalf("Failed to convert typed to object: %v", err)
+	}
+	if !reflect.DeepEqual(obj, newObj) {
+		t.Errorf(`YAML conversion resulted in different object failed:
+Original object:
+%#v
+Final object:
+%#v`, obj, newObj)
+	}
 }

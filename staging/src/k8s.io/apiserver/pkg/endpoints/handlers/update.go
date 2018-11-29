@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/apply"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -39,6 +40,8 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	"k8s.io/klog"
+	"sigs.k8s.io/structured-merge-diff/merge"
 )
 
 // UpdateResource returns a function that will handle a resource update
@@ -115,7 +118,26 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		var transformers []rest.TransformFunc
+		transformers := []rest.TransformFunc{}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			if scope.OpenAPIModels == nil {
+				klog.Warningf("No OpenAPI for: %v", scope.Kind)
+			} else {
+				converter, err := apply.NewTypeConverter(scope.OpenAPIModels)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
+
+				updater := merge.Updater{
+					Converter: apply.NewVersionConverter(converter, scope.UnsafeConvertor),
+				}
+				// We start by updating the managed fields before
+				// performing any other mutation.
+				transformers = append(transformers, makeManagedFieldsUpdater(converter, newConvertor(scope.UnsafeConvertor, scope.Kind.GroupVersion()), updater, "put"))
+			}
+		}
+
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)

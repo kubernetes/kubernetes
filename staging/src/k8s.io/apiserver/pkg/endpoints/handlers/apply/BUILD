@@ -6,6 +6,7 @@ go_library(
         "decode.go",
         "encode.go",
         "gvkparser.go",
+        "managedfields.go",
         "typeconverter.go",
         "versionconverter.go",
     ],
@@ -13,6 +14,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers/apply",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -23,6 +25,7 @@ go_library(
         "//vendor/sigs.k8s.io/structured-merge-diff/merge:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/typed:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

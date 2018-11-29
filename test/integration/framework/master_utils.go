@@ -129,21 +129,21 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
-		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:   "Kubernetes",
-				Version: "unversioned",
-			},
-		}
-		masterConfig.GenericConfig.OpenAPIConfig.DefaultResponse = &spec.Response{
-			ResponseProps: spec.ResponseProps{
-				Description: "Default Response.",
-			},
-		}
-		masterConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
-		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	}
+	masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	masterConfig.GenericConfig.OpenAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	masterConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+	masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	// set the loopback client config
 	if masterConfig.GenericConfig.LoopbackClientConfig == nil {
