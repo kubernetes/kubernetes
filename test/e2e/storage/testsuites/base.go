@@ -81,7 +81,7 @@ func RunTestSuite(f *framework.Framework, config framework.VolumeTestConfig, dri
 // is not suitable to be tested.
 // Whether it needs to be skipped is checked by following steps:
 // 1. Check if Whether volType is supported by driver from its interface
-// 2. Check if fsType is supported by driver
+// 2. Check if fsType is supported
 // 3. Check with driver specific logic
 // 4. Check with testSuite specific logic
 func skipUnsupportedTest(suite TestSuite, driver drivers.TestDriver, pattern testpatterns.TestPattern) {
@@ -104,9 +104,12 @@ func skipUnsupportedTest(suite TestSuite, driver drivers.TestDriver, pattern tes
 		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 	}
 
-	// 2. Check if fsType is supported by driver
+	// 2. Check if fsType is supported
 	if !dInfo.SupportedFsType.Has(pattern.FsType) {
 		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
+	}
+	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci") {
+		framework.Skipf("Distro doesn't support xfs -- skipping")
 	}
 
 	// 3. Check with driver specific logic
