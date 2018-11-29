@@ -33,7 +33,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: gcr.io/projectcalico-org/node:v2.6.7
+          image: gcr.io/projectcalico-org/node:v3.3.1
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -73,6 +73,7 @@ spec:
             httpGet:
               path: /liveness
               port: 9099
+              host: localhost
             periodSeconds: 10
             initialDelaySeconds: 10
             failureThreshold: 6
@@ -80,6 +81,7 @@ spec:
             httpGet:
               path: /readiness
               port: 9099
+              host: localhost
             periodSeconds: 10
           volumeMounts:
             - mountPath: /lib/modules
@@ -97,7 +99,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v1.11.2
+          image: gcr.io/projectcalico-org/cni:v3.3.1
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -110,7 +112,7 @@ spec:
                   "plugins": [
                     {
                       "type": "calico",
-                      "log_level": "debug",
+                      "log_level": "info",
                       "datastore_type": "kubernetes",
                       "nodename": "__KUBERNETES_NODE_NAME__",
                       "ipam": {
@@ -118,11 +120,9 @@ spec:
                         "subnet": "usePodCidr"
                       },
                       "policy": {
-                        "type": "k8s",
-                        "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__"
+                        "type": "k8s"
                       },
                       "kubernetes": {
-                        "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
                         "kubeconfig": "__KUBECONFIG_FILEPATH__"
                       }
                     },
