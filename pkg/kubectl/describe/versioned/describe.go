@@ -1647,12 +1647,12 @@ func describeContainerVolumes(container corev1.Container, w PrefixWriter) {
 	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
 	for _, mount := range container.VolumeMounts {
 		flags := []string{}
-		switch {
-		case mount.ReadOnly:
+		if mount.ReadOnly {
 			flags = append(flags, "ro")
-		case !mount.ReadOnly:
+		} else {
 			flags = append(flags, "rw")
-		case len(mount.SubPath) > 0:
+		}
+		if len(mount.SubPath) > 0 {
 			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
 		}
 		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
