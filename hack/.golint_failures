@@ -746,14 +746,6 @@ test/e2e_node/environment
 test/e2e_node/remote
 test/e2e_node/runner/remote
 test/e2e_node/services
-test/images/net/nat
-test/images/netexec
-test/images/nettest
-test/images/no-snat-test
-test/images/no-snat-test-proxy
-test/images/resource-consumer
-test/images/resource-consumer/common
-test/images/resource-consumer/controller
 test/integration
 test/integration/auth
 test/integration/evictions
