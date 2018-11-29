@@ -71,9 +71,6 @@ var (
 	defaultExcludeMasterFromStandardLB = true
 )
 
-// Azure implements PVLabeler.
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
-
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
 type Config struct {
@@ -142,6 +139,13 @@ type Config struct {
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
 }
+
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 
 // Cloud holds the config and clients
 type Cloud struct {

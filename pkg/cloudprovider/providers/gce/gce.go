@@ -98,6 +98,14 @@ type gceObject interface {
 	MarshalJSON() ([]byte, error)
 }
 
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var _ cloudprovider.Clusters = (*Cloud)(nil)
+
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type Cloud struct {
 	// ClusterID contains functionality for getting (and initializing) the ingress-uid. Call Cloud.Initialize()
@@ -764,9 +772,6 @@ func isProjectNumber(idOrNumber string) bool {
 	_, err := strconv.ParseUint(idOrNumber, 10, 64)
 	return err == nil
 }
-
-// Cloud implements cloudprovider.Interface.
-var _ cloudprovider.Interface = (*Cloud)(nil)
 
 func gceNetworkURL(apiEndpoint, project, network string) string {
 	if apiEndpoint == "" {

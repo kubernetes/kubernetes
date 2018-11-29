@@ -261,9 +261,6 @@ const DefaultVolumeType = "gp2"
 // Used to call recognizeWellKnownRegions just once
 var once sync.Once
 
-// AWS implements PVLabeler.
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
-
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
 	Compute(region string) (EC2, error)
@@ -479,6 +476,13 @@ type InstanceGroupInfo interface {
 	// The number of instances currently running under control of this group
 	CurrentSize() (int, error)
 }
+
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {

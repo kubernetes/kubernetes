@@ -120,6 +120,11 @@ func newCSCloud(cfg *CSConfig) (*CSCloud, error) {
 	return cs, nil
 }
 
+var _ cloudprovider.Interface = (*CSCloud)(nil)
+var _ cloudprovider.Instances = (*CSCloud)(nil)
+var _ cloudprovider.LoadBalancer = (*CSCloud)(nil)
+var _ cloudprovider.Zones = (*CSCloud)(nil)
+
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (cs *CSCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 }
