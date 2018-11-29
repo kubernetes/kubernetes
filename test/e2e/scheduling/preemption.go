@@ -436,7 +436,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		podNamesSeen := make(map[string]struct{})
 		stopCh := make(chan struct{})
 
-		// create an pod controller to list/watch pod events from the test framework namespace
+		// create a pod controller to list/watch pod events from the test framework namespace
 		_, podController := cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -465,7 +465,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			{
 				Replicas: int32(5),
 				PodConfig: pausePodConfig{
-					Name:              fmt.Sprintf("pod1"),
+					Name:              "pod1",
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod1"},
 					PriorityClassName: "p1",
@@ -479,7 +479,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			{
 				Replicas: int32(4),
 				PodConfig: pausePodConfig{
-					Name:              fmt.Sprintf("pod2"),
+					Name:              "pod2",
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod2"},
 					PriorityClassName: "p2",
@@ -493,7 +493,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			{
 				Replicas: int32(4),
 				PodConfig: pausePodConfig{
-					Name:              fmt.Sprintf("pod3"),
+					Name:              "pod3",
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod3"},
 					PriorityClassName: "p3",
@@ -507,7 +507,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			{
 				Replicas: int32(1),
 				PodConfig: pausePodConfig{
-					Name:              fmt.Sprintf("pod4"),
+					Name:              "pod4",
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod4"},
 					PriorityClassName: "p4",
@@ -536,16 +536,25 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		framework.Logf("pods created so far: %v", podNamesSeen)
 		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
 
-		// count pods number of RepliaSet3, if it's more than orignal replicas (4)
-		// then means its pods has been preempted once or more
-		rs3PodsSeen := 0
+		// count pods number of ReplicaSet{1,2,3}, if it's more than expected replicas
+		// then it denotes its pods have been over-preempted
+		// "*2" means pods of ReplicaSet{1,2} are expected to be only preempted once
+		maxRSPodsSeen := []int{5 * 2, 4 * 2, 4}
+		rsPodsSeen := []int{0, 0, 0}
 		for podName := range podNamesSeen {
-			if strings.HasPrefix(podName, "rs-pod3") {
-				rs3PodsSeen++
+			if strings.HasPrefix(podName, "rs-pod1") {
+				rsPodsSeen[0]++
+			} else if strings.HasPrefix(podName, "rs-pod2") {
+				rsPodsSeen[1]++
+			} else if strings.HasPrefix(podName, "rs-pod3") {
+				rsPodsSeen[2]++
 			}
 		}
-		if rs3PodsSeen != 4 {
-			framework.Failf("some pods of ReplicaSet3 have been preempted: expect 4 pod names, but got %d", rs3PodsSeen)
+		for i, got := range rsPodsSeen {
+			expected := maxRSPodsSeen[i]
+			if got > expected {
+				framework.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expected, got)
+			}
 		}
 	})
 
