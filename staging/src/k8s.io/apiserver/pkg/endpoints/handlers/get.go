@@ -257,7 +257,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
 			metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-				serveWatch(watcher, scope, req, w, timeout)
+				serveWatch(watcher, scope, outputMediaType, req, w, timeout)
 			})
 			return
 		}

@@ -18,6 +18,7 @@ package resttest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1421,7 +1422,7 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	columns := table.ColumnDefinitions
 	if len(columns) == 0 {
-		t.Errorf("unexpected number of columns: %v", len(columns))
+		t.Fatalf("unexpected number of columns: %v\n%#v", len(columns), columns)
 	}
 	if !strings.EqualFold(columns[0].Name, "Name") || columns[0].Type != "string" || columns[0].Format != "name" {
 		t.Errorf("expect column 0 to be the name column: %#v", columns[0])
@@ -1466,8 +1467,11 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 			}
 		}
 		if len(row.Cells) != len(table.ColumnDefinitions) {
+			t.Fatalf("unmatched row length on row %d: %#v", i, row.Cells)
 		}
 	}
+	data, _ := json.MarshalIndent(table, "", "  ")
+	t.Logf("%s", string(data))
 }
 
 // =============================================================================

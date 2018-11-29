@@ -36,6 +36,19 @@ type dynamicClient struct {
 
 var _ Interface = &dynamicClient{}
 
+// ConfigFor returns a copy of the provided config with the
+// appropriate dynamic client defaults set.
+func ConfigFor(inConfig *rest.Config) *rest.Config {
+	config := rest.CopyConfig(inConfig)
+	config.AcceptContentTypes = "application/json"
+	config.ContentType = "application/json"
+	config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
+	if config.UserAgent == "" {
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	return config
+}
+
 // NewForConfigOrDie creates a new Interface for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) Interface {
@@ -46,17 +59,12 @@ func NewForConfigOrDie(c *rest.Config) Interface {
 	return ret
 }
 
+// NewForConfig creates a new dynamic client or returns an error.
 func NewForConfig(inConfig *rest.Config) (Interface, error) {
-	config := rest.CopyConfig(inConfig)
+	config := ConfigFor(inConfig)
 	// for serializing the options
 	config.GroupVersion = &schema.GroupVersion{}
 	config.APIPath = "/if-you-see-this-search-for-the-break"
-	config.AcceptContentTypes = "application/json"
-	config.ContentType = "application/json"
-	config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
-	if config.UserAgent == "" {
-		config.UserAgent = rest.DefaultKubernetesUserAgent()
-	}
 
 	restClient, err := rest.RESTClientFor(config)
 	if err != nil {

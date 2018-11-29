@@ -56,15 +56,9 @@ func NegotiateOutputMediaType(req *http.Request, ns runtime.NegotiatedSerializer
 	return mediaType, info, nil
 }
 
-// NegotiateOutputSerializer returns a serializer for the output.
-func NegotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
-	_, info, err := NegotiateOutputMediaType(req, ns, DefaultEndpointRestrictions)
-	return info, err
-}
-
-// NegotiateOutputStreamSerializer returns a stream serializer for the given request.
-func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
-	mediaType, ok := NegotiateMediaTypeOptions(req.Header.Get("Accept"), AcceptedMediaTypesForEndpoint(ns), DefaultEndpointRestrictions)
+// NegotiateOutputMediaTypeStream returns a stream serializer for the given request.
+func NegotiateOutputMediaTypeStream(req *http.Request, ns runtime.NegotiatedSerializer, restrictions EndpointRestrictions) (runtime.SerializerInfo, error) {
+	mediaType, ok := NegotiateMediaTypeOptions(req.Header.Get("Accept"), AcceptedMediaTypesForEndpoint(ns), restrictions)
 	if !ok || mediaType.Accepted.Serializer.StreamSerializer == nil {
 		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, NewNotAcceptableError(supported)
@@ -124,7 +118,7 @@ func isPrettyPrint(req *http.Request) bool {
 type EndpointRestrictions interface {
 	// AllowsConversion should return true if the specified group version kind
 	// is an allowed target object.
-	AllowsConversion(schema.GroupVersionKind) bool
+	AllowsConversion(target schema.GroupVersionKind, mimeType, mimeSubType string) bool
 	// AllowsServerVersion should return true if the specified version is valid
 	// for the server group.
 	AllowsServerVersion(version string) bool
@@ -139,9 +133,11 @@ var DefaultEndpointRestrictions = emptyEndpointRestrictions{}
 
 type emptyEndpointRestrictions struct{}
 
-func (emptyEndpointRestrictions) AllowsConversion(schema.GroupVersionKind) bool { return false }
-func (emptyEndpointRestrictions) AllowsServerVersion(string) bool               { return false }
-func (emptyEndpointRestrictions) AllowsStreamSchema(s string) bool              { return s == "watch" }
+func (emptyEndpointRestrictions) AllowsConversion(schema.GroupVersionKind, string, string) bool {
+	return false
+}
+func (emptyEndpointRestrictions) AllowsServerVersion(string) bool  { return false }
+func (emptyEndpointRestrictions) AllowsStreamSchema(s string) bool { return s == "watch" }
 
 // AcceptedMediaType contains information about a valid media type that the
 // server can serialize.
@@ -240,7 +236,7 @@ func acceptMediaTypeOptions(params map[string]string, accepts *AcceptedMediaType
 		}
 	}
 
-	if options.Convert != nil && !endpoint.AllowsConversion(*options.Convert) {
+	if options.Convert != nil && !endpoint.AllowsConversion(*options.Convert, accepts.Type, accepts.SubType) {
 		return MediaTypeOptions{}, false
 	}
 

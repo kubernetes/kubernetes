@@ -430,14 +430,14 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
 
-	resorceQuotaColumnDefinitions := []metav1beta1.TableColumnDefinition{
+	resourceQuotaColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Request", Type: "string", Description: "Request represents a minimum amount of cpu/memory that a container may consume."},
 		{Name: "Limit", Type: "string", Description: "Limits control the maximum amount of cpu/memory that a container may use independent of contention on the node."},
 	}
-	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuota)
-	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuotaList)
+	h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuota)
+	h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuotaList)
 
 	priorityClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -455,6 +455,17 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClass)
 	h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClassList)
+
+	volumeAttachmentColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Attacher", Type: "string", Format: "name", Description: storagev1.VolumeAttachmentSpec{}.SwaggerDoc()["attacher"]},
+		{Name: "PV", Type: "string", Description: storagev1.VolumeAttachmentSource{}.SwaggerDoc()["persistentVolumeName"]},
+		{Name: "Node", Type: "string", Description: storagev1.VolumeAttachmentSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "Attached", Type: "boolean", Description: storagev1.VolumeAttachmentStatus{}.SwaggerDoc()["attached"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachment)
+	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachmentList)
 
 	AddDefaultHandlers(h)
 }
@@ -1996,6 +2007,34 @@ func printRuntimeClassList(list *nodeapi.RuntimeClassList, options printers.Prin
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printRuntimeClass(&list.Items[i], options)
+
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printVolumeAttachment(obj *storage.VolumeAttachment, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	pvName := ""
+	if obj.Spec.Source.PersistentVolumeName != nil {
+		pvName = *obj.Spec.Source.PersistentVolumeName
+	}
+	row.Cells = append(row.Cells, name, obj.Spec.Attacher, pvName, obj.Spec.NodeName, obj.Status.Attached, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printVolumeAttachmentList(list *storage.VolumeAttachmentList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printVolumeAttachment(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

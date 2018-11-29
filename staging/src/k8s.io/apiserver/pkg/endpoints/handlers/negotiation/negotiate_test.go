@@ -231,7 +231,7 @@ func TestNegotiate(t *testing.T) {
 			req = &http.Request{Header: http.Header{}}
 			req.Header.Set("Accept", test.accept)
 		}
-		s, err := NegotiateOutputSerializer(req, test.ns)
+		_, s, err := NegotiateOutputMediaType(req, test.ns, DefaultEndpointRestrictions)
 		switch {
 		case err == nil && test.errFn != nil:
 			t.Errorf("%d: failed: expected error", i)
