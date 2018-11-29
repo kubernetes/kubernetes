@@ -479,7 +479,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 
 	if fsType != "" {
 		By("Checking fsType is correct.")
-		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", fmt.Sprintf(" /opt/0 %s", fsType), "/proc/mounts"}, fsType, time.Minute)
+		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
 		Expect(err).NotTo(HaveOccurred(), "failed: getting the right fsType %s", fsType)
 	}
 }
