@@ -76,6 +76,10 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s)", nodeResourceGroup, vmName, diskName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
+
+	// Invalidate the cache right after updating
+	defer as.cloud.vmCache.Delete(vmName)
+
 	_, err = as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
 	if err != nil {
 		glog.Errorf("azureDisk - attach disk(%s) failed, err: %v", diskName, err)
@@ -87,8 +91,6 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		}
 	} else {
 		glog.V(2).Infof("azureDisk - attach disk(%s) succeeded", diskName)
-		// Invalidate the cache right after updating
-		as.cloud.vmCache.Delete(vmName)
 	}
 	return err
 }
@@ -138,13 +140,15 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s)", nodeResourceGroup, vmName, diskName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
+
+	// Invalidate the cache right after updating
+	defer as.cloud.vmCache.Delete(vmName)
+
 	_, err = as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
 	if err != nil {
 		glog.Errorf("azureDisk - detach disk(%s) failed, err: %v", diskName, err)
 	} else {
 		glog.V(2).Infof("azureDisk - detach disk(%s) succeeded", diskName)
-		// Invalidate the cache right after updating
-		as.cloud.vmCache.Delete(vmName)
 	}
 	return err
 }
