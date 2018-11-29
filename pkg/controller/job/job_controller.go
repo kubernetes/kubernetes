@@ -489,6 +489,13 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 				key, *job.Spec.ActiveDeadlineSeconds)
 			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
 		}
+
+		// enqueue a sync to check if job past ProgressDeadlineSeconds
+		if job.Spec.ProgressDeadlineSeconds != nil {
+			klog.V(4).Infof("Job %s have ProgressDeadlineSeconds will sync after %d seconds",
+				key, *job.Spec.ProgressDeadlineSeconds)
+			jm.queue.AddAfter(key, time.Duration(*job.Spec.ProgressDeadlineSeconds)*time.Second)
+		}
 	}
 
 	var manageJobErr error
@@ -509,6 +516,10 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
 		failureMessage = "Job has reached the specified backoff limit"
+	} else if previousRetry == 0 && hasPendingPod(pods) && pastProgressDeadline(&job) {
+		jobFailed = true
+		failureReason = "ProgressDeadlineExceeded"
+		failureMessage = "Job has not started before ProgressDeadline"
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
@@ -649,6 +660,17 @@ func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
 	return result >= *job.Spec.BackoffLimit
 }
 
+// hasPendingPod checks if any Pod of this job is in pending state
+func hasPendingPod(pods []*v1.Pod) bool {
+	for i := range pods {
+		pod := pods[i]
+		if pod.Status.Phase == v1.PodPending {
+			return true
+		}
+	}
+	return false
+}
+
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
 func pastActiveDeadline(job *batch.Job) bool {
 	if job.Spec.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil {
@@ -658,6 +680,18 @@ func pastActiveDeadline(job *batch.Job) bool {
 	start := job.Status.StartTime.Time
 	duration := now.Time.Sub(start)
 	allowedDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second
+	return duration >= allowedDuration
+}
+
+// pastProgressDeadline checks if job has ProgressDeadlineSeconds field set and if it is exceeded.
+func pastProgressDeadline(job *batch.Job) bool {
+	if job.Spec.ProgressDeadlineSeconds == nil || job.Status.StartTime == nil {
+		return false
+	}
+	now := metav1.Now()
+	start := job.Status.StartTime.Time
+	duration := now.Time.Sub(start)
+	allowedDuration := time.Duration(*job.Spec.ProgressDeadlineSeconds) * time.Second
 	return duration >= allowedDuration
 }
 

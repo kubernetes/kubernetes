@@ -82,6 +82,11 @@ type JobSpec struct {
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
+	// Specifies the duration in seconds relative to the startTime that the job needs to become active,
+	// otherwise the system will try to terminate it; value must be positive integer
+	// +optional
+	ProgressDeadlineSeconds *int64 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
+
 	// Specifies the number of retries before marking this job failed.
 	// Defaults to 6
 	// +optional

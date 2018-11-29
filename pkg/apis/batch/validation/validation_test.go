@@ -156,6 +156,18 @@ func TestValidateJob(t *testing.T) {
 				Template:              validPodTemplateSpecForGenerated,
 			},
 		},
+		"spec.progressDeadlineSeconds:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				ProgressDeadlineSeconds: &negative64,
+				Selector:                validGeneratedSelector,
+				Template:                validPodTemplateSpecForGenerated,
+			},
+		},
 		"spec.selector:Required value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
@@ -547,6 +559,23 @@ func TestValidateCronJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						ActiveDeadlineSeconds: &negative64,
+						Template:              validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.progressDeadlineSeconds:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						ProgressDeadlineSeconds: &negative64,
 						Template:              validPodTemplateSpec,
 					},
 				},

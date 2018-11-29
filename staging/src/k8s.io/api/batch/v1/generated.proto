@@ -112,6 +112,11 @@ message JobSpec {
   // +optional
   optional int32 backoffLimit = 7;
 
+  // Specifies the duration in seconds relative to the startTime that the job becomes active
+  // before the system tries to terminate it; value must be positive integer
+  // +optional
+  optional int64 progressDeadlineSeconds = 9;
+
   // A label query over pods that should match the pod count.
   // Normally, the system sets this field for you.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors

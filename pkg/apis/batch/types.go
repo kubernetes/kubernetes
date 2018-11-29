@@ -109,6 +109,11 @@ type JobSpec struct {
 	// +optional
 	ActiveDeadlineSeconds *int64
 
+	// Optional duration in seconds relative to the startTime that the job needs to become active,
+	// otherwise the system will try to terminate it; value must be positive integer
+	// +optional
+	ProgressDeadlineSeconds *int64
+
 	// Optional number of retries before marking this job failed.
 	// Defaults to 6
 	// +optional

@@ -2036,6 +2036,9 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		if job.Spec.ActiveDeadlineSeconds != nil {
 			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
+		if job.Spec.ProgressDeadlineSeconds != nil {
+			w.Write(LEVEL_0, "Progress Deadline Seconds:\t%ds\n", *job.Spec.ProgressDeadlineSeconds)
+		}
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
 		DescribePodTemplate(&job.Spec.Template, w)
 		if events != nil {
