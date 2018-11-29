@@ -259,9 +259,6 @@ func (g *glusterFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 
 func (g *glusterFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
-	if pattern.FsType == "xfs" {
-		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
-	}
 }
 
 func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
@@ -1178,9 +1175,6 @@ func (g *gcePdDriver) GetDriverInfo() *testsuites.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FsType == "xfs" {
-		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
-	}
 }
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource {
