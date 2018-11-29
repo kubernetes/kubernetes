@@ -4049,19 +4049,19 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
 		},
 		{
 			"ImportPath": "k8s.io/utils/pointer",
-			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

@@ -274,6 +274,26 @@ func (eic execInContainer) SetStderr(out io.Writer) {
 	//unimplemented
 }
 
+func (eic execInContainer) SetEnv(env []string) {
+	//unimplemented
+}
+
 func (eic execInContainer) Stop() {
 	//unimplemented
+}
+
+func (eic execInContainer) Start() error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (eic execInContainer) Wait() error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (eic execInContainer) StdoutPipe() (io.ReadCloser, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
+func (eic execInContainer) StderrPipe() (io.ReadCloser, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
