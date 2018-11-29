@@ -595,7 +595,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   "Failed",
 	}.AsSelector().String()
-	err = framework.WaitTimeoutForPodEvent(f.ClientSet, pod.Name, f.Namespace.Name, selector, errorMsg, framework.PodEventTimeout)
+	err = framework.WaitTimeoutForPodEvent(f.ClientSet, pod.Name, f.Namespace.Name, selector, errorMsg, framework.PodStartTimeout)
 	Expect(err).NotTo(HaveOccurred(), "while waiting for failed event to occur")
 }
 
