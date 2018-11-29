@@ -18,11 +18,13 @@ package portforward
 
 import (
 	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
@@ -39,11 +41,31 @@ func (d *fakeDialer) Dial(protocols ...string) (httpstream.Connection, string, e
 	return d.conn, d.negotiatedProtocol, d.err
 }
 
+type fakeConnection struct {
+	closeChan chan bool
+}
+
+func (_ *fakeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	return nil, nil
+}
+
+func (fc *fakeConnection) Close() error {
+	close(fc.closeChan)
+	return nil
+}
+
+func (fc *fakeConnection) CloseChan() <-chan bool {
+	return fc.closeChan
+}
+
+func (_ *fakeConnection) SetIdleTimeout(timeout time.Duration) {
+}
+
 func TestParsePortsAndNew(t *testing.T) {
 	tests := []struct {
 		input                   []string
 		addresses               []string
-		expectedPorts           []ForwardedPort
+		expectedParsedPorts     []ForwardedPort
 		expectedAddresses       []listenAddress
 		expectPortParseError    bool
 		expectAddressParseError bool
@@ -62,10 +84,10 @@ func TestParsePortsAndNew(t *testing.T) {
 		{input: []string{"5000:5000"}, addresses: []string{"::g"}, expectPortParseError: false, expectAddressParseError: true, expectNewError: true},
 		{input: []string{"5000:5000"}, addresses: []string{"domain.invalid"}, expectPortParseError: false, expectAddressParseError: true, expectNewError: true},
 		{
-			input:     []string{"5000:5000"},
+			input:     []string{"50000:50000"},
 			addresses: []string{"localhost"},
-			expectedPorts: []ForwardedPort{
-				{5000, 5000},
+			expectedParsedPorts: []ForwardedPort{
+				{50000, 50000},
 			},
 			expectedAddresses: []listenAddress{
 				{protocol: "tcp4", address: "127.0.0.1", failureMode: "all"},
@@ -73,10 +95,10 @@ func TestParsePortsAndNew(t *testing.T) {
 			},
 		},
 		{
-			input:     []string{"5000:5000"},
+			input:     []string{"50000:50000"},
 			addresses: []string{"localhost", "127.0.0.1"},
-			expectedPorts: []ForwardedPort{
-				{5000, 5000},
+			expectedParsedPorts: []ForwardedPort{
+				{50000, 50000},
 			},
 			expectedAddresses: []listenAddress{
 				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
@@ -84,15 +106,15 @@ func TestParsePortsAndNew(t *testing.T) {
 			},
 		},
 		{
-			input:     []string{"5000", "5000:5000", "8888:5000", "5000:8888", ":5000", "0:5000"},
+			input:     []string{"50000", "50001:50001", "58888:50000", "50002:58888", ":50000", "0:50000"},
 			addresses: []string{"127.0.0.1", "::1"},
-			expectedPorts: []ForwardedPort{
-				{5000, 5000},
-				{5000, 5000},
-				{8888, 5000},
-				{5000, 8888},
-				{0, 5000},
-				{0, 5000},
+			expectedParsedPorts: []ForwardedPort{
+				{50000, 50000},
+				{50001, 50001},
+				{58888, 50000},
+				{50002, 58888},
+				{0, 50000},
+				{0, 50000},
 			},
 			expectedAddresses: []listenAddress{
 				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
@@ -120,7 +142,9 @@ func TestParsePortsAndNew(t *testing.T) {
 			t.Fatalf("%d: parseAddresses: error expected=%t, got %t: %s", i, e, a, err)
 		}
 
-		dialer := &fakeDialer{}
+		dialer := &fakeDialer{
+			conn: &fakeConnection{},
+		}
 		expectedStopChan := make(chan struct{})
 		readyChan := make(chan struct{})
 
@@ -146,7 +170,7 @@ func TestParsePortsAndNew(t *testing.T) {
 			t.Fatalf("%d: expectedAddresses: %v, got: %v", i, test.expectedAddresses, parsedAddresses)
 		}
 
-		for pi, expectedPort := range test.expectedPorts {
+		for pi, expectedPort := range test.expectedParsedPorts {
 			if e, a := expectedPort.Local, parsedPorts[pi].Local; e != a {
 				t.Fatalf("%d: local expected: %d, got: %d", i, e, a)
 			}
@@ -162,20 +186,46 @@ func TestParsePortsAndNew(t *testing.T) {
 			t.Fatalf("%d: GetPorts: error expected but got nil", i)
 		}
 
-		// mock-signal the Ready channel
-		close(readyChan)
+		errorChan := make(chan error)
+		go func() {
+			if err := pf.ForwardPorts(); err != nil {
+				errorChan <- err
+			}
+		}()
 
-		if ports, portErr := pf.GetPorts(); portErr != nil {
-			t.Fatalf("%d: GetPorts: unable to retrieve ports: %s", i, portErr)
-		} else if !reflect.DeepEqual(test.expectedPorts, ports) {
-			t.Fatalf("%d: ports: expected %#v, got %#v", i, test.expectedPorts, ports)
+		// wait for ports to be ready
+		select {
+		case errorChan <- err:
+			t.Fatalf("%d: ForwardPorts: unable to forward ports: %s", i, err)
+			continue
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%d: ForwardPorts: timed out waiting for ports to be ready", i)
+			continue
+		case <-readyChan:
 		}
+
+		ports, portErr := pf.GetPorts()
+
+		if portErr != nil {
+			t.Fatalf("%d: GetPorts: unable to retrieve ports: %s", i, portErr)
+		} else if e, a := pf.ports, ports; !reflect.DeepEqual(e, a) {
+			t.Fatalf("%d: GetPorts: expected %#v, got %#v", i, e, a)
+		}
+
+		for _, port := range ports {
+			if port.Local == 0 {
+				t.Fatalf("%d: GetPorts: expected non-zero local port, got %#v", i, port)
+			}
+		}
+
 		if e, a := expectedStopChan, pf.stopChan; e != a {
 			t.Fatalf("%d: stopChan: expected %#v, got %#v", i, e, a)
 		}
 		if pf.Ready == nil {
 			t.Fatalf("%d: Ready should be non-nil", i)
 		}
+
+		pf.Close()
 	}
 }
 
