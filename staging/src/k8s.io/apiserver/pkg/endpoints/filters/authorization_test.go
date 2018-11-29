@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -62,19 +63,43 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 
-		"resource": {
+		"create resource without namespace": {
 			Verb: "POST",
-			Path: "/api/v1/nodes/mynode",
+			Path: "/api/v1/nodes",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "create",
-				Path:            "/api/v1/nodes/mynode",
+				Path:            "/api/v1/nodes",
 				ResourceRequest: true,
 				Resource:        "nodes",
 				APIVersion:      "v1",
-				Name:            "mynode",
 			},
 		},
-		"namespaced resource": {
+		"create resource with namespace": {
+			Verb: "POST",
+			Path: "/apis/apps/v1/namespaces/myns/deployments",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb:            "create",
+				Path:            "/apis/apps/v1/namespaces/myns/deployments",
+				ResourceRequest: true,
+				Namespace:       "myns",
+				Resource:        "deployments",
+				APIGroup:        apps.GroupName,
+				APIVersion:      "v1",
+			},
+		},
+		"update resource without a namespace": {
+			Verb: "PUT",
+			Path: "/api/v1/persistentvolumes/mypv",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb:            "update",
+				Path:            "/api/v1/persistentvolumes/mypv",
+				ResourceRequest: true,
+				Resource:        "persistentvolumes",
+				APIVersion:      "v1",
+				Name:            "mypv",
+			},
+		},
+		"update resource with a namespace": {
 			Verb: "PUT",
 			Path: "/api/v1/namespaces/myns/pods/mypod",
 			ExpectedAttributes: &authorizer.AttributesRecord{
@@ -85,6 +110,20 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 				Resource:        "pods",
 				APIVersion:      "v1",
 				Name:            "mypod",
+			},
+		},
+		"subresource": {
+			Verb: "GET",
+			Path: "/api/v1/namespaces/myns/pods/mypod/status",
+			ExpectedAttributes: &authorizer.AttributesRecord{
+				Verb:            "get",
+				Path:            "/api/v1/namespaces/myns/pods/mypod/status",
+				ResourceRequest: true,
+				Namespace:       "myns",
+				Resource:        "pods",
+				APIVersion:      "v1",
+				Name:            "mypod",
+				Subresource:     "status",
 			},
 		},
 		"API group resource": {
