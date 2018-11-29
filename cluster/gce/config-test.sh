@@ -148,6 +148,10 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 #   glbc           - CE L7 Load Balancer Controller
 ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 
+# Optional: Disable including the built-in ManagedCertificate CRD so that you
+# can overwrite it with a custom definition.
+ENABLE_MANAGED_CERTIFICATE_CRD="${ENABLE_MANAGED_CERTIFICATE_CRD:-true}"
+
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none           - No cluster monitoring setup
 #   influxdb       - Heapster, InfluxDB, and Grafana

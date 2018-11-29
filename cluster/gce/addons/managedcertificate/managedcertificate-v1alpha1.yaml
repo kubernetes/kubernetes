@@ -1,0 +1,49 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: managedcertificates.gke.googleapis.com
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: gke.googleapis.com
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    plural: managedcertificates
+    singular: managedcertificate
+    kind: ManagedCertificate
+    shortNames:
+      - mcrt
+  validation:
+    openAPIV3Schema:
+      properties:
+        status:
+          properties:
+            certificateStatus:
+              type: string
+            domainStatus:
+              type: array
+              items:
+                type: object
+                required:
+                  - domain
+                  - status
+                properties:
+                  domain:
+                    type: string
+                  status:
+                    type: string
+            certificateName:
+              type: string
+            expireTime:
+              type: string
+              format: date-time
+        spec:
+          properties:
+            domains:
+              type: array
+              maxItems: 1
+              items:
+                type: string
+                maxLength: 63
+                pattern: '^(([a-zA-Z0-9]+|[a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9])\.)+[a-zA-Z][-a-zA-Z0-9]*[a-zA-Z0-9]\.?$'

@@ -1132,6 +1132,11 @@ EOF
 ADDON_MANAGER_LEADER_ELECTION: $(yaml-quote ${ADDON_MANAGER_LEADER_ELECTION})
 EOF
     fi
+    if [ -n "${ENABLE_MANAGED_CERTIFICATE_CRD:-}" ]; then
+      cat >>$file <<EOF
+ENABLE_MANAGED_CERTIFICATE_CRD: $(yaml-quote ${ENABLE_MANAGED_CERTIFICATE_CRD})
+EOF
+    fi
 
   else
     # Node-only env vars.

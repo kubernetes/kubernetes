@@ -2606,11 +2606,13 @@ EOF
   if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
     setup-addon-manifests "addons" "runtimeclass"
   fi
+  if [[ "${ENABLE_MANAGED_CERTIFICATE_CRD:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "managedcertificate" "gce"
+  fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"
   fi
-
 
   # Place addon manager pod manifest.
   src_file="${src_dir}/kube-addon-manager.yaml"
