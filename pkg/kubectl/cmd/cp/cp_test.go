@@ -175,6 +175,11 @@ func TestStripPathShortcuts(t *testing.T) {
 			input:    "...foo",
 			expected: "...foo",
 		},
+		{
+			name:     "test root directory",
+			input:    "/",
+			expected: "",
+		},
 	}
 
 	for _, test := range tests {
