@@ -387,8 +387,8 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.SplitUniqueName failed", err)
 		}
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(pluginName)
-		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
+		if err != nil || attachableVolumePlugin == nil {
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginByName failed", err)
 		}
 	}
 
