@@ -390,7 +390,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 	if len(g.predicates) == 0 {
 		filtered = nodes
 	} else {
-		allNodes := int32(g.cache.NodeTree().NumNodes)
+		allNodes := int32(g.cache.NodeTree().NumNodes())
 		numNodesToFind := g.numFeasibleNodesToFind(allNodes)
 
 		// Create filtered list with enough space to avoid growing it
