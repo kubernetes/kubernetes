@@ -267,6 +267,9 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	createGCESecrets(cs, config)
 	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
 }
+	if pattern.FsType == "xfs" {
+		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	ns := g.driverInfo.Framework.Namespace.Name
@@ -355,6 +358,9 @@ func (g *gcePDExternalCSIDriver) GetDriverInfo() *DriverInfo {
 func (g *gcePDExternalCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
 	framework.SkipIfMultizone(g.driverInfo.Framework.ClientSet)
+	if pattern.FsType == "xfs" {
+		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
+	}
 }
 
 func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
