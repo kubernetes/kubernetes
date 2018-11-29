@@ -283,10 +283,6 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 // setObjectSelfLink sets the self link of an object as needed.
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if !meta.IsListType(obj) {
-		// status needs no self link
-		if _, ok := obj.(*metav1.Status); ok {
-			return nil
-		}
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {
 			return fmt.Errorf("missing requestInfo")
