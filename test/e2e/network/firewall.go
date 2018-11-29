@@ -131,7 +131,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		Expect(framework.TestHitNodesFromOutside(svcExternalIP, gce.FirewallTestHttpPort, gce.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
+		Expect(framework.TestHitNodesFromOutside(svcExternalIP, gce.FirewallTestHttpPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
 		// by removing the tag on one vm and make sure it doesn't get any traffic. This is an imperfect
@@ -151,11 +151,11 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			Expect(framework.TestHitNodesFromOutside(svcExternalIP, gce.FirewallTestHttpPort, gce.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
+			Expect(framework.TestHitNodesFromOutside(svcExternalIP, gce.FirewallTestHttpPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 		}()
 
 		By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, gce.FirewallTestHttpPort, gce.FirewallTimeoutDefault, nodesSet, 15)).NotTo(HaveOccurred())
+		Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, gce.FirewallTestHttpPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet, 15)).NotTo(HaveOccurred())
 	})
 
 	It("should have correct firewall rules for e2e cluster", func() {
