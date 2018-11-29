@@ -14,7 +14,6 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",

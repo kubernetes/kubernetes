@@ -24,7 +24,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/keymutex:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",

@@ -34,7 +34,6 @@ go_test(
     embed = [":go_default_library"],
     tags = ["integration"],
     deps = [
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
