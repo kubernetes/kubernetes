@@ -361,7 +361,12 @@ func getTestPod(t testsuites.StorageClassTest, claim *v1.PersistentVolumeClaim, 
 
 func testCSIDriverUpdate(f *framework.Framework, driver drivers.TestDriver) {
 	// NOTE: this test assumes that all CSI drivers in csiTestDrivers deploy exactly one DaemonSet.
-	It("should work after update", func() {
+	testName := "should work after update"
+	if driver.GetDriverInfo().InstalledNamespace != "" {
+		testName = testName + " [Disruptive]"
+	}
+
+	It(testName, func() {
 		cs := f.ClientSet
 
 		By("Checking the driver works before update")
@@ -398,7 +403,14 @@ func testCSIDriverUpdate(f *framework.Framework, driver drivers.TestDriver) {
 		err = framework.DeletePodWithWait(f, cs, pod)
 
 		By("Finding CSI driver deployment")
-		ds, err := getDriverDaemonSet(f)
+		var namespace string
+		if driver.GetDriverInfo().InstalledNamespace != "" {
+			namespace = driver.GetDriverInfo().InstalledNamespace
+		} else {
+			namespace = f.Namespace.Name
+		}
+
+		ds, err := getDriverDaemonSet(cs, namespace)
 		framework.ExpectNoError(err, "Failed to get driver DaemonSets")
 
 		By("Updating the driver")
@@ -462,9 +474,9 @@ func testCSIDriverUpdate(f *framework.Framework, driver drivers.TestDriver) {
 // getDriverDaemonSet finds *any* DaemonSet in framework's namespace and returns it.
 // It must be called just after driver installation, where the only DaemonSet in the
 // namespace must be the driver.
-func getDriverDaemonSet(f *framework.Framework) (*appsv1.DaemonSet, error) {
+func getDriverDaemonSet(cs clientset.Interface, namespace string) (*appsv1.DaemonSet, error) {
 	By("Finding CSI driver DaemonSet")
-	daemonSets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{})
+	daemonSets, err := cs.AppsV1().DaemonSets(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

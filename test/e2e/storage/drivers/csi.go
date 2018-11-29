@@ -42,6 +42,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -323,7 +324,8 @@ var _ DynamicPVTestDriver = &gcePDExternalCSIDriver{}
 func InitGcePDExternalCSIDriver() TestDriver {
 	return &gcePDExternalCSIDriver{
 		driverInfo: DriverInfo{
-			Name: "pd.csi.storage.gke.io",
+			Name:               "pd.csi.storage.gke.io",
+			InstalledNamespace: metav1.NamespaceDefault,
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
 			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,

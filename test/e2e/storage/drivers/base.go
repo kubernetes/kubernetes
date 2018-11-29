@@ -80,6 +80,9 @@ type DynamicPVTestDriver interface {
 type DriverInfo struct {
 	Name       string // Name of the driver
 	FeatureTag string // FeatureTag for the driver
+	// Namespace the driver is installed to, default is empty which represents the
+	// test namespace
+	InstalledNamespace string
 
 	MaxFileSize          int64       // Max file size to be tested for this driver
 	SupportedFsType      sets.String // Map of string for supported fs type
