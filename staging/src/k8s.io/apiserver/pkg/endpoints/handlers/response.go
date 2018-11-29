@@ -33,16 +33,13 @@ import (
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
-func transformResponseObject(ctx context.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
-	// TODO: fetch the media type much earlier in request processing and pass it into this method.
-	trace := scope.Trace
-	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
-	if err != nil {
-		status := responsewriters.ErrorToAPIStatus(err)
-		trace.Step("Writing raw JSON response")
-		responsewriters.WriteRawJSON(int(status.Code), status, w)
+func transformResponseObject(ctx context.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+	if err := setObjectSelfLink(ctx, result, req, scope.Namer); err != nil {
+		scope.err(err, w, req)
 		return
 	}
+
+	trace := scope.Trace
 
 	// If conversion was allowed by the scope, perform it before writing the response
 	if target := mediaType.Convert; target != nil {
@@ -51,7 +48,7 @@ func transformResponseObject(ctx context.Context, scope RequestScope, req *http.
 		case target.Kind == "PartialObjectMetadata" && target.GroupVersion() == metav1beta1.SchemeGroupVersion:
 			if meta.IsListType(result) {
 				// TODO: this should be calculated earlier
-				err = newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadata, but the requested object is a list (%T)", result))
+				err := newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadata, but the requested object is a list (%T)", result))
 				scope.err(err, w, req)
 				return
 			}
@@ -77,7 +74,7 @@ func transformResponseObject(ctx context.Context, scope RequestScope, req *http.
 		case target.Kind == "PartialObjectMetadataList" && target.GroupVersion() == metav1beta1.SchemeGroupVersion:
 			if !meta.IsListType(result) {
 				// TODO: this should be calculated earlier
-				err = newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadataList, but the requested object is not a list (%T)", result))
+				err := newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadataList, but the requested object is not a list (%T)", result))
 				scope.err(err, w, req)
 				return
 			}
