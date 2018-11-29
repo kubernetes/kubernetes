@@ -29,7 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -832,7 +831,7 @@ func TestMaxVolumeFuncM5(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-m5-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "m5.large",
+				v1.LabelInstanceType: "m5.large",
 			},
 		},
 	}
@@ -849,7 +848,7 @@ func TestMaxVolumeFuncT3(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-t3-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "t3.medium",
+				v1.LabelInstanceType: "t3.medium",
 			},
 		},
 	}
@@ -866,7 +865,7 @@ func TestMaxVolumeFuncR5(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-r5-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "r5d.xlarge",
+				v1.LabelInstanceType: "r5d.xlarge",
 			},
 		},
 	}
@@ -883,7 +882,7 @@ func TestMaxVolumeFuncM4(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-for-m4-instance",
 			Labels: map[string]string{
-				kubeletapis.LabelInstanceType: "m4.2xlarge",
+				v1.LabelInstanceType: "m4.2xlarge",
 			},
 		},
 	}

@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -489,8 +488,8 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[kubeletapis.LabelZoneFailureDomain] ==
-				prevNode.Labels[kubeletapis.LabelZoneFailureDomain] {
+			if newNode.Labels[v1.LabelZoneFailureDomain] ==
+				prevNode.Labels[v1.LabelZoneFailureDomain] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -524,7 +523,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if prevNode != nil {
 		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(prevZone) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
@@ -547,7 +546,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if newNode != nil {
 		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()

@@ -52,7 +52,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -1192,7 +1191,7 @@ func (g *gcePdDriver) CreateVolume(volType testpatterns.TestVolType) interface{}
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		g.driverInfo.Config.NodeSelector = map[string]string{
-			kubeletapis.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 		}
 	}
 	By("creating a test gce pd volume")

@@ -22,6 +22,7 @@ import (
 	"io"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	vol "k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -146,7 +146,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 
 			// Set NodeSelectorRequirements based on the labels
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain {
 				zones, err := volumeutil.LabelZonesToSet(v)
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
@@ -248,7 +248,7 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 	}
 
 	// If the zone is already labeled, honor the hint
-	zone := volume.Labels[kubeletapis.LabelZoneFailureDomain]
+	zone := volume.Labels[v1.LabelZoneFailureDomain]
 
 	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {

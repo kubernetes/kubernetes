@@ -22,13 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -117,12 +117,12 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == kubeletapis.LabelZoneFailureDomain {
+		if key == v1.LabelZoneFailureDomain {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, kubeletapis.LabelZoneFailureDomain)
+		node.Name, v1.LabelZoneFailureDomain)
 }
 
 // Return the number of zones in which we have nodes in this cluster.

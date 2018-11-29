@@ -25,7 +25,6 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +36,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/client-go/kubernetes"
@@ -219,7 +217,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		// Set NodeSelectorRequirements based on the labels
 		if populateAffinity {
 			var values []string
-			if k == kubeletapis.LabelZoneFailureDomain {
+			if k == v1.LabelZoneFailureDomain {
 				zones, err := volumeutil.LabelZonesToSet(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v)

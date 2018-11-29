@@ -53,7 +53,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -539,7 +538,7 @@ func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.Persist
 
 // isZoneRegionLabel check if given key of label is zone or region label.
 func isZoneRegionLabel(k string) bool {
-	return k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion
+	return k == v1.LabelZoneFailureDomain || k == v1.LabelZoneRegion
 }
 
 func (c *configFactory) onPvDelete(obj interface{}) {

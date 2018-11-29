@@ -19,11 +19,11 @@ package antiaffinity
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
@@ -101,7 +101,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						},
 					},
 				},
@@ -123,7 +123,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						},
 					},
 				},
@@ -167,7 +167,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						}, {
 							LabelSelector: &metav1.LabelSelector{
 								MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -189,7 +189,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						},
 					},
 				},

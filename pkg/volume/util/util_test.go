@@ -41,8 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -1051,7 +1050,7 @@ func TestValidateZone(t *testing.T) {
 func TestSelectZoneForVolume(t *testing.T) {
 
 	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{kubeletapis.LabelZoneFailureDomain: "zoneX"}
+	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -1143,7 +1142,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1167,7 +1166,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1193,7 +1192,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 							Values: []string{"zoneX"},
 						},
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1337,7 +1336,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneZ", "zoneY"},
 						},
 					},
@@ -1361,7 +1360,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1384,7 +1383,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1392,7 +1391,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1416,7 +1415,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1483,7 +1482,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 func TestSelectZonesForVolume(t *testing.T) {
 
 	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{kubeletapis.LabelZoneFailureDomain: "zoneX"}
+	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -1577,7 +1576,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1601,7 +1600,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1627,7 +1626,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 							Values: []string{"zoneX"},
 						},
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1711,7 +1710,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1835,7 +1834,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
 						},
 					},
@@ -1861,7 +1860,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1888,7 +1887,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX", "zoneY", "zoneZ"},
 						},
 					},
@@ -1912,7 +1911,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1940,7 +1939,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneV"},
 						},
 					},
@@ -1948,7 +1947,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneW"},
 						},
 					},
@@ -1956,7 +1955,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1964,7 +1963,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1972,7 +1971,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneZ"},
 						},
 					},
@@ -1998,7 +1997,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -2006,7 +2005,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -2033,7 +2032,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -2041,7 +2040,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -2049,7 +2048,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneZ"},
 						},
 					},
@@ -2073,7 +2072,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -2081,7 +2080,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    kubeletapis.LabelZoneFailureDomain,
+							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneY"},
 						},
 					},

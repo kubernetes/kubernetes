@@ -39,7 +39,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -355,7 +354,7 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 
 		var nodeInstanceType string
 		for k, v := range node.ObjectMeta.Labels {
-			if k == kubeletapis.LabelInstanceType {
+			if k == v1.LabelInstanceType {
 				nodeInstanceType = v
 			}
 		}
@@ -598,7 +597,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
+		if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -659,7 +658,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
-				if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
+				if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]

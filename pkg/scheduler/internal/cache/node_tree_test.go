@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 var allNodes = []*v1.Node{
@@ -37,7 +36,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion: "region-1",
+				v1.LabelZoneRegion: "region-1",
 			},
 		},
 	},
@@ -46,7 +45,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-2",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -55,8 +54,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-3",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -65,8 +64,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-4",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -75,8 +74,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-5",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-3",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-3",
 			},
 		},
 	},
@@ -85,8 +84,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-6",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -95,8 +94,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-7",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -105,8 +104,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-8",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	}}
@@ -252,8 +251,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
@@ -272,8 +271,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
@@ -288,8 +287,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-new",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},

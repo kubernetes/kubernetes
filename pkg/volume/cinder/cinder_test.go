@@ -26,7 +26,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -119,7 +118,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
-	labels[kubeletapis.LabelZoneFailureDomain] = "nova"
+	labels[v1.LabelZoneFailureDomain] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -234,7 +233,7 @@ func TestPlugin(t *testing.T) {
 
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
-	if req.Key != kubeletapis.LabelZoneFailureDomain {
+	if req.Key != v1.LabelZoneFailureDomain {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 

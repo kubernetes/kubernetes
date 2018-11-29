@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -116,7 +115,7 @@ func TestMarkControlPlane(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: hostname,
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: hostname,
+					v1.LabelHostname: hostname,
 				},
 			},
 		}

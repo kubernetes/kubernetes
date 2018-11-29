@@ -385,8 +385,8 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		if instanceType, err := getInstanceTypeByProviderIDOrName(instances, curNode); err != nil {
 			return err
 		} else if instanceType != "" {
-			klog.V(2).Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
-			curNode.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = instanceType
+			klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
+			curNode.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
 		}
 
 		if zones, ok := cnc.cloud.Zones(); ok {
@@ -395,12 +395,12 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 				return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
-				curNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
+				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
+				curNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
-				curNode.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
+				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
+				curNode.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
 			}
 		}
 

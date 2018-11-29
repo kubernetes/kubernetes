@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func TestPatchNodeNonErrorCases(t *testing.T) {
@@ -39,7 +38,7 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 			node: v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "testnode",
-					Labels: map[string]string{kubeletapis.LabelHostname: ""},
+					Labels: map[string]string{v1.LabelHostname: ""},
 				},
 			},
 			success: true,

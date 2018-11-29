@@ -22,13 +22,12 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -666,9 +665,9 @@ func TestZoneInitialized(t *testing.T) {
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
 	assert.Equal(t, 2, len(fnh.UpdatedNodes[0].ObjectMeta.Labels),
 		"Node label for Region and Zone were not set")
-	assert.Equal(t, "us-west", fnh.UpdatedNodes[0].ObjectMeta.Labels[kubeletapis.LabelZoneRegion],
+	assert.Equal(t, "us-west", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneRegion],
 		"Node Region not correctly updated")
-	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain],
+	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneFailureDomain],
 		"Node FailureDomain not correctly updated")
 }
 

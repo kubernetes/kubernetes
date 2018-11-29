@@ -25,8 +25,8 @@ import (
 	kubescedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
+	"k8s.io/api/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
 
@@ -87,7 +87,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 	}
 
 	if len(obj.FailureDomains) == 0 {
-		obj.FailureDomains = kubeletapis.DefaultFailureDomains
+		obj.FailureDomains = v1.DefaultFailureDomains
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {

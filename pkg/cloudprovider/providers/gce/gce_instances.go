@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -60,7 +59,7 @@ func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {
 }
 
 func getZone(n *v1.Node) string {
-	zone, ok := n.Labels[kubeletapis.LabelZoneFailureDomain]
+	zone, ok := n.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
 		return defaultZone
 	}
