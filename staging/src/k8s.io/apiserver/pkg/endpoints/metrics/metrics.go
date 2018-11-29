@@ -46,35 +46,35 @@ var (
 	requestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "apiserver_request_count",
-			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response contentType and code.",
+			Help: "Counter of apiserver requests broken out for each verb, group, version, resource, scope, client, and HTTP response contentType and code.",
 		},
-		[]string{"verb", "resource", "subresource", "scope", "client", "contentType", "code"},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "client", "contentType", "code"},
 	)
 	longRunningRequestGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "apiserver_longrunning_gauge",
-			Help: "Gauge of all active long-running apiserver requests broken out by verb, API resource, and scope. Not all requests are tracked this way.",
+			Help: "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, and scope. Not all requests are tracked this way.",
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each verb, resource and subresource.",
+			Help: "Response latency distribution in microseconds for each verb, group, version, resource, subresource, and scope.",
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 	requestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name: "apiserver_request_latencies_summary",
-			Help: "Response latency summary in microseconds for each verb, resource and subresource.",
+			Help: "Response latency summary in microseconds for each verb, group, version, resource, subresource, and scope.",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on our SLI definition (medium term).
 			MaxAge: 5 * time.Hour,
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 	responseSizes = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -83,7 +83,7 @@ var (
 			// Use buckets ranging from 1000 bytes (1KB) to 10^9 bytes (1GB).
 			Buckets: prometheus.ExponentialBuckets(1000, 10.0, 7),
 		},
-		[]string{"verb", "resource", "subresource", "scope"},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 	// DroppedRequests is a number of requests dropped with 'Try again later' response"
 	DroppedRequests = prometheus.NewCounterVec(
@@ -163,9 +163,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, contentType str
 	}
 	scope := CleanScope(requestInfo)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, scope, contentType, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, contentType, code, responseSizeInBytes, elapsed)
 	} else {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, scope, contentType, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", "", "", requestInfo.Path, scope, contentType, code, responseSizeInBytes, elapsed)
 	}
 }
 
@@ -179,9 +179,9 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, fn f
 	scope := CleanScope(requestInfo)
 	reportedVerb := cleanVerb(strings.ToUpper(requestInfo.Verb), req)
 	if requestInfo.IsResourceRequest {
-		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.Resource, requestInfo.Subresource, scope)
+		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope)
 	} else {
-		g = longRunningRequestGauge.WithLabelValues(reportedVerb, "", requestInfo.Path, scope)
+		g = longRunningRequestGauge.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope)
 	}
 	g.Inc()
 	defer g.Dec()
@@ -190,22 +190,22 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, fn f
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(req *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
+func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := cleanVerb(verb, req)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
-	requestCounter.WithLabelValues(reportedVerb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
-	requestLatenciesSummary.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
+	requestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Observe(elapsedMicroseconds)
+	requestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
-		responseSizes.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(float64(respSize))
+		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Observe(float64(respSize))
 	}
 }
 
 // InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
 // the go-restful RouteFunction instead of a HandlerFunc plus some Kubernetes endpoint specific information.
-func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc restful.RouteFunction) restful.RouteFunction {
+func InstrumentRouteFunc(verb, group, version, resource, subresource, scope string, routeFunc restful.RouteFunction) restful.RouteFunction {
 	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
 		now := time.Now()
 
@@ -224,12 +224,12 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 
 		routeFunc(request, response)
 
-		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
+		MonitorRequest(request.Request, verb, group, version, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	})
 }
 
 // InstrumentHandlerFunc works like Prometheus' InstrumentHandlerFunc but adds some Kubernetes endpoint specific information.
-func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler http.HandlerFunc) http.HandlerFunc {
+func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		now := time.Now()
 
@@ -246,7 +246,7 @@ func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler ht
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
+		MonitorRequest(req, verb, group, version, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	}
 }
 
