@@ -1216,6 +1216,7 @@ items:
     verbs:
     - create
     - get
+    - update
   - apiGroups:
     - ""
     resources:
