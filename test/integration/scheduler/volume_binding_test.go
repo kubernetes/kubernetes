@@ -387,7 +387,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 	}
 }
 
-// TestVolumeBindingStress creates <podLimit> pods, each with <volsPerPod> unbound PVCs.
+// TestVolumeBindingStress creates <podLimit> pods, each with <volsPerPod> unbound or prebound PVCs.
 // PVs are precreated.
 func TestVolumeBindingStress(t *testing.T) {
 	testVolumeBindingStress(t, 0, false, 0)
@@ -437,16 +437,31 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 	pvs := []*v1.PersistentVolume{}
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < podLimit*volsPerPod; i++ {
+		var (
+			pv      *v1.PersistentVolume
+			pvc     *v1.PersistentVolumeClaim
+			pvName  = fmt.Sprintf("pv-stress-%v", i)
+			pvcName = fmt.Sprintf("pvc-stress-%v", i)
+		)
 		// Don't create pvs for dynamic provisioning test
 		if !dynamic {
-			pv := makePV(fmt.Sprintf("pv-stress-%v", i), *scName, "", "", node1)
+			if rand.Int()%2 == 0 {
+				// static unbound pvs
+				pv = makePV(pvName, *scName, "", "", node1)
+			} else {
+				// static prebound pvs
+				pv = makePV(pvName, classImmediate, pvcName, config.ns, node1)
+			}
 			if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
 			pvs = append(pvs, pv)
 		}
-
-		pvc := makePVC(fmt.Sprintf("pvc-stress-%v", i), config.ns, scName, "")
+		if pv != nil && pv.Spec.ClaimRef != nil && pv.Spec.ClaimRef.Name == pvcName {
+			pvc = makePVC(pvcName, config.ns, &classImmediate, pv.Name)
+		} else {
+			pvc = makePVC(pvcName, config.ns, scName, "")
+		}
 		if pvc, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
 			t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 		}
