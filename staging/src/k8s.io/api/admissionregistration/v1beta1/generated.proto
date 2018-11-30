@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
-// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+// MutatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and may change the object.
 message MutatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
@@ -113,7 +113,7 @@ message ServiceReference {
   optional string path = 3;
 }
 
-// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.
 message ValidatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional

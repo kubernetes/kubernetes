@@ -160,7 +160,7 @@ type ValidatingWebhookConfigurationList struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+// MutatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and may change the object.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.

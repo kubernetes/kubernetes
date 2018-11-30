@@ -28,7 +28,7 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_MutatingWebhookConfiguration = map[string]string{
-	"":         "MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.",
+	"":         "MutatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and may change the object.",
 	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
 	"webhooks": "Webhooks is a list of webhooks and the affected resources and operations.",
 }
@@ -79,7 +79,7 @@ func (ServiceReference) SwaggerDoc() map[string]string {
 }
 
 var map_ValidatingWebhookConfiguration = map[string]string{
-	"":         "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
+	"":         "ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.",
 	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
 	"webhooks": "Webhooks is a list of webhooks and the affected resources and operations.",
 }
