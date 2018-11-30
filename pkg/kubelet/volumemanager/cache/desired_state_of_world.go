@@ -222,7 +222,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	} else {
 		// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
 		// namespace and name and the name of the volume within the pod.
-		volumeName = util.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, volumeSpec)
+		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
