@@ -47,7 +47,7 @@ var csiTestDrivers = []func() drivers.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	drivers.InitGcePDExternalCSIDriver,
-	drivers.InitHostV0PathCSIDriver,
+	drivers.InitHostPathV0CSIDriver,
 }
 
 // List of testSuites to be executed in below loop

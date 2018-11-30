@@ -51,16 +51,13 @@ import (
 type hostpathCSIDriver struct {
 	cleanup    func()
 	driverInfo DriverInfo
+	manifests  []string
 }
 
-var _ TestDriver = &hostpathCSIDriver{}
-var _ DynamicPVTestDriver = &hostpathCSIDriver{}
-
-// InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
-func InitHostPathCSIDriver() TestDriver {
+func initHostPathCSIDriver(name string, manifests ...string) TestDriver {
 	return &hostpathCSIDriver{
 		driverInfo: DriverInfo{
-			Name:        "csi-hostpath",
+			Name:        name,
 			FeatureTag:  "",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -70,7 +67,24 @@ func InitHostPathCSIDriver() TestDriver {
 				CapPersistence: true,
 			},
 		},
+		manifests: manifests,
 	}
+}
+
+var _ TestDriver = &hostpathCSIDriver{}
+var _ DynamicPVTestDriver = &hostpathCSIDriver{}
+
+// InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
+func InitHostPathCSIDriver() TestDriver {
+	return initHostPathCSIDriver("csi-hostpath",
+		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
+	)
 }
 
 func (h *hostpathCSIDriver) GetDriverInfo() *DriverInfo {
@@ -90,7 +104,7 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *stor
 }
 
 func (h *hostpathCSIDriver) CreateDriver() {
-	By("deploying csi hostpath driver")
+	By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	f := h.driverInfo.Framework
 	cs := f.ClientSet
 
@@ -112,92 +126,23 @@ func (h *hostpathCSIDriver) CreateDriver() {
 	cleanup, err := h.driverInfo.Framework.CreateFromManifests(func(item interface{}) error {
 		return utils.PatchCSIDeployment(h.driverInfo.Framework, o, item)
 	},
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
-	)
+		h.manifests...)
 	h.cleanup = cleanup
 	if err != nil {
-		framework.Failf("deploying csi hostpath driver: %v", err)
+		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
 	}
 }
 
 func (h *hostpathCSIDriver) CleanupDriver() {
 	if h.cleanup != nil {
-		By("uninstalling csi hostpath driver")
+		By(fmt.Sprintf("uninstalling %s driver", h.driverInfo.Name))
 		h.cleanup()
 	}
 }
 
-// hostpathV0CSIDriver
-type hostpathV0CSIDriver struct {
-	cleanup    func()
-	driverInfo DriverInfo
-}
-
-var _ TestDriver = &hostpathV0CSIDriver{}
-var _ DynamicPVTestDriver = &hostpathV0CSIDriver{}
-
-// InitHostPathV0CSIDriver returns hostpathV0CSIDriver that implements TestDriver interface
-func InitHostV0PathCSIDriver() TestDriver {
-	return &hostpathV0CSIDriver{
-		driverInfo: DriverInfo{
-			Name:        "csi-hostpath-v0",
-			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedFsType: sets.NewString(
-				"", // Default fsType
-			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-			},
-		},
-	}
-}
-
-func (h *hostpathV0CSIDriver) GetDriverInfo() *DriverInfo {
-	return &h.driverInfo
-}
-
-func (h *hostpathV0CSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-}
-
-func (h *hostpathV0CSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
-	provisioner := GetUniqueDriverName(h)
-	parameters := map[string]string{}
-	ns := h.driverInfo.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", provisioner)
-
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
-}
-
-func (h *hostpathV0CSIDriver) CreateDriver() {
-	By("deploying csi hostpath v0 driver")
-	f := h.driverInfo.Framework
-	cs := f.ClientSet
-
-	// pods should be scheduled on the node
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
-	node := nodes.Items[rand.Intn(len(nodes.Items))]
-	h.driverInfo.Config.ClientNodeName = node.Name
-	h.driverInfo.Config.ServerNodeName = node.Name
-
-	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
-	// settings are ignored for this test. We could patch the image definitions.
-	o := utils.PatchCSIOptions{
-		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            GetUniqueDriverName(h),
-		DriverContainerName:      "hostpath",
-		ProvisionerContainerName: "csi-provisioner-v0",
-		NodeName:                 h.driverInfo.Config.ServerNodeName,
-	}
-	cleanup, err := h.driverInfo.Framework.CreateFromManifests(func(item interface{}) error {
-		return utils.PatchCSIDeployment(h.driverInfo.Framework, o, item)
-	},
+// InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
+func InitHostPathV0CSIDriver() TestDriver {
+	return initHostPathCSIDriver("csi-hostpath-v0",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -206,17 +151,6 @@ func (h *hostpathV0CSIDriver) CreateDriver() {
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpathplugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/e2e-test-rbac.yaml",
 	)
-	h.cleanup = cleanup
-	if err != nil {
-		framework.Failf("deploying csi hostpath v0 driver: %v", err)
-	}
-}
-
-func (h *hostpathV0CSIDriver) CleanupDriver() {
-	if h.cleanup != nil {
-		By("uninstalling csi hostpath v0 driver")
-		h.cleanup()
-	}
 }
 
 // gce-pd
