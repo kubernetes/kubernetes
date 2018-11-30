@@ -181,7 +181,7 @@ limitations under the License.
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    cgroupDriver: "cgroupfs"
-// 	localApiEndpoint:
+// 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
 // 	---
