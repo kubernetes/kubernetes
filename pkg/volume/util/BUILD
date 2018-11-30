@@ -52,7 +52,6 @@ go_test(
         "atomic_writer_test.go",
         "attach_limit_test.go",
         "device_util_linux_test.go",
-        "main_test.go",
         "nested_volumes_test.go",
         "resize_util_test.go",
         "util_test.go",

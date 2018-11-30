@@ -60,7 +60,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "daemon_controller_test.go",
-        "main_test.go",
         "update_test.go",
     ],
     embed = [":go_default_library"],

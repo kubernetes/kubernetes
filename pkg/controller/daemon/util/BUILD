@@ -36,10 +36,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "daemonset_util_test.go",
-        "main_test.go",
-    ],
+    srcs = ["daemonset_util_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",

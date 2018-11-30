@@ -51,8 +51,15 @@ var (
 		allAlphaGate: setUnsetAlphaGates,
 	}
 
+	// DefaultMutableFeatureGate is a mutable version of DefaultFeatureGate.
+	// Only top-level commands/options setup and the k8s.io/apiserver/pkg/util/feature/testing package should make use of this.
+	// Tests that need to modify feature gates for the duration of their test should use:
+	//   defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, <value>)()
+	DefaultMutableFeatureGate MutableFeatureGate = NewFeatureGate()
+
 	// DefaultFeatureGate is a shared global FeatureGate.
-	DefaultFeatureGate FeatureGate = NewFeatureGate()
+	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
+	DefaultFeatureGate FeatureGate = DefaultMutableFeatureGate
 )
 
 type FeatureSpec struct {
@@ -72,9 +79,23 @@ const (
 	Deprecated = prerelease("DEPRECATED")
 )
 
-// FeatureGate parses and stores flag gates for known features from
-// a string like feature1=true,feature2=false,...
+// FeatureGate indicates whether a given feature is enabled or not
 type FeatureGate interface {
+	// Enabled returns true if the key is enabled.
+	Enabled(key Feature) bool
+	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
+	KnownFeatures() []string
+	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
+	// set on the copy without mutating the original. This is useful for validating
+	// config against potential feature gate changes before committing those changes.
+	DeepCopy() MutableFeatureGate
+}
+
+// MutableFeatureGate parses and stores flag gates for known features from
+// a string like feature1=true,feature2=false,...
+type MutableFeatureGate interface {
+	FeatureGate
+
 	// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 	AddFlag(fs *pflag.FlagSet)
 	// Set parses and stores flag gates for known features
@@ -82,16 +103,8 @@ type FeatureGate interface {
 	Set(value string) error
 	// SetFromMap stores flag gates for known features from a map[string]bool or returns an error
 	SetFromMap(m map[string]bool) error
-	// Enabled returns true if the key is enabled.
-	Enabled(key Feature) bool
 	// Add adds features to the featureGate.
 	Add(features map[Feature]FeatureSpec) error
-	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
-	KnownFeatures() []string
-	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
-	// set on the copy without mutating the original. This is useful for validating
-	// config against potential feature gate changes before committing those changes.
-	DeepCopy() FeatureGate
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -294,7 +307,7 @@ func (f *featureGate) KnownFeatures() []string {
 // DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
 // set on the copy without mutating the original. This is useful for validating
 // config against potential feature gate changes before committing those changes.
-func (f *featureGate) DeepCopy() FeatureGate {
+func (f *featureGate) DeepCopy() MutableFeatureGate {
 	// Copy existing state.
 	known := map[Feature]FeatureSpec{}
 	for k, v := range f.known.Load().(map[Feature]FeatureSpec) {

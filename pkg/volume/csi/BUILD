@@ -46,7 +46,6 @@ go_test(
         "csi_client_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
-        "main_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
