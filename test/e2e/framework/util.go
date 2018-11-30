@@ -2491,7 +2491,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	// 1. it takes tens of minutes or hours to grab all of them
 	// 2. there are so many of them that working with them are mostly impossible
 	// So we dump them only if the cluster is relatively small.
-	maxNodesForDump := 20
+	maxNodesForDump := TestContext.MaxNodesToGather
 	if nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{}); err == nil {
 		if len(nodes.Items) <= maxNodesForDump {
 			dumpAllPodInfo(c)
