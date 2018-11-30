@@ -1009,7 +1009,7 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				if err := proxier.syncService(svcNameString, serv, true); err == nil {
 					// check if service need skip endpoints that not in same host as kube-proxy
-					onlyLocal := svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP && svcInfo.OnlyNodeLocalEndpoints
+					onlyLocal := svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP || svcInfo.OnlyNodeLocalEndpoints
 					activeIPVSServices[serv.String()] = true
 					activeBindAddrs[serv.Address.String()] = true
 					if err := proxier.syncEndpoint(svcName, onlyLocal, serv); err != nil {
