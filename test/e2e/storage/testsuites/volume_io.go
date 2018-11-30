@@ -90,7 +90,7 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 	}
 
-	if dInfo.IsFsGroupSupported {
+	if dInfo.Capabilities[drivers.CapFsGroup] {
 		fsGroupVal := int64(1234)
 		fsGroup = &fsGroupVal
 	}
