@@ -349,6 +349,8 @@ func NewNodeKiller(config NodeKillerConfig, client clientset.Interface, provider
 
 // Run starts NodeKiller until stopCh is closed.
 func (k *NodeKiller) Run(stopCh <-chan struct{}) {
+	// wait.JitterUntil starts work immediately, so wait first.
+	time.Sleep(wait.Jitter(k.config.Interval, k.config.JitterFactor))
 	wait.JitterUntil(func() {
 		nodes := k.pickNodes()
 		k.kill(nodes)
