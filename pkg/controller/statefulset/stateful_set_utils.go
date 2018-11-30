@@ -308,10 +308,12 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
-	volumeClaimTemplates := spec["volumeClaimTemplates"].([]interface{})
 	specCopy["template"] = template
 	template["$patch"] = "replace"
-	specCopy["volumeClaimTemplates"] = volumeClaimTemplates
+	if templates, ok := spec["volumeClaimTemplates"]; ok {
+		volumeClaimTemplates := templates.([]interface{})
+		specCopy["volumeClaimTemplates"] = volumeClaimTemplates
+	}
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err
