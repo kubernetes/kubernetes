@@ -176,11 +176,11 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	const operation = "run_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.RunPodSandbox(config)
+	out, err := in.service.RunPodSandbox(config, runtimeHandler)
 	recordError(operation, err)
 	return out, err
 }

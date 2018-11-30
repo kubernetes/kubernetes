@@ -212,6 +212,16 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
+  ### Test kubectl create deployment with image and command
+  # Pre-Condition: No deployment exists.
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create deployment nginx-with-command --image=k8s.gcr.io/nginx:test-cmd -- /bin/sleep infinity
+  # Post-Condition: Deployment "nginx" is created.
+  kube::test::get_object_assert 'deploy nginx-with-command' "{{$container_name_field}}" 'nginx'
+  # Clean up
+  kubectl delete deployment nginx-with-command "${kube_flags[@]}"
+
   ### Test kubectl create deployment should not fail validation
   # Pre-Condition: No deployment exists.
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -289,7 +299,7 @@ run_deployment_tests() {
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1000000 - should be no-op
-  kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]}"
+  ! kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to last revision
   kubectl rollout undo deployment nginx "${kube_flags[@]}"
@@ -359,7 +369,8 @@ run_deployment_tests() {
   kubectl create -f hack/testdata/configmap.yaml "${kube_flags[@]}"
   kubectl create -f hack/testdata/secret.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
-  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-config:'
+  #configmap is special here due to controller will create kube-root-ca.crt for each namespace automatically
+  kube::test::get_object_assert 'configmaps/test-set-env-config' "{{$id_field}}" 'test-set-env-config'
   kube::test::get_object_assert secret "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-secret:'
   # Set env of deployments by configmap from keys
   kubectl set env deployment nginx-deployment --keys=key-2 --from=configmap/test-set-env-config "${kube_flags[@]}"
@@ -500,11 +511,13 @@ run_rs_tests() {
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  #TODO(mortent): Remove this workaround when ReplicaSet bug described in issue #69376 is fixed
+  local replicaset_name="frontend-no-cascade"
+  sed -r 's/^(\s*)(name\s*:\s*frontend\s*$)/\1name: '"${replicaset_name}"'/' hack/testdata/frontend-replicaset.yaml | kubectl create "${kube_flags[@]}" -f -
   # wait for all 3 pods to be set up
   kube::test::wait_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{$pod_container_name_field}}:{{end}}" 'php-redis:php-redis:php-redis:'
   kube::log::status "Deleting rs"
-  kubectl delete rs frontend "${kube_flags[@]}" --cascade=false
+  kubectl delete rs "${replicaset_name}" "${kube_flags[@]}" --cascade=false
   # Wait for the rs to be deleted.
   kube::test::wait_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Post-condition: All 3 pods still remain from frontend replica set

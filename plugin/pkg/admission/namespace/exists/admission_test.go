@@ -21,23 +21,24 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	informers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 // newHandlerForTest returns the admission controller configured for testing.
-func newHandlerForTest(c clientset.Interface) (admission.ValidationInterface, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c kubernetes.Interface) (admission.ValidationInterface, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewExists()
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err := admission.ValidateInitialization(handler)
 	return handler, f, err
@@ -47,13 +48,13 @@ func newHandlerForTest(c clientset.Interface) (admission.ValidationInterface, in
 func newMockClientForTest(namespaces []string) *fake.Clientset {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("list", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
-		namespaceList := &api.NamespaceList{
+		namespaceList := &corev1.NamespaceList{
 			ListMeta: metav1.ListMeta{
 				ResourceVersion: fmt.Sprintf("%d", len(namespaces)),
 			},
 		}
 		for i, ns := range namespaces {
-			namespaceList.Items = append(namespaceList.Items, api.Namespace{
+			namespaceList.Items = append(namespaceList.Items, corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            ns,
 					ResourceVersion: fmt.Sprintf("%d", i),
@@ -87,7 +88,7 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("unexpected error returned from admission handler")
 	}
@@ -107,7 +108,7 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := newPod(namespace)
-	err = handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	err = handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		actions := ""
 		for _, action := range mockClient.Actions() {

@@ -1,0 +1,12 @@
+reviewers:
+  - timothysc
+  - dims
+  - ixdy
+  - spiffxp
+approvers:
+  - timothysc
+  - dims
+  - ixdy
+  - spiffxp
+labels:
+- sig/release

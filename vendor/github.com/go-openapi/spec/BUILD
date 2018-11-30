@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "bindata.go",
         "contact_info.go",
+        "debug.go",
         "expander.go",
         "external_docs.go",
         "header.go",

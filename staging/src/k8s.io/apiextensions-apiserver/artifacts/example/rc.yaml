@@ -23,4 +23,4 @@ spec:
         - "--etcd-servers=http://localhost:2379"
         - "--audit-log-path=-"
       - name: etcd
-        image: quay.io/coreos/etcd:v3.2.18
+        image: quay.io/coreos/etcd:v3.2.24

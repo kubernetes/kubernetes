@@ -17,98 +17,10 @@ limitations under the License.
 package fuzzer
 
 import (
-	"fmt"
-
-	fuzz "github.com/google/gofuzz"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Funcs returns the fuzzer functions for the extensions api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{
-		func(j *extensions.Deployment, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
-
-			// match defaulting
-			if j.Spec.Selector == nil {
-				j.Spec.Selector = &metav1.LabelSelector{MatchLabels: j.Spec.Template.Labels}
-			}
-			if len(j.Labels) == 0 {
-				j.Labels = j.Spec.Template.Labels
-			}
-		},
-		func(j *extensions.DeploymentSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			rhl := int32(c.Rand.Int31())
-			pds := int32(c.Rand.Int31())
-			j.RevisionHistoryLimit = &rhl
-			j.ProgressDeadlineSeconds = &pds
-		},
-		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			// Ensure that strategyType is one of valid values.
-			strategyTypes := []extensions.DeploymentStrategyType{extensions.RecreateDeploymentStrategyType, extensions.RollingUpdateDeploymentStrategyType}
-			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
-			if j.Type != extensions.RollingUpdateDeploymentStrategyType {
-				j.RollingUpdate = nil
-			} else {
-				rollingUpdate := extensions.RollingUpdateDeployment{}
-				if c.RandBool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.Rand.Int31()))
-					rollingUpdate.MaxSurge = intstr.FromInt(int(c.Rand.Int31()))
-				} else {
-					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
-				}
-				j.RollingUpdate = &rollingUpdate
-			}
-		},
-		func(j *extensions.DaemonSet, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
-
-			// match defaulter
-			j.Spec.Template.Generation = 0
-			if len(j.ObjectMeta.Labels) == 0 {
-				j.ObjectMeta.Labels = j.Spec.Template.ObjectMeta.Labels
-			}
-		},
-		func(j *extensions.DaemonSetSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			rhl := int32(c.Rand.Int31())
-			j.RevisionHistoryLimit = &rhl
-		},
-		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			// Ensure that strategyType is one of valid values.
-			strategyTypes := []extensions.DaemonSetUpdateStrategyType{extensions.RollingUpdateDaemonSetStrategyType, extensions.OnDeleteDaemonSetStrategyType}
-			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
-			if j.Type != extensions.RollingUpdateDaemonSetStrategyType {
-				j.RollingUpdate = nil
-			} else {
-				rollingUpdate := extensions.RollingUpdateDaemonSet{}
-				if c.RandBool() {
-					if c.RandBool() {
-						rollingUpdate.MaxUnavailable = intstr.FromInt(1 + int(c.Rand.Int31()))
-					} else {
-						rollingUpdate.MaxUnavailable = intstr.FromString(fmt.Sprintf("%d%%", 1+c.Rand.Int31()))
-					}
-				}
-				j.RollingUpdate = &rollingUpdate
-			}
-		},
-		func(j *extensions.ReplicaSet, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
-
-			// match defaulter
-			if j.Spec.Selector == nil {
-				j.Spec.Selector = &metav1.LabelSelector{MatchLabels: j.Spec.Template.Labels}
-			}
-			if len(j.Labels) == 0 {
-				j.Labels = j.Spec.Template.Labels
-			}
-		},
-	}
+	return []interface{}{}
 }

@@ -77,7 +77,7 @@ func (f *RemoteRuntime) Version(ctx context.Context, req *kubeapi.VersionRequest
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
 // the sandbox is in the ready state on success.
 func (f *RemoteRuntime) RunPodSandbox(ctx context.Context, req *kubeapi.RunPodSandboxRequest) (*kubeapi.RunPodSandboxResponse, error) {
-	sandboxID, err := f.RuntimeService.RunPodSandbox(req.Config)
+	sandboxID, err := f.RuntimeService.RunPodSandbox(req.Config, req.RuntimeHandler)
 	if err != nil {
 		return nil, err
 	}

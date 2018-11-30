@@ -1,3 +1,19 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto3';
 
@@ -143,6 +159,7 @@ message DNSConfig {
 enum Protocol {
     TCP = 0;
     UDP = 1;
+    SCTP = 2;
 }
 
 // PortMapping specifies the port mapping configurations of a sandbox.
@@ -344,6 +361,12 @@ message PodSandboxConfig {
 message RunPodSandboxRequest {
     // Configuration for creating a PodSandbox.
     PodSandboxConfig config = 1;
+    // Named runtime configuration to use for this PodSandbox.
+    // If the runtime handler is unknown, this request should be rejected.  An
+    // empty string should select the default handler, equivalent to the
+    // behavior before this feature was added.
+    // See https://git.k8s.io/community/keps/sig-node/0014-runtime-class.md
+    string runtime_handler = 2;
 }
 
 message RunPodSandboxResponse {
@@ -586,6 +609,12 @@ message LinuxContainerSecurityContext {
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
     bool no_new_privs = 11;
+    // masked_paths is a slice of paths that should be masked by the container
+    // runtime, this can be passed directly to the OCI spec.
+    repeated string masked_paths = 13;
+    // readonly_paths is a slice of paths that should be set as readonly by the
+    // container runtime, this can be passed directly to the OCI spec.
+    repeated string readonly_paths = 14;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for

@@ -7,31 +7,31 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
-        "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["admission_test.go"],
+    srcs = [
+        "admission_test.go",
+        "main_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
-        "//pkg/controller:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )

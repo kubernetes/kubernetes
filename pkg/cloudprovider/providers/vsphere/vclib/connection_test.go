@@ -170,8 +170,6 @@ func TestWithInvalidCaCertPath(t *testing.T) {
 }
 
 func TestInvalidCaCert(t *testing.T) {
-	t.Skip("Waiting for https://github.com/vmware/govmomi/pull/1154")
-
 	connection := &vclib.VSphereConnection{
 		Hostname: "should-not-matter",
 		Port:     "should-not-matter",

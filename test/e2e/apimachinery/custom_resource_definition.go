@@ -20,7 +20,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,9 +34,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	Context("Simple CustomResourceDefinition", func() {
 		/*
-			   	   Testname: crd-creation-test
-			   	   Description: Create a random Custom Resource Definition and make sure
-				   the API returns success.
+			Release : v1.9
+			Testname: Custom Resource Definition, create
+			Description: Create a API extension client, define a random custom resource definition, create the custom resource. API server MUST be able to create the custom resource.
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 

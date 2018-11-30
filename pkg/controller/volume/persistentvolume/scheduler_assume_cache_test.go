@@ -456,7 +456,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 
 	// Assume PVC
 	newPVC := pvc.DeepCopy()
-	newPVC.Annotations["volume.alpha.kubernetes.io/selected-node"] = "test-node"
+	newPVC.Annotations[annSelectedNode] = "test-node"
 	if err := cache.Assume(newPVC); err != nil {
 		t.Fatalf("failed to assume PVC: %v", err)
 	}

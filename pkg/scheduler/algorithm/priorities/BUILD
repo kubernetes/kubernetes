@@ -44,7 +44,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -55,6 +55,7 @@ go_test(
         "image_locality_test.go",
         "interpod_affinity_test.go",
         "least_requested_test.go",
+        "main_test.go",
         "metadata_test.go",
         "most_requested_test.go",
         "node_affinity_test.go",
@@ -74,12 +75,12 @@ go_test(
         "//pkg/scheduler/cache:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//pkg/util/parsers:go_default_library",
-        "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -89,9 +89,7 @@ func ReadPassword(fd int) ([]byte, error) {
 		return nil, err
 	}
 
-	defer func() {
-		windows.SetConsoleMode(windows.Handle(fd), old)
-	}()
+	defer windows.SetConsoleMode(windows.Handle(fd), old)
 
 	var h windows.Handle
 	p, _ := windows.GetCurrentProcess()

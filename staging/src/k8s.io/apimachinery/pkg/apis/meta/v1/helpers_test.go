@@ -17,11 +17,16 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/google/gofuzz"
+
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {
@@ -70,15 +75,21 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 	}
 
 	for i, tc := range tc {
+		inCopy := tc.in.DeepCopy()
 		out, err := LabelSelectorAsSelector(tc.in)
+		// after calling LabelSelectorAsSelector, tc.in shouldn't be modified
+		if !reflect.DeepEqual(inCopy, tc.in) {
+			t.Errorf("[%v]expected:\n\t%#v\nbut got:\n\t%#v", i, inCopy, tc.in)
+		}
 		if err == nil && tc.expectErr {
 			t.Errorf("[%v]expected error but got none.", i)
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		}
-		if !reflect.DeepEqual(out, tc.out) {
-			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
+		// fmt.Sprint() over String() as nil.String() will panic
+		if fmt.Sprint(out) != fmt.Sprint(tc.out) {
+			t.Errorf("[%v]expected:\n\t%s\nbut got:\n\t%s", i, fmt.Sprint(tc.out), fmt.Sprint(out))
 		}
 	}
 }
@@ -150,5 +161,38 @@ func TestLabelSelectorAsMap(t *testing.T) {
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
 		}
+	}
+}
+
+func TestResetObjectMetaForStatus(t *testing.T) {
+	meta := &ObjectMeta{}
+	existingMeta := &ObjectMeta{}
+
+	// fuzz the existingMeta to set every field, no nils
+	f := fuzz.New().NilChance(0).NumElements(1, 1)
+	f.Fuzz(existingMeta)
+	ResetObjectMetaForStatus(meta, existingMeta)
+
+	// not all fields are stomped during the reset.  These fields should not have been set. False
+	// set them all to their zero values.  Before you add anything to this list, consider whether or not
+	// you're enforcing immutability (those are fine) and whether /status should be able to update
+	// these values (these are usually not fine).
+
+	// generateName doesn't do anything after create
+	existingMeta.SetGenerateName("")
+	// resourceVersion is enforced in validation and used during the storage update
+	existingMeta.SetResourceVersion("")
+	// fields made immutable in validation
+	existingMeta.SetUID(types.UID(""))
+	existingMeta.SetName("")
+	existingMeta.SetNamespace("")
+	existingMeta.SetClusterName("")
+	existingMeta.SetCreationTimestamp(Time{})
+	existingMeta.SetDeletionTimestamp(nil)
+	existingMeta.SetDeletionGracePeriodSeconds(nil)
+	existingMeta.SetInitializers(nil)
+
+	if !reflect.DeepEqual(meta, existingMeta) {
+		t.Error(diff.ObjectDiff(meta, existingMeta))
 	}
 }

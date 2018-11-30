@@ -20,6 +20,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ConversionStrategyType describes different conversion types.
+type ConversionStrategyType string
+
+const (
+	// NoneConverter is a converter that only sets apiversion of the CR and leave everything else unchanged.
+	NoneConverter ConversionStrategyType = "None"
+	// WebhookConverter is a converter that calls to an external webhook to convert the CR.
+	WebhookConverter ConversionStrategyType = "Webhook"
+)
+
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
@@ -34,8 +44,14 @@ type CustomResourceDefinitionSpec struct {
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
 	// Validation describes the validation methods for CustomResources
+	// Optional, the global validation schema for all versions.
+	// Top-level and per-version schemas are mutually exclusive.
+	// +optional
 	Validation *CustomResourceValidation
-	// Subresources describes the subresources for CustomResources
+	// Subresources describes the subresources for CustomResource
+	// Optional, the global subresources for all versions.
+	// Top-level and per-version subresources are mutually exclusive.
+	// +optional
 	Subresources *CustomResourceSubresources
 	// Versions is the list of all supported versions for this resource.
 	// If Version field is provided, this field is optional.
@@ -50,9 +66,90 @@ type CustomResourceDefinitionSpec struct {
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Optional, the global columns for all versions.
+	// Top-level and per-version columns are mutually exclusive.
+	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+
+	// `conversion` defines conversion settings for the CRD.
+	Conversion *CustomResourceConversion
 }
 
+// CustomResourceConversion describes how to convert different versions of a CR.
+type CustomResourceConversion struct {
+	// `strategy` specifies the conversion strategy. Allowed values are:
+	// - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
+	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information is needed for this option.
+	Strategy ConversionStrategyType
+
+	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
+	WebhookClientConfig *WebhookClientConfig
+}
+
+// WebhookClientConfig contains the information to make a TLS
+// connection with the webhook. It has the same field as admissionregistration.internal.WebhookClientConfig.
+type WebhookClientConfig struct {
+	// `url` gives the location of the webhook, in standard URL form
+	// (`scheme://host:port/path`). Exactly one of `url` or `service`
+	// must be specified.
+	//
+	// The `host` should not refer to a service running in the cluster; use
+	// the `service` field instead. The host might be resolved via external
+	// DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
+	// in-cluster DNS as that would be a layering violation). `host` may
+	// also be an IP address.
+	//
+	// Please note that using `localhost` or `127.0.0.1` as a `host` is
+	// risky unless you take great care to run this webhook on all hosts
+	// which run an apiserver which might need to make calls to this
+	// webhook. Such installs are likely to be non-portable, i.e., not easy
+	// to turn up in a new cluster.
+	//
+	// The scheme must be "https"; the URL must begin with "https://".
+	//
+	// A path is optional, and if present may be any string permissible in
+	// a URL. You may use the path to pass an arbitrary string to the
+	// webhook, for example, a cluster identifier.
+	//
+	// Attempting to use a user or basic auth e.g. "user:password@" is not
+	// allowed. Fragments ("#...") and query parameters ("?...") are not
+	// allowed, either.
+	//
+	// +optional
+	URL *string
+
+	// `service` is a reference to the service for this webhook. Either
+	// `service` or `url` must be specified.
+	//
+	// If the webhook is running within the cluster, then you should use `service`.
+	//
+	// Port 443 will be used if it is open, otherwise it is an error.
+	//
+	// +optional
+	Service *ServiceReference
+
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
+	// +optional
+	CABundle []byte
+}
+
+// ServiceReference holds a reference to Service.legacy.k8s.io
+type ServiceReference struct {
+	// `namespace` is the namespace of the service.
+	// Required
+	Namespace string
+	// `name` is the name of the service.
+	// Required
+	Name string
+
+	// `path` is an optional URL path which will be sent in any request to
+	// this service.
+	// +optional
+	Path *string
+}
+
+// CustomResourceDefinitionVersion describes a version for CRD.
 type CustomResourceDefinitionVersion struct {
 	// Name is the version name, e.g. “v1”, “v2beta1”, etc.
 	Name string
@@ -61,6 +158,27 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
+	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+	// Top-level and per-version schemas are mutually exclusive.
+	// Per-version schemas must not all be set to identical values (top-level validation schema should be used instead)
+	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+	// +optional
+	Schema *CustomResourceValidation
+	// Subresources describes the subresources for CustomResource
+	// Top-level and per-version subresources are mutually exclusive.
+	// Per-version subresources must not all be set to identical values (top-level subresources should be used instead)
+	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+	// +optional
+	Subresources *CustomResourceSubresources
+	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Top-level and per-version columns are mutually exclusive.
+	// Per-version columns must not all be set to identical values (top-level columns should be used instead)
+	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+	// NOTE: CRDs created prior to 1.13 populated the top-level additionalPrinterColumns field by default. To apply an
+	// update that changes to per-version additionalPrinterColumns, the top-level additionalPrinterColumns field must
+	// be explicitly set to null
+	// +optional
+	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.

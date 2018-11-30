@@ -131,7 +131,7 @@ func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOpt
 // Patch applies the patch and returns the patched resourceQuota.
 func (c *FakeResourceQuotas) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ResourceQuota, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &corev1.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, pt, data, subresources...), &corev1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err

@@ -19,7 +19,6 @@ package kubelet
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -35,14 +34,19 @@ type fakeCmd struct {
 	err error
 }
 
-func (f fakeCmd) Run() error                      { return f.err }
-func (f fakeCmd) CombinedOutput() ([]byte, error) { return f.b, f.err }
-func (f fakeCmd) Output() ([]byte, error)         { return f.b, f.err }
-func (f fakeCmd) SetDir(dir string)               {}
-func (f fakeCmd) SetStdin(in io.Reader)           {}
-func (f fakeCmd) SetStdout(out io.Writer)         {}
-func (f fakeCmd) SetStderr(out io.Writer)         {}
-func (f fakeCmd) Stop()                           {}
+func (f fakeCmd) Run() error                         { return f.err }
+func (f fakeCmd) CombinedOutput() ([]byte, error)    { return f.b, f.err }
+func (f fakeCmd) Output() ([]byte, error)            { return f.b, f.err }
+func (f fakeCmd) SetDir(dir string)                  {}
+func (f fakeCmd) SetStdin(in io.Reader)              {}
+func (f fakeCmd) SetStdout(out io.Writer)            {}
+func (f fakeCmd) SetStderr(out io.Writer)            {}
+func (f fakeCmd) SetEnv([]string)                    {}
+func (f fakeCmd) Stop()                              {}
+func (f fakeCmd) Start() error                       { return nil }
+func (f fakeCmd) Wait() error                        { return nil }
+func (f fakeCmd) StdoutPipe() (io.ReadCloser, error) { return nil, nil }
+func (f fakeCmd) StderrPipe() (io.ReadCloser, error) { return nil, nil }
 
 type fakeExecer struct {
 	ioMap map[string]fakeCmd
@@ -78,7 +82,7 @@ var (
 	errCgroupExecer = fakeExecer{
 		ioMap: map[string]fakeCmd{
 			"docker info": {
-				err: fmt.Errorf("no such binary: docker"),
+				err: errors.New("no such binary: docker"),
 			},
 		},
 	}
@@ -205,9 +209,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					},
 				},
 				registerTaintsUsingFlags: true,
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
-				defaultHostname: "foo",
+				execer:                   cgroupfsCgroupExecer,
+				pidOfFunc:                binaryNotRunningPidOfFunc,
+				defaultHostname:          "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -233,23 +237,21 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 		},
 		{
-			name: "dynamic kubelet config enabled",
+			name: "pause image is set",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
+					CRISocket: "/var/run/dockershim.sock",
 					Name:      "foo",
 				},
-				featureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
+				pauseImage:      "gcr.io/pause:3.1",
 				execer:          cgroupfsCgroupExecer,
 				pidOfFunc:       binaryNotRunningPidOfFunc,
 				defaultHostname: "foo",
 			},
 			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"dynamic-config-dir":         "/var/lib/kubelet/dynamic-config",
+				"network-plugin":            "cni",
+				"cgroup-driver":             "cgroupfs",
+				"pod-infra-container-image": "gcr.io/pause:3.1",
 			},
 		},
 	}

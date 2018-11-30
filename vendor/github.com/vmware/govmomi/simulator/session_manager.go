@@ -137,6 +137,16 @@ func (s *SessionManager) LoginByToken(ctx *Context, req *types.LoginByToken) soa
 func (s *SessionManager) Logout(ctx *Context, _ *types.Logout) soap.HasFault {
 	session := ctx.Session
 	delete(s.sessions, session.Key)
+	pc := Map.content().PropertyCollector
+
+	for ref, obj := range ctx.Session.Registry.objects {
+		if ref == pc {
+			continue // don't unregister the PropertyCollector singleton
+		}
+		if _, ok := obj.(RegisterObject); ok {
+			ctx.Map.Remove(ref) // Remove RegisterObject handlers
+		}
+	}
 
 	ctx.postEvent(&types.UserLogoutSessionEvent{
 		IpAddress: session.IpAddress,

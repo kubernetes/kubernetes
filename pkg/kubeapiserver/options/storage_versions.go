@@ -17,14 +17,12 @@ limitations under the License.
 package options
 
 import (
+	"sort"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
-	"sort"
-
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -104,6 +102,11 @@ func (s *StorageSerializationOptions) AddFlags(fs *pflag.FlagSet) {
 		"you may specify the format \"group1=group2/v1beta1,group3/v1beta1,...\". "+
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all known groups.")
+
+	fs.MarkDeprecated("storage-versions", ""+
+		"Please omit this flag to ensure the default storage versions are used ."+
+		"Otherwise the cluster is not safe to upgrade to a version newer than 1.12. "+
+		"This flag will be removed in 1.13.")
 
 }
 

@@ -29,7 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultHPA(t *testing.T) {
@@ -39,7 +39,7 @@ func TestSetDefaultHPA(t *testing.T) {
 		{
 			Type: autoscalingv2beta1.ResourceMetricSourceType,
 			Resource: &autoscalingv2beta1.ResourceMetricSource{
-				Name: v1.ResourceCPU,
+				Name:                     v1.ResourceCPU,
 				TargetAverageUtilization: &utilizationDefaultVal,
 			},
 		},

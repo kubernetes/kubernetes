@@ -23,9 +23,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	goruntime "runtime"
+	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -33,13 +35,13 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -56,15 +58,19 @@ type RequestScope struct {
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 	Authorizer      authorizer.Authorizer
+	Trace           *utiltrace.Trace
 
 	TableConvertor rest.TableConvertor
-	OpenAPISchema  openapiproto.Schema
+	OpenAPIModels  openapiproto.Models
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
+
+	// HubGroupVersion indicates what version objects read from etcd or incoming requests should be converted to for in-memory handling.
+	HubGroupVersion schema.GroupVersion
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
@@ -98,6 +104,11 @@ func (scope *RequestScope) AllowsStreamSchema(s string) bool {
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
 func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported"), w, req)
+			return
+		}
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -115,22 +126,17 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			return
 		}
 		if admit != nil && admit.Handles(admission.Connect) {
-			connectRequest := &rest.ConnectRequest{
-				Name:         name,
-				Options:      opts,
-				ResourcePath: restPath,
-			}
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
+				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -177,10 +183,17 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	panicCh := make(chan interface{}, 1)
 	go func() {
 		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer utilruntime.HandleCrash(func(panicReason interface{}) {
+		defer func() {
+			panicReason := recover()
+			if panicReason != nil {
+				const size = 64 << 10
+				buf := make([]byte, size)
+				buf = buf[:goruntime.Stack(buf, false)]
+				panicReason = strings.TrimSuffix(fmt.Sprintf("%v\n%s", panicReason, string(buf)), "\n")
+			}
 			// Propagate to parent goroutine
 			panicCh <- panicReason
-		})
+		}()
 
 		if result, err := fn(); err != nil {
 			errCh <- err
@@ -202,7 +215,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	case p := <-panicCh:
 		panic(p)
 	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError("request did not complete within allowed duration", 0)
+		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
 	}
 }
 
@@ -279,7 +292,7 @@ func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request,
 		return 0, err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
-		glog.V(4).Infof("Unable to set self link on object: %v", err)
+		klog.V(4).Infof("Unable to set self link on object: %v", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
@@ -322,7 +335,7 @@ func parseTimeout(str string) time.Duration {
 		if err == nil {
 			return timeout
 		}
-		glog.Errorf("Failed to parse %q: %v", str, err)
+		klog.Errorf("Failed to parse %q: %v", str, err)
 	}
 	return 30 * time.Second
 }

@@ -25,17 +25,21 @@ import (
 
 	"github.com/spf13/pflag"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 func TestAddFlags(t *testing.T) {
-	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
-	s.AddFlags(f, []string{""}, []string{""})
+	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	args := []string{
 		"--address=192.168.4.10",
@@ -72,6 +76,9 @@ func TestAddFlags(t *testing.T) {
 		"--horizontal-pod-autoscaler-downscale-delay=2m",
 		"--horizontal-pod-autoscaler-sync-period=45s",
 		"--horizontal-pod-autoscaler-upscale-delay=1m",
+		"--horizontal-pod-autoscaler-downscale-stabilization=3m",
+		"--horizontal-pod-autoscaler-cpu-initialization-period=90s",
+		"--horizontal-pod-autoscaler-initial-readiness-delay=50s",
 		"--http2-max-streams-per-connection=47",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/json",
@@ -109,38 +116,38 @@ func TestAddFlags(t *testing.T) {
 		"--cert-dir=/a/b/c",
 		"--bind-address=192.168.4.21",
 		"--secure-port=10001",
+		"--concurrent-ttl-after-finished-syncs=8",
 	}
-	f.Parse(args)
+	fs.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
 	sort.Sort(sortedGCIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))
 
 	expected := &KubeControllerManagerOptions{
-		CloudProvider: &cmoptions.CloudProviderOptions{
-			Name:            "gce",
-			CloudConfigFile: "/cloud-config",
-		},
-		Debugging: &cmoptions.DebuggingOptions{
-			EnableProfiling:           false,
-			EnableContentionProfiling: true,
-		},
-		GenericComponent: &cmoptions.GenericComponentConfigOptions{
-			MinResyncPeriod:         metav1.Duration{Duration: 8 * time.Hour},
-			ContentType:             "application/json",
-			KubeAPIQPS:              50.0,
-			KubeAPIBurst:            100,
+		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
+			Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
+			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+				ContentType: "application/json",
+				QPS:         50.0,
+				Burst:       100,
+			},
 			ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
-			LeaderElection: componentconfig.LeaderElectionConfiguration{
+			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
 				ResourceLock:  "configmap",
 				LeaderElect:   false,
 				LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
 				RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
 				RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
 			},
+			Debugging: &cmoptions.DebuggingOptions{
+				EnableProfiling:           false,
+				EnableContentionProfiling: true,
+			},
+			Controllers: []string{"foo", "bar"},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			Port:    10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address: "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			UseServiceAccountCredentials: true,
 			RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
 			NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
@@ -149,6 +156,10 @@ func TestAddFlags(t *testing.T) {
 			AllocateNodeCIDRs:            true,
 			CIDRAllocatorType:            "CloudAllocator",
 			ConfigureCloudRoutes:         false,
+			CloudProvider: &cmoptions.CloudProviderOptions{
+				Name:            "gce",
+				CloudConfigFile: "/cloud-config",
+			},
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
 			ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
@@ -170,22 +181,25 @@ func TestAddFlags(t *testing.T) {
 			DeletingPodsQPS:    0.1,
 			RegisterRetryCount: 10,
 		},
-		EndPointController: &EndPointControllerOptions{
+		EndpointController: &EndpointControllerOptions{
 			ConcurrentEndpointSyncs: 10,
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			ConcurrentGCSyncs: 30,
-			GCIgnoredResources: []componentconfig.GroupResource{
+			GCIgnoredResources: []kubectrlmgrconfig.GroupResource{
 				{Group: "", Resource: "events"},
 			},
 			EnableGarbageCollector: false,
 		},
 		HPAController: &HPAControllerOptions{
-			HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 45 * time.Second},
-			HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
-			HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
-			HorizontalPodAutoscalerTolerance:                0.1,
-			HorizontalPodAutoscalerUseRESTClients:           true,
+			HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
+			HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
+			HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
+			HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
+			HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
+			HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
+			HorizontalPodAutoscalerTolerance:                    0.1,
+			HorizontalPodAutoscalerUseRESTClients:               true,
 		},
 		JobController: &JobControllerOptions{
 			ConcurrentJobSyncs: 5,
@@ -194,7 +208,7 @@ func TestAddFlags(t *testing.T) {
 			NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 			ConcurrentNamespaceSyncs: 20,
 		},
-		NodeIpamController: &NodeIpamControllerOptions{
+		NodeIPAMController: &NodeIPAMControllerOptions{
 			NodeCIDRMaskSize: 48,
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{
@@ -209,11 +223,11 @@ func TestAddFlags(t *testing.T) {
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-			VolumeConfiguration: componentconfig.VolumeConfiguration{
+			VolumeConfiguration: kubectrlmgrconfig.VolumeConfiguration{
 				EnableDynamicProvisioning:  false,
 				EnableHostPathProvisioning: true,
 				FlexVolumePluginDir:        "/flex-volume-plugin",
-				PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+				PersistentVolumeRecyclerConfiguration: kubectrlmgrconfig.PersistentVolumeRecyclerConfiguration{
 					MaximumRetry:             3,
 					MinimumTimeoutNFS:        200,
 					IncrementTimeoutNFS:      45,
@@ -242,8 +256,10 @@ func TestAddFlags(t *testing.T) {
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 2,
 		},
-		Controllers: []string{"foo", "bar"},
-		SecureServing: &apiserveroptions.SecureServingOptions{
+		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
+			ConcurrentTTLSyncs: 8,
+		},
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
 			BindAddress: net.ParseIP("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -251,11 +267,27 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "kube-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 47,
-		},
-		InsecureServing: &cmoptions.InsecureServingOptions{
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
+		}).WithLoopback(),
+		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+			CacheTTL:   10 * time.Second,
+			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+				UsernameHeaders:     []string{"x-remote-user"},
+				GroupHeaders:        []string{"x-remote-group"},
+				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			},
+			RemoteKubeConfigFileOptional: true,
+		},
+		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+			AllowCacheTTL:                10 * time.Second,
+			DenyCacheTTL:                 10 * time.Second,
+			RemoteKubeConfigFileOptional: true,
+			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
@@ -270,7 +302,7 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
-type sortedGCIgnoredResources []componentconfig.GroupResource
+type sortedGCIgnoredResources []kubectrlmgrconfig.GroupResource
 
 func (r sortedGCIgnoredResources) Len() int {
 	return len(r)

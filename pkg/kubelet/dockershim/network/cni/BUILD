@@ -15,13 +15,14 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni",
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/network:go_default_library",
         "//pkg/util/bandwidth:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
@@ -37,7 +38,7 @@ go_test(
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+            "//pkg/kubelet/apis/config:go_default_library",
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/container/testing:go_default_library",
             "//pkg/kubelet/dockershim/network:go_default_library",

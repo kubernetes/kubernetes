@@ -19,13 +19,14 @@ package server
 import (
 	"fmt"
 	"net/http"
+	gpath "path"
 	"strings"
 	"sync"
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful-swagger12"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,8 +43,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
+	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	openapiutil "k8s.io/kube-openapi/pkg/util"
+	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // Info about an API group.
@@ -312,7 +317,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	s.RunPostStartHooks(stopCh)
 
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
-		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
 	return nil
@@ -320,9 +325,13 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
+	openAPIGroupModels, err := s.getOpenAPIModelsForGroup(apiPrefix, apiGroupInfo)
+	if err != nil {
+		return fmt.Errorf("unable to get openapi models for group %v: %v", apiPrefix, err)
+	}
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
-			glog.Warningf("Skipping API %v because it has no resources.", groupVersion)
+			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
 			continue
 		}
 
@@ -330,6 +339,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
+		apiGroupVersion.OpenAPIModels = openAPIGroupModels
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
@@ -427,7 +437,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Admit:                        s.admissionControl,
 		MinRequestTimeout:            s.minRequestTimeout,
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
-		OpenAPIConfig:                s.openAPIConfig,
 		Authorizer:                   s.Authorizer,
 	}
 }
@@ -444,4 +453,38 @@ func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec
 		ParameterCodec:         parameterCodec,
 		NegotiatedSerializer:   codecs,
 	}
+}
+
+// getOpenAPIModelsForGroup is a private method for getting the OpenAPI Schemas for each  api group
+func (s *GenericAPIServer) getOpenAPIModelsForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) (openapiproto.Models, error) {
+	if s.openAPIConfig == nil {
+		return nil, nil
+	}
+	pathsToIgnore := openapiutil.NewTrie(s.openAPIConfig.IgnorePrefixes)
+	// Get the canonical names of every resource we need to build in this api group
+	resourceNames := make([]string, 0)
+	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
+		for resource, storage := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
+			path := gpath.Join(apiPrefix, groupVersion.Group, groupVersion.Version, resource)
+			if !pathsToIgnore.HasPrefix(path) {
+				kind, err := genericapi.GetResourceKind(groupVersion, storage, apiGroupInfo.Scheme)
+				if err != nil {
+					return nil, err
+				}
+				sampleObject, err := apiGroupInfo.Scheme.New(kind)
+				if err != nil {
+					return nil, err
+				}
+				name := openapiutil.GetCanonicalTypeName(sampleObject)
+				resourceNames = append(resourceNames, name)
+			}
+		}
+	}
+
+	// Build the openapi definitions for those resources and convert it to proto models
+	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
+	if err != nil {
+		return nil, err
+	}
+	return utilopenapi.ToProtoModels(openAPISpec)
 }

@@ -17,7 +17,7 @@ limitations under the License.
 package defaults
 
 import (
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -94,10 +94,6 @@ func init() {
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
 	factory.RegisterPriorityFunction2("EqualPriority", core.EqualPriorityMap, nil, 1)
-	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
-	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
-	// packages required by the pod or a small total size of already-installed packages required by the pod.
-	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
 	factory.RegisterPriorityFunction2(
@@ -135,6 +131,12 @@ func defaultPredicates() sets.String {
 			predicates.MaxAzureDiskVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
+			},
+		),
+		factory.RegisterFitPredicateFactory(
+			predicates.MaxCSIVolumeCountPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by inter-pod affinity.
@@ -197,19 +199,24 @@ func ApplyFeatureGates() {
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
 		factory.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
+		// Fit is determined based on whether a pod can tolerate unschedulable of node
+		factory.RegisterMandatoryFitPredicate(predicates.CheckNodeUnschedulablePred, predicates.CheckNodeUnschedulablePredicate)
 		// Insert Key "PodToleratesNodeTaints" and "CheckNodeUnschedulable" To All Algorithm Provider
 		// The key will insert to all providers which in algorithmProviderMap[]
 		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
+		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.CheckNodeUnschedulablePred)
 
-		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
+		klog.Infof("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
+		klog.Infof("Registering resourcelimits priority function")
 		factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1)
+		// Register the priority function to specific provider too.
+		factory.InsertPriorityKeyToAlgorithmProviderMap(factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1))
 	}
-
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {
@@ -260,6 +267,9 @@ func defaultPriorities() sets.String {
 
 		// Prioritizes nodes that marked with taint which pod can tolerate.
 		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
+
+		// ImageLocalityPriority prioritizes nodes that have images requested by the pod present.
+		factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1),
 	)
 }
 

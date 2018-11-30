@@ -17,11 +17,13 @@ limitations under the License.
 package gci
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -53,87 +55,95 @@ readonly ETC_MANIFESTS=${KUBE_HOME}/etc/kubernetes/manifests
 readonly KUBE_API_SERVER_DOCKER_TAG=v1.11.0-alpha.0.1808_3c7452dc11645d-dirty
 readonly LOG_OWNER_USER=$(id -un)
 readonly LOG_OWNER_GROUP=$(id -gn)
+readonly SERVICEACCOUNT_ISSUER=https://foo.bar.baz
+readonly SERVICEACCOUNT_KEY_PATH=/foo/bar/baz.key
+{{if .EncryptionProviderConfig}}
 ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
+{{end}}
 ENCRYPTION_PROVIDER_CONFIG_PATH={{.EncryptionProviderConfigPath}}
-readonly ETCD_KMS_KEY_ID={{.ETCDKMSKeyID}}
+{{if .CloudKMSIntegration}}
+readonly CLOUD_KMS_INTEGRATION=true
+{{end}}
 `
 	kubeAPIServerManifestFileName = "kube-apiserver.manifest"
-	kmsPluginManifestFileName     = "kms-plugin-container.manifest"
 	kubeAPIServerStartFuncName    = "start-kube-apiserver"
-
-	// Position of containers within a pod manifest
-	kmsPluginContainerIndex        = 0
-	apiServerContainerIndexNoKMS   = 0
-	apiServerContainerIndexWithKMS = 1
-
-	//	command": [
-	//   "/bin/sh", - Index 0
-	//   "-c",      - Index 1
-	//   "exec /usr/local/bin/kube-apiserver " - Index 2
-	execArgsIndex = 2
-
-	socketVolumeMountIndexKMSPlugin = 1
-	socketVolumeMountIndexAPIServer = 0
 )
 
 type kubeAPIServerEnv struct {
 	KubeHome                     string
-	EncryptionProviderConfig     string
 	EncryptionProviderConfigPath string
-	ETCDKMSKeyID                 string
+	EncryptionProviderConfig     string
+	CloudKMSIntegration          bool
 }
 
 type kubeAPIServerManifestTestCase struct {
 	*ManifestTestCase
-	apiServerContainer v1.Container
-	kmsPluginContainer v1.Container
 }
 
 func newKubeAPIServerManifestTestCase(t *testing.T) *kubeAPIServerManifestTestCase {
 	return &kubeAPIServerManifestTestCase{
-		ManifestTestCase: newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, []string{kmsPluginManifestFileName}),
+		ManifestTestCase: newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, nil),
 	}
 }
 
-func (c *kubeAPIServerManifestTestCase) mustLoadContainers() {
+func (c *kubeAPIServerManifestTestCase) invokeTest(e kubeAPIServerEnv, kubeEnv string) {
+	c.mustInvokeFunc(kubeEnv, e)
 	c.mustLoadPodFromManifest()
-
-	switch len(c.pod.Spec.Containers) {
-	case 1:
-		c.apiServerContainer = c.pod.Spec.Containers[apiServerContainerIndexNoKMS]
-	case 2:
-		c.apiServerContainer = c.pod.Spec.Containers[apiServerContainerIndexWithKMS]
-		c.kmsPluginContainer = c.pod.Spec.Containers[kmsPluginContainerIndex]
-	default:
-		c.t.Fatalf("got %d containers in apiserver pod, want 1 or 2", len(c.pod.Spec.Containers))
-	}
-}
-
-func (c *kubeAPIServerManifestTestCase) invokeTest(e kubeAPIServerEnv) {
-	c.mustInvokeFunc(deployHelperEnv, e)
-	c.mustLoadContainers()
-}
-
-func getEncryptionProviderConfigFlag(path string) string {
-	return fmt.Sprintf("--experimental-encryption-provider-config=%s", path)
 }
 
 func TestEncryptionProviderFlag(t *testing.T) {
-	c := newKubeAPIServerManifestTestCase(t)
-	defer c.tearDown()
+	var (
+		//	command": [
+		//   "/bin/sh", - Index 0
+		//   "-c",      - Index 1
+		//   "exec /usr/local/bin/kube-apiserver " - Index 2
+		execArgsIndex        = 2
+		encryptionConfigFlag = "--encryption-provider-config"
+	)
 
-	e := kubeAPIServerEnv{
-		KubeHome:                     c.kubeHome,
-		EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("FOO")),
-		EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
+	testCases := []struct {
+		desc                     string
+		encryptionProviderConfig string
+		wantFlag                 bool
+	}{
+		{
+			desc:                     "ENCRYPTION_PROVIDER_CONFIG is set",
+			encryptionProviderConfig: base64.StdEncoding.EncodeToString([]byte("foo")),
+			wantFlag:                 true,
+		},
+		{
+			desc:                     "ENCRYPTION_PROVIDER_CONFIG is not set",
+			encryptionProviderConfig: "",
+			wantFlag:                 false,
+		},
 	}
 
-	c.invokeTest(e)
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := newKubeAPIServerManifestTestCase(t)
+			defer c.tearDown()
 
-	expectedFlag := getEncryptionProviderConfigFlag(e.EncryptionProviderConfigPath)
-	execArgs := c.apiServerContainer.Command[execArgsIndex]
-	if !strings.Contains(execArgs, expectedFlag) {
-		c.t.Fatalf("Got %q, wanted the flag to contain %q", execArgs, expectedFlag)
+			e := kubeAPIServerEnv{
+				KubeHome:                     c.kubeHome,
+				EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
+				EncryptionProviderConfig:     tc.encryptionProviderConfig,
+			}
+
+			c.invokeTest(e, deployHelperEnv)
+
+			execArgs := c.pod.Spec.Containers[0].Command[execArgsIndex]
+			flagIsInArg := strings.Contains(execArgs, encryptionConfigFlag)
+			flag := fmt.Sprintf("%s=%s", encryptionConfigFlag, e.EncryptionProviderConfigPath)
+
+			switch {
+			case tc.wantFlag && !flagIsInArg:
+				t.Fatalf("Got %q,\n want flags to contain %q", execArgs, flag)
+			case !tc.wantFlag && flagIsInArg:
+				t.Fatalf("Got %q,\n do not want flags to contain %q", execArgs, encryptionConfigFlag)
+			case tc.wantFlag && flagIsInArg && !strings.Contains(execArgs, flag):
+				t.Fatalf("Got flags: %q, want it to contain %q", execArgs, flag)
+			}
+		})
 	}
 }
 
@@ -144,8 +154,8 @@ func TestEncryptionProviderConfig(t *testing.T) {
 	p := filepath.Join(c.kubeHome, "encryption-provider-config.yaml")
 	e := kubeAPIServerEnv{
 		KubeHome:                     c.kubeHome,
-		EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("FOO")),
 		EncryptionProviderConfigPath: p,
+		EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("foo")),
 	}
 
 	c.mustInvokeFunc(deployHelperEnv, e)
@@ -153,60 +163,91 @@ func TestEncryptionProviderConfig(t *testing.T) {
 	if _, err := os.Stat(p); err != nil {
 		c.t.Fatalf("Expected encryption provider config to be written to %s, but stat failed with error: %v", p, err)
 	}
-}
 
-// TestKMSEncryptionProviderConfig asserts that if ETCD_KMS_KEY_ID is set then start-kube-apiserver will produce
-// EncryptionProviderConfig file of type KMS and inject experimental-encryption-provider-config startup flag.
-func TestKMSEncryptionProviderConfig(t *testing.T) {
-	c := newKubeAPIServerManifestTestCase(t)
-	defer c.tearDown()
-
-	e := kubeAPIServerEnv{
-		KubeHome:                     c.kubeHome,
-		EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
-		ETCDKMSKeyID:                 "FOO",
-	}
-
-	c.invokeTest(e)
-
-	expectedFlag := getEncryptionProviderConfigFlag(e.EncryptionProviderConfigPath)
-	execArgs := c.apiServerContainer.Command[execArgsIndex]
-	if !strings.Contains(execArgs, expectedFlag) {
-		c.t.Fatalf("Got %q, wanted the flag to contain %q", execArgs, expectedFlag)
-	}
-
-	p := filepath.Join(c.kubeHome, "encryption-provider-config.yaml")
-	if _, err := os.Stat(p); err != nil {
-		c.t.Fatalf("Expected encryption provider config to be written to %s, but stat failed with error: %v", p, err)
-	}
-
-	d, err := ioutil.ReadFile(p)
+	got, err := ioutil.ReadFile(p)
 	if err != nil {
 		c.t.Fatalf("Failed to read encryption provider config %s", p)
 	}
 
-	if !strings.Contains(string(d), "name: grpc-kms-provider") {
-		c.t.Fatalf("Got %s\n, wanted encryption provider config to be of type grpc-kms", string(d))
+	want := []byte("foo")
+	if !bytes.Equal(got, want) {
+		c.t.Fatalf("got encryptionConfig:\n%q\n, want encryptionConfig:\n%q", got, want)
 	}
 }
 
-func TestKMSPluginAndAPIServerSharedVolume(t *testing.T) {
-	c := newKubeAPIServerManifestTestCase(t)
-	defer c.tearDown()
-
-	var e = kubeAPIServerEnv{
-		KubeHome:                     c.kubeHome,
-		EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
-		ETCDKMSKeyID:                 "FOO",
+func TestKMSIntegration(t *testing.T) {
+	var (
+		socketPath  = "/var/run/kmsplugin"
+		dirOrCreate = v1.HostPathType(v1.HostPathDirectoryOrCreate)
+		socketName  = "kmssocket"
+	)
+	testCases := []struct {
+		desc                string
+		cloudKMSIntegration bool
+		wantVolume          v1.Volume
+		wantVolMount        v1.VolumeMount
+	}{
+		{
+			desc:                "CLOUD_KMS_INTEGRATION is set",
+			cloudKMSIntegration: true,
+			wantVolume: v1.Volume{
+				Name: socketName,
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: socketPath,
+						Type: &dirOrCreate,
+					},
+				},
+			},
+			wantVolMount: v1.VolumeMount{
+				Name:      socketName,
+				MountPath: socketPath,
+			},
+		},
+		{
+			desc:                "CLOUD_KMS_INTEGRATION is not set",
+			cloudKMSIntegration: false,
+		},
 	}
 
-	c.invokeTest(e)
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := newKubeAPIServerManifestTestCase(t)
+			defer c.tearDown()
 
-	k := c.kmsPluginContainer.VolumeMounts[socketVolumeMountIndexKMSPlugin].MountPath
-	a := c.apiServerContainer.VolumeMounts[socketVolumeMountIndexAPIServer].MountPath
+			var e = kubeAPIServerEnv{
+				KubeHome:                     c.kubeHome,
+				EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
+				EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("foo")),
+				CloudKMSIntegration:          tc.cloudKMSIntegration,
+			}
 
-	if k != a {
-		t.Fatalf("Got %s!=%s, wanted KMSPlugin VolumeMount #1:%s to be equal to kube-apiserver VolumeMount #0:%s",
-			k, a, k, a)
+			c.invokeTest(e, deployHelperEnv)
+			// By this point, we can be sure that kube-apiserver manifest is a valid POD.
+
+			var gotVolume v1.Volume
+			for _, v := range c.pod.Spec.Volumes {
+				if v.Name == socketName {
+					gotVolume = v
+					break
+				}
+			}
+
+			if !reflect.DeepEqual(gotVolume, tc.wantVolume) {
+				t.Errorf("got volume %v, want %v", gotVolume, tc.wantVolume)
+			}
+
+			var gotVolumeMount v1.VolumeMount
+			for _, v := range c.pod.Spec.Containers[0].VolumeMounts {
+				if v.Name == socketName {
+					gotVolumeMount = v
+					break
+				}
+			}
+
+			if !reflect.DeepEqual(gotVolumeMount, tc.wantVolMount) {
+				t.Errorf("got volumeMount %v, want %v", gotVolumeMount, tc.wantVolMount)
+			}
+		})
 	}
 }

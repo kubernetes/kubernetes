@@ -4,3 +4,5 @@ approvers:
 reviewers:
 - piosz
 - x13n
+labels:
+- sig/gcp

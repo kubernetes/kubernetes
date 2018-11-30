@@ -112,7 +112,7 @@ func (c *FakeMutatingWebhookConfigurations) DeleteCollection(options *v1.DeleteO
 // Patch applies the patch and returns the patched mutatingWebhookConfiguration.
 func (c *FakeMutatingWebhookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, data, subresources...), &admissionregistration.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, pt, data, subresources...), &admissionregistration.MutatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

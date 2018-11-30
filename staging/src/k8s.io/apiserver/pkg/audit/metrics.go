@@ -19,9 +19,9 @@ package audit
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/klog"
 )
 
 const (
@@ -52,12 +52,22 @@ var (
 		},
 		[]string{"level"},
 	)
+
+	ApiserverAuditDroppedCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: subsystem,
+			Name:      "requests_rejected_total",
+			Help: "Counter of apiserver requests rejected due to an error " +
+				"in audit logging backend.",
+		},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(eventCounter)
 	prometheus.MustRegister(errorCounter)
 	prometheus.MustRegister(levelCounter)
+	prometheus.MustRegister(ApiserverAuditDroppedCounter)
 }
 
 // ObserveEvent updates the relevant prometheus metrics for the generated audit event.
@@ -83,5 +93,5 @@ func HandlePluginError(plugin string, err error, impacted ...*auditinternal.Even
 	for _, ev := range impacted {
 		msg = msg + EventString(ev) + "\n"
 	}
-	glog.Error(msg)
+	klog.Error(msg)
 }

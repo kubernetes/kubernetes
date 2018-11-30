@@ -14,6 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/version:go_default_library",
         "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
     ],
 )

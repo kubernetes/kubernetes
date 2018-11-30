@@ -22,11 +22,11 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -71,7 +71,7 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 // These conditions are needed so that we won't accidentally report lack of progress for resumed deployments
 // that were paused for longer than progressDeadlineSeconds.
 func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error {
-	if d.Spec.ProgressDeadlineSeconds == nil {
+	if !deploymentutil.HasProgressDeadline(d) {
 		return nil
 	}
 	cond := deploymentutil.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
@@ -158,7 +158,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		// of this deployment then it is likely that old users started caring about progress. In that
 		// case we need to take into account the first time we noticed their new replica set.
 		cond := deploymentutil.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
-		if d.Spec.ProgressDeadlineSeconds != nil && cond == nil {
+		if deploymentutil.HasProgressDeadline(d) && cond == nil {
 			msg := fmt.Sprintf("Found new replica set %q", rsCopy.Name)
 			condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *condition)
@@ -248,12 +248,12 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		// error.
 		_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)
 		if dErr == nil {
-			glog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
+			klog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
 		}
 		return nil, err
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
-		if d.Spec.ProgressDeadlineSeconds != nil {
+		if deploymentutil.HasProgressDeadline(d) {
 			cond := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *cond)
 			// We don't really care about this error at this point, since we have a bigger issue to report.
@@ -269,7 +269,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 	}
 
 	needsUpdate := deploymentutil.SetDeploymentRevision(d, newRevision)
-	if !alreadyExists && d.Spec.ProgressDeadlineSeconds != nil {
+	if !alreadyExists && deploymentutil.HasProgressDeadline(d) {
 		msg := fmt.Sprintf("Created new replica set %q", createdRS.Name)
 		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
@@ -424,7 +424,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 // where N=d.Spec.RevisionHistoryLimit. Old replica sets are older versions of the podtemplate of a deployment kept
 // around by default 1) for historical reasons and 2) for the ability to rollback a deployment.
 func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) error {
-	if deployment.Spec.RevisionHistoryLimit == nil {
+	if !deploymentutil.HasRevisionHistoryLimit(deployment) {
 		return nil
 	}
 
@@ -440,7 +440,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 	}
 
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(cleanableRSes))
-	glog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
+	klog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
 
 	for i := int32(0); i < diff; i++ {
 		rs := cleanableRSes[i]
@@ -448,7 +448,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 		if rs.Status.Replicas != 0 || *(rs.Spec.Replicas) != 0 || rs.Generation > rs.Status.ObservedGeneration || rs.DeletionTimestamp != nil {
 			continue
 		}
-		glog.V(4).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
+		klog.V(4).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
 		if err := dc.client.AppsV1().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
 			// Return error instead of aggregating and continuing DELETEs on the theory
 			// that we may be overloading the api server.

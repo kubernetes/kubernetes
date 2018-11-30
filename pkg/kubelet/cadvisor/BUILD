@@ -31,13 +31,13 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
             "//vendor/github.com/google/cadvisor/container:go_default_library",
             "//vendor/github.com/google/cadvisor/fs:go_default_library",
             "//vendor/github.com/google/cadvisor/manager:go_default_library",
             "//vendor/github.com/google/cadvisor/metrics:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/winstats:go_default_library",
@@ -50,16 +50,19 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cadvisor_linux_test.go",
+        "main_test.go",
         "util_test.go",
     ],
     embed = [":go_default_library"],
-    deps = select({
+    deps = [
+        "//pkg/features:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/apis/core/v1/helper:go_default_library",
-            "//pkg/features:go_default_library",
             "//pkg/kubelet/types:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
             "//vendor/github.com/google/cadvisor/metrics:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

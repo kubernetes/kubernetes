@@ -103,11 +103,15 @@ func TestFirewallToGcloudArgs(t *testing.T) {
 				IPProtocol: "tcp",
 				Ports:      []string{"321", "123-456", "123"},
 			},
+			{
+				IPProtocol: "sctp",
+				Ports:      []string{"321", "123-456", "123"},
+			},
 		},
 	}
 	got := firewallToGcloudArgs(&firewall, "my-project")
 
-	var e = `--description "Last Line of Defense" --allow tcp:123,tcp:123-456,tcp:321,udp:123,udp:123-456,udp:321 --source-ranges 1.1.1.1/20,2.2.2.2/20,3.3.3.3/20 --target-tags band-nodes,jock-nodes --project my-project`
+	var e = `--description "Last Line of Defense" --allow sctp:123,sctp:123-456,sctp:321,tcp:123,tcp:123-456,tcp:321,udp:123,udp:123-456,udp:321 --source-ranges 1.1.1.1/20,2.2.2.2/20,3.3.3.3/20 --target-tags band-nodes,jock-nodes --project my-project`
 	if got != e {
 		t.Errorf("%q does not equal %q", got, e)
 	}

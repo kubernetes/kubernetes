@@ -20,9 +20,9 @@ go_library(
         "//staging/src/k8s.io/code-generator/cmd/conversion-gen/args:go_default_library",
         "//staging/src/k8s.io/code-generator/cmd/conversion-gen/generators:go_default_library",
         "//staging/src/k8s.io/code-generator/pkg/util:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

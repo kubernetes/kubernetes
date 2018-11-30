@@ -29,7 +29,6 @@ go_test(
     data = ["//api/openapi-spec:swagger-spec"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

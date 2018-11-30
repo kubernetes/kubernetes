@@ -28,6 +28,7 @@ const (
 	sandboxCheckpointDir = "sandbox"
 	protocolTCP          = Protocol("tcp")
 	protocolUDP          = Protocol("udp")
+	protocolSCTP         = Protocol("sctp")
 	schemaVersion        = "v1"
 )
 

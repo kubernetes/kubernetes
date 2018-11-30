@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
@@ -132,11 +133,25 @@ func validateAllowVolumeExpansion(allowExpand *bool, fldPath *field.Path) field.
 	return allErrs
 }
 
-// ValidateVolumeAttachment validates a VolumeAttachment.
+// ValidateVolumeAttachment validates a VolumeAttachment. This function is common for v1 and v1beta1 objects,
 func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttachment.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateVolumeAttachmentSpec(&volumeAttachment.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentStatus(&volumeAttachment.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+// ValidateVolumeAttachmentV1 validates a v1/VolumeAttachment. It contains only extra checks missing in
+// ValidateVolumeAttachment.
+func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
+	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher"))
+
+	if volumeAttachment.Spec.Source.PersistentVolumeName != nil {
+		pvName := *volumeAttachment.Spec.Source.PersistentVolumeName
+		for _, msg := range apivalidation.ValidatePersistentVolumeName(pvName, false) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.source.persistentVolumeName"), pvName, msg))
+		}
+	}
 	return allErrs
 }
 
@@ -217,6 +232,7 @@ func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.Er
 	allErrs := ValidateVolumeAttachment(new)
 
 	// Spec is read-only
+	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
 	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
 	}
@@ -249,12 +265,24 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		return allErrs
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
+	rawTopologies := make([]map[string]sets.String, len(topologies))
 	for i, term := range topologies {
-		allErrs = append(allErrs, apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))...)
+		idxPath := fldPath.Index(i)
+		exprMap, termErrs := apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))
+		allErrs = append(allErrs, termErrs...)
+
+		// TODO (verult) consider improving runtime
+		for _, t := range rawTopologies {
+			if helper.Semantic.DeepEqual(exprMap, t) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("matchLabelExpressions"), ""))
+			}
+		}
+
+		rawTopologies = append(rawTopologies, exprMap)
 	}
 
 	return allErrs

@@ -42,13 +42,14 @@ type fakeAuditSink struct {
 	events []*auditinternal.Event
 }
 
-func (s *fakeAuditSink) ProcessEvents(evs ...*auditinternal.Event) {
+func (s *fakeAuditSink) ProcessEvents(evs ...*auditinternal.Event) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	for _, e := range evs {
 		event := e.DeepCopy()
 		s.events = append(s.events, event)
 	}
+	return true
 }
 
 func (s *fakeAuditSink) Events() []*auditinternal.Event {
@@ -817,7 +818,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 				t.Errorf("[%s] expected Audit-ID http header returned, but not returned", test.desc)
 				continue
 			}
-			// if get Audit-ID returned, it should be the same same with the requested one
+			// if get Audit-ID returned, it should be the same with the requested one
 			if test.requestHeader != "" && resp.Header.Get("Audit-ID") != test.requestHeader {
 				t.Errorf("[%s] returned audit http header is not the same with the requested http header, expected: %s, get %s", test.desc, test.requestHeader, resp.Header.Get("Audit-ID"))
 			}

@@ -18,10 +18,11 @@ package selfhosting
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -588,13 +589,13 @@ spec:
 func createTempFileWithContent(content []byte) (string, error) {
 	tempFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return "", fmt.Errorf("cannot create temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot create temporary file")
 	}
 	if _, err = tempFile.Write([]byte(content)); err != nil {
-		return "", fmt.Errorf("cannot save temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot save temporary file")
 	}
 	if err = tempFile.Close(); err != nil {
-		return "", fmt.Errorf("cannot close temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot close temporary file")
 	}
 	return tempFile.Name(), nil
 }

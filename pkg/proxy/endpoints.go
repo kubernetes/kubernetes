@@ -22,12 +22,12 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -113,7 +113,7 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 //   - pass <oldEndpoints, endpoints> as the <previous, current> pair.
 // Delete item
 //   - pass <endpoints, nil> as the <previous, current> pair.
-func (ect *EndpointChangeTracker) Update(previous, current *api.Endpoints) bool {
+func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 	endpoints := current
 	if endpoints == nil {
 		endpoints = previous
@@ -184,7 +184,7 @@ type EndpointsMap map[ServicePortName][]Endpoint
 // This function is used for incremental updated of endpointsMap.
 //
 // NOTE: endpoints object should NOT be modified.
-func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoints) EndpointsMap {
+func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoints) EndpointsMap {
 	if endpoints == nil {
 		return nil
 	}
@@ -197,7 +197,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoin
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
 			if port.Port == 0 {
-				glog.Warningf("ignoring invalid endpoint port %s", port.Name)
+				klog.Warningf("ignoring invalid endpoint port %s", port.Name)
 				continue
 			}
 			svcPortName := ServicePortName{
@@ -207,7 +207,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoin
 			for i := range ss.Addresses {
 				addr := &ss.Addresses[i]
 				if addr.IP == "" {
-					glog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
+					klog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
 				// Filter out the incorrect IP version case.
@@ -226,12 +226,12 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoin
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], baseEndpointInfo)
 				}
 			}
-			if glog.V(3) {
+			if klog.V(3) {
 				newEPList := []string{}
 				for _, ep := range endpointsMap[svcPortName] {
 					newEPList = append(newEPList, ep.String())
 				}
-				glog.Infof("Setting endpoints for %q to %+v", svcPortName, newEPList)
+				klog.Infof("Setting endpoints for %q to %+v", svcPortName, newEPList)
 			}
 		}
 	}
@@ -299,7 +299,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				glog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.String())
+				klog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.String())
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}

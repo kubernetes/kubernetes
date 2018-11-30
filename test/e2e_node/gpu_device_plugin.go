@@ -42,6 +42,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 	Context("DevicePlugin", func() {
 		var devicePluginPod *v1.Pod
+		var err error
 		BeforeEach(func() {
 			By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
@@ -49,7 +50,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 
 			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			devicePluginPod = f.PodClient().CreateSync(framework.NVIDIADevicePlugin(f.Namespace.Name))
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(framework.NVIDIADevicePlugin())
+			framework.ExpectNoError(err)
 
 			By("Waiting for GPUs to become available on the local node")
 			Eventually(func() bool {
@@ -106,7 +108,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			Expect(devId1).To(Not(Equal(devId2)))
 
 			By("Deleting device plugin.")
-			f.PodClient().Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
+			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
 			By("Waiting for GPUs to become unavailable on the local node")
 			Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})

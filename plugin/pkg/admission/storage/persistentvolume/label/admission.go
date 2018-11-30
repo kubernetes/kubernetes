@@ -22,12 +22,13 @@ import (
 	"io"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -57,7 +58,8 @@ type persistentVolumeLabel struct {
 	mutex            sync.Mutex
 	ebsVolumes       aws.Volumes
 	cloudConfig      []byte
-	gceCloudProvider *gce.GCECloud
+	gceCloudProvider *gce.Cloud
+	azureProvider    *azure.Cloud
 }
 
 var _ admission.MutationInterface = &persistentVolumeLabel{}
@@ -69,9 +71,9 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func newPersistentVolumeLabel() *persistentVolumeLabel {
 	// DEPRECATED: cloud-controller-manager will now start NewPersistentVolumeLabelController
-	// which does exactly what this admission controller used to do. So once GCE and AWS can
+	// which does exactly what this admission controller used to do. So once GCE, AWS and AZURE can
 	// run externally, we can remove this admission controller.
-	glog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
+	klog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
 		"Please remove this controller from your configuration files and scripts.")
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
@@ -123,6 +125,13 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 		}
 		volumeLabels = labels
 	}
+	if volume.Spec.AzureDisk != nil {
+		labels, err := l.findAzureDiskLabels(volume)
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("error querying AzureDisk volume %s: %v", volume.Spec.AzureDisk.DiskName, err))
+		}
+		volumeLabels = labels
+	}
 
 	requirements := make([]api.NodeSelectorRequirement, 0)
 	if len(volumeLabels) != 0 {
@@ -157,11 +166,11 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 				volume.Spec.NodeAffinity.Required = new(api.NodeSelector)
 			}
 			if len(volume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-				// Need atleast one term pre-allocated whose MatchExpressions can be appended to
+				// Need at least one term pre-allocated whose MatchExpressions can be appended to
 				volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
 			}
 			if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-				glog.V(4).Info("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+				klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
 					requirements, volume.Spec.NodeAffinity)
 			} else {
 				for _, req := range requirements {
@@ -250,7 +259,7 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 }
 
 // getGCECloudProvider returns the GCE cloud provider, for use for querying volume labels
-func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
+func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.Cloud, error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -263,7 +272,7 @@ func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
 		if err != nil || cloudProvider == nil {
 			return nil, err
 		}
-		gceCloudProvider, ok := cloudProvider.(*gce.GCECloud)
+		gceCloudProvider, ok := cloudProvider.(*gce.Cloud)
 		if !ok {
 			// GetCloudProvider has gone very wrong
 			return nil, fmt.Errorf("error retrieving GCE cloud provider")
@@ -271,4 +280,46 @@ func (l *persistentVolumeLabel) getGCECloudProvider() (*gce.GCECloud, error) {
 		l.gceCloudProvider = gceCloudProvider
 	}
 	return l.gceCloudProvider, nil
+}
+
+// getAzureCloudProvider returns the Azure cloud provider, for use for querying volume labels
+func (l *persistentVolumeLabel) getAzureCloudProvider() (*azure.Cloud, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if l.azureProvider == nil {
+		var cloudConfigReader io.Reader
+		if len(l.cloudConfig) > 0 {
+			cloudConfigReader = bytes.NewReader(l.cloudConfig)
+		}
+		cloudProvider, err := cloudprovider.GetCloudProvider("azure", cloudConfigReader)
+		if err != nil || cloudProvider == nil {
+			return nil, err
+		}
+		azureProvider, ok := cloudProvider.(*azure.Cloud)
+		if !ok {
+			// GetCloudProvider has gone very wrong
+			return nil, fmt.Errorf("error retrieving Azure cloud provider")
+		}
+		l.azureProvider = azureProvider
+	}
+
+	return l.azureProvider, nil
+}
+
+func (l *persistentVolumeLabel) findAzureDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if volume.Spec.AzureDisk.DiskName == vol.ProvisionedVolumeName {
+		return nil, nil
+	}
+
+	provider, err := l.getAzureCloudProvider()
+	if err != nil {
+		return nil, err
+	}
+	if provider == nil {
+		return nil, fmt.Errorf("unable to build Azure cloud provider for AzureDisk")
+	}
+
+	return provider.GetAzureDiskLabels(volume.Spec.AzureDisk.DataDiskURI)
 }

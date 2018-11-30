@@ -17,39 +17,40 @@ limitations under the License.
 package audit
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/audit/install"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // CreateDefaultAuditLogPolicy writes the default audit log policy to disk.
 func CreateDefaultAuditLogPolicy(policyFile string) error {
-	policy := auditv1beta1.Policy{
+	policy := auditv1.Policy{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: auditv1beta1.SchemeGroupVersion.String(),
+			APIVersion: auditv1.SchemeGroupVersion.String(),
 			Kind:       "Policy",
 		},
-		Rules: []auditv1beta1.PolicyRule{
+		Rules: []auditv1.PolicyRule{
 			{
-				Level: auditv1beta1.LevelMetadata,
+				Level: auditv1.LevelMetadata,
 			},
 		},
 	}
 	return writePolicyToDisk(policyFile, &policy)
 }
 
-func writePolicyToDisk(policyFile string, policy *auditv1beta1.Policy) error {
+func writePolicyToDisk(policyFile string, policy *auditv1.Policy) error {
 	// creates target folder if not already exists
 	if err := os.MkdirAll(filepath.Dir(policyFile), 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", filepath.Dir(policyFile), err)
+		return errors.Wrapf(err, "failed to create directory %q: ", filepath.Dir(policyFile))
 	}
 
 	scheme := runtime.NewScheme()
@@ -59,14 +60,14 @@ func writePolicyToDisk(policyFile string, policy *auditv1beta1.Policy) error {
 	codecs := serializer.NewCodecFactory(scheme)
 
 	// writes the policy to disk
-	serialized, err := util.MarshalToYamlForCodecs(policy, auditv1beta1.SchemeGroupVersion, codecs)
+	serialized, err := util.MarshalToYamlForCodecs(policy, auditv1.SchemeGroupVersion, codecs)
 
 	if err != nil {
-		return fmt.Errorf("failed to marshal audit policy to YAML: %v", err)
+		return errors.Wrap(err, "failed to marshal audit policy to YAML")
 	}
 
 	if err := ioutil.WriteFile(policyFile, serialized, 0600); err != nil {
-		return fmt.Errorf("failed to write audit policy to %v: %v", policyFile, err)
+		return errors.Wrapf(err, "failed to write audit policy to %v: ", policyFile)
 	}
 
 	return nil

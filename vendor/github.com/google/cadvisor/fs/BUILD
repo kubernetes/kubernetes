@@ -12,11 +12,11 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
-            "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",
             "//vendor/github.com/google/cadvisor/utils:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
             "//vendor/github.com/mistifyio/go-zfs:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "//conditions:default": [],
     }),

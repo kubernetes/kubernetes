@@ -70,7 +70,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintln(w, sampleDockerConfig)
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -148,7 +148,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 			w.Header().Set("Content-Type", "application/text")
 			fmt.Fprint(w, "http://foo.bar.com"+valueEndpoint)
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -232,7 +232,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintln(w, "default/\ncustom")
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -291,7 +291,7 @@ func TestContainerRegistryNoServiceAccount(t *testing.T) {
 			}
 			fmt.Fprintln(w, string(bytes))
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -335,7 +335,7 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintln(w, "default/\ncustom")
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -380,7 +380,7 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintln(w, "default/\ncustom")
 		} else {
-			w.WriteHeader(http.StatusNotFound)
+			http.Error(w, "", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -410,7 +410,7 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 
 func TestAllProvidersNoMetadata(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, "", http.StatusNotFound)
 	}))
 	defer server.Close()
 

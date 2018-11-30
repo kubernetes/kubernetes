@@ -1,0 +1,16 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+  name: standard-rdi-hdd-pool
+parameters:
+  adminId: sam
+  adminSecretName: ceph-sec-admin-rdi
+  adminSecretNamespace: sam-system
+  monitors: 10.253.101.170:6789,10.253.101.154:6789,10.253.101.186:6789
+  pool: sam
+  userId: sam
+  userSecretName: ceph-sec-user-rdi
+provisioner: kubernetes.io/rbd
+reclaimPolicy: Retain
+volumeBindingMode: Immediate

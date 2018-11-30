@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 // ImageTag tags an image in the docker host

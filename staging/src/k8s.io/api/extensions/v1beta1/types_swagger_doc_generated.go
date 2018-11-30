@@ -46,25 +46,6 @@ func (AllowedHostPath) SwaggerDoc() map[string]string {
 	return map_AllowedHostPath
 }
 
-var map_CustomMetricCurrentStatus = map[string]string{
-	"name":  "Custom Metric name.",
-	"value": "Custom Metric value (average).",
-}
-
-func (CustomMetricCurrentStatus) SwaggerDoc() map[string]string {
-	return map_CustomMetricCurrentStatus
-}
-
-var map_CustomMetricTarget = map[string]string{
-	"":      "Alpha-level support for Custom Metrics in HPA (as annotations).",
-	"name":  "Custom Metric name.",
-	"value": "Custom Metric value (average).",
-}
-
-func (CustomMetricTarget) SwaggerDoc() map[string]string {
-	return map_CustomMetricTarget
-}
-
 var map_DaemonSet = map[string]string{
 	"":         "DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for more information. DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
@@ -114,7 +95,7 @@ func (DaemonSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetStatus = map[string]string{
-	"": "DaemonSetStatus represents the current status of a daemon set.",
+	"":                       "DaemonSetStatus represents the current status of a daemon set.",
 	"currentNumberScheduled": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"numberMisscheduled":     "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"desiredNumberScheduled": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
@@ -193,10 +174,10 @@ var map_DeploymentSpec = map[string]string{
 	"template":                "Template describes the pods that will be created.",
 	"strategy":                "The deployment strategy to use to replace existing pods with new ones.",
 	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
-	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
+	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. This is set to the max value of int32 (i.e. 2147483647) by default, which means \"retaining all old RelicaSets\".",
 	"paused":                  "Indicates that the deployment is paused and will not be processed by the deployment controller.",
 	"rollbackTo":              "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
-	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. This is not set by default.",
+	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. This is set to the max value of int32 (i.e. 2147483647) by default, which means \"no deadline\".",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {
@@ -419,7 +400,7 @@ func (NetworkPolicyPeer) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicyPort = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.",
-	"protocol": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP.",
+	"protocol": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
 	"port":     "If specified, the port on the given protocol.  This can either be a numerical or named port on a pod.  If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
 }
 
@@ -472,6 +453,7 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"hostIPC":                         "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
 	"seLinux":                         "seLinux is the strategy that will dictate the allowable labels that may be set.",
 	"runAsUser":                       "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"runAsGroup":                      "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled.",
 	"supplementalGroups":              "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
 	"fsGroup":                         "fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
 	"readOnlyRootFilesystem":          "readOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
@@ -481,6 +463,7 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"allowedFlexVolumes":              "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field.",
 	"allowedUnsafeSysctls":            "allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed. Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.\n\nExamples: e.g. \"foo/*\" allows \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" allows \"foo.bar\", \"foo.baz\", etc.",
 	"forbiddenSysctls":                "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc.",
+	"allowedProcMountTypes":           "AllowedProcMountTypes is a whitelist of allowed ProcMountTypes. Empty or nil indicates that only the DefaultProcMountType may be used. This requires the ProcMountType feature flag to be enabled.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -581,6 +564,16 @@ var map_RollingUpdateDeployment = map[string]string{
 
 func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 	return map_RollingUpdateDeployment
+}
+
+var map_RunAsGroupStrategyOptions = map[string]string{
+	"":       "RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use RunAsGroupStrategyOptions from policy API Group instead.",
+	"rule":   "rule is the strategy that will dictate the allowable RunAsGroup values that may be set.",
+	"ranges": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs.",
+}
+
+func (RunAsGroupStrategyOptions) SwaggerDoc() map[string]string {
+	return map_RunAsGroupStrategyOptions
 }
 
 var map_RunAsUserStrategyOptions = map[string]string{

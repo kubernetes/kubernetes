@@ -42,9 +42,10 @@ func NewLoadBalancerFrontendIPConfigurationsClientWithBaseURI(baseURI string, su
 }
 
 // Get gets load balancer frontend IP configuration.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// frontendIPConfigurationName is the name of the frontend IP configuration.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// frontendIPConfigurationName - the name of the frontend IP configuration.
 func (client LoadBalancerFrontendIPConfigurationsClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, frontendIPConfigurationName string) (result FrontendIPConfiguration, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, frontendIPConfigurationName)
 	if err != nil {
@@ -110,8 +111,9 @@ func (client LoadBalancerFrontendIPConfigurationsClient) GetResponder(resp *http
 }
 
 // List gets all the load balancer frontend IP configurations.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
 func (client LoadBalancerFrontendIPConfigurationsClient) List(ctx context.Context, resourceGroupName string, loadBalancerName string) (result LoadBalancerFrontendIPConfigurationListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, loadBalancerName)

@@ -22,9 +22,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -54,6 +54,7 @@ go_test(
         "//pkg/controller/serviceaccount:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",

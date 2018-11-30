@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/blang/semver"
 	. "github.com/onsi/ginkgo"
@@ -170,7 +171,7 @@ func checkDockerConfig() error {
 // checkDockerNetworkClient checks client networking by pinging an external IP
 // address from a container.
 func checkDockerNetworkClient() error {
-	const imageName = "k8s.gcr.io/busybox"
+	imageName := imageutils.GetE2EImage(imageutils.BusyBox)
 	output, err := runCommand("docker", "run", "--rm", imageName, "sh", "-c", "ping -w 5 -q google.com")
 	if err != nil {
 		return err
@@ -310,7 +311,7 @@ func checkDockerStorageDriver() error {
 	return fmt.Errorf("failed to find storage driver")
 }
 
-var _ = framework.KubeDescribe("GKE system requirements [Conformance][NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
+var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
 	BeforeEach(func() {
 		framework.RunIfSystemSpecNameIs("gke")
 	})

@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
     ],
 )
 
@@ -18,7 +18,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
     ],
 )
 

@@ -22,8 +22,11 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
-	"runtime"
+	"strings"
 	"time"
+
+	"github.com/Azure/go-autorest/logger"
+	"github.com/Azure/go-autorest/version"
 )
 
 const (
@@ -41,15 +44,6 @@ const (
 )
 
 var (
-	// defaultUserAgent builds a string containing the Go version, system archityecture and OS,
-	// and the go-autorest version.
-	defaultUserAgent = fmt.Sprintf("Go/%s (%s-%s) go-autorest/%s",
-		runtime.Version(),
-		runtime.GOARCH,
-		runtime.GOOS,
-		Version(),
-	)
-
 	// StatusCodesForRetry are a defined group of status code for which the client will retry
 	StatusCodesForRetry = []int{
 		http.StatusRequestTimeout,      // 408
@@ -153,6 +147,7 @@ type Client struct {
 	PollingDelay time.Duration
 
 	// PollingDuration sets the maximum polling time after which an error is returned.
+	// Setting this to zero will use the provided context to control the duration.
 	PollingDuration time.Duration
 
 	// RetryAttempts sets the default number of retry attempts for client.
@@ -179,7 +174,7 @@ func NewClientWithUserAgent(ua string) Client {
 		PollingDuration: DefaultPollingDuration,
 		RetryAttempts:   DefaultRetryAttempts,
 		RetryDuration:   DefaultRetryDuration,
-		UserAgent:       defaultUserAgent,
+		UserAgent:       version.UserAgent(),
 	}
 	c.Sender = c.sender()
 	c.AddToUserAgent(ua)
@@ -216,8 +211,17 @@ func (c Client) Do(r *http.Request) (*http.Response, error) {
 		}
 		return resp, NewErrorWithError(err, "autorest/Client", "Do", nil, "Preparing request failed")
 	}
-
+	logger.Instance.WriteRequest(r, logger.Filter{
+		Header: func(k string, v []string) (bool, []string) {
+			// remove the auth token from the log
+			if strings.EqualFold(k, "Authorization") || strings.EqualFold(k, "Ocp-Apim-Subscription-Key") {
+				v = []string{"**REDACTED**"}
+			}
+			return true, v
+		},
+	})
 	resp, err := SendWithSender(c.sender(), r)
+	logger.Instance.WriteResponse(resp, logger.Filter{})
 	Respond(resp, c.ByInspecting())
 	return resp, err
 }

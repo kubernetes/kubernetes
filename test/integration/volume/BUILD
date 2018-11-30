@@ -20,6 +20,7 @@ go_test(
         "//pkg/controller/volume/attachdetach:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
+        "//pkg/controller/volume/persistentvolume/options:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -36,7 +37,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

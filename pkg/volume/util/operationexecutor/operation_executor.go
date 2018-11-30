@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -329,6 +329,10 @@ type VolumeToMount struct {
 	// the volume.Attacher interface
 	PluginIsAttachable bool
 
+	// PluginIsDeviceMountable indicates that the plugin for this volume implements
+	// the volume.DeviceMounter interface
+	PluginIsDeviceMountable bool
+
 	// VolumeGidValue contains the value of the GID annotation, if present.
 	VolumeGidValue string
 
@@ -623,14 +627,14 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 	for node, nodeAttachedVolumes := range attachedVolumes {
 		for _, volumeAttached := range nodeAttachedVolumes {
 			if volumeAttached.VolumeSpec == nil {
-				glog.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName)
+				klog.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName)
 				continue
 			}
 			volumePlugin, err :=
 				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
 
 			if err != nil || volumePlugin == nil {
-				glog.Errorf(
+				klog.Errorf(
 					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
 					volumeAttached.VolumeName,
 					volumeAttached.VolumeSpec.Name(),
@@ -669,7 +673,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			// If node doesn't support Bulk volume polling it is best to poll individually
 			nodeError := oe.VerifyVolumesAreAttachedPerNode(nodeAttachedVolumes, node, actualStateOfWorld)
 			if nodeError != nil {
-				glog.Errorf("BulkVerifyVolumes.VerifyVolumesAreAttached verifying volumes on node %q with %v", node, nodeError)
+				klog.Errorf("BulkVerifyVolumes.VerifyVolumesAreAttached verifying volumes on node %q with %v", node, nodeError)
 			}
 			break
 		}
@@ -682,14 +686,14 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			volumeSpecMapByPlugin[pluginName],
 			actualStateOfWorld)
 		if err != nil {
-			glog.Errorf("BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc error bulk verifying volumes for plugin %q with  %v", pluginName, err)
+			klog.Errorf("BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc error bulk verifying volumes for plugin %q with  %v", pluginName, err)
 		}
 
 		// Ugly hack to ensure - we don't do parallel bulk polling of same volume plugin
 		uniquePluginName := v1.UniqueVolumeName(pluginName)
 		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, generatedOperations)
 		if err != nil {
-			glog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
+			klog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
 		}
 	}
 }
@@ -738,8 +742,8 @@ func (oe *operationExecutor) MountVolume(
 	podName := nestedpendingoperations.EmptyUniquePodName
 
 	// TODO: remove this -- not necessary
-	if !volumeToMount.PluginIsAttachable {
-		// Non-attachable volume plugins can execute mount for multiple pods
+	if !volumeToMount.PluginIsAttachable && !volumeToMount.PluginIsDeviceMountable {
+		// volume plugins which are Non-attachable and Non-deviceMountable can execute mount for multiple pods
 		// referencing the same volume in parallel
 		podName = util.GetUniquePodName(volumeToMount.Pod)
 	}
@@ -858,7 +862,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	// Filesystem Volume case
 	if volumeMode == v1.PersistentVolumeFilesystem {
 		// Create volumeSpec from mount path
-		glog.V(5).Infof("Starting operationExecutor.ReconstructVolumepodName")
+		klog.V(5).Infof("Starting operationExecutor.ReconstructVolumepodName")
 		volumeSpec, err := plugin.ConstructVolumeSpec(volumeSpecName, mountPath)
 		if err != nil {
 			return nil, err
@@ -868,7 +872,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 
 	// Block Volume case
 	// Create volumeSpec from mount path
-	glog.V(5).Infof("Starting operationExecutor.ReconstructVolume")
+	klog.V(5).Infof("Starting operationExecutor.ReconstructVolume")
 	if mapperPlugin == nil {
 		return nil, fmt.Errorf("Could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)",
 			pluginName,

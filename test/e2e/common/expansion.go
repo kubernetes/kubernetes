@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -33,9 +34,9 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
 	/*
-		    Testname: var-expansion-env
-		    Description: Make sure environment variables can be set using an
-			expansion of previously defined environment variables
+		Release : v1.9
+		Testname: Environment variables, expansion
+		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 	*/
 	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
@@ -48,7 +49,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
@@ -78,9 +79,9 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-command
-		    Description: Make sure a container's commands can be set using an
-			expansion of environment variables.
+		Release : v1.9
+		Testname: Environment variables, command expansion
+		Description: Create a Pod with environment variables and container command using them. Container command using the  defined environment variables MUST expand to proper values.
 	*/
 	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
@@ -93,7 +94,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []v1.EnvVar{
 							{
@@ -113,9 +114,9 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-arg
-		    Description: Make sure a container's args can be set using an
-			expansion of environment variables.
+		Release : v1.9
+		Testname: Environment variables, command argument expansion
+		Description: Create a Pod with environment variables and container command arguments using them. Container command arguments using the  defined environment variables MUST expand to proper values.
 	*/
 	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
@@ -128,7 +129,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"sh", "-c"},
 						Args:    []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []v1.EnvVar{
@@ -164,7 +165,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"sh", "-c", "test -d /testcontainer/" + podName + ";echo $?"},
 						Env: []v1.EnvVar{
 							{
@@ -225,7 +226,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "dapi-container",
-						Image: busyboxImage,
+						Image: imageutils.GetE2EImage(imageutils.BusyBox),
 						Env: []v1.EnvVar{
 							{
 								Name:  "POD_NAME",
@@ -274,7 +275,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "dapi-container",
-						Image: busyboxImage,
+						Image: imageutils.GetE2EImage(imageutils.BusyBox),
 						Env: []v1.EnvVar{
 							{
 								Name:  "POD_NAME",

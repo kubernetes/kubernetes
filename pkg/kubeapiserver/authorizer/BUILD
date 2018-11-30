@@ -12,7 +12,6 @@ go_library(
     deps = [
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//plugin/pkg/auth/authorizer/node:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",

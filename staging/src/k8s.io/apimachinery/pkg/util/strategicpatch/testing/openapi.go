@@ -74,7 +74,7 @@ func getSchema(f Fake, model string) (openapi.Schema, error) {
 	return m.LookupModel(model), nil
 }
 
-// GetSchemaOrDie returns returns the openapi schema.
+// GetSchemaOrDie returns the openapi schema.
 func GetSchemaOrDie(f Fake, model string) openapi.Schema {
 	s, err := getSchema(f, model)
 	if err != nil {

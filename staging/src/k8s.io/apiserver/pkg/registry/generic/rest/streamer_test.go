@@ -19,6 +19,7 @@ package rest
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -27,6 +28,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -45,7 +48,7 @@ func TestInputStreamReader(t *testing.T) {
 	streamer := &LocationStreamer{
 		Location: u,
 	}
-	readCloser, _, _, err := streamer.InputStream("", "")
+	readCloser, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream: %v", err)
 		return
@@ -61,7 +64,7 @@ func TestInputStreamNullLocation(t *testing.T) {
 	streamer := &LocationStreamer{
 		Location: nil,
 	}
-	readCloser, _, _, err := streamer.InputStream("", "")
+	readCloser, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream with null location: %v", err)
 	}
@@ -91,7 +94,7 @@ func TestInputStreamContentType(t *testing.T) {
 		Location:  location,
 		Transport: fakeTransport("application/json", "hello world"),
 	}
-	readCloser, _, contentType, err := streamer.InputStream("", "")
+	readCloser, _, contentType, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream: %v", err)
 		return
@@ -109,7 +112,7 @@ func TestInputStreamTransport(t *testing.T) {
 		Location:  location,
 		Transport: fakeTransport("text/plain", message),
 	}
-	readCloser, _, _, err := streamer.InputStream("", "")
+	readCloser, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream: %v", err)
 		return
@@ -136,7 +139,7 @@ func TestInputStreamInternalServerErrorTransport(t *testing.T) {
 	}
 	expectedError := errors.NewInternalError(fmt.Errorf("%s", message))
 
-	_, _, _, err := streamer.InputStream("", "")
+	_, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 		return
@@ -145,4 +148,24 @@ func TestInputStreamInternalServerErrorTransport(t *testing.T) {
 	if !reflect.DeepEqual(err, expectedError) {
 		t.Errorf("StreamInternalServerError does not match. Got: %s. Expected: %s.", err, expectedError)
 	}
+}
+
+func TestInputStreamRedirects(t *testing.T) {
+	const redirectPath = "/redirect"
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == redirectPath {
+			t.Fatal("Redirects should not be followed")
+		} else {
+			http.Redirect(w, req, redirectPath, http.StatusFound)
+		}
+	}))
+	loc, err := url.Parse(s.URL)
+	require.NoError(t, err, "Error parsing server URL")
+
+	streamer := &LocationStreamer{
+		Location:        loc,
+		RedirectChecker: PreventRedirects,
+	}
+	_, _, _, err = streamer.InputStream(context.Background(), "", "")
+	assert.Error(t, err, "Redirect should trigger an error")
 }

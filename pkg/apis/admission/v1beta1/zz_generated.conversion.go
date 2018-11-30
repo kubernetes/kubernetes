@@ -89,6 +89,7 @@ func autoConvert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(in *v1be
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.OldObject, &out.OldObject, s); err != nil {
 		return err
 	}
+	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
 	return nil
 }
 
@@ -115,6 +116,7 @@ func autoConvert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest(in *admi
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.OldObject, &out.OldObject, s); err != nil {
 		return err
 	}
+	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
 	return nil
 }
 
@@ -129,6 +131,7 @@ func autoConvert_v1beta1_AdmissionResponse_To_admission_AdmissionResponse(in *v1
 	out.Result = (*v1.Status)(unsafe.Pointer(in.Result))
 	out.Patch = *(*[]byte)(unsafe.Pointer(&in.Patch))
 	out.PatchType = (*admission.PatchType)(unsafe.Pointer(in.PatchType))
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 
@@ -143,6 +146,7 @@ func autoConvert_admission_AdmissionResponse_To_v1beta1_AdmissionResponse(in *ad
 	out.Result = (*v1.Status)(unsafe.Pointer(in.Result))
 	out.Patch = *(*[]byte)(unsafe.Pointer(&in.Patch))
 	out.PatchType = (*v1beta1.PatchType)(unsafe.Pointer(in.PatchType))
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 

@@ -91,9 +91,10 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		framework.Logf("waiting for CSR to be signed")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
-			csr, _ = csrs.Get(csrName, metav1.GetOptions{})
+			csr, err = csrs.Get(csrName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				framework.Logf("error getting csr: %v", err)
+				return false, nil
 			}
 			if len(csr.Status.Certificate) == 0 {
 				framework.Logf("csr not signed yet")

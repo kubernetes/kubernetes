@@ -51,20 +51,42 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				return q
 			}
 
+			var podMetricID autoscaling.MetricIdentifier
+			var objMetricID autoscaling.MetricIdentifier
+			c.Fuzz(&podMetricID)
+			c.Fuzz(&objMetricID)
+
 			targetUtilization := int32(c.RandUint64())
+			averageValue := randomQuantity()
 			s.Metrics = []autoscaling.MetricSpec{
 				{
 					Type: autoscaling.PodsMetricSourceType,
 					Pods: &autoscaling.PodsMetricSource{
-						MetricName:         c.RandString(),
-						TargetAverageValue: randomQuantity(),
+						Metric: podMetricID,
+						Target: autoscaling.MetricTarget{
+							Type:         autoscaling.AverageValueMetricType,
+							AverageValue: &averageValue,
+						},
+					},
+				},
+				{
+					Type: autoscaling.ObjectMetricSourceType,
+					Object: &autoscaling.ObjectMetricSource{
+						Metric: objMetricID,
+						Target: autoscaling.MetricTarget{
+							Type:  autoscaling.ValueMetricType,
+							Value: &averageValue,
+						},
 					},
 				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
 						Name: api.ResourceCPU,
-						TargetAverageUtilization: &targetUtilization,
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: &targetUtilization,
+						},
 					},
 				},
 			}
@@ -78,20 +100,28 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				_ = q.String()
 				return q
 			}
+			averageValue := randomQuantity()
 			currentUtilization := int32(c.RandUint64())
 			s.CurrentMetrics = []autoscaling.MetricStatus{
 				{
 					Type: autoscaling.PodsMetricSourceType,
 					Pods: &autoscaling.PodsMetricStatus{
-						MetricName:          c.RandString(),
-						CurrentAverageValue: randomQuantity(),
+						Metric: autoscaling.MetricIdentifier{
+							Name: c.RandString(),
+						},
+						Current: autoscaling.MetricValueStatus{
+							AverageValue: &averageValue,
+						},
 					},
 				},
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricStatus{
 						Name: api.ResourceCPU,
-						CurrentAverageUtilization: &currentUtilization,
+						Current: autoscaling.MetricValueStatus{
+							AverageUtilization: &currentUtilization,
+							AverageValue:       &averageValue,
+						},
 					},
 				},
 			}

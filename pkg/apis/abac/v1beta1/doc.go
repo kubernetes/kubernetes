@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=abac.authorization.kubernetes.io
+
 package v1beta1 // import "k8s.io/kubernetes/pkg/apis/abac/v1beta1"

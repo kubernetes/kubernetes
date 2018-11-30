@@ -17,9 +17,11 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"k8s.io/client-go/tools/clientcmd"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // SubCmdRunE returns a function that handles a case where a subcommand must be specified
@@ -30,10 +32,10 @@ import (
 func SubCmdRunE(name string) func(*cobra.Command, []string) error {
 	return func(_ *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return fmt.Errorf("missing subcommand; %q is not meant to be run on its own", name)
+			return errors.Errorf("missing subcommand; %q is not meant to be run on its own", name)
 		}
 
-		return fmt.Errorf("invalid subcommand: %q", args[0])
+		return errors.Errorf("invalid subcommand: %q", args[0])
 	}
 }
 
@@ -48,12 +50,26 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 		}
 		// break early for too many arguments
 		if validArgs > lenSupported {
-			return fmt.Errorf("too many arguments. Required arguments: %v", supportedArgs)
+			return errors.Errorf("too many arguments. Required arguments: %v", supportedArgs)
 		}
 	}
 
 	if validArgs < lenSupported {
-		return fmt.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
+		return errors.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
 	}
 	return nil
+}
+
+// FindExistingKubeConfig returns the localtion of kubeconfig
+func FindExistingKubeConfig(file string) string {
+	// The user did provide a --kubeconfig flag. Respect that and threat it as an
+	// explicit path without building a DefaultClientConfigLoadingRules object.
+	if file != kubeadmconstants.GetAdminKubeConfigPath() {
+		return file
+	}
+	// The user did not provide a --kubeconfig flag. Find a config in the standard
+	// locations using DefaultClientConfigLoadingRules, but also consider the default config path.
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
+	return rules.GetDefaultFilename()
 }

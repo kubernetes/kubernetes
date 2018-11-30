@@ -41,7 +41,6 @@ if ! grep -q "# gazelle:importmap_prefix" "${KUBE_ROOT}/vendor/BUILD"; then
 fi
 
 gazelle fix \
-    -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
     -mode=fix \
     -repo_root "${KUBE_ROOT}" \

@@ -19,7 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // ServiceControllerOptions holds the ServiceController options.
@@ -37,7 +37,7 @@ func (o *ServiceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up ServiceController config with options.
-func (o *ServiceControllerOptions) ApplyTo(cfg *componentconfig.ServiceControllerConfiguration) error {
+func (o *ServiceControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.ServiceControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

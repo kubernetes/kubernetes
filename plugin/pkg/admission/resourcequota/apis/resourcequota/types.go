@@ -17,8 +17,8 @@ limitations under the License.
 package resourcequota
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -68,5 +68,5 @@ type LimitedResource struct {
 	// "PriorityClassNameIn=cluster-services"
 	// +optional
 	//	MatchScopes []string `json:"matchScopes,omitempty"`
-	MatchScopes []core.ScopedResourceSelectorRequirement `json:"matchScopes,omitempty"`
+	MatchScopes []corev1.ScopedResourceSelectorRequirement `json:"matchScopes,omitempty"`
 }

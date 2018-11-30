@@ -543,7 +543,7 @@ Depending on the enclosing object, subresources might not be allowed. Required.<
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">continue</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1051,6 +1051,10 @@ Depending on the enclosing object, subresources might not be allowed. Required.<
 
 </div>
 <div class="sect2">
+<h3 id="_v1_deletionpropagation">v1.DeletionPropagation</h3>
+
+</div>
+<div class="sect2">
 <h3 id="_v1beta1_webhook">v1beta1.Webhook</h3>
 <div class="paragraph">
 <p>Webhook describes an admission webhook and the resources and operations it applies to.</p>
@@ -1138,12 +1142,15 @@ Default to the empty LabelSelector, which matches everything.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">sideEffects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SideEffects states whether this webhookk has side effects. Acceptable values are: Unknown, None, Some, NoneOnDryRun Webhooks with side effects MUST implement a reconciliation system, since a request may be rejected by a future step in the admission change and the side effects therefore need to be undone. Requests with the dryRun attribute will be auto-rejected if they match a webhook with sideEffects == Unknown or Some. Defaults to Unknown.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_sideeffectclass">v1beta1.SideEffectClass</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1_deletionpropagation">v1.DeletionPropagation</h3>
 
 </div>
 <div class="sect2">
@@ -1338,7 +1345,7 @@ Default to the empty LabelSelector, which matches everything.</p></td>
 <div class="sect2">
 <h3 id="_v1_ownerreference">v1.OwnerReference</h3>
 <div class="paragraph">
-<p>OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.</p>
+<p>OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1584,7 +1591,7 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">url</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>url</code> gives the location of the webhook, in standard URL form (<code>[scheme://]host:port/path</code>). Exactly one of <code>url</code> or <code>service</code> must be specified.<br>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>url</code> gives the location of the webhook, in standard URL form (<code>scheme://host:port/path</code>). Exactly one of <code>url</code> or <code>service</code> must be specified.<br>
 <br>
 The <code>host</code> should not refer to a service running in the cluster; use the <code>service</code> field instead. The host might be resolved via external DNS in some apiservers (e.g., <code>kube-apiserver</code> cannot resolve in-cluster DNS as that would be a layering violation). <code>host</code> may also be an IP address.<br>
 <br>
@@ -1606,14 +1613,14 @@ Attempting to use a user or basic auth e.g. "user:password@" is not allowed. Fra
 If the webhook is running within the cluster, then you should use <code>service</code>.<br>
 <br>
 Port 443 will be used if it is open, otherwise it is an error.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_servicereference">v1beta1.ServiceReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">caBundle</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>caBundle</code> is a PEM encoded CA bundle which will be used to validate the webhook&#8217;s server certificate. Required.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>caBundle</code> is a PEM encoded CA bundle which will be used to validate the webhook&#8217;s server certificate. If unspecified, system trust roots on the apiserver are used.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -1764,6 +1771,10 @@ Port 443 will be used if it is open, otherwise it is an error.</p></td>
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1beta1_sideeffectclass">v1beta1.SideEffectClass</h3>
 
 </div>
 <div class="sect2">

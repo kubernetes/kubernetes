@@ -40,9 +40,10 @@ func NewRouteFiltersClientWithBaseURI(baseURI string, subscriptionID string) Rou
 }
 
 // CreateOrUpdate creates or updates a route filter in a specified resource group.
-//
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter.
-// routeFilterParameters is parameters supplied to the create or update route filter operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeFilterName - the name of the route filter.
+// routeFilterParameters - parameters supplied to the create or update route filter operation.
 func (client RouteFiltersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeFilterName string, routeFilterParameters RouteFilter) (result RouteFiltersCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, routeFilterName, routeFilterParameters)
 	if err != nil {
@@ -73,7 +74,7 @@ func (client RouteFiltersClient) CreateOrUpdatePreparer(ctx context.Context, res
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/routeFilters/{routeFilterName}", pathParameters),
@@ -85,15 +86,13 @@ func (client RouteFiltersClient) CreateOrUpdatePreparer(ctx context.Context, res
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client RouteFiltersClient) CreateOrUpdateSender(req *http.Request) (future RouteFiltersCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -111,8 +110,9 @@ func (client RouteFiltersClient) CreateOrUpdateResponder(resp *http.Response) (r
 }
 
 // Delete deletes the specified route filter.
-//
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeFilterName - the name of the route filter.
 func (client RouteFiltersClient) Delete(ctx context.Context, resourceGroupName string, routeFilterName string) (result RouteFiltersDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, routeFilterName)
 	if err != nil {
@@ -153,15 +153,13 @@ func (client RouteFiltersClient) DeletePreparer(ctx context.Context, resourceGro
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client RouteFiltersClient) DeleteSender(req *http.Request) (future RouteFiltersDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -178,9 +176,10 @@ func (client RouteFiltersClient) DeleteResponder(resp *http.Response) (result au
 }
 
 // Get gets the specified route filter.
-//
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. expand is
-// expands referenced express route bgp peering resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeFilterName - the name of the route filter.
+// expand - expands referenced express route bgp peering resources.
 func (client RouteFiltersClient) Get(ctx context.Context, resourceGroupName string, routeFilterName string, expand string) (result RouteFilter, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, routeFilterName, expand)
 	if err != nil {
@@ -338,8 +337,8 @@ func (client RouteFiltersClient) ListComplete(ctx context.Context) (result Route
 }
 
 // ListByResourceGroup gets all route filters in a resource group.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client RouteFiltersClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result RouteFilterListResultPage, err error) {
 	result.fn = client.listByResourceGroupNextResults
 	req, err := client.ListByResourceGroupPreparer(ctx, resourceGroupName)
@@ -431,9 +430,10 @@ func (client RouteFiltersClient) ListByResourceGroupComplete(ctx context.Context
 }
 
 // Update updates a route filter in a specified resource group.
-//
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter.
-// routeFilterParameters is parameters supplied to the update route filter operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeFilterName - the name of the route filter.
+// routeFilterParameters - parameters supplied to the update route filter operation.
 func (client RouteFiltersClient) Update(ctx context.Context, resourceGroupName string, routeFilterName string, routeFilterParameters PatchRouteFilter) (result RouteFiltersUpdateFuture, err error) {
 	req, err := client.UpdatePreparer(ctx, resourceGroupName, routeFilterName, routeFilterParameters)
 	if err != nil {
@@ -464,7 +464,7 @@ func (client RouteFiltersClient) UpdatePreparer(ctx context.Context, resourceGro
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/routeFilters/{routeFilterName}", pathParameters),
@@ -476,15 +476,13 @@ func (client RouteFiltersClient) UpdatePreparer(ctx context.Context, resourceGro
 // UpdateSender sends the Update request. The method will close the
 // http.Response Body if it receives an error.
 func (client RouteFiltersClient) UpdateSender(req *http.Request) (future RouteFiltersUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

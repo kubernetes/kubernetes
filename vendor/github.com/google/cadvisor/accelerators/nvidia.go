@@ -26,8 +26,8 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 
-	"github.com/golang/glog"
 	"github.com/mindprince/gonvml"
+	"k8s.io/klog"
 )
 
 type NvidiaManager struct {
@@ -50,7 +50,7 @@ const nvidiaVendorId = "0x10de"
 // Setup initializes NVML if nvidia devices are present on the node.
 func (nm *NvidiaManager) Setup() {
 	if !detectDevices(nvidiaVendorId) {
-		glog.V(4).Info("No NVIDIA devices found.")
+		klog.V(4).Info("No NVIDIA devices found.")
 		return
 	}
 
@@ -63,7 +63,7 @@ func (nm *NvidiaManager) Setup() {
 func detectDevices(vendorId string) bool {
 	devices, err := ioutil.ReadDir(sysFsPCIDevicesPath)
 	if err != nil {
-		glog.Warningf("Error reading %q: %v", sysFsPCIDevicesPath, err)
+		klog.Warningf("Error reading %q: %v", sysFsPCIDevicesPath, err)
 		return false
 	}
 
@@ -71,11 +71,11 @@ func detectDevices(vendorId string) bool {
 		vendorPath := filepath.Join(sysFsPCIDevicesPath, device.Name(), "vendor")
 		content, err := ioutil.ReadFile(vendorPath)
 		if err != nil {
-			glog.V(4).Infof("Error while reading %q: %v", vendorPath, err)
+			klog.V(4).Infof("Error while reading %q: %v", vendorPath, err)
 			continue
 		}
 		if strings.EqualFold(strings.TrimSpace(string(content)), vendorId) {
-			glog.V(3).Infof("Found device with vendorId %q", vendorId)
+			klog.V(3).Infof("Found device with vendorId %q", vendorId)
 			return true
 		}
 	}
@@ -88,26 +88,26 @@ var initializeNVML = func(nm *NvidiaManager) {
 	if err := gonvml.Initialize(); err != nil {
 		// This is under a logging level because otherwise we may cause
 		// log spam if the drivers/nvml is not installed on the system.
-		glog.V(4).Infof("Could not initialize NVML: %v", err)
+		klog.V(4).Infof("Could not initialize NVML: %v", err)
 		return
 	}
 	nm.nvmlInitialized = true
 	numDevices, err := gonvml.DeviceCount()
 	if err != nil {
-		glog.Warningf("GPU metrics would not be available. Failed to get the number of nvidia devices: %v", err)
+		klog.Warningf("GPU metrics would not be available. Failed to get the number of nvidia devices: %v", err)
 		return
 	}
-	glog.V(1).Infof("NVML initialized. Number of nvidia devices: %v", numDevices)
+	klog.V(1).Infof("NVML initialized. Number of nvidia devices: %v", numDevices)
 	nm.nvidiaDevices = make(map[int]gonvml.Device, numDevices)
 	for i := 0; i < int(numDevices); i++ {
 		device, err := gonvml.DeviceHandleByIndex(uint(i))
 		if err != nil {
-			glog.Warningf("Failed to get nvidia device handle %d: %v", i, err)
+			klog.Warningf("Failed to get nvidia device handle %d: %v", i, err)
 			continue
 		}
 		minorNumber, err := device.MinorNumber()
 		if err != nil {
-			glog.Warningf("Failed to get nvidia device minor number: %v", err)
+			klog.Warningf("Failed to get nvidia device minor number: %v", err)
 			continue
 		}
 		nm.nvidiaDevices[int(minorNumber)] = device

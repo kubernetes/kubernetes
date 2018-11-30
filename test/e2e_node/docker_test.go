@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]"
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  containerName,
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					}},
 				},
 			})

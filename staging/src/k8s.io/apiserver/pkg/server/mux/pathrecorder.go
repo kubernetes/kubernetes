@@ -25,7 +25,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -237,20 +237,20 @@ func (m *PathRecorderMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ServeHTTP makes it an http.Handler
 func (h *pathHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if exactHandler, ok := h.pathToHandler[r.URL.Path]; ok {
-		glog.V(5).Infof("%v: %q satisfied by exact match", h.muxName, r.URL.Path)
+		klog.V(5).Infof("%v: %q satisfied by exact match", h.muxName, r.URL.Path)
 		exactHandler.ServeHTTP(w, r)
 		return
 	}
 
 	for _, prefixHandler := range h.prefixHandlers {
 		if strings.HasPrefix(r.URL.Path, prefixHandler.prefix) {
-			glog.V(5).Infof("%v: %q satisfied by prefix %v", h.muxName, r.URL.Path, prefixHandler.prefix)
+			klog.V(5).Infof("%v: %q satisfied by prefix %v", h.muxName, r.URL.Path, prefixHandler.prefix)
 			prefixHandler.handler.ServeHTTP(w, r)
 			return
 		}
 	}
 
-	glog.V(5).Infof("%v: %q satisfied by NotFoundHandler", h.muxName, r.URL.Path)
+	klog.V(5).Infof("%v: %q satisfied by NotFoundHandler", h.muxName, r.URL.Path)
 	h.notFoundHandler.ServeHTTP(w, r)
 }
 
