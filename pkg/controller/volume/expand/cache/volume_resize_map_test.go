@@ -98,7 +98,7 @@ func Test_AddValidPVCUpdate(t *testing.T) {
 		resizeMap := createTestVolumeResizeMap()
 		pvc := test.pvc.DeepCopy()
 		pv := test.pv.DeepCopy()
-		resizeMap.AddPVCUpdate(pvc, pv)
+		resizeMap.AddPVCUpdate(pvc, pv, false)
 		pvcr := resizeMap.GetPVCsWithResizeRequest()
 		if len(pvcr) != test.expectedPVCs {
 			t.Errorf("Test %q expected %d pvc resize request got %d", test.name, test.expectedPVCs, len(pvcr))

@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -54,16 +56,37 @@ func MarkFSResizeFinished(
 	newPVC := pvc.DeepCopy()
 	newPVC.Status.Capacity = capacity
 	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{})
-	_, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+	_, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient, false)
 	return err
 }
 
 // PatchPVCStatus updates PVC status using PATCH verb
+// If the PVC was requed for processing then we MUST add version check to PATCH
+// request so as to ensure that we aren't working with stale PVC objects.
 func PatchPVCStatus(
 	oldPVC *v1.PersistentVolumeClaim,
 	newPVC *v1.PersistentVolumeClaim,
-	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	kubeClient clientset.Interface,
+	addVersionCheck bool) (*v1.PersistentVolumeClaim, error) {
 	pvcName := oldPVC.Name
+	patchBytes, err := createPVCPatch(oldPVC, newPVC, addVersionCheck)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(oldPVC.Namespace).
+		Patch(pvcName, types.StrategicMergePatchType, patchBytes, "status")
+	if updateErr != nil {
+		return nil, fmt.Errorf("PatchPVCStatus.Failed to patch PVC %q with %v", pvcName, updateErr)
+	}
+	return updatedClaim, nil
+}
+
+func createPVCPatch(oldPVC *v1.PersistentVolumeClaim,
+	newPVC *v1.PersistentVolumeClaim,
+	addVersionCheck bool) ([]byte, error) {
+	pvcName := oldPVC.Name
+	resourceVersion := oldPVC.ResourceVersion
 
 	oldData, err := json.Marshal(oldPVC)
 	if err != nil {
@@ -79,12 +102,31 @@ func PatchPVCStatus(
 	if err != nil {
 		return nil, fmt.Errorf("PatchPVCStatus.Failed to CreateTwoWayMergePatch for pvc %q with %v ", pvcName, err)
 	}
-	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(oldPVC.Namespace).
-		Patch(pvcName, types.StrategicMergePatchType, patchBytes, "status")
-	if updateErr != nil {
-		return nil, fmt.Errorf("PatchPVCStatus.Failed to patch PVC %q with %v", pvcName, updateErr)
+	if addVersionCheck {
+		patchBytes, err = addResourceVersion(patchBytes, resourceVersion)
+		if err != nil {
+			return nil, fmt.Errorf("error adding resource version to pvc %q with %v ", pvcName, err)
+		}
 	}
-	return updatedClaim, nil
+	return patchBytes, nil
+}
+func addResourceVersion(patchBytes []byte, resourceVersion string) ([]byte, error) {
+	var patchMap map[string]interface{}
+	err := json.Unmarshal(patchBytes, &patchMap)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling patch with %v", err)
+	}
+	u := unstructured.Unstructured{Object: patchMap}
+	a, err := meta.Accessor(&u)
+	if err != nil {
+		return nil, fmt.Errorf("error creating accessor with  %v", err)
+	}
+	a.SetResourceVersion(resourceVersion)
+	versionBytes, err := json.Marshal(patchMap)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling json patch with %v", err)
+	}
+	return versionBytes, nil
 }
 
 // MergeResizeConditionOnPVC updates pvc with requested resize conditions

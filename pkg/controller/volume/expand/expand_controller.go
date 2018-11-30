@@ -223,7 +223,7 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, err)
 			return
 		}
-		expc.resizeMap.AddPVCUpdate(newPVC, pv)
+		expc.resizeMap.AddPVCUpdate(newPVC, pv, false /*Requeued*/)
 	}
 }
 

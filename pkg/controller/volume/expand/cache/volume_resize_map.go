@@ -35,7 +35,7 @@ import (
 // VolumeResizeMap defines an interface that serves as a cache for holding pending resizing requests
 type VolumeResizeMap interface {
 	// AddPVCUpdate adds pvc for resizing
-	AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume)
+	AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, requeued bool)
 	// DeletePVC deletes pvc that is scheduled for resizing
 	DeletePVC(pvc *v1.PersistentVolumeClaim)
 	// GetPVCsWithResizeRequest returns all pending pvc resize requests
@@ -68,6 +68,10 @@ type PVCWithResizeRequest struct {
 	CurrentSize resource.Quantity
 	// Expended volume size
 	ExpectedSize resource.Quantity
+	// Requeued indicates that the PVC is being
+	// reprocessed for resize because of either some error
+	// or via populator loop.
+	Requeued bool
 }
 
 // UniquePVCKey returns unique key of the PVC based on its UID
@@ -95,7 +99,7 @@ func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 // pvc update will be successful too and after resize we alyways update PV first.
 // If for some reason we weren't able to update PVC after successful resize, then we are going to reprocess
 // the PVC and hopefully after a no-op resize in volume plugin, PVC will be updated with right values as well.
-func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, requeued bool) {
 	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
 		klog.V(4).Infof("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
 		return
@@ -119,6 +123,7 @@ func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv
 		CurrentSize:      pvcStatusSize,
 		ExpectedSize:     pvcSize,
 		PersistentVolume: pv,
+		Requeued:         requeued,
 	}
 
 	resizeMap.Lock()
@@ -173,7 +178,7 @@ func (resizeMap *volumeResizeMap) MarkForFSResize(pvcr *PVCWithResizeRequest) er
 	conditions := []v1.PersistentVolumeClaimCondition{pvcCondition}
 	newPVC := pvcr.PVC.DeepCopy()
 	newPVC = util.MergeResizeConditionOnPVC(newPVC, conditions)
-	_, err := util.PatchPVCStatus(pvcr.PVC /*oldPVC*/, newPVC, resizeMap.kubeClient)
+	_, err := util.PatchPVCStatus(pvcr.PVC /*oldPVC*/, newPVC, resizeMap.kubeClient, pvcr.Requeued)
 	return err
 }
 
@@ -215,6 +220,6 @@ func (resizeMap *volumeResizeMap) updatePVCCapacityAndConditions(pvcr *PVCWithRe
 	newPVC := pvcr.PVC.DeepCopy()
 	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
 	newPVC = util.MergeResizeConditionOnPVC(newPVC, pvcConditions)
-	_, err := util.PatchPVCStatus(pvcr.PVC /*oldPVC*/, newPVC, resizeMap.kubeClient)
+	_, err := util.PatchPVCStatus(pvcr.PVC /*oldPVC*/, newPVC, resizeMap.kubeClient, pvcr.Requeued)
 	return err
 }

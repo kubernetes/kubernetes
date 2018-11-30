@@ -120,6 +120,6 @@ func (populator *pvcPopulator) Sync() {
 		//  - pvc.Spec.Size > pvc.Status.Size
 		// These 2 checks are already performed in AddPVCUpdate function before adding pvc for resize
 		// and hence we do not repeat those checks here.
-		populator.resizeMap.AddPVCUpdate(pvc, pv)
+		populator.resizeMap.AddPVCUpdate(pvc, pv, true /*Requeued*/)
 	}
 }
