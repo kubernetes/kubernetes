@@ -139,11 +139,11 @@ func TestEmpty(t *testing.T) {
 
 func TestProxyWatcher(t *testing.T) {
 	events := []Event{
-		{Added, testType("foo")},
-		{Modified, testType("qux")},
-		{Modified, testType("bar")},
-		{Deleted, testType("bar")},
-		{Error, testType("error: blah")},
+		{Added, testType("foo"), ""},
+		{Modified, testType("qux"), ""},
+		{Modified, testType("bar"), ""},
+		{Deleted, testType("bar"), ""},
+		{Error, testType("error: blah"), ""},
 	}
 
 	ch := make(chan Event, len(events))

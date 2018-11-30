@@ -180,6 +180,7 @@ TestCase:
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
 			e := <-ch
+			e.TrackInfo = ""
 			if !reflect.DeepEqual(event, e) {
 				t.Errorf("%d: unexpected event %d: %s", i, j, diff.ObjectReflectDiff(event, e))
 				break TestCase

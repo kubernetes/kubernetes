@@ -69,7 +69,7 @@ func TestDecoder(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			action, got, err := decoder.Decode()
+			action, got, _, err := decoder.Decode()
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
@@ -86,7 +86,7 @@ func TestDecoder(t *testing.T) {
 
 		done = make(chan struct{})
 		go func() {
-			_, _, err := decoder.Decode()
+			_, _, _, err := decoder.Decode()
 			if err == nil {
 				t.Errorf("Unexpected nil error")
 			}
@@ -105,7 +105,7 @@ func TestDecoder_SourceClose(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		_, _, err := decoder.Decode()
+		_, _, _, err := decoder.Decode()
 		if err == nil {
 			t.Errorf("Unexpected nil error")
 		}

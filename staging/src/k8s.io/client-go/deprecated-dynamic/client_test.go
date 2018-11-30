@@ -530,6 +530,7 @@ func TestWatch(t *testing.T) {
 
 		for _, want := range tc.events {
 			got := <-watcher.ResultChan()
+			got.TrackInfo = ""
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("Watch(%q) want: %v\ngot: %v", tc.name, want, got)
 			}

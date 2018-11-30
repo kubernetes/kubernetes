@@ -29,12 +29,12 @@ type fakeDecoder struct {
 	items chan Event
 }
 
-func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err error) {
+func (f fakeDecoder) Decode() (action EventType, object runtime.Object, fakeInfo string, err error) {
 	item, open := <-f.items
 	if !open {
-		return action, nil, io.EOF
+		return action, nil, "", io.EOF
 	}
-	return item.Type, item.Object, nil
+	return item.Type, item.Object, "", nil
 }
 
 func (f fakeDecoder) Close() {
@@ -55,6 +55,7 @@ func TestStreamWatcher(t *testing.T) {
 		if !open {
 			t.Errorf("unexpected early close")
 		}
+		got.TrackInfo = ""
 		if e, a := item, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("expected %v, got %v", e, a)
 		}

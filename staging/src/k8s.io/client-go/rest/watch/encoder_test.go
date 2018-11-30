@@ -69,7 +69,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 
 		rc := ioutil.NopCloser(buf)
 		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(rc, getDecoder()), getDecoder())
-		event, obj, err := decoder.Decode()
+		event, obj, _, err := decoder.Decode()
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue

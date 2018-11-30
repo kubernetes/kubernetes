@@ -66,6 +66,7 @@ func TestBroadcaster(t *testing.T) {
 				if !ok {
 					break
 				}
+				event.TrackInfo = ""
 				if e, a := table[tableLine], event; !reflect.DeepEqual(e, a) {
 					t.Errorf("Watcher %v, line %v: Expected (%v, %#v), got (%v, %#v)",
 						watcher, tableLine, e.Type, e.Object, a.Type, a.Object)
@@ -160,6 +161,7 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 			if !ok {
 				t.Errorf("Watcher %v failed to retrieve first event.", watcher)
 			}
+			e1.TrackInfo = ""
 			if e, a := event1, e1; !reflect.DeepEqual(e, a) {
 				t.Errorf("Watcher %v: Expected (%v, %#v), got (%v, %#v)",
 					watcher, e.Type, e.Object, a.Type, a.Object)
