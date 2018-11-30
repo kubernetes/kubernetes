@@ -677,7 +677,7 @@ func TestPatch(t *testing.T) {
 
 	t.Logf("Patching .num.num2 to 999")
 	patch := []byte(`{"num": {"num2":999}}`)
-	patchedNoxuInstance, err := noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+	patchedNoxuInstance, err := noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -692,7 +692,7 @@ func TestPatch(t *testing.T) {
 
 	// a patch with no change
 	t.Logf("Patching .num.num2 again to 999")
-	patchedNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+	patchedNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -702,7 +702,7 @@ func TestPatch(t *testing.T) {
 
 	// an empty patch
 	t.Logf("Applying empty patch")
-	patchedNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.UpdateOptions{})
+	patchedNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.PatchOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -27,7 +27,6 @@ import (
 	"unicode"
 
 	restful "github.com/emicklei/go-restful"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -265,6 +264,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, err
 	}
 	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
+	if err != nil {
+		return nil, err
+	}
+	versionedPatchOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("PatchOptions"))
 	if err != nil {
 		return nil, err
 	}
@@ -691,7 +694,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
-			if err := addObjectParams(ws, route, versionedUpdateOptions); err != nil {
+			if err := addObjectParams(ws, route, versionedPatchOptions); err != nil {
 				return nil, err
 			}
 			addParams(route, action.Params)

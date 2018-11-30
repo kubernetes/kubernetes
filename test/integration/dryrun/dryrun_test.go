@@ -58,7 +58,7 @@ func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstruct
 
 func DryRunPatchTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	patch := []byte(`{"metadata":{"annotations":{"patch": "true"}}}`)
-	obj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	obj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}
@@ -97,7 +97,7 @@ func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name stri
 
 	replicas := getReplicasOrFail(t, obj)
 	patch := []byte(`{"spec":{"replicas":10}}`)
-	patchedObj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
+	patchedObj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}

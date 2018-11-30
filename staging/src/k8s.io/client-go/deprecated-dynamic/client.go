@@ -127,5 +127,5 @@ func (s oldResourceShimType) List(opts metav1.ListOptions) (runtime.Object, erro
 }
 
 func (s oldResourceShimType) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
-	return s.ResourceInterface.Patch(name, pt, data, metav1.UpdateOptions{}, s.subresources...)
+	return s.ResourceInterface.Patch(name, pt, data, metav1.PatchOptions{}, s.subresources...)
 }

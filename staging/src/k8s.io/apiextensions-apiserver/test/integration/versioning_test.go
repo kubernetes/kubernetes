@@ -24,13 +24,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func TestInternalVersionIsHandlerVersion(t *testing.T) {
@@ -88,7 +87,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta1.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+			_, err := noxuNamespacedResourceClientV1beta1.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			if err != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
@@ -111,7 +110,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta2.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+			_, err := noxuNamespacedResourceClientV1beta2.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			assert.NotNil(t, err)
 
 			// work around "grpc: the client connection is closing" error

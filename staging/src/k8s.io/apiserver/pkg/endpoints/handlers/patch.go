@@ -95,14 +95,14 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		options := &metav1.UpdateOptions{}
+		options := &metav1.PatchOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
-		if errs := validation.ValidateUpdateOptions(options); len(errs) > 0 {
-			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "UpdateOptions"}, "", errs)
+		if errs := validation.ValidatePatchOptions(options, patchType); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "PatchOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
 		}
@@ -254,7 +254,7 @@ type patcher struct {
 	codec runtime.Codec
 
 	timeout time.Duration
-	options *metav1.UpdateOptions
+	options *metav1.PatchOptions
 
 	// Operation information
 	restPatcher rest.Patcher
@@ -470,7 +470,11 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
-		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, p.options)
+		options, err := patchToUpdateOptions(p.options)
+		if err != nil {
+			return nil, err
+		}
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, options)
 		wasCreated = created
 		return updateObject, updateErr
 	})
@@ -512,4 +516,14 @@ func interpretStrategicMergePatchError(err error) error {
 	default:
 		return err
 	}
+}
+
+func patchToUpdateOptions(po *metav1.PatchOptions) (*metav1.UpdateOptions, error) {
+	b, err := json.Marshal(po)
+	if err != nil {
+		return nil, err
+	}
+	uo := metav1.UpdateOptions{}
+	err = json.Unmarshal(b, &uo)
+	return &uo, err
 }
