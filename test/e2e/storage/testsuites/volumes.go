@@ -181,11 +181,16 @@ func testVolumes(input *volumesTestInput) {
 		f := input.f
 		skipExecTest(input.resource.driver)
 
-		testScriptInPod(f, input.resource.volType, input.resource.volSource)
+		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.config.NodeSelector)
 	})
 }
 
-func testScriptInPod(f *framework.Framework, volumeType string, source *v1.VolumeSource) {
+func testScriptInPod(
+	f *framework.Framework,
+	volumeType string,
+	source *v1.VolumeSource,
+	nodeSelector map[string]string) {
+
 	const (
 		volPath = "/vol1"
 		volName = "vol1"
@@ -221,6 +226,7 @@ func testScriptInPod(f *framework.Framework, volumeType string, source *v1.Volum
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
+			NodeSelector:  nodeSelector,
 		},
 	}
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
