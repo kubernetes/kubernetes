@@ -154,7 +154,7 @@ func TestCreatePodTemplate(t *testing.T) {
 	}
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}
-		newPodTemplate := CreatePodTemplate("", podTemplateSpec, test.templateGeneration, test.hash)
+		newPodTemplate := CreatePodTemplate(podTemplateSpec, test.templateGeneration, test.hash)
 		val, exists := newPodTemplate.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey]
 		if !exists || val != fmt.Sprint(*test.templateGeneration) {
 			t.Errorf("Expected podTemplateSpec to have generation label value: %d, got: %s", *test.templateGeneration, val)
