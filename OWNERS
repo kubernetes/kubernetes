@@ -17,7 +17,9 @@ filters:
       - smarterclayton
       - thockin
       - wojtek-t
-
+      # Only meant for FEATURE BRANCH
+      - apelisse
+      - jennybuckley
   # Bazel build infrastructure changes often touch files throughout the tree
   "\\.bzl$":
     reviewers:
