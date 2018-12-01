@@ -206,10 +206,31 @@ type PriorityQueue struct {
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ = SchedulingQueue(&PriorityQueue{})
 
+// podTimeStamp returns pod's last schedule time or its creation time if the
+// scheduler has never tried scheduling it.
+func podTimestamp(pod *v1.Pod) *metav1.Time {
+	_, condition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+	if condition == nil {
+		return &pod.CreationTimestamp
+	}
+	return &condition.LastTransitionTime
+}
+
+// activeQComp is the function used by the activeQ heap algorithm to sort pods.
+// It sorts pods based on their priority. When priorities are equal, it uses
+// podTimestamp.
+func activeQComp(pod1, pod2 interface{}) bool {
+	p1 := pod1.(*v1.Pod)
+	p2 := pod2.(*v1.Pod)
+	prio1 := util.GetPodPriority(p1)
+	prio2 := util.GetPodPriority(p2)
+	return (prio1 > prio2) || (prio1 == prio2 && podTimestamp(p1).Before(podTimestamp(p2)))
+}
+
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue() *PriorityQueue {
 	pq := &PriorityQueue{
-		activeQ:        newHeap(cache.MetaNamespaceKeyFunc, util.HigherPriorityPod),
+		activeQ:        newHeap(cache.MetaNamespaceKeyFunc, activeQComp),
 		unschedulableQ: newUnschedulablePodsMap(),
 		nominatedPods:  map[string][]*v1.Pod{},
 	}
