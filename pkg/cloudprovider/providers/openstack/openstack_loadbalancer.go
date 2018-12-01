@@ -78,6 +78,8 @@ const (
 	ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/openstack-internal-load-balancer"
 )
 
+var _ cloudprovider.LoadBalancer = (*LbaasV2)(nil)
+
 // LbaasV2 is a LoadBalancer implementation for Neutron LBaaS v2 API
 type LbaasV2 struct {
 	LoadBalancer

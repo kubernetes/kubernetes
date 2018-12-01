@@ -31,6 +31,9 @@ import (
 	"k8s.io/klog"
 )
 
+var _ cloudprovider.Instances = (*metadata)(nil)
+var _ cloudprovider.Zones = (*metadata)(nil)
+
 type metadata struct {
 	dhcpServer string
 	zone       string
