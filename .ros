@@ -1,0 +1,351 @@
+Skip to content
+Office 365 CLI Home	
+
+Search
+ 
+Type to start searching
+Office 365 CLI
+ GitHub
+167 Stars54 Forks
+ 
+Home
+Table of contents
+Installation
+Getting started
+SharePoint Patterns and Practices
+User Guide
+User Guide
+Installing the CLI
+Using the CLI
+Logging in to Office 365
+CLI output mode
+Commands
+Commands
+SharePoint Online (spo)
+SharePoint Online (spo)
+login
+logout
+status
+app
+app
+app add
+app deploy
+app get
+app install
+app list
+app remove
+app retract
+app uninstall
+app upgrade
+cdn
+cdn
+cdn get
+cdn origin add
+cdn origin list
+cdn origin remove
+cdn policy list
+cdn policy set
+cdn set
+contenttype
+contenttype
+contenttype add
+contenttype get
+contenttype field set
+customaction
+customaction
+customaction add
+customaction clear
+customaction get
+customaction list
+customaction remove
+customaction set
+externaluser
+externaluser
+externaluser list
+field
+field
+field add
+field get
+file
+file
+file checkin
+file checkout
+file copy
+file get
+file list
+file remove
+folder
+folder
+folder add
+folder copy
+folder get
+folder list
+folder remove
+folder rename
+hidedefaultthemes
+hidedefaultthemes
+hidedefaultthemes get
+hidedefaultthemes set
+hubsite
+hubsite
+hubsite connect
+hubsite data get
+hubsite disconnect
+hubsite get
+hubsite list
+hubsite register
+hubsite rights grant
+hubsite rights revoke
+hubsite set
+hubsite theme sync
+hubsite unregister
+list
+list
+list add
+list get
+list list
+list remove
+list set
+list webhook get
+list webhook list
+listitem
+listitem
+listitem add
+listitem get
+listitem list
+listitem remove
+listitem set
+navigation
+navigation
+navigation node add
+navigation node list
+navigation node remove
+page
+page
+page add
+page get
+page list
+page remove
+page set
+page clientsidewebpart add
+page column get
+page column list
+page control get
+page control list
+page section add
+page section get
+page section list
+propertybag
+propertybag
+propertybag get
+propertybag list
+propertybag remove
+propertybag set
+serviceprincipal
+serviceprincipal
+serviceprincipal grant list
+serviceprincipal grant revoke
+serviceprincipal permissionrequest approve
+serviceprincipal permissionrequest deny
+serviceprincipal permissionrequest list
+serviceprincipal set
+site
+site
+site add
+site get
+site list
+site set
+site appcatalog add
+site appcatalog remove
+site classic add
+site classic list
+site classic remove
+site classic set
+site o365group set
+sitedesign
+sitedesign
+sitedesign add
+sitedesign apply
+sitedesign get
+sitedesign list
+sitedesign remove
+sitedesign set
+sitedesign rights grant
+sitedesign rights list
+sitedesign rights revoke
+sitescript
+sitescript
+sitescript add
+sitescript get
+sitescript list
+sitescript remove
+sitescript set
+storageentity
+storageentity
+storageentity get
+storageentity list
+storageentity remove
+storageentity set
+tenant
+tenant
+tenant appcatalogurl get
+tenant settings list
+tenant settings set
+term
+term
+term add
+term get
+term list
+term group add
+term group get
+term group list
+term set add
+term set get
+term set list
+theme
+theme
+theme apply
+theme get
+theme list
+theme remove
+theme set
+web
+web
+web add
+web clientsidewebpart list
+web get
+web list
+web remove
+web set
+SharePoint Framework (spfx)
+SharePoint Framework (spfx)
+project
+project
+project upgrade
+Microsoft Graph (graph)
+Microsoft Graph (graph)
+login
+logout
+status
+groupsetting
+groupsetting
+groupsetting add
+groupsetting get
+groupsetting list
+groupsetting remove
+groupsetting set
+groupsettingtemplate
+groupsettingtemplate
+groupsettingtemplate get
+groupsettingtemplate list
+o365group
+o365group
+o365group add
+o365group get
+o365group list
+o365group remove
+o365group restore
+o365group set
+siteclassification
+siteclassification
+siteclassification disable
+siteclassification enable
+siteclassification get
+teams
+teams
+teams list
+teams channel add
+user
+user
+user get
+user list
+user sendmail
+Azure Management Service (azmgmt)
+Azure Management Service (azmgmt)
+login
+logout
+status
+flow
+flow
+flow environment get
+flow environment list
+flow export
+flow get
+flow list
+flow run get
+flow run list
+Azure Active Directory Graph (aad)
+Azure Active Directory Graph (aad)
+login
+logout
+status
+oauth2grant
+oauth2grant
+oauth2grant add
+oauth2grant list
+oauth2grant remove
+oauth2grant set
+service principal (sp)
+service principal (sp)
+sp get
+Concepts
+Concepts
+Persisting connection
+Authorization and access tokens
+Command completion
+Communication with Office 365
+About
+About
+Why this CLI
+Comparison to SharePoint PowerShell
+Release notes
+License
+
+Office 365 CLI¶
+Using the Office 365 CLI, you can manage your Microsoft Office 365 tenant and SharePoint Framework projects on any platform. No matter if you are on Windows, macOS or Linux, using Bash, Cmder or PowerShell, using the Office 365 CLI you can configure Office 365, manage SharePoint Framework projects and build automation scripts.
+
+
+Installation¶
+The Office 365 CLI is distributed as an NPM package. To use it, install it globally using:
+
+
+npm i -g @pnp/office365-cli
+or using yarn:
+
+
+yarn global add @pnp/office365-cli
+Getting started¶
+Start the Office 365 CLI by typing in the command line:
+
+
+$ office365
+
+o365$ _
+Running the office365 command will start the immersive CLI with its own command prompt.
+
+Start managing the settings of your Office 365 tenant by logging in to it, using the spo login <url> site, for example:
+
+
+o365$ spo login https://contoso-admin.sharepoint.com
+Depending on which settings you want to manage you might need to log in either to your tenant admin site (URL with -admin in it), or to a regular SharePoint site. For more information refer to the help of the command you want to use.
+
+To list all available commands, type in the Office 365 CLI prompt help:
+
+
+o365$ help
+To exit the CLI, type exit:
+
+
+o365$ exit
+See the User Guide to learn more about the Office 365 CLI and its capabilities.
+
+SharePoint Patterns and Practices¶
+Office 365 CLI is an open-source project driven by the SharePoint Patterns and Practices initiative. The project is built and managed publicly on GitHub at https://github.com/pnp/office365-cli and accepts community contributions. We would encourage you to try it and tell us what you think. We would also love your help! We have a number of feature requests that are a good starting point to contribute to the project.
+
+“Sharing is caring”
+
+SharePoint PnP team
+
+Next Installing the CLI	
+powered by MkDocs and Material for MkDocs
+  
