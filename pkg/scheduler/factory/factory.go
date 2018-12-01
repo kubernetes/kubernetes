@@ -63,6 +63,8 @@ import (
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/plugins"
+	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -109,6 +111,8 @@ type Config struct {
 	PodConditionUpdater PodConditionUpdater
 	// PodPreemptor is used to evict pods and update pod annotations.
 	PodPreemptor PodPreemptor
+	// PlugingSet has a set of plugins and data used to run them.
+	PluginSet pluginsv1alpha1.PluginSet
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -202,6 +206,8 @@ type configFactory struct {
 	pdbLister policylisters.PodDisruptionBudgetLister
 	// a means to list all StorageClasses
 	storageClassLister storagelisters.StorageClassLister
+	// pluginRunner has a set of plugins and the context used for running them.
+	pluginSet pluginsv1alpha1.PluginSet
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -1225,6 +1231,9 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
+	// TODO(bsalamat): the default registrar should be able to process config files.
+	c.pluginSet = plugins.NewDefaultPluginSet(pluginsv1alpha1.NewPluginContext(), &c.schedulerCache)
+
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache {
 		c.equivalencePodCache = equivalence.NewCache(predicates.Ordering())
@@ -1239,6 +1248,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
+		c.pluginSet,
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
@@ -1258,6 +1268,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		GetBinder:           c.getBinderFunc(extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
+		PluginSet:           c.pluginSet,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},

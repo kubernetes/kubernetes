@@ -295,6 +295,7 @@ func TestScheduler(t *testing.T) {
 					NextPod: func() *v1.Pod {
 						return item.sendPod
 					},
+					PluginSet:    &EmptyPluginSet{},
 					Recorder:     eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
 					VolumeBinder: volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 				},
@@ -643,6 +644,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyPriorityMetadataProducer,
+		&EmptyPluginSet{},
 		[]algorithm.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -672,6 +674,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 			Recorder:            &record.FakeRecorder{},
 			PodConditionUpdater: fakePodConditionUpdater{},
 			PodPreemptor:        fakePodPreemptor{},
+			PluginSet:           &EmptyPluginSet{},
 			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 		},
 	}
@@ -694,6 +697,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyPriorityMetadataProducer,
+		&EmptyPluginSet{},
 		[]algorithm.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -727,6 +731,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			PodConditionUpdater: fakePodConditionUpdater{},
 			PodPreemptor:        fakePodPreemptor{},
 			StopEverything:      stop,
+			PluginSet:           &EmptyPluginSet{},
 			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 		},
 	}

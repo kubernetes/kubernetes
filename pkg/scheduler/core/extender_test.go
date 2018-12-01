@@ -516,6 +516,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				algorithm.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				algorithm.EmptyPriorityMetadataProducer,
+				emptyPluginSet,
 				extenders,
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
