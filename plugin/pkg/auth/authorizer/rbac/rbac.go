@@ -33,6 +33,7 @@ import (
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
+// RequestToRuleMapper provides a mapping from a (user.Info, namespace) pair to a set of RBAC rules.
 type RequestToRuleMapper interface {
 	// RulesFor returns all known PolicyRules and any errors that happened while locating those rules.
 	// Any rule returned is still valid, since rules are deny by default.  If you can pass with the rules
@@ -46,7 +47,8 @@ type RequestToRuleMapper interface {
 	VisitRulesFor(user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
 }
 
-type RBACAuthorizer struct {
+// Authorizer holds configuration for RBAC authorization.
+type Authorizer struct {
 	authorizationRuleResolver RequestToRuleMapper
 }
 
@@ -71,7 +73,8 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 	return true
 }
 
-func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+// Authorize authorizes or denies a request on the basis of a set of authorizer.Attributes.
+func (r *Authorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
 	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
@@ -125,7 +128,8 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 	return authorizer.DecisionNoOpinion, reason, nil
 }
 
-func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+// RulesFor implements the RequestToRuleMapper.RulesFor interface method, described above.
+func (r *Authorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo
 		nonResourceRules []authorizer.NonResourceRuleInfo
@@ -155,8 +159,9 @@ func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorize
 	return resourceRules, nonResourceRules, false, err
 }
 
-func New(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister) *RBACAuthorizer {
-	authorizer := &RBACAuthorizer{
+// New returns an initialized Authorizer.
+func New(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister) *Authorizer {
+	authorizer := &Authorizer{
 		authorizationRuleResolver: rbacregistryvalidation.NewDefaultRuleResolver(
 			roles, roleBindings, clusterRoles, clusterRoleBindings,
 		),
@@ -164,6 +169,7 @@ func New(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalid
 	return authorizer
 }
 
+// RulesAllow returns true if all of the RBAC rules allow requestAttributes and false otherwise.
 func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbacv1.PolicyRule) bool {
 	for i := range rules {
 		if RuleAllows(requestAttributes, &rules[i]) {
@@ -174,6 +180,7 @@ func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbacv1.PolicyR
 	return false
 }
 
+// RuleAllows returns true if the provided RBAC rule allows requestAttributes and false otherwise.
 func RuleAllows(requestAttributes authorizer.Attributes, rule *rbacv1.PolicyRule) bool {
 	if requestAttributes.IsResourceRequest() {
 		combinedResource := requestAttributes.GetResource()
@@ -191,34 +198,42 @@ func RuleAllows(requestAttributes authorizer.Attributes, rule *rbacv1.PolicyRule
 		rbacv1helpers.NonResourceURLMatches(rule, requestAttributes.GetPath())
 }
 
+// RoleGetter holds configuration for resolving a role with a given (namespace, name) pair.
 type RoleGetter struct {
 	Lister rbaclisters.RoleLister
 }
 
+// GetRole returns a role for a given (namespace, name) pair.
 func (g *RoleGetter) GetRole(namespace, name string) (*rbacv1.Role, error) {
 	return g.Lister.Roles(namespace).Get(name)
 }
 
+// RoleBindingLister holds configuration for listing role bindings.
 type RoleBindingLister struct {
 	Lister rbaclisters.RoleBindingLister
 }
 
+// ListRoleBindings provides a list of role bindings within namespace.
 func (l *RoleBindingLister) ListRoleBindings(namespace string) ([]*rbacv1.RoleBinding, error) {
 	return l.Lister.RoleBindings(namespace).List(labels.Everything())
 }
 
+// ClusterRoleGetter holds configuration for resolving a cluster role with a given name.
 type ClusterRoleGetter struct {
 	Lister rbaclisters.ClusterRoleLister
 }
 
+// GetClusterRole resolves a cluster role for a given name.
 func (g *ClusterRoleGetter) GetClusterRole(name string) (*rbacv1.ClusterRole, error) {
 	return g.Lister.Get(name)
 }
 
+// ClusterRoleBindingLister holds configuration for resolving a list of cluster role bindings.
 type ClusterRoleBindingLister struct {
 	Lister rbaclisters.ClusterRoleBindingLister
 }
 
+// ListClusterRoleBindings returns all cluster role bindings.
 func (l *ClusterRoleBindingLister) ListClusterRoleBindings() ([]*rbacv1.ClusterRoleBinding, error) {
 	return l.Lister.List(labels.Everything())
 }

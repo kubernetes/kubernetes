@@ -101,7 +101,7 @@ func TestAuthorizer(t *testing.T) {
 	populate(g, nodes, pods, pvs, attachments)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
-	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*NodeAuthorizer)
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*Authorizer)
 
 	node0 := &user.DefaultInfo{Name: "system:node:node0", Groups: []string{"system:nodes"}}
 
@@ -714,7 +714,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	populate(g, nodes, pods, pvs, attachments)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
-	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*NodeAuthorizer)
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*Authorizer)
 
 	node0 := &user.DefaultInfo{Name: "system:node:node0", Groups: []string{"system:nodes"}}
 

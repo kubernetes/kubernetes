@@ -246,7 +246,7 @@ func TestAuthorizer(t *testing.T) {
 	}
 	for i, tt := range tests {
 		ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
-		a := RBACAuthorizer{ruleResolver}
+		a := Authorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
 			if decision, _, _ := a.Authorize(attr); decision != authorizer.DecisionAllow {
 				t.Errorf("case %d: incorrectly restricted %s", i, attr)

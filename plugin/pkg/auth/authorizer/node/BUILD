@@ -11,7 +11,7 @@ go_test(
     srcs = [
         "graph_test.go",
         "intset_test.go",
-        "node_authorizer_test.go",
+        "authorizer_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -35,7 +35,7 @@ go_library(
         "graph.go",
         "graph_populator.go",
         "intset.go",
-        "node_authorizer.go",
+        "authorizer.go",
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
     deps = [

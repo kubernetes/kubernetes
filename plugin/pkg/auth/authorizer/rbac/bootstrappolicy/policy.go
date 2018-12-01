@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// RBAC-related enums for the bootstrap policy.
 var (
 	Write      = []string{"create", "update", "patch", "delete", "deletecollection"}
 	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
@@ -94,6 +95,7 @@ func addClusterRoleBindingLabel(rolebindings []rbacv1.ClusterRoleBinding) {
 	return
 }
 
+// NodeRules returns an initialized []rbacv1.PolicyRule slice.
 func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules := []rbacv1.PolicyRule{
 		// Needed to check API access.  These creates are non-mutating
@@ -553,6 +555,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	return rolebindings
 }
 
+// ClusterRolesToAggregate provides a mapping from role names to aggregated role names.
 func ClusterRolesToAggregate() map[string]string {
 	return map[string]string{
 		"admin": "system:aggregate-to-admin",

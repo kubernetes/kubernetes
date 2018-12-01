@@ -93,6 +93,7 @@ type namespaceVertexMapping map[string]nameVertexMapping
 // nameVertexMapping is a map of name -> vertex
 type nameVertexMapping map[string]*namedVertex
 
+// NewGraph returns a Graph initialized to defaults.
 func NewGraph() *Graph {
 	return &Graph{
 		vertices: map[vertexType]namespaceVertexMapping{},
@@ -132,21 +133,21 @@ var vertexTypes = map[vertexType]string{
 }
 
 // must be called under a write lock
-func (g *Graph) getOrCreateVertex_locked(vertexType vertexType, namespace, name string) *namedVertex {
-	if vertex, exists := g.getVertex_rlocked(vertexType, namespace, name); exists {
+func (g *Graph) getOrCreateVertexLocked(vertexType vertexType, namespace, name string) *namedVertex {
+	if vertex, exists := g.getVertexRlocked(vertexType, namespace, name); exists {
 		return vertex
 	}
-	return g.createVertex_locked(vertexType, namespace, name)
+	return g.createVertexLocked(vertexType, namespace, name)
 }
 
 // must be called under a read lock
-func (g *Graph) getVertex_rlocked(vertexType vertexType, namespace, name string) (*namedVertex, bool) {
+func (g *Graph) getVertexRlocked(vertexType vertexType, namespace, name string) (*namedVertex, bool) {
 	vertex, exists := g.vertices[vertexType][namespace][name]
 	return vertex, exists
 }
 
 // must be called under a write lock
-func (g *Graph) createVertex_locked(vertexType vertexType, namespace, name string) *namedVertex {
+func (g *Graph) createVertexLocked(vertexType vertexType, namespace, name string) *namedVertex {
 	typedVertices, exists := g.vertices[vertexType]
 	if !exists {
 		typedVertices = namespaceVertexMapping{}
@@ -167,8 +168,8 @@ func (g *Graph) createVertex_locked(vertexType vertexType, namespace, name strin
 }
 
 // must be called under write lock
-func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name string) {
-	vertex, exists := g.getVertex_rlocked(vertexType, namespace, name)
+func (g *Graph) deleteVertexLocked(vertexType vertexType, namespace, name string) {
+	vertex, exists := g.getVertexRlocked(vertexType, namespace, name)
 	if !exists {
 		return
 	}
@@ -195,25 +196,25 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 	})
 
 	// remove the vertex
-	g.removeVertex_locked(vertex)
+	g.removeVertexLocked(vertex)
 
 	// remove neighbors that are now edgeless
 	for _, neighbor := range neighborsToRemove {
-		g.removeVertex_locked(neighbor.(*namedVertex))
+		g.removeVertexLocked(neighbor.(*namedVertex))
 	}
 
 	// recompute destination indexes for neighbors that dropped outbound edges
 	for _, neighbor := range neighborsToRecompute {
-		g.recomputeDestinationIndex_locked(neighbor)
+		g.recomputeDestinationIndexLocked(neighbor)
 	}
 }
 
 // must be called under write lock
 // deletes edges from a given vertex type to a specific vertex
 // will delete each orphaned "from" vertex, but will never delete the "to" vertex
-func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toName string) {
+func (g *Graph) deleteEdgesLocked(fromType, toType vertexType, toNamespace, toName string) {
 	// get the "to" side
-	toVert, exists := g.getVertex_rlocked(toType, toNamespace, toName)
+	toVert, exists := g.getVertexRlocked(toType, toNamespace, toName)
 	if !exists {
 		return
 	}
@@ -239,19 +240,19 @@ func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toN
 
 	// clean up orphaned verts
 	for _, v := range neighborsToRemove {
-		g.removeVertex_locked(v)
+		g.removeVertexLocked(v)
 	}
 
 	// recompute destination indexes for neighbors that dropped outbound edges
 	for _, v := range neighborsToRecompute {
-		g.recomputeDestinationIndex_locked(v)
+		g.recomputeDestinationIndexLocked(v)
 	}
 }
 
 // must be called under write lock
-// removeVertex_locked removes the specified vertex from the graph and from the maintained indices.
+// removeVertexLocked removes the specified vertex from the graph and from the maintained indices.
 // It does nothing to indexes of neighbor vertices.
-func (g *Graph) removeVertex_locked(v *namedVertex) {
+func (g *Graph) removeVertexLocked(v *namedVertex) {
 	g.graph.RemoveNode(v)
 	delete(g.destinationEdgeIndex, v.ID())
 	delete(g.vertices[v.vertexType][v.namespace], v.name)
@@ -261,8 +262,8 @@ func (g *Graph) removeVertex_locked(v *namedVertex) {
 }
 
 // must be called under write lock
-// recomputeDestinationIndex_locked recomputes the index of destination ids for the specified vertex
-func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
+// recomputeDestinationIndexLocked recomputes the index of destination ids for the specified vertex
+func (g *Graph) recomputeDestinationIndexLocked(n graph.Node) {
 	// don't maintain indices for nodes with few edges
 	edgeCount := g.graph.Degree(n)
 	if edgeCount < g.destinationEdgeThreshold {
@@ -309,9 +310,9 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	g.deleteVertex_locked(podVertexType, pod.Namespace, pod.Name)
-	podVertex := g.getOrCreateVertex_locked(podVertexType, pod.Namespace, pod.Name)
-	nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", pod.Spec.NodeName)
+	g.deleteVertexLocked(podVertexType, pod.Namespace, pod.Name)
+	podVertex := g.getOrCreateVertexLocked(podVertexType, pod.Namespace, pod.Name)
+	nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", pod.Spec.NodeName)
 	g.graph.SetEdge(newDestinationEdge(podVertex, nodeVertex, nodeVertex))
 
 	// Short-circuit adding edges to other resources for mirror pods.
@@ -326,37 +327,39 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	//
 	// ref https://github.com/kubernetes/kubernetes/issues/58790
 	if len(pod.Spec.ServiceAccountName) > 0 {
-		serviceAccountVertex := g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName)
+		serviceAccountVertex := g.getOrCreateVertexLocked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName)
 		g.graph.SetEdge(newDestinationEdge(serviceAccountVertex, podVertex, nodeVertex))
-		g.recomputeDestinationIndex_locked(serviceAccountVertex)
+		g.recomputeDestinationIndexLocked(serviceAccountVertex)
 	}
 
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
-		secretVertex := g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret)
+		secretVertex := g.getOrCreateVertexLocked(secretVertexType, pod.Namespace, secret)
 		g.graph.SetEdge(newDestinationEdge(secretVertex, podVertex, nodeVertex))
-		g.recomputeDestinationIndex_locked(secretVertex)
+		g.recomputeDestinationIndexLocked(secretVertex)
 		return true
 	})
 
 	podutil.VisitPodConfigmapNames(pod, func(configmap string) bool {
-		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, pod.Namespace, configmap)
+		configmapVertex := g.getOrCreateVertexLocked(configMapVertexType, pod.Namespace, configmap)
 		g.graph.SetEdge(newDestinationEdge(configmapVertex, podVertex, nodeVertex))
-		g.recomputeDestinationIndex_locked(configmapVertex)
+		g.recomputeDestinationIndexLocked(configmapVertex)
 		return true
 	})
 
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim != nil {
-			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			pvcVertex := g.getOrCreateVertexLocked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
 			g.graph.SetEdge(newDestinationEdge(pvcVertex, podVertex, nodeVertex))
-			g.recomputeDestinationIndex_locked(pvcVertex)
+			g.recomputeDestinationIndexLocked(pvcVertex)
 		}
 	}
 }
+
+// DeletePod deletes a pod from the graph.
 func (g *Graph) DeletePod(name, namespace string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.deleteVertex_locked(podVertexType, namespace, name)
+	g.deleteVertexLocked(podVertexType, namespace, name)
 }
 
 // AddPV sets up edges for the following relationships:
@@ -369,27 +372,29 @@ func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 	defer g.lock.Unlock()
 
 	// clear existing edges
-	g.deleteVertex_locked(pvVertexType, "", pv.Name)
+	g.deleteVertexLocked(pvVertexType, "", pv.Name)
 
 	// if we have a pvc, establish new edges
 	if pv.Spec.ClaimRef != nil {
-		pvVertex := g.getOrCreateVertex_locked(pvVertexType, "", pv.Name)
+		pvVertex := g.getOrCreateVertexLocked(pvVertexType, "", pv.Name)
 
 		// since we don't know the other end of the pvc -> pod -> node chain (or it may not even exist yet), we can't decorate these edges with kubernetes node info
-		g.graph.SetEdge(simple.Edge{F: pvVertex, T: g.getOrCreateVertex_locked(pvcVertexType, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)})
+		g.graph.SetEdge(simple.Edge{F: pvVertex, T: g.getOrCreateVertexLocked(pvcVertexType, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)})
 		pvutil.VisitPVSecretNames(pv, func(namespace, secret string, kubeletVisible bool) bool {
 			// This grants access to the named secret in the same namespace as the bound PVC
 			if kubeletVisible {
-				g.graph.SetEdge(simple.Edge{F: g.getOrCreateVertex_locked(secretVertexType, namespace, secret), T: pvVertex})
+				g.graph.SetEdge(simple.Edge{F: g.getOrCreateVertexLocked(secretVertexType, namespace, secret), T: pvVertex})
 			}
 			return true
 		})
 	}
 }
+
+// DeletePV deletes a persistent volume from the graph.
 func (g *Graph) DeletePV(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.deleteVertex_locked(pvVertexType, "", name)
+	g.deleteVertexLocked(pvVertexType, "", name)
 }
 
 // AddVolumeAttachment sets up edges for the following relationships:
@@ -400,19 +405,21 @@ func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
 	defer g.lock.Unlock()
 
 	// clear existing edges
-	g.deleteVertex_locked(vaVertexType, "", attachmentName)
+	g.deleteVertexLocked(vaVertexType, "", attachmentName)
 
 	// if we have a node, establish new edges
 	if len(nodeName) > 0 {
-		vaVertex := g.getOrCreateVertex_locked(vaVertexType, "", attachmentName)
-		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		vaVertex := g.getOrCreateVertexLocked(vaVertexType, "", attachmentName)
+		nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", nodeName)
 		g.graph.SetEdge(newDestinationEdge(vaVertex, nodeVertex, nodeVertex))
 	}
 }
+
+// DeleteVolumeAttachment deletes a volume attachment from the graph.
 func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.deleteVertex_locked(vaVertexType, "", name)
+	g.deleteVertexLocked(vaVertexType, "", name)
 }
 
 // SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMap relationship:
@@ -426,12 +433,12 @@ func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace str
 
 	// clear edges configmaps -> node where the destination is the current node *only*
 	// at present, a node can only have one *direct* configmap reference at a time
-	g.deleteEdges_locked(configMapVertexType, nodeVertexType, "", nodeName)
+	g.deleteEdgesLocked(configMapVertexType, nodeVertexType, "", nodeName)
 
 	// establish new edges if we have a real ConfigMap to reference
 	if len(configMapName) > 0 && len(configMapNamespace) > 0 {
-		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, configMapNamespace, configMapName)
-		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		configmapVertex := g.getOrCreateVertexLocked(configMapVertexType, configMapNamespace, configMapName)
+		nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", nodeName)
 		g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex, nodeVertex))
 	}
 

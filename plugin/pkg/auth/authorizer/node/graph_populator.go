@@ -33,6 +33,7 @@ type graphPopulator struct {
 	graph *Graph
 }
 
+// AddGraphEventHandlers registers various event handlers with the graph.
 func AddGraphEventHandlers(
 	graph *Graph,
 	nodes corev1informers.NodeInformer,

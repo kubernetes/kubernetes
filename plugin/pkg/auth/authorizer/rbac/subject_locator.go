@@ -25,18 +25,22 @@ import (
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
+// RoleToRuleMapper provides an interface for resolving policies for a given (roleRef, namespace) pair.
 type RoleToRuleMapper interface {
 	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namespace
 	// of the role binding, the empty string if a cluster role binding.
 	GetRoleReferenceRules(roleRef rbacv1.RoleRef, namespace string) ([]rbacv1.PolicyRule, error)
 }
 
+// SubjectLocator provides an interface for resolving a []rbacv1.Subject list for a given
+// authorizer.Attributes.
 type SubjectLocator interface {
 	AllowedSubjects(attributes authorizer.Attributes) ([]rbacv1.Subject, error)
 }
 
 var _ = SubjectLocator(&SubjectAccessEvaluator{})
 
+// SubjectAccessEvaluator holds configuration for evaluating subject access.
 type SubjectAccessEvaluator struct {
 	superUser string
 
@@ -45,6 +49,7 @@ type SubjectAccessEvaluator struct {
 	roleToRuleMapper         RoleToRuleMapper
 }
 
+// NewSubjectAccessEvaluator returns an initialized SubjectAccessEvaluator.
 func NewSubjectAccessEvaluator(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister, superUser string) *SubjectAccessEvaluator {
 	subjectLocator := &SubjectAccessEvaluator{
 		superUser:                superUser,

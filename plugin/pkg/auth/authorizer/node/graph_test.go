@@ -42,16 +42,16 @@ func TestDeleteEdges_locked(t *testing.T) {
 			toName:      "node1",
 			start: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap2")
-				nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
-				configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap2")
+				nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
+				configmapVertex := g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex, nodeVertex))
 				return g
 			}(),
 			expect: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap2")
-				g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
+				g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap2")
+				g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
 				return g
 			}(),
 		},
@@ -64,18 +64,18 @@ func TestDeleteEdges_locked(t *testing.T) {
 			toName:      "node2",
 			start: func() *Graph {
 				g := NewGraph()
-				nodeVertex1 := g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
-				nodeVertex2 := g.getOrCreateVertex_locked(nodeVertexType, "", "node2")
-				configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				nodeVertex1 := g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
+				nodeVertex2 := g.getOrCreateVertexLocked(nodeVertexType, "", "node2")
+				configmapVertex := g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex1, nodeVertex1))
 				g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex2, nodeVertex2))
 				return g
 			}(),
 			expect: func() *Graph {
 				g := NewGraph()
-				nodeVertex1 := g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
-				g.getOrCreateVertex_locked(nodeVertexType, "", "node2")
-				configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				nodeVertex1 := g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
+				g.getOrCreateVertexLocked(nodeVertexType, "", "node2")
+				configmapVertex := g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex1, nodeVertex1))
 				return g
 			}(),
@@ -88,14 +88,14 @@ func TestDeleteEdges_locked(t *testing.T) {
 			toName:      "node1",
 			start: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
-				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
+				g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				return g
 			}(),
 			expect: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
-				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
+				g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				return g
 			}(),
 		},
@@ -107,12 +107,12 @@ func TestDeleteEdges_locked(t *testing.T) {
 			toName:      "node1",
 			start: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				return g
 			}(),
 			expect: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
+				g.getOrCreateVertexLocked(configMapVertexType, "namespace1", "configmap1")
 				return g
 			}(),
 		},
@@ -124,19 +124,19 @@ func TestDeleteEdges_locked(t *testing.T) {
 			toName:      "node1",
 			start: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
+				g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
 				return g
 			}(),
 			expect: func() *Graph {
 				g := NewGraph()
-				g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
+				g.getOrCreateVertexLocked(nodeVertexType, "", "node1")
 				return g
 			}(),
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.start.deleteEdges_locked(c.fromType, c.toType, c.toNamespace, c.toName)
+			c.start.deleteEdgesLocked(c.fromType, c.toType, c.toNamespace, c.toName)
 
 			// Note: We assert on substructures (graph.Nodes(), graph.Edges()) because the graph tracks
 			// freed IDs for reuse, which results in an irrelevant inequality between start and expect.
