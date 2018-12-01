@@ -47,6 +47,8 @@ pkg_rpm(
     changelog = "//:CHANGELOG.md",
     data = [
         "10-kubeadm.conf",
+        "50-kubeadm.conf",
+        "kubeadm.conf",
         "kubelet.env",
         "//cmd/kubeadm",
     ],

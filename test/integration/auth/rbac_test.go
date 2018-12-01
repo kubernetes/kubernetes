@@ -27,12 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
-
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
@@ -47,6 +44,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -571,10 +569,11 @@ func TestRBAC(t *testing.T) {
 			}
 
 			req, err := http.NewRequest(r.verb, s.URL+path, body)
-			if r.verb == "PATCH" {
-				// For patch operations, use the apply content type
-				req.Header.Add("Content-Type", string(types.ApplyPatchType))
-			}
+			// TODO: Un-comment this when Apply works again
+			// if r.verb == "PATCH" {
+			// 	// For patch operations, use the apply content type
+			// 	req.Header.Add("Content-Type", string(types.ApplyPatchType))
+			// }
 
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)

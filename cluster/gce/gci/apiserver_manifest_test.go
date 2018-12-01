@@ -98,7 +98,7 @@ func TestEncryptionProviderFlag(t *testing.T) {
 		//   "-c",      - Index 1
 		//   "exec /usr/local/bin/kube-apiserver " - Index 2
 		execArgsIndex        = 2
-		encryptionConfigFlag = "--experimental-encryption-provider-config"
+		encryptionConfigFlag = "--encryption-provider-config"
 	)
 
 	testCases := []struct {

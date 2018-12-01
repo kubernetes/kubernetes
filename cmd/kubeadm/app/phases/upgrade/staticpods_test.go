@@ -56,9 +56,12 @@ kind: InitConfiguration
 nodeRegistration:
   name: foo
   criSocket: ""
-apiEndpoint:
-  advertiseAddress: 1.2.3.4
+localAPIEndpoint:
+  advertiseAddress: 192.168.2.2
   bindPort: 6443
+bootstrapTokens:
+- token: ce3aa5.5ec8455bb76b379f
+  ttl: 24h
 ---
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
@@ -67,21 +70,16 @@ apiServer:
   certSANs: null
   extraArgs: null
 certificatesDir: %s
-controllerManagerExtraArgs: null
 etcd:
   local:
     dataDir: %s
     image: ""
-featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-schedulerExtraArgs: null
-token: ce3aa5.5ec8455bb76b379f
-tokenTTL: 24h
 useHyperKubeImage: false
 `
 )
@@ -473,7 +471,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't read temp file: %v", err)
 		}
 
-		newcfg, err := getConfig("v1.11.0", tempCertsDir, tmpEtcdDataDir)
+		newcfg, err := getConfig("v1.13.0", tempCertsDir, tmpEtcdDataDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
@@ -525,10 +523,11 @@ func TestStaticPodControlPlane(t *testing.T) {
 
 		if (oldHash != newHash) != rt.manifestShouldChange {
 			t.Errorf(
-				"failed StaticPodControlPlane\n%s\n\texpected manifest change: %t\n\tgot: %t",
+				"failed StaticPodControlPlane\n%s\n\texpected manifest change: %t\n\tgot: %t\n\tnewHash: %v",
 				rt.description,
 				rt.manifestShouldChange,
 				(oldHash != newHash),
+				newHash,
 			)
 		}
 		return

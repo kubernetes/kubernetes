@@ -28,14 +28,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+var (
+	deprecationDisabledFeature = utilfeature.NewFeatureGate()
+	deprecationEnabledFeature  = utilfeature.NewFeatureGate()
+)
+
+func init() {
+	if err := deprecationDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: false}}); err != nil {
+		panic(err)
+	}
+	if err := deprecationEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: true}}); err != nil {
+		panic(err)
+	}
+}
 
 func TestIgnoresNonCreate(t *testing.T) {
 	for _, op := range []admission.Operation{admission.Delete, admission.Connect} {
@@ -267,266 +283,270 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-	ns := "myns"
-	tokenName := "token-name"
-	serviceAccountName := DefaultServiceAccountName
-	serviceAccountUID := "12345"
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
 
-	expectedVolume := api.Volume{
-		Name: tokenName,
-		VolumeSource: api.VolumeSource{
-			Secret: &api.SecretVolumeSource{SecretName: tokenName},
-		},
-	}
-	expectedVolumeMount := api.VolumeMount{
-		Name:      tokenName,
-		ReadOnly:  true,
-		MountPath: DefaultAPITokenMountPath,
-	}
+		admit := applyFeatures(NewServiceAccount())
+		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+		admit.SetExternalKubeInformerFactory(informerFactory)
+		admit.generateName = testGenerateName
+		admit.MountServiceAccountToken = true
+		admit.RequireAPIToken = true
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.MountServiceAccountToken = true
-	admit.RequireAPIToken = true
+		ns := "myns"
+		serviceAccountName := DefaultServiceAccountName
+		serviceAccountUID := "12345"
 
-	// Add the default service account for the ns with a token into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccountName,
-			Namespace: ns,
-			UID:       types.UID(serviceAccountUID),
-		},
-		Secrets: []corev1.ObjectReference{
-			{Name: tokenName},
-		},
-	})
-	// Add a token for the service account into the cache
-	informerFactory.Core().V1().Secrets().Informer().GetStore().Add(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
+		tokenName := "token-name"
+		if admit.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+			tokenName = generatedVolumeName
+		}
+
+		expectedVolume := admit.createVolume(tokenName, tokenName)
+		expectedVolumeMount := api.VolumeMount{
 			Name:      tokenName,
-			Namespace: ns,
-			Annotations: map[string]string{
-				corev1.ServiceAccountNameKey: serviceAccountName,
-				corev1.ServiceAccountUIDKey:  serviceAccountUID,
+			ReadOnly:  true,
+			MountPath: DefaultAPITokenMountPath,
+		}
+		// Add the default service account for the ns with a token into the cache
+		informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceAccountName,
+				Namespace: ns,
+				UID:       types.UID(serviceAccountUID),
 			},
-		},
-		Type: corev1.SecretTypeServiceAccountToken,
-		Data: map[string][]byte{
-			api.ServiceAccountTokenKey: []byte("token-data"),
-		},
-	})
-
-	pod := &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{},
+			Secrets: []corev1.ObjectReference{
+				{Name: tokenName},
 			},
-		},
-	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
-	}
-	if len(pod.Spec.Volumes) != 1 {
-		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
-	}
-	if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
-	}
-	if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
-		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
-	}
-	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
-	}
+		})
+		// Add a token for the service account into the cache
+		informerFactory.Core().V1().Secrets().Informer().GetStore().Add(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      tokenName,
+				Namespace: ns,
+				Annotations: map[string]string{
+					corev1.ServiceAccountNameKey: serviceAccountName,
+					corev1.ServiceAccountUIDKey:  serviceAccountUID,
+				},
+			},
+			Type: corev1.SecretTypeServiceAccountToken,
+			Data: map[string][]byte{
+				api.ServiceAccountTokenKey: []byte("token-data"),
+			},
+		})
 
-	// Test ServiceAccount admission plugin applies the same changes if the
-	// operation is an update to an uninitialized pod.
-	oldPod := &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					// the volumeMount in the oldPod shouldn't affect the result.
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name:      "wrong-" + tokenName,
-							ReadOnly:  true,
-							MountPath: DefaultAPITokenMountPath,
+		pod := &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{},
+				},
+			},
+		}
+		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
+		err := admit.Admit(attrs)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+			t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+		}
+		if len(pod.Spec.Volumes) != 1 {
+			t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+		}
+		if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+		}
+		if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
+			t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
+		}
+		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
+		}
+
+		// Test ServiceAccount admission plugin applies the same changes if the
+		// operation is an update to an uninitialized pod.
+		oldPod := &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						// the volumeMount in the oldPod shouldn't affect the result.
+						VolumeMounts: []api.VolumeMount{
+							{
+								Name:      "wrong-" + tokenName,
+								ReadOnly:  true,
+								MountPath: DefaultAPITokenMountPath,
+							},
 						},
 					},
 				},
 			},
-		},
-	}
-	// oldPod is not intialized.
-	oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
-	pod = &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{},
+		}
+		// oldPod is not intialized.
+		oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
+		pod = &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{},
+				},
 			},
-		},
-	}
-	attrs = admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil)
-	err = admit.Admit(attrs)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
-	}
-	if len(pod.Spec.Volumes) != 1 {
-		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
-	}
-	if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
-	}
-	if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
-		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
-	}
-	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
-	}
+		}
+		attrs = admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil)
+		err = admit.Admit(attrs)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+			t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+		}
+		if len(pod.Spec.Volumes) != 1 {
+			t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+		}
+		if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+		}
+		if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
+			t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
+		}
+		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
+		}
 
-	// testing InitContainers
-	pod = &api.Pod{
-		Spec: api.PodSpec{
-			InitContainers: []api.Container{
-				{},
+		// testing InitContainers
+		pod = &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{
+					{},
+				},
 			},
-		},
-	}
-	attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
-	}
-	if len(pod.Spec.Volumes) != 1 {
-		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
-	}
-	if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
-	}
-	if len(pod.Spec.InitContainers[0].VolumeMounts) != 1 {
-		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.InitContainers[0].VolumeMounts))
-	}
-	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
-	}
+		}
+		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
+		if err := admit.Admit(attrs); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+			t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+		}
+		if len(pod.Spec.Volumes) != 1 {
+			t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+		}
+		if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+		}
+		if len(pod.Spec.InitContainers[0].VolumeMounts) != 1 {
+			t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.InitContainers[0].VolumeMounts))
+		}
+		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
+		}
+	})
 }
 
 func TestRespectsExistingMount(t *testing.T) {
-	ns := "myns"
-	tokenName := "token-name"
-	serviceAccountName := DefaultServiceAccountName
-	serviceAccountUID := "12345"
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+		ns := "myns"
+		tokenName := "token-name"
+		serviceAccountName := DefaultServiceAccountName
+		serviceAccountUID := "12345"
 
-	expectedVolumeMount := api.VolumeMount{
-		Name:      "my-custom-mount",
-		ReadOnly:  false,
-		MountPath: DefaultAPITokenMountPath,
-	}
+		expectedVolumeMount := api.VolumeMount{
+			Name:      "my-custom-mount",
+			ReadOnly:  false,
+			MountPath: DefaultAPITokenMountPath,
+		}
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.MountServiceAccountToken = true
-	admit.RequireAPIToken = true
+		admit := applyFeatures(NewServiceAccount())
+		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+		admit.SetExternalKubeInformerFactory(informerFactory)
+		admit.MountServiceAccountToken = true
+		admit.RequireAPIToken = true
 
-	// Add the default service account for the ns with a token into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceAccountName,
-			Namespace: ns,
-			UID:       types.UID(serviceAccountUID),
-		},
-		Secrets: []corev1.ObjectReference{
-			{Name: tokenName},
-		},
-	})
-	// Add a token for the service account into the cache
-	informerFactory.Core().V1().Secrets().Informer().GetStore().Add(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      tokenName,
-			Namespace: ns,
-			Annotations: map[string]string{
-				corev1.ServiceAccountNameKey: serviceAccountName,
-				corev1.ServiceAccountUIDKey:  serviceAccountUID,
+		// Add the default service account for the ns with a token into the cache
+		informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceAccountName,
+				Namespace: ns,
+				UID:       types.UID(serviceAccountUID),
 			},
-		},
-		Type: corev1.SecretTypeServiceAccountToken,
-		Data: map[string][]byte{
-			corev1.ServiceAccountTokenKey: []byte("token-data"),
-		},
-	})
+			Secrets: []corev1.ObjectReference{
+				{Name: tokenName},
+			},
+		})
+		// Add a token for the service account into the cache
+		informerFactory.Core().V1().Secrets().Informer().GetStore().Add(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      tokenName,
+				Namespace: ns,
+				Annotations: map[string]string{
+					corev1.ServiceAccountNameKey: serviceAccountName,
+					corev1.ServiceAccountUIDKey:  serviceAccountUID,
+				},
+			},
+			Type: corev1.SecretTypeServiceAccountToken,
+			Data: map[string][]byte{
+				corev1.ServiceAccountTokenKey: []byte("token-data"),
+			},
+		})
 
-	// Define a pod with a container that already mounts a volume at the API token path
-	// Admission should respect that
-	// Additionally, no volume should be created if no container is going to use it
-	pod := &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					VolumeMounts: []api.VolumeMount{
-						expectedVolumeMount,
+		// Define a pod with a container that already mounts a volume at the API token path
+		// Admission should respect that
+		// Additionally, no volume should be created if no container is going to use it
+		pod := &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						VolumeMounts: []api.VolumeMount{
+							expectedVolumeMount,
+						},
 					},
 				},
 			},
-		},
-	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	err := admit.Admit(attrs)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
-	}
-	if len(pod.Spec.Volumes) != 0 {
-		t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))
-	}
-	if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
-		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
-	}
-	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
-	}
+		}
+		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
+		err := admit.Admit(attrs)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+			t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+		}
+		if len(pod.Spec.Volumes) != 0 {
+			t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))
+		}
+		if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
+			t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
+		}
+		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
+		}
 
-	// check init containers
-	pod = &api.Pod{
-		Spec: api.PodSpec{
-			InitContainers: []api.Container{
-				{
-					VolumeMounts: []api.VolumeMount{
-						expectedVolumeMount,
+		// check init containers
+		pod = &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						VolumeMounts: []api.VolumeMount{
+							expectedVolumeMount,
+						},
 					},
 				},
 			},
-		},
-	}
-	attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
-	if err := admit.Admit(attrs); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
-		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
-	}
-	if len(pod.Spec.Volumes) != 0 {
-		t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))
-	}
-	if len(pod.Spec.InitContainers[0].VolumeMounts) != 1 {
-		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.InitContainers[0].VolumeMounts))
-	}
-	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
-		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
-	}
+		}
+		attrs = admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
+		if err := admit.Admit(attrs); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+			t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+		}
+		if len(pod.Spec.Volumes) != 0 {
+			t.Fatalf("Expected 0 volumes (shouldn't create a volume for a secret we don't need), got %d", len(pod.Spec.Volumes))
+		}
+		if len(pod.Spec.InitContainers[0].VolumeMounts) != 1 {
+			t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.InitContainers[0].VolumeMounts))
+		}
+		if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0]) {
+			t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.InitContainers[0].VolumeMounts[0])
+		}
+	})
 }
 
 func TestAllowsReferencedSecret(t *testing.T) {
@@ -950,43 +970,174 @@ func newSecret(secretType corev1.SecretType, namespace, name, serviceAccountName
 }
 
 func TestGetServiceAccountTokens(t *testing.T) {
-	admit := NewServiceAccount()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
-	admit.secretLister = corev1listers.NewSecretLister(indexer)
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+		admit := applyFeatures(NewServiceAccount())
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		admit.secretLister = corev1listers.NewSecretLister(indexer)
 
-	ns := "namespace"
+		ns := "namespace"
+		serviceAccountUID := "12345"
+
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      DefaultServiceAccountName,
+				Namespace: ns,
+				UID:       types.UID(serviceAccountUID),
+			},
+		}
+
+		nonSATokenSecret := newSecret(corev1.SecretTypeDockercfg, ns, "nonSATokenSecret", DefaultServiceAccountName, serviceAccountUID)
+		indexer.Add(nonSATokenSecret)
+
+		differentSAToken := newSecret(corev1.SecretTypeServiceAccountToken, ns, "differentSAToken", "someOtherSA", "someOtherUID")
+		indexer.Add(differentSAToken)
+
+		matchingSAToken := newSecret(corev1.SecretTypeServiceAccountToken, ns, "matchingSAToken", DefaultServiceAccountName, serviceAccountUID)
+		indexer.Add(matchingSAToken)
+
+		tokens, err := admit.getServiceAccountTokens(sa)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if len(tokens) != 1 {
+			names := make([]string, 0, len(tokens))
+			for _, token := range tokens {
+				names = append(names, token.Name)
+			}
+			t.Fatalf("expected only 1 token, got %v", names)
+		}
+		if e, a := matchingSAToken.Name, tokens[0].Name; e != a {
+			t.Errorf("expected token %s, got %s", e, a)
+		}
+	})
+}
+
+func TestAutomountIsBackwardsCompatible(t *testing.T) {
+	ns := "myns"
+	tokenName := "token-name"
+	serviceAccountName := DefaultServiceAccountName
 	serviceAccountUID := "12345"
+	defaultTokenName := "default-token-abc123"
 
-	sa := &corev1.ServiceAccount{
+	expectedVolume := api.Volume{
+		Name: defaultTokenName,
+		VolumeSource: api.VolumeSource{
+			Secret: &api.SecretVolumeSource{
+				SecretName: defaultTokenName,
+			},
+		},
+	}
+	expectedVolumeMount := api.VolumeMount{
+		Name:      defaultTokenName,
+		ReadOnly:  true,
+		MountPath: DefaultAPITokenMountPath,
+	}
+
+	admit := NewServiceAccount()
+	admit.generateName = testGenerateName
+	admit.featureGate = deprecationEnabledFeature
+
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.MountServiceAccountToken = true
+	admit.RequireAPIToken = true
+
+	// Add the default service account for the ns with a token into the cache
+	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultServiceAccountName,
+			Name:      serviceAccountName,
 			Namespace: ns,
 			UID:       types.UID(serviceAccountUID),
 		},
+		Secrets: []corev1.ObjectReference{
+			{Name: tokenName},
+		},
+	})
+	// Add a token for the service account into the cache
+	informerFactory.Core().V1().Secrets().Informer().GetStore().Add(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tokenName,
+			Namespace: ns,
+			Annotations: map[string]string{
+				corev1.ServiceAccountNameKey: serviceAccountName,
+				corev1.ServiceAccountUIDKey:  serviceAccountUID,
+			},
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{
+			api.ServiceAccountTokenKey: []byte("token-data"),
+		},
+	})
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "c-1",
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      defaultTokenName,
+							MountPath: DefaultAPITokenMountPath,
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: defaultTokenName,
+					VolumeSource: api.VolumeSource{
+						Secret: &api.SecretVolumeSource{
+							SecretName: defaultTokenName,
+						},
+					},
+				},
+			},
+		},
 	}
-
-	nonSATokenSecret := newSecret(corev1.SecretTypeDockercfg, ns, "nonSATokenSecret", DefaultServiceAccountName, serviceAccountUID)
-	indexer.Add(nonSATokenSecret)
-
-	differentSAToken := newSecret(corev1.SecretTypeServiceAccountToken, ns, "differentSAToken", "someOtherSA", "someOtherUID")
-	indexer.Add(differentSAToken)
-
-	matchingSAToken := newSecret(corev1.SecretTypeServiceAccountToken, ns, "matchingSAToken", DefaultServiceAccountName, serviceAccountUID)
-	indexer.Add(matchingSAToken)
-
-	tokens, err := admit.getServiceAccountTokens(sa)
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil)
+	err := admit.Admit(attrs)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	}
+	_ = expectedVolume
+	_ = expectedVolumeMount
+	if len(pod.Spec.Volumes) != 1 {
+		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+	}
+	if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+	}
+	if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
+		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
+	}
+	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
+	}
+}
 
-	if len(tokens) != 1 {
-		names := make([]string, 0, len(tokens))
-		for _, token := range tokens {
-			names = append(names, token.Name)
-		}
-		t.Fatalf("expected only 1 token, got %v", names)
-	}
-	if e, a := matchingSAToken.Name, tokens[0].Name; e != a {
-		t.Errorf("expected token %s, got %s", e, a)
-	}
+func testGenerateName(n string) string {
+	return n + "abc123"
+}
+
+var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
+
+func testBoundServiceAccountTokenVolumePhases(t *testing.T, f func(*testing.T, func(*serviceAccount) *serviceAccount)) {
+	t.Run("BoundServiceAccountTokenVolume disabled", func(t *testing.T) {
+		f(t, func(s *serviceAccount) *serviceAccount {
+			s.featureGate = deprecationDisabledFeature
+			return s
+		})
+	})
+
+	t.Run("BoundServiceAccountTokenVolume enabled", func(t *testing.T) {
+		f(t, func(s *serviceAccount) *serviceAccount {
+			s.featureGate = deprecationEnabledFeature
+			return s
+		})
+	})
 }

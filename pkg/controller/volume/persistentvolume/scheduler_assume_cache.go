@@ -377,8 +377,7 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 type PVCAssumeCache interface {
 	AssumeCache
 
-	// GetPVC returns the PVC from the cache with the same
-	// namespace and the same name of the specified pod.
+	// GetPVC returns the PVC from the cache with given pvcKey.
 	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
 	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
 }

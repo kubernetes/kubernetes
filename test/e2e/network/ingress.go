@@ -1083,7 +1083,8 @@ func detectHttpVersionAndSchemeTest(f *framework.Framework, jig *ingress.Ingress
 	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
 	resp := ""
 	err := wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
-		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
+		var err error
+		resp, err = framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
 		if err != nil {
 			framework.Logf("SimpleGET failed: %v", err)
 			return false, nil

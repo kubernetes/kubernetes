@@ -148,14 +148,15 @@ k8s_deb(
 k8s_deb(
     name = "kubelet",
     depends = [
-        "iptables (>= 1.4.21)",
-        "kubernetes-cni (>= 0.5.1)",
-        "iproute2",
-        "socat",
-        "util-linux",
-        "mount",
+        "conntrack",
         "ebtables",
         "ethtool",
+        "iproute2",
+        "iptables (>= 1.4.21)",
+        "kubernetes-cni (>= 0.6.0)",
+        "mount",
+        "socat",
+        "util-linux",
     ],
     description = """Kubernetes Node Agent
 The node agent of Kubernetes, the container cluster manager
@@ -168,7 +169,7 @@ k8s_deb(
     depends = [
         "kubelet (>= 1.8.0)",
         "kubectl (>= 1.8.0)",
-        "kubernetes-cni (>= 0.5.1)",
+        "kubernetes-cni (>= 0.6.0)",
         "cri-tools (>= 1.11.0)",
     ],
     description = """Kubernetes Cluster Bootstrapping Tool

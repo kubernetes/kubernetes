@@ -17,7 +17,6 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -27,8 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/feature"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -118,31 +119,29 @@ func TestAdmit(t *testing.T) {
 	ctrl := newPlugin()
 
 	for _, test := range tests {
-		feature.DefaultFeatureGate.Set(fmt.Sprintf("StorageObjectInUseProtection=%v", test.featureEnabled))
-		obj := test.object.DeepCopyObject()
-		attrs := admission.NewAttributesRecord(
-			obj,                  // new object
-			obj.DeepCopyObject(), // old object, copy to be sure it's not modified
-			schema.GroupVersionKind{},
-			test.namespace,
-			"foo",
-			test.resource,
-			"", // subresource
-			admission.Create,
-			false, // dryRun
-			nil,   // userInfo
-		)
+		t.Run(test.name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, test.featureEnabled)()
+			obj := test.object.DeepCopyObject()
+			attrs := admission.NewAttributesRecord(
+				obj,                  // new object
+				obj.DeepCopyObject(), // old object, copy to be sure it's not modified
+				schema.GroupVersionKind{},
+				test.namespace,
+				"foo",
+				test.resource,
+				"", // subresource
+				admission.Create,
+				false, // dryRun
+				nil,   // userInfo
+			)
 
-		err := ctrl.Admit(attrs)
-		if err != nil {
-			t.Errorf("Test %q: got unexpected error: %v", test.name, err)
-		}
-		if !reflect.DeepEqual(test.expectedObject, obj) {
-			t.Errorf("Test %q: Expected object:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedObject), spew.Sdump(obj))
-		}
+			err := ctrl.Admit(attrs)
+			if err != nil {
+				t.Errorf("Test %q: got unexpected error: %v", test.name, err)
+			}
+			if !reflect.DeepEqual(test.expectedObject, obj) {
+				t.Errorf("Test %q: Expected object:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedObject), spew.Sdump(obj))
+			}
+		})
 	}
-
-	// Disable the feature for rest of the tests.
-	// TODO: remove after alpha
-	feature.DefaultFeatureGate.Set("StorageObjectInUseProtection=false")
 }

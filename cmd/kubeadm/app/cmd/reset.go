@@ -187,14 +187,15 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 
 	// Output help text instructing user how to remove iptables rules
 	msg := `
-	The reset process does not reset or clean up iptables rules or IPVS tables.
-	If you wish to reset iptables, you must do so manually.
-	For example: 
-	iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+The reset process does not reset or clean up iptables rules or IPVS tables.
+If you wish to reset iptables, you must do so manually.
+For example: 
+iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 
-	If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
-	to reset your system's IPVS tables.
-	`
+If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
+to reset your system's IPVS tables.
+
+`
 	fmt.Print(msg)
 
 	return nil
@@ -206,7 +207,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 
 	if client != nil {
 		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
-		if err == nil {
+		if err == nil && cfg.Etcd.Local != nil {
 			return cfg.Etcd.Local.DataDir, nil
 		}
 		klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap, using etcd pod spec as fallback: %v", err)

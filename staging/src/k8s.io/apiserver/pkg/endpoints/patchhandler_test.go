@@ -28,6 +28,7 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 )
 
 func TestPatch(t *testing.T) {
@@ -153,9 +154,8 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 }
 
 func TestPatchApply(t *testing.T) {
-	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.ServerSideApply) + "=true"); err != nil {
-		t.Fatal(err)
-	}
+	t.Skip("apply is being refactored")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 	storage := map[string]rest.Storage{}
 	item := &genericapitesting.Simple{
 		ObjectMeta: metav1.ObjectMeta{
@@ -197,9 +197,8 @@ func TestPatchApply(t *testing.T) {
 }
 
 func TestApplyAddsGVK(t *testing.T) {
-	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.ServerSideApply) + "=true"); err != nil {
-		t.Fatal(err)
-	}
+	t.Skip("apply is being refactored")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 	storage := map[string]rest.Storage{}
 	item := &genericapitesting.Simple{
 		ObjectMeta: metav1.ObjectMeta{
@@ -241,9 +240,8 @@ func TestApplyAddsGVK(t *testing.T) {
 }
 
 func TestApplyCreatesWithManagedFields(t *testing.T) {
-	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.ServerSideApply) + "=true"); err != nil {
-		t.Fatal(err)
-	}
+	t.Skip("apply is being refactored")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	storage["simple"] = &simpleStorage

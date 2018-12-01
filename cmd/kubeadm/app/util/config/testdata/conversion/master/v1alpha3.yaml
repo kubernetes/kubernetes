@@ -42,12 +42,12 @@ etcd:
     image: ""
 imageRepository: k8s.gcr.io
 kind: ClusterConfiguration
-kubernetesVersion: v1.11.2
+kubernetesVersion: v1.12.2
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-unifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.11.2"
+unifiedControlPlaneImage: "k8s.gcr.io/hyperkube:v1.12.2"
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0

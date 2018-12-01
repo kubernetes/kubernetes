@@ -57,6 +57,14 @@ func (kl *Kubelet) getPluginsDir() string {
 	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsDirName)
 }
 
+// getPluginsRegistrationDir returns the full path to the directory under which
+// plugins socket should be placed to be registered.
+// More information is available about plugin registration in the pluginwatcher
+// module
+func (kl *Kubelet) getPluginsRegistrationDir() string {
+	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPluginsRegistrationDirName)
+}
+
 // getPluginDir returns a data directory name for a given plugin name.
 // Plugins can use these directories to store data that they need to persist.
 // For per-pod plugin data, see getPodPluginDir.
@@ -137,6 +145,11 @@ func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
 // exist if the pod or container does not exist.
 func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletContainersDirName, ctrName)
+}
+
+// getPodResourcesSocket returns the full path to the directory containing the pod resources socket
+func (kl *Kubelet) getPodResourcesDir() string {
+	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPodResourcesDirName)
 }
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror

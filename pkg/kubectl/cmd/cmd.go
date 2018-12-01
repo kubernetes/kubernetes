@@ -452,7 +452,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				expose.NewCmdExposeService(f, ioStreams),
 				run.NewCmdRun(f, ioStreams),
 				set.NewCmdSet(f, ioStreams),
-				deprecatedAlias("run-container", run.NewCmdRun(f, ioStreams)),
 			},
 		},
 		{

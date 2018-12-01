@@ -5,3 +5,5 @@ approvers:
 - janetkuo
 reviewers:
 - deads2k
+labels:
+- sig/apps

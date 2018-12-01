@@ -17,30 +17,25 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 
 	certsapi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	certstype "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
+	csrutil "k8s.io/client-go/util/certificate/csr"
 )
 
-const (
-	certAPIPrefixName = "kubeadm-cert"
-)
+const certAPIPrefixName = "kubeadm-cert"
 
-var (
-	watchTimeout = 5 * time.Minute
-)
+var watchTimeout = 5 * time.Minute
 
 // CertsAPIRenewal creates new certificates using the certs API
 type CertsAPIRenewal struct {
@@ -70,7 +65,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		return nil, nil, errors.Wrap(err, "couldn't create new private key")
 	}
 
-	csr, err := x509.CreateCertificateRequest(rand.Reader, reqTmp, key)
+	csr, err := certutil.MakeCSRFromTemplate(key, reqTmp)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
@@ -86,7 +81,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 
 	k8sCSR := &certsapi.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: certAPIPrefixName,
+			GenerateName: fmt.Sprintf("%s-%s-", certAPIPrefixName, cfg.CommonName),
 		},
 		Spec: certsapi.CertificateSigningRequestSpec{
 			Request: csr,
@@ -99,43 +94,23 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
-	watcher, err := r.client.CertificateSigningRequests().Watch(metav1.ListOptions{
-		Watch:         true,
-		FieldSelector: fields.Set{"metadata.name": req.Name}.String(),
-	})
+	fmt.Printf("[certs] certificate request %q created\n", req.Name)
+
+	certData, err := csrutil.WaitForCertificate(r.client.CertificateSigningRequests(), req, watchTimeout)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't watch for certificate creation")
-	}
-	defer watcher.Stop()
-
-	select {
-	case ev := <-watcher.ResultChan():
-		if ev.Type != watch.Modified {
-			return nil, nil, errors.Errorf("unexpected event received: %q", ev.Type)
-		}
-	case <-time.After(watchTimeout):
-		return nil, nil, errors.New("timeout trying to sign certificate")
+		return nil, nil, errors.Wrap(err, "certificate failed to appear")
 	}
 
-	req, err = r.client.CertificateSigningRequests().Get(req.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get certificate signing request")
-	}
-	if len(req.Status.Conditions) < 1 {
-		return nil, nil, errors.New("certificate signing request has no statuses")
-	}
-
-	// TODO: under what circumstances are there more than one?
-	if status := req.Status.Conditions[0].Type; status != certsapi.CertificateApproved {
-		return nil, nil, errors.Errorf("unexpected certificate status: %v", status)
-	}
-
-	cert, err := x509.ParseCertificate(req.Status.Certificate)
+	cert, err := certutil.ParseCertsPEM(certData)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't parse issued certificate")
 	}
 
-	return cert, key, nil
+	if len(cert) != 1 {
+		return nil, nil, errors.Errorf("certificate request %q has %d certificates, wanted exactly 1", req.Name, len(cert))
+	}
+
+	return cert[0], key, nil
 }
 
 var usageMap = map[x509.ExtKeyUsage]certsapi.KeyUsage{

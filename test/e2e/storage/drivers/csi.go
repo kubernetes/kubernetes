@@ -38,7 +38,6 @@ package drivers
 import (
 	"fmt"
 	"math/rand"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
@@ -67,9 +66,9 @@ func InitHostPathCSIDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+			},
 		},
 	}
 }
@@ -134,6 +133,92 @@ func (h *hostpathCSIDriver) CleanupDriver() {
 	}
 }
 
+// hostpathV0CSIDriver
+type hostpathV0CSIDriver struct {
+	cleanup    func()
+	driverInfo DriverInfo
+}
+
+var _ TestDriver = &hostpathV0CSIDriver{}
+var _ DynamicPVTestDriver = &hostpathV0CSIDriver{}
+
+// InitHostPathV0CSIDriver returns hostpathV0CSIDriver that implements TestDriver interface
+func InitHostV0PathCSIDriver() TestDriver {
+	return &hostpathV0CSIDriver{
+		driverInfo: DriverInfo{
+			Name:        "csi-hostpath-v0",
+			FeatureTag:  "",
+			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedFsType: sets.NewString(
+				"", // Default fsType
+			),
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+			},
+		},
+	}
+}
+
+func (h *hostpathV0CSIDriver) GetDriverInfo() *DriverInfo {
+	return &h.driverInfo
+}
+
+func (h *hostpathV0CSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+}
+
+func (h *hostpathV0CSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+	provisioner := GetUniqueDriverName(h)
+	parameters := map[string]string{}
+	ns := h.driverInfo.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-sc", provisioner)
+
+	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (h *hostpathV0CSIDriver) CreateDriver() {
+	By("deploying csi hostpath v0 driver")
+	f := h.driverInfo.Framework
+	cs := f.ClientSet
+
+	// pods should be scheduled on the node
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	node := nodes.Items[rand.Intn(len(nodes.Items))]
+	h.driverInfo.Config.ClientNodeName = node.Name
+	h.driverInfo.Config.ServerNodeName = node.Name
+
+	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
+	// settings are ignored for this test. We could patch the image definitions.
+	o := utils.PatchCSIOptions{
+		OldDriverName:            h.driverInfo.Name,
+		NewDriverName:            GetUniqueDriverName(h),
+		DriverContainerName:      "hostpath",
+		ProvisionerContainerName: "csi-provisioner-v0",
+		NodeName:                 h.driverInfo.Config.ServerNodeName,
+	}
+	cleanup, err := h.driverInfo.Framework.CreateFromManifests(func(item interface{}) error {
+		return utils.PatchCSIDeployment(h.driverInfo.Framework, o, item)
+	},
+		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-provisioner.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpathplugin.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/e2e-test-rbac.yaml",
+	)
+	h.cleanup = cleanup
+	if err != nil {
+		framework.Failf("deploying csi hostpath v0 driver: %v", err)
+	}
+}
+
+func (h *hostpathV0CSIDriver) CleanupDriver() {
+	if h.cleanup != nil {
+		By("uninstalling csi hostpath v0 driver")
+		h.cleanup()
+	}
+}
+
 // gce-pd
 type gcePDCSIDriver struct {
 	cleanup    func()
@@ -147,7 +232,7 @@ var _ DynamicPVTestDriver = &gcePDCSIDriver{}
 func InitGcePDCSIDriver() TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: DriverInfo{
-			Name:        "com.google.csi.gcepd",
+			Name:        "pd.csi.storage.gke.io",
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -157,9 +242,11 @@ func InitGcePDCSIDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -170,14 +257,8 @@ func (g *gcePDCSIDriver) GetDriverInfo() *DriverInfo {
 
 func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	f := g.driverInfo.Framework
-	cs := f.ClientSet
-	config := g.driverInfo.Config
 	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(cs)
-
-	// TODO(#62561): Use credentials through external pod identity when that goes GA instead of downloading keys.
-	createGCESecrets(cs, config)
-	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
+	framework.SkipIfMultizone(f.ClientSet)
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -204,6 +285,8 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }
+	createGCESecrets(g.driverInfo.Framework.ClientSet, g.driverInfo.Config)
+
 	cleanup, err := g.driverInfo.Framework.CreateFromManifests(nil,
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
@@ -237,7 +320,7 @@ var _ DynamicPVTestDriver = &gcePDExternalCSIDriver{}
 func InitGcePDExternalCSIDriver() TestDriver {
 	return &gcePDExternalCSIDriver{
 		driverInfo: DriverInfo{
-			Name: "com.google.csi.gcepd",
+			Name: "pd.csi.storage.gke.io",
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
 			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,
@@ -248,9 +331,11 @@ func InitGcePDExternalCSIDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapExec:        true,
+			},
 		},
 	}
 }

@@ -284,13 +284,24 @@ func TestHelp(t *testing.T) {
 
 func phaseBuilder4(name string, cmdFlags []string, phases ...Phase) Phase {
 	return Phase{
-		Name:     name,
-		Phases:   phases,
-		CmdFlags: cmdFlags,
+		Name:         name,
+		Phases:       phases,
+		InheritFlags: cmdFlags,
+	}
+}
+
+func phaseBuilder5(name string, flags *pflag.FlagSet) Phase {
+	return Phase{
+		Name:       name,
+		LocalFlags: flags,
 	}
 }
 
 func TestBindToCommand(t *testing.T) {
+
+	var dummy string
+	localFlags := pflag.NewFlagSet("dummy", pflag.ContinueOnError)
+	localFlags.StringVarP(&dummy, "flag4", "d", "d", "d")
 
 	var usecases = []struct {
 		name                string
@@ -340,12 +351,22 @@ func TestBindToCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "it should be possible to apply custom flags to single phases",
+			runner: Runner{
+				Phases: []Phase{phaseBuilder5("foo", localFlags)},
+			},
+			expectedCmdAndFlags: map[string][]string{
+				"phase foo": {"flag4"},
+			},
+		},
+		{
 			name: "all the above applies to nested phases too",
 			runner: Runner{
 				Phases: []Phase{
 					phaseBuilder4("foo", []string{"flag3"},
 						phaseBuilder4("bar", []string{"flag1", "flag2", "flag3"}),
 						phaseBuilder4("baz", []string{"flag1"}), //test if additional flags are filtered too
+						phaseBuilder5("qux", localFlags),
 					),
 				},
 			},
@@ -357,6 +378,7 @@ func TestBindToCommand(t *testing.T) {
 				"phase foo":     {"flag3"},
 				"phase foo bar": {"flag1", "flag2", "flag3"},
 				"phase foo baz": {"flag1"},
+				"phase foo qux": {"flag4"},
 			},
 		},
 	}
@@ -372,7 +394,7 @@ func TestBindToCommand(t *testing.T) {
 			cmd.Flags().StringVarP(&dummy2, "flag2", "b", "b", "b")
 
 			if rt.setAdditionalFlags != nil {
-				rt.runner.SetPhaseSubcommandsAdditionalFlags(rt.setAdditionalFlags)
+				rt.runner.SetAdditionalFlags(rt.setAdditionalFlags)
 			}
 
 			rt.runner.BindToCommand(cmd)

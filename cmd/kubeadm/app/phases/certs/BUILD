@@ -21,6 +21,7 @@ go_test(
         "//cmd/kubeadm/test/certs:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

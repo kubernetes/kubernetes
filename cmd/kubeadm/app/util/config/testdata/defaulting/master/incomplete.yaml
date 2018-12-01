@@ -12,7 +12,7 @@ apiVersion: kubeadm.k8s.io/v1beta1
 certificatesDir: /var/lib/kubernetes/pki
 imageRepository: my-company.com
 kind: ClusterConfiguration
-kubernetesVersion: v1.12.0
+kubernetesVersion: v1.13.0
 networking:
   dnsDomain: cluster.global
   podSubnet: 10.148.0.0/16

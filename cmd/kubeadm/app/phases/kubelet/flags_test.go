@@ -34,14 +34,19 @@ type fakeCmd struct {
 	err error
 }
 
-func (f fakeCmd) Run() error                      { return f.err }
-func (f fakeCmd) CombinedOutput() ([]byte, error) { return f.b, f.err }
-func (f fakeCmd) Output() ([]byte, error)         { return f.b, f.err }
-func (f fakeCmd) SetDir(dir string)               {}
-func (f fakeCmd) SetStdin(in io.Reader)           {}
-func (f fakeCmd) SetStdout(out io.Writer)         {}
-func (f fakeCmd) SetStderr(out io.Writer)         {}
-func (f fakeCmd) Stop()                           {}
+func (f fakeCmd) Run() error                         { return f.err }
+func (f fakeCmd) CombinedOutput() ([]byte, error)    { return f.b, f.err }
+func (f fakeCmd) Output() ([]byte, error)            { return f.b, f.err }
+func (f fakeCmd) SetDir(dir string)                  {}
+func (f fakeCmd) SetStdin(in io.Reader)              {}
+func (f fakeCmd) SetStdout(out io.Writer)            {}
+func (f fakeCmd) SetStderr(out io.Writer)            {}
+func (f fakeCmd) SetEnv([]string)                    {}
+func (f fakeCmd) Stop()                              {}
+func (f fakeCmd) Start() error                       { return nil }
+func (f fakeCmd) Wait() error                        { return nil }
+func (f fakeCmd) StdoutPipe() (io.ReadCloser, error) { return nil, nil }
+func (f fakeCmd) StderrPipe() (io.ReadCloser, error) { return nil, nil }
 
 type fakeExecer struct {
 	ioMap map[string]fakeCmd

@@ -460,7 +460,7 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 		p.mechanism = &smpPatcher{patcher: p, schemaReferenceObj: schemaReferenceObj}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
-		p.mechanism = &applyPatcher{patcher: p, model: scope.OpenAPISchema}
+		p.mechanism = &applyPatcher{patcher: p, models: scope.OpenAPIModels}
 		p.forceAllowCreate = true
 	default:
 		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)

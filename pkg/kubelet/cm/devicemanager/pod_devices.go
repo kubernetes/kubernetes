@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -270,4 +271,22 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 		}
 	}
 	return opts
+}
+
+// getContainerDevices returns the devices assigned to the provided container for all ResourceNames
+func (pdev podDevices) getContainerDevices(podUID, contName string) []*podresourcesapi.ContainerDevices {
+	if _, podExists := pdev[podUID]; !podExists {
+		return nil
+	}
+	if _, contExists := pdev[podUID][contName]; !contExists {
+		return nil
+	}
+	cDev := []*podresourcesapi.ContainerDevices{}
+	for resource, allocateInfo := range pdev[podUID][contName] {
+		cDev = append(cDev, &podresourcesapi.ContainerDevices{
+			ResourceName: resource,
+			DeviceIds:    allocateInfo.deviceIds.UnsortedList(),
+		})
+	}
+	return cDev
 }

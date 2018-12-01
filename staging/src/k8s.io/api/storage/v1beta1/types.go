@@ -204,7 +204,7 @@ type VolumeError struct {
 	Time metav1.Time `json:"time,omitempty" protobuf:"bytes,1,opt,name=time"`
 
 	// String detailing the error encountered during Attach or Detach operation.
-	// This string maybe logged, so it should not contain sensitive
+	// This string may be logged, so it should not contain sensitive
 	// information.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`

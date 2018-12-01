@@ -89,7 +89,6 @@ pkg/auth/authorizer/abac
 pkg/capabilities
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/gce/cloud
-pkg/cloudprovider/providers/ovirt
 pkg/cloudprovider/providers/photon
 pkg/cloudprovider/providers/vsphere
 pkg/cloudprovider/providers/vsphere/vclib
@@ -181,6 +180,7 @@ pkg/kubectl/cmd/util/openapi
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/version
 pkg/kubectl/cmd/wait
+pkg/kubectl/describe/versioned
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
@@ -393,6 +393,7 @@ pkg/version/verflag
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
+pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/host_path
@@ -653,7 +654,6 @@ staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
 staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
-staging/src/k8s.io/client-go/util/cert/triple
 staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
 staging/src/k8s.io/client-go/util/integer
@@ -746,14 +746,6 @@ test/e2e_node/environment
 test/e2e_node/remote
 test/e2e_node/runner/remote
 test/e2e_node/services
-test/images/net/nat
-test/images/netexec
-test/images/nettest
-test/images/no-snat-test
-test/images/no-snat-test-proxy
-test/images/resource-consumer
-test/images/resource-consumer/common
-test/images/resource-consumer/controller
 test/integration
 test/integration/auth
 test/integration/evictions

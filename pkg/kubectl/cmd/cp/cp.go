@@ -315,8 +315,8 @@ func stripPathShortcuts(p string) string {
 		trimmed = strings.TrimPrefix(newPath, "../")
 	}
 
-	// trim leftover ".."
-	if newPath == ".." {
+	// trim leftover {".", ".."}
+	if newPath == "." || newPath == ".." {
 		newPath = ""
 	}
 

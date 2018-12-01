@@ -208,7 +208,7 @@ func (o *Options) Complete() error {
 		return err
 	}
 
-	if err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
 		return err
 	}
 
