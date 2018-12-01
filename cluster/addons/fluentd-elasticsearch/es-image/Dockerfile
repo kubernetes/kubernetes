@@ -17,7 +17,7 @@ FROM docker.elastic.co/elasticsearch/elasticsearch-oss:6.3.2
 VOLUME ["/data"]
 EXPOSE 9200 9300
 
-COPY elasticsearch_logging_discovery run.sh bin/
+COPY elasticsearch_logging_discovery.go run.sh bin/
 COPY config/elasticsearch.yml config/log4j2.properties config/
 
 USER root
