@@ -71,15 +71,15 @@ func getDevFromImageAndPool(pool, image string) (string, bool) {
 // Search /sys/bus for rbd device that matches given pool and image.
 func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 	// /sys/bus/rbd/devices/X/name and /sys/bus/rbd/devices/X/pool
-	sys_path := "/sys/bus/rbd/devices"
-	if dirs, err := ioutil.ReadDir(sys_path); err == nil {
+	sysPath := "/sys/bus/rbd/devices"
+	if dirs, err := ioutil.ReadDir(sysPath); err == nil {
 		for _, f := range dirs {
 			// Pool and name format:
 			// see rbd_pool_show() and rbd_name_show() at
 			// https://github.com/torvalds/linux/blob/master/drivers/block/rbd.c
 			name := f.Name()
 			// First match pool, then match name.
-			poolFile := path.Join(sys_path, name, "pool")
+			poolFile := path.Join(sysPath, name, "pool")
 			poolBytes, err := ioutil.ReadFile(poolFile)
 			if err != nil {
 				klog.V(4).Infof("error reading %s: %v", poolFile, err)
@@ -89,7 +89,7 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 				klog.V(4).Infof("device %s is not %q: %q", name, pool, string(poolBytes))
 				continue
 			}
-			imgFile := path.Join(sys_path, name, "name")
+			imgFile := path.Join(sysPath, name, "name")
 			imgBytes, err := ioutil.ReadFile(imgFile)
 			if err != nil {
 				klog.V(4).Infof("error reading %s: %v", imgFile, err)
@@ -222,11 +222,10 @@ func execRbdMap(b rbdMounter, rbdCmd string, mon string) ([]byte, error) {
 	imgPath := fmt.Sprintf("%s/%s", b.Pool, b.Image)
 	if b.Secret != "" {
 		return b.exec.Run(rbdCmd,
-			"map", imgPath, "--id", b.Id, "-m", mon, "--key="+b.Secret)
-	} else {
-		return b.exec.Run(rbdCmd,
-			"map", imgPath, "--id", b.Id, "-m", mon, "-k", b.Keyring)
+			"map", imgPath, "--id", b.ID, "-m", mon, "--key="+b.Secret)
 	}
+	return b.exec.Run(rbdCmd,
+		"map", imgPath, "--id", b.ID, "-m", mon, "-k", b.Keyring)
 }
 
 // Check if rbd-nbd tools are installed.
@@ -303,15 +302,15 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	var err error
 	var output, locker string
 	var cmd []byte
-	var secret_opt []string
+	var secretOpt []string
 
 	if b.Secret != "" {
-		secret_opt = []string{"--key=" + b.Secret}
+		secretOpt = []string{"--key=" + b.Secret}
 	} else {
-		secret_opt = []string{"-k", b.Keyring}
+		secretOpt = []string{"-k", b.Keyring}
 	}
-	if len(b.adminId) == 0 {
-		b.adminId = b.Id
+	if len(b.adminID) == 0 {
+		b.adminID = b.ID
 	}
 	if len(b.adminSecret) == 0 {
 		b.adminSecret = b.Secret
@@ -322,20 +321,20 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	if err != nil {
 		return err
 	}
-	lock_id := kubeLockMagic + hostName
+	lockID := kubeLockMagic + hostName
 
 	mon := util.kernelRBDMonitorsOpt(b.Mon)
 
 	// Get the locker name, something like "client.1234".
-	args := []string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}
-	args = append(args, secret_opt...)
+	args := []string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.ID, "-m", mon}
+	args = append(args, secretOpt...)
 	cmd, err = b.exec.Run("rbd", args...)
 	output = string(cmd)
 	klog.V(4).Infof("lock list output %q", output)
 	if err != nil {
 		return err
 	}
-	ind := strings.LastIndex(output, lock_id) - 1
+	ind := strings.LastIndex(output, lockID) - 1
 	for i := ind; i >= 0; i-- {
 		if output[i] == '\n' {
 			locker = output[(i + 1):ind]
@@ -345,13 +344,13 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 
 	// Remove a lock if found: rbd lock remove.
 	if len(locker) > 0 {
-		args := []string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}
-		args = append(args, secret_opt...)
+		args := []string{"lock", "remove", b.Image, lockID, locker, "--pool", b.Pool, "--id", b.ID, "-m", mon}
+		args = append(args, secretOpt...)
 		cmd, err = b.exec.Run("rbd", args...)
 		if err == nil {
-			klog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
+			klog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lockID, b.Pool, b.Image, b.ID, mon)
 		} else {
-			klog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lock_id, b.Pool, b.Image, b.Id, mon, err)
+			klog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lockID, b.Pool, b.Image, b.ID, mon, err)
 		}
 	}
 
@@ -560,7 +559,7 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 
 	decoder := json.NewDecoder(fp)
 	if err = decoder.Decode(mounter); err != nil {
-		return fmt.Errorf("rbd: decode err: %v.", err)
+		return fmt.Errorf("rbd: decode err: %v", err)
 	}
 
 	if err != nil {
@@ -589,11 +588,11 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 	volSz := fmt.Sprintf("%d", sz)
 	mon := util.kernelRBDMonitorsOpt(p.Mon)
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
-		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminID, p.rbdMounter.adminSecret)
 	} else {
-		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminID, p.rbdMounter.adminSecret)
 	}
-	args := []string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", p.rbdMounter.imageFormat}
+	args := []string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminID, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", p.rbdMounter.imageFormat}
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
 		// If no image features is provided, it results in empty string
 		// which disable all RBD image format 2 features as expected.
@@ -626,9 +625,9 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 	}
 	// rbd rm.
 	mon := util.kernelRBDMonitorsOpt(p.rbdMounter.Mon)
-	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminID, p.rbdMounter.adminSecret)
 	output, err = p.exec.Run("rbd",
-		"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key="+p.rbdMounter.adminSecret)
+		"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminID, "-m", mon, "--key="+p.rbdMounter.adminSecret)
 	if err == nil {
 		return nil
 	}
@@ -658,9 +657,9 @@ func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 
 	// rbd resize.
 	mon := util.kernelRBDMonitorsOpt(rbdExpander.rbdMounter.Mon)
-	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminId, rbdExpander.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminID, rbdExpander.rbdMounter.adminSecret)
 	output, err = rbdExpander.exec.Run("rbd",
-		"resize", rbdExpander.rbdMounter.Image, "--size", newVolSz, "--pool", rbdExpander.rbdMounter.Pool, "--id", rbdExpander.rbdMounter.adminId, "-m", mon, "--key="+rbdExpander.rbdMounter.adminSecret)
+		"resize", rbdExpander.rbdMounter.Image, "--size", newVolSz, "--pool", rbdExpander.rbdMounter.Pool, "--id", rbdExpander.rbdMounter.adminID, "-m", mon, "--key="+rbdExpander.rbdMounter.adminSecret)
 	if err == nil {
 		return newSizeQuant, nil
 	}
@@ -676,10 +675,10 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	var cmd []byte
 
 	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
-	id := b.adminId
+	id := b.adminID
 	secret := b.adminSecret
 	if id == "" {
-		id = b.Id
+		id = b.ID
 		secret = b.Secret
 	}
 
@@ -745,10 +744,10 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	var cmd []byte
 
 	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
-	id := b.adminId
+	id := b.adminID
 	secret := b.adminSecret
 	if id == "" {
-		id = b.Id
+		id = b.ID
 		secret = b.Secret
 	}
 
@@ -788,8 +787,7 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	if strings.Contains(output, imageWatcherStr) {
 		klog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
 		return true, output, nil
-	} else {
-		klog.Warningf("rbd: no watchers on %s", b.Image)
-		return false, output, nil
 	}
+	klog.Warningf("rbd: no watchers on %s", b.Image)
+	return false, output, nil
 }
