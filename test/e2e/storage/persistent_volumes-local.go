@@ -247,7 +247,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				BeforeEach(func() {
 					By("Creating pod1")
 					pod1, pod1Err = createLocalPod(config, testVol, nil)
-					Expect(pod1Err).NotTo(HaveOccurred())
+					Expect(pod1Err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod1, pod1Err)
 					verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 					writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -389,7 +389,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			pod := makeLocalPodWithNodeName(config, testVol, config.nodes[1].Name)
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod, err)
 
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			Expect(err).To(HaveOccurred())
@@ -452,35 +452,35 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			By("Waiting for a PersistentVolume to be created")
 			oldPV, err := waitForLocalPersistentVolume(config.client, volumePath)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to create local PersistentVolume %+v : %s", oldPV, err)
 
 			// Create a persistent volume claim for local volume: the above volume will be bound.
 			By("Creating a persistent volume claim")
 			claim, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(newLocalClaim(config))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to create volume claim %+v : %s", claim, err)
 			err = framework.WaitForPersistentVolumeClaimPhase(
 				v1.ClaimBound, config.client, claim.Namespace, claim.Name, framework.Poll, 1*time.Minute)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "timed out waiting for claim %+v : %s", claim, err)
 
 			claim, err = config.client.CoreV1().PersistentVolumeClaims(config.ns).Get(claim.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to get volume claim %+v : %s", claim, err)
 			Expect(claim.Spec.VolumeName).To(Equal(oldPV.Name))
 
 			// Delete the persistent volume claim: file will be cleaned up and volume be re-created.
 			By("Deleting the persistent volume claim to clean up persistent volume and re-create one")
 			writeCmd := createWriteCmd(volumePath, testFile, testFileContent, DirectoryLocalVolumeType)
 			err = issueNodeCommand(config, writeCmd, config.node0)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "node command failed : %s", err)
 			err = config.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to delet volume claim %+v : %s", claim, err)
 
 			By("Waiting for a new PersistentVolume to be re-created")
 			newPV, err := waitForLocalPersistentVolume(config.client, volumePath)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to recreate new PersistentVolume %+v : %s", newPV, err)
 			Expect(newPV.UID).NotTo(Equal(oldPV.UID))
 			fileDoesntExistCmd := createFileDoesntExistCmd(volumePath, testFile)
 			err = issueNodeCommand(config, fileDoesntExistCmd, config.node0)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to issue command %+v : %s", fileDoesntExistCmd, err)
 
 			By("Deleting provisioner daemonset")
 			deleteProvisionerDaemonset(config)
@@ -491,7 +491,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			By("Creating a directory, not bind mounted, in discovery directory")
 			mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", directoryPath)
 			err := issueNodeCommand(config, mkdirCmd, config.node0)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to create directory '%s': %s", directoryPath, err)
 
 			By("Starting a provisioner daemonset")
 			createProvisionerDaemonset(config)
@@ -521,7 +521,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			By("Waiting for the PersistentVolume to be created")
 			_, err := waitForLocalPersistentVolume(config.client, dynamicVolumePath)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to create new PersistentVolume : %s", err)
 
 			By("Deleting provisioner daemonset")
 			deleteProvisionerDaemonset(config)
@@ -671,7 +671,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 					pod := framework.MakeSecPod(config.ns, pvcs, false, "sleep 1", false, false, selinuxLabel, nil)
 					pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-					Expect(err).NotTo(HaveOccurred())
+					Expect(err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod, err)
 					pods[pod.Name] = pod
 					numCreated++
 				}
@@ -749,10 +749,10 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
 	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod, err)
 
 	err = framework.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "timed out waiting pending pod : %s", err)
 }
 
 type eventPatterns struct {
@@ -770,7 +770,7 @@ func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) 
 	}.AsSelector().String()
 	options := metav1.ListOptions{FieldSelector: selector}
 	events, err := config.client.CoreV1().Events(config.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to retrieve pod events %+v : %s", events, err)
 	Expect(len(events.Items)).NotTo(Equal(0))
 	for _, p := range ep.pattern {
 		Expect(events.Items[0].Message).To(ContainSubstring(p))
@@ -783,7 +783,7 @@ func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) 
 func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1 to write to the PV")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
-	Expect(pod1Err).NotTo(HaveOccurred())
+	Expect(pod1Err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod1, pod1Err)
 	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -796,7 +796,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 
 	By("Creating pod2 to read from the PV")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
-	Expect(pod2Err).NotTo(HaveOccurred())
+	Expect(pod2Err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod2, pod2Err)
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	// testFileContent was written after creating pod1
@@ -820,7 +820,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
-	Expect(pod1Err).NotTo(HaveOccurred())
+	Expect(pod1Err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod1, pod1Err)
 	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -836,7 +836,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 
 	By("Creating pod2")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
-	Expect(pod2Err).NotTo(HaveOccurred())
+	Expect(pod2Err).NotTo(HaveOccurred(), "failed to create pod %+v : %s", pod2, pod2Err)
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	By("Reading in pod2")
@@ -865,7 +865,7 @@ func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMod
 	}
 
 	sc, err := config.client.StorageV1().StorageClasses().Create(sc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to setup storage class %+v : %s", sc, err)
 }
 
 func cleanupStorageClass(config *localTestConfig) {
@@ -914,7 +914,7 @@ func generateLocalTestVolume(hostDir string, config *localTestConfig, localVolum
 	if localVolumeType != BlockLocalVolumeType && localVolumeType != BlockFsWithoutFormatLocalVolumeType {
 		mkdirCmd := fmt.Sprintf("mkdir -p %s", hostDir)
 		err := issueNodeCommand(config, mkdirCmd, node)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create directory '%s': %s", hostDir, err)
 	}
 
 	return &localTestVolume{
@@ -933,7 +933,7 @@ func setupLocalVolumeTmpfs(config *localTestConfig, node *v1.Node) *localTestVol
 
 func setupLocalVolumeGCELocalSSD(config *localTestConfig, node *v1.Node) *localTestVolume {
 	res, err := issueNodeCommandWithResult(config, "ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command : %s", err)
 	dirName := strings.Fields(res)[0]
 	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
 	// gce local ssd does not need to create a directory
@@ -1024,6 +1024,7 @@ func setupLocalVolumeDirectoryLink(config *localTestConfig, node *v1.Node) *loca
 	cmd := fmt.Sprintf("mkdir %s && sudo ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
 	_, err := issueNodeCommandWithResult(config, cmd, node)
 	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", cmd, err)
 	return generateLocalTestVolume(hostDir, config, DirectoryLinkLocalVolumeType, node)
 }
 
@@ -1032,7 +1033,7 @@ func setupLocalVolumeDirectoryBindMounted(config *localTestConfig, node *v1.Node
 	hostDir := filepath.Join(hostBase, testDirName)
 	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s", hostDir, hostDir, hostDir)
 	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", cmd, err)
 	return generateLocalTestVolume(hostDir, config, DirectoryBindMountedLocalVolumeType, node)
 }
 
@@ -1043,7 +1044,7 @@ func setupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, node *v1.
 	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s && sudo ln -s %s %s",
 		hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
 	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", cmd, err)
 	return generateLocalTestVolume(hostDir, config, DirectoryLinkBindMountedLocalVolumeType, node)
 }
 
@@ -1067,7 +1068,7 @@ func setupLocalVolumeBlockFsWithFormat(config *localTestConfig, node *v1.Node) *
 	// give others rwx for read/write testing
 	cmd := fmt.Sprintf("sudo mkfs -t ext4 %s && sudo mount -t ext4 %s %s && sudo chmod o+rwx %s", loopDev, loopDev, hostDir, hostDir)
 	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", cmd, err)
 	volume := generateLocalTestVolume(hostDir, config, BlockFsWithFormatLocalVolumeType, node)
 	volume.hostDir = hostDir
 	volume.loopDevDir = loopDev
@@ -1091,7 +1092,7 @@ func setupLocalVolumeBlockFsWithoutFormat(config *localTestConfig, node *v1.Node
 func getBlockLoopDev(config *localTestConfig, hostDir string, node *v1.Node) string {
 	loopDevCmd := fmt.Sprintf("E2E_LOOP_DEV=$(sudo losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", hostDir)
 	loopDevResult, err := issueNodeCommandWithResult(config, loopDevCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", loopDevCmd, err)
 	return strings.TrimSpace(loopDevResult)
 }
 
@@ -1101,7 +1102,7 @@ func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
 
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
 	podNodeName, err := podNodeName(config, pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to retrieve podNodeNname for %+v : %s", pod, err)
 	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
 	Expect(podNodeName).To(Equal(expectedNodeName))
 }
@@ -1112,7 +1113,7 @@ func cleanupLocalVolumeGCELocalSSD(config *localTestConfig, volume *localTestVol
 	file := volume.hostDir + "/" + testFile
 	removeCmd := fmt.Sprintf("if [ -f %s ]; then rm %s; fi", file, file)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
@@ -1122,7 +1123,7 @@ func cleanupLocalVolumeTmpfs(config *localTestConfig, volume *localTestVolume) {
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
@@ -1130,7 +1131,7 @@ func cleanupLocalVolumeDirectory(config *localTestConfig, volume *localTestVolum
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
@@ -1140,7 +1141,7 @@ func cleanupLocalVolumeDirectoryLink(config *localTestConfig, volume *localTestV
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("sudo rm -r %s && rm -r %s", hostDir, hostDirBackend)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
@@ -1149,7 +1150,7 @@ func cleanupLocalVolumeDirectoryBindMounted(config *localTestConfig, volume *loc
 	hostDir := volume.hostDir
 	removeCmd := fmt.Sprintf("sudo umount %s && rm -r %s", hostDir, hostDir)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
@@ -1159,7 +1160,7 @@ func cleanupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, volume 
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("sudo rm %s && sudo umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV and removes the test directory holding the block file.
@@ -1169,7 +1170,7 @@ func cleanupLocalVolumeBlock(config *localTestConfig, volume *localTestVolume) {
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 // Deletes the PVC/PV and removes the test directory holding the block file.
@@ -1182,7 +1183,7 @@ func cleanupLocalVolumeBlockFsWithFormat(config *localTestConfig, volume *localT
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
 	err = issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 func cleanupLocalVolumeBlockFsWithoutFormat(config *localTestConfig, volume *localTestVolume) {
@@ -1191,7 +1192,7 @@ func cleanupLocalVolumeBlockFsWithoutFormat(config *localTestConfig, volume *loc
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
 	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to issue node command '%s': %s", removeCmd, err)
 }
 
 func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) framework.PersistentVolumeClaimConfig {
@@ -1342,6 +1343,7 @@ func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, 
 // createSecPod should be used when Pod requires non default SELinux labels
 func createSecPod(config *localTestConfig, volume *localTestVolume, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) (*v1.Pod, error) {
 	pod, err := framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", hostIPC, hostPID, seLinuxLabel, nil, framework.PodStartShortTimeout)
+	Expect(err).NotTo(HaveOccurred(), "failed to retrieve pod name for '%+v' : %s", pod, podNodeName)
 	podNodeName, podNodeNameErr := podNodeName(config, pod)
 	Expect(podNodeNameErr).NotTo(HaveOccurred())
 	framework.Logf("Security Context POD %q created on Node %q", pod.Name, podNodeName)
@@ -1357,13 +1359,13 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *i
 func createAndMountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
 	By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", node.Name, dir))
 	err := issueNodeCommand(config, fmt.Sprintf("mkdir -p %q && sudo mount -t tmpfs -o size=1m tmpfs-%q %q", dir, dir, dir), node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to mount tmpfs : %s", err)
 }
 
 func unmountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
 	By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", node.Name, dir))
 	err := issueNodeCommand(config, fmt.Sprintf("sudo umount %q", dir), node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to unmount tmpfs : %s", err)
 }
 
 func createAndMapBlockLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
@@ -1373,7 +1375,7 @@ func createAndMapBlockLocalVolume(config *localTestConfig, dir string, node *v1.
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=512 count=20480", dir)
 	losetupCmd := fmt.Sprintf("sudo losetup -f  %s/file", dir)
 	err := issueNodeCommand(config, fmt.Sprintf("%s && %s && %s", mkdirCmd, ddCmd, losetupCmd), node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to map block local volume : %s", err)
 }
 
 func unmapBlockLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
@@ -1381,7 +1383,7 @@ func unmapBlockLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
 	By(fmt.Sprintf("Unmap block device %q on node %q at path %s/file", loopDev, node.Name, dir))
 	losetupDeleteCmd := fmt.Sprintf("sudo losetup -d %s", loopDev)
 	err := issueNodeCommand(config, losetupDeleteCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to unmap block local volume : %s", err)
 }
 
 func createWriteCmd(testDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) string {
@@ -1434,7 +1436,7 @@ func createFileDoesntExistCmd(testFileDir string, testFile string) string {
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
 	out, err := utils.PodExec(pod, cmd)
 	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to execute R/W cmd : %s", err)
 	return out
 }
 
@@ -1467,7 +1469,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 		By(fmt.Sprintf("Initializing local volume discovery base path on node %v", node.Name))
 		mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", config.discoveryDir)
 		err := issueNodeCommand(config, mkdirCmd, &node)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to provision local volume '%s' : %s", mkdirCmd, err)
 	}
 }
 
@@ -1480,7 +1482,7 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig) {
 		By(fmt.Sprintf("Removing the test discovery directory on node %v", node.Name))
 		removeCmd := fmt.Sprintf("[ ! -e %v ] || rm -r %v", config.discoveryDir, config.discoveryDir)
 		err := issueNodeCommand(config, removeCmd, &node)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to '%s' : %s", removeCmd, err)
 	}
 }
 
@@ -1488,31 +1490,31 @@ func setupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath s
 	By(fmt.Sprintf("Creating local directory at path %q", volumePath))
 	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
 	err := issueNodeCommand(config, mkdirCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed cmd '%s' : %s", mkdirCmd, err)
 
 	By(fmt.Sprintf("Mounting local directory at path %q", volumePath))
 	mntCmd := fmt.Sprintf("sudo mount --bind %v %v", volumePath, volumePath)
 	err = issueNodeCommand(config, mntCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed cmd '%s' : %s", mntCmd, err)
 }
 
 func cleanupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string, node *v1.Node) {
 	By(fmt.Sprintf("Unmounting the test mount point from %q", volumePath))
 	umountCmd := fmt.Sprintf("[ ! -e %v ] || sudo umount %v", volumePath, volumePath)
 	err := issueNodeCommand(config, umountCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed cmd '%s' : %s", umountCmd, err)
 
 	By("Removing the test mount point")
 	removeCmd := fmt.Sprintf("[ ! -e %v ] || rm -r %v", volumePath, volumePath)
 	err = issueNodeCommand(config, removeCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed cmd '%s' : %s", removeCmd, err)
 
 	By("Cleaning up persistent volume")
 	pv, err := findLocalPersistentVolume(config.client, volumePath)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed finding LocalPersistentVolume '%+v' : %s", pv, err)
 	if pv != nil {
 		err = config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to delete '%s' : %s", pv.Name, err)
 	}
 }
 
@@ -1522,7 +1524,8 @@ func createServiceAccount(config *localTestConfig) {
 		ObjectMeta: metav1.ObjectMeta{Name: testServiceAccount, Namespace: config.ns},
 	}
 	_, err := config.client.CoreV1().ServiceAccounts(config.ns).Create(&serviceAccount)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create service account '%+v' : %s",
+		serviceAccount, err)
 }
 
 // createProvisionerClusterRoleBinding creates two cluster role bindings for local volume provisioner's
@@ -1570,9 +1573,9 @@ func createProvisionerClusterRoleBinding(config *localTestConfig) {
 
 	deleteClusterRoleBinding(config)
 	_, err := config.client.RbacV1beta1().ClusterRoleBindings().Create(&pvBinding)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create binding %+v : %s", pvBinding, err)
 	_, err = config.client.RbacV1beta1().ClusterRoleBindings().Create(&nodeBinding)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create binding %+v : %s", nodeBinding, err)
 }
 
 func deleteClusterRoleBinding(config *localTestConfig) {
@@ -1603,7 +1606,7 @@ func createVolumeConfigMap(config *localTestConfig) {
 	}
 
 	data, err := yaml.Marshal(&provisionerConfig.StorageClassConfig)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to marshall : %s", err)
 
 	configMap := v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -1620,7 +1623,7 @@ func createVolumeConfigMap(config *localTestConfig) {
 	}
 
 	_, err = config.client.CoreV1().ConfigMaps(config.ns).Create(&configMap)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create ConfigMap %+v : %s", configMap, err)
 }
 
 func createProvisionerDaemonset(config *localTestConfig) {
@@ -1709,7 +1712,7 @@ func createProvisionerDaemonset(config *localTestConfig) {
 		},
 	}
 	_, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Create(provisioner)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create provisioner %+v : %s", provisioner, err)
 
 	kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
 	framework.WaitForControlledPodsRunning(config.client, config.ns, daemonSetName, kind)
@@ -1738,7 +1741,7 @@ func deleteProvisionerDaemonset(config *localTestConfig) {
 	}
 
 	err = config.client.ExtensionsV1beta1().DaemonSets(config.ns).Delete(daemonSetName, nil)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to delete DaemonSet %v : %s", daemonSetName, err)
 
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 		pods, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
@@ -1756,7 +1759,7 @@ func deleteProvisionerDaemonset(config *localTestConfig) {
 		// All DaemonSet pods are deleted
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to list pods : %s", err)
 }
 
 // newLocalClaim creates a new persistent volume claim.
@@ -1921,7 +1924,7 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	}
 
 	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create StatefulSets %v : %s", spec, err)
 
 	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)
 	return ss
@@ -1950,7 +1953,7 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 			if pvcSource != nil {
 				err := framework.WaitForPersistentVolumeClaimPhase(
 					v1.ClaimBound, config.client, config.ns, pvcSource.ClaimName, framework.Poll, time.Second)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred(), "failed to claim Volumes : %s", err)
 			}
 		}
 	}
@@ -1961,7 +1964,7 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 	res, err := issueNodeCommandWithResult(config, ssdCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed cmd '%s' : %s", ssdCmd, err)
 	num, err := strconv.Atoi(strings.TrimSpace(res))
 	Expect(err).NotTo(HaveOccurred())
 	if num < 1 {
