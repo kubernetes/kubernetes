@@ -361,4 +361,139 @@ metadata:
   name: coredns
   namespace: kube-system
 `
+
+	// NodeLocalDNSCacheDaemonSet is the node local cache DaemonSet manifest
+	NodeLocalDNSCacheDaemonSet = `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .DeploymentName }}
+  namespace: kube-system
+  labels:
+    k8s-app: node-local-dns
+spec:
+  selector:
+    matchLabels:
+      k8s-app: node-local-dns
+  template:
+    metadata:
+        labels:
+          k8s-app: node-local-dns
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: node-local-dns
+      hostNetwork: true
+      dnsPolicy: Default  # Don't use cluster DNS.
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      - key: {{ .MasterTaintKey }}
+        effect: NoSchedule
+      containers:
+      - name: node-local-dns
+        image: {{ .Image }}
+        resources:
+          limits:
+            memory: 30Mi
+          requests:
+            cpu: 25m
+            memory: 5Mi
+        args: [ "-localip", "{{ .DNSCacheIP }}", "-conf", "/etc/coredns/Corefile" ]
+        securityContext:
+          privileged: true
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9253
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            host: {{ .DNSCacheIP }}
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+      volumes:
+        - name: config-volume
+          configMap:
+            name: node-local-dns
+            items:
+            - key: Corefile
+              path: Corefile
+`
+	// NodeLocalDNSCacheServiceAccount is the node local cache ServiceAccount manifest
+	NodeLocalDNSCacheServiceAccount = `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-local-dns
+  namespace: kube-system
+  labels:
+    k8s-app: node-local-dns
+`
+	// NodeLocalDNSCacheConfigMap is the node local cache ConfigMap manifest
+	NodeLocalDNSCacheConfigMap = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-local-dns
+  namespace: kube-system
+  labels:
+    k8s-app: node-local-dns
+data:
+  Corefile: |
+    {{ .DNSDomain }}:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind {{ .DNSCacheIP }}
+        forward . {{ .DNSIP }} {
+                force_tcp
+        }
+        prometheus :9253
+        health {{ .DNSCacheIP }}:8080
+        }
+    in-addr.arpa:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind {{ .DNSCacheIP }}
+        forward . {{ .DNSIP }} {
+                force_tcp
+        }
+        prometheus :9253
+        }
+    ip6.arpa:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind {{ .DNSCacheIP }}
+        forward . {{ .DNSIP }} {
+                force_tcp
+        }
+        prometheus :9253
+        }
+    .:53 {
+        errors
+        cache 30
+        reload
+        loop
+        bind {{ .DNSCacheIP }}
+        forward . /etc/resolv.conf {
+                force_tcp
+        }
+        prometheus :9253
+        }
+`
 )

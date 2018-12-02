@@ -31,6 +31,8 @@ const (
 
 	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
+	// NodeLocalDNSCache is alpha in v1.14
+	NodeLocalDNSCache = "NodeLocalDNSCache"
 )
 
 var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
@@ -38,7 +40,8 @@ var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	CoreDNS: {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
+	CoreDNS:           {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
+	NodeLocalDNSCache: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, HiddenInHelpText: false},
 }
 
 // Feature represents a feature being gated

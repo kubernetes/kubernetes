@@ -24,7 +24,7 @@ import (
 	"github.com/mholt/caddy/caddyfile"
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +33,7 @@ import (
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -74,6 +75,11 @@ func DeployedDNSAddon(client clientset.Interface) (kubeadmapi.DNSAddOnType, stri
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
 func EnsureDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.NodeLocalDNSCache) {
+		if err := nodeLocalDNCacheAddon(cfg, client); err != nil {
+			return err
+		}
+	}
 	if cfg.DNS.Type == kubeadmapi.CoreDNS {
 		return coreDNSAddon(cfg, client)
 	}
@@ -270,6 +276,70 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSService := &v1.Service{}
 	return createDNSService(coreDNSService, serviceBytes, client)
+}
+
+func nodeLocalDNCacheAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+	nodeLocalIP := cfg.NodeLocalDNSCache.IP
+	nodeLocalCacheDaemonSetBytes, err := kubeadmutil.ParseTemplate(NodeLocalDNSCacheDaemonSet, struct{ DeploymentName, DNSCacheIP, Image, MasterTaintKey string }{
+		DeploymentName: kubeadmconstants.NodeLocalDNSCacheDaemonSetName,
+		DNSCacheIP:     nodeLocalIP,
+		Image:          images.GetNodeLocalDNSCacheImage(&cfg.ClusterConfiguration),
+		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
+	})
+	if err != nil {
+		return errors.Wrap(err, "error when parsing node local DNS cache DaemonSet template")
+	}
+
+	dnsip, err := kubeadmconstants.GetDNSIP(cfg.Networking.ServiceSubnet)
+	if err != nil {
+		return err
+	}
+
+	configMapBytes, err := kubeadmutil.ParseTemplate(NodeLocalDNSCacheConfigMap, struct{ DNSDomain, DNSCacheIP, DNSIP string }{
+		DNSDomain:  cfg.Networking.DNSDomain,
+		DNSCacheIP: nodeLocalIP,
+		DNSIP:      dnsip.String(),
+	})
+	if err != nil {
+		return errors.Wrap(err, "error when parsing node local DNS cache ConfigMap template")
+	}
+
+	serviceAccountBytes, err := kubeadmutil.ParseTemplate(NodeLocalDNSCacheServiceAccount, nil)
+	if err != nil {
+		return errors.Wrap(err, "error when parsing node local DNS cache ServiceAccount template")
+	}
+
+	return createNodeLocalDNSCacheAddon(nodeLocalCacheDaemonSetBytes, serviceAccountBytes, configMapBytes, client)
+}
+
+func createNodeLocalDNSCacheAddon(daemonSetBytes, serviceAccountBytes, configMapBytes []byte, client clientset.Interface) error {
+	dnsCacheServiceAccount := &v1.ServiceAccount{}
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), serviceAccountBytes, dnsCacheServiceAccount); err != nil {
+		return errors.Wrap(err, "unable to decode node local DNS cache ServiceAccount")
+	}
+
+	// Create the ServiceAccount for DNS cache or update it in case it already exists
+	if err := apiclient.CreateOrUpdateServiceAccount(client, dnsCacheServiceAccount); err != nil {
+		return err
+	}
+
+	dnsCacheConfigMap := &v1.ConfigMap{}
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), serviceAccountBytes, dnsCacheConfigMap); err != nil {
+		return errors.Wrap(err, "unable to decode node local DNS cache ConfigMap")
+	}
+
+	// Create the ConfigMap for DNS cache or update it in case it already exists
+	if err := apiclient.CreateOrUpdateConfigMap(client, dnsCacheConfigMap); err != nil {
+		return err
+	}
+
+	dnsCacheDaemonSet := &apps.DaemonSet{}
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetBytes, dnsCacheDaemonSet); err != nil {
+		return errors.Wrap(err, "unable to decode node local DNS cache DaemonSet")
+	}
+
+	// Create the DaemonSet for node local DNS cache or update it in case it already exists
+	return apiclient.CreateOrUpdateDaemonSet(client, dnsCacheDaemonSet)
 }
 
 func createDNSService(dnsService *v1.Service, serviceBytes []byte, client clientset.Interface) error {

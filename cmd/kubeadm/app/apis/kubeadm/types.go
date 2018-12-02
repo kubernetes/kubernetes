@@ -17,7 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -98,6 +98,9 @@ type ClusterConfiguration struct {
 	// DNS defines the options for the DNS add-on installed in the cluster.
 	DNS DNS
 
+	// NodeLocalDNSCache defines the options for the node local DNS cache addon
+	NodeLocalDNSCache NodeLocalDNSCache
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
 
@@ -161,6 +164,15 @@ type DNS struct {
 	Type DNSAddOnType
 
 	// ImageMeta allows to customize the image used for the DNS component
+	ImageMeta `json:",inline"`
+}
+
+// NodeLocalDNSCache defines the node local DNS cache addon
+type NodeLocalDNSCache struct {
+	// IP specifies the local IP to bind the DNS cache to. Defaults to "169.254.20.10"
+	IP string `json:"ip"`
+
+	// ImageMeta allows to customize the image used for the DNS cache component
 	ImageMeta `json:",inline"`
 }
 

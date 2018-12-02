@@ -292,6 +292,12 @@ const (
 	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
 	CoreDNSImageName = "coredns"
 
+	// NodeLocalDNSCacheDaemonSetName specifies the name of the DaemonSet for node local DNS cache add-on
+	NodeLocalDNSCacheDaemonSetName = "node-local-dns"
+
+	// NodeLocalDNSCacheImageName specifies the name of the image for node local DNS cache add-on
+	NodeLocalDNSCacheImageName = "k8s-dns-node-cache"
+
 	// KubeDNSConfigMap specifies in what ConfigMap in the kube-system namespace the kube-dns config should be stored
 	KubeDNSConfigMap = "kube-dns"
 

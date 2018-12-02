@@ -21,6 +21,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -57,6 +58,24 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration, imageName string) string 
 		dnsImageTag = cfg.DNS.ImageTag
 	}
 	return GetGenericImage(dnsImageRepository, imageName, dnsImageTag)
+}
+
+// GetNodeLocalDNSCacheImage generates and returns the image for node local DNS cache
+func GetNodeLocalDNSCacheImage(cfg *kubeadmapi.ClusterConfiguration) string {
+	// DNS cache uses default image repository by default
+	dnsImageRepository := cfg.ImageRepository
+	// unless an override is specified
+	if cfg.NodeLocalDNSCache.ImageRepository != "" {
+		dnsImageRepository = cfg.NodeLocalDNSCache.ImageRepository
+	}
+	// node local DNS cache uses an imageTag that corresponds to the DNS version
+	dnsImageTag := constants.KubeDNSVersion
+
+	// unless an override is specified
+	if cfg.NodeLocalDNSCache.ImageTag != "" {
+		dnsImageTag = cfg.NodeLocalDNSCache.ImageTag
+	}
+	return GetGenericImage(dnsImageRepository, constants.NodeLocalDNSCacheImageName, dnsImageTag)
 }
 
 // GetEtcdImage generates and returns the image for etcd
@@ -114,6 +133,10 @@ func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSKubeDNSImageName))
 		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSSidecarImageName))
 		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSDnsMasqNannyImageName))
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalDNSCache) {
+		imgs = append(imgs, GetNodeLocalDNSCacheImage(cfg))
 	}
 
 	return imgs

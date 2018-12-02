@@ -53,6 +53,8 @@ const (
 	DefaultProxyBindAddressv6 = "::"
 	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
+	// DefaultNodeLocalDNSCacheIP specifies the default IP address to bind the node local DNS cache
+	DefaultNodeLocalDNSCacheIP = "169.254.20.10"
 )
 
 var (
@@ -100,6 +102,7 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 	}
 
 	SetDefaults_DNS(obj)
+	SetDefaults_NodeLocalDNSCache(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_APIServer(&obj.APIServer)
 }
@@ -117,6 +120,13 @@ func SetDefaults_APIServer(obj *APIServer) {
 func SetDefaults_DNS(obj *ClusterConfiguration) {
 	if obj.DNS.Type == "" {
 		obj.DNS.Type = CoreDNS
+	}
+}
+
+// SetDefaults_NodeLocalDNSCache assigns default values for the DNS cache component
+func SetDefaults_NodeLocalDNSCache(obj *ClusterConfiguration) {
+	if obj.NodeLocalDNSCache.IP == "" {
+		obj.NodeLocalDNSCache.IP = DefaultNodeLocalDNSCacheIP
 	}
 }
 

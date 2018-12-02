@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -94,6 +94,9 @@ type ClusterConfiguration struct {
 	// DNS defines the options for the DNS add-on installed in the cluster.
 	DNS DNS `json:"dns"`
 
+	// NodeLocalDNSCache defines the options for the node local DNS cache addon
+	NodeLocalDNSCache NodeLocalDNSCache `json:"nodeLocalDNSCache"`
+
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string `json:"certificatesDir"`
 
@@ -152,6 +155,15 @@ type DNS struct {
 	Type DNSAddOnType `json:"type"`
 
 	// ImageMeta allows to customize the image used for the DNS component
+	ImageMeta `json:",inline"`
+}
+
+// NodeLocalDNSCache defines the node local DNS cache addon
+type NodeLocalDNSCache struct {
+	// IP specifies the local IP to bind the DNS cache to. Defaults to "169.254.20.10"
+	IP string `json:"ip"`
+
+	// ImageMeta allows to customize the image used for the DNS cache component
 	ImageMeta `json:",inline"`
 }
 
