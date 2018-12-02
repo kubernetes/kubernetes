@@ -375,7 +375,7 @@ func (u *Unstructured) SetLabels(labels map[string]string) {
 }
 
 func (u *Unstructured) GetAnnotations() map[string]string {
-	m, _, _ := NestedStringMap(u.Object, "metadata", "annotations")
+	m, _, _ := NestedBoolStringMap(u.Object, "metadata", "annotations")
 	return m
 }
 

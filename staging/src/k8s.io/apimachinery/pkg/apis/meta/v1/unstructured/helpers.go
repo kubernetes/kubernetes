@@ -20,6 +20,7 @@ import (
 	gojson "encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,6 +166,27 @@ func NestedStringMap(obj map[string]interface{}, fields ...string) (map[string]s
 	for k, v := range m {
 		if str, ok := v.(string); ok {
 			strMap[k] = str
+		} else {
+			return nil, false, fmt.Errorf("%v accessor error: contains non-string key in the map: %v is of the type %T, expected string", jsonPath(fields), v, v)
+		}
+	}
+	return strMap, true, nil
+}
+
+// NestedBoolStringMap returns a copy of map[string]string value of a nested field.
+// Converts a boolean value to a string value.
+// Returns false if value is not found and an error if not a map[string]interface{} or contains non-string values in the map.
+func NestedBoolStringMap(obj map[string]interface{}, fields ...string) (map[string]string, bool, error) {
+	m, found, err := nestedMapNoCopy(obj, fields...)
+	if !found || err != nil {
+		return nil, found, err
+	}
+	strMap := make(map[string]string, len(m))
+	for k, v := range m {
+		if str, ok := v.(string); ok {
+			strMap[k] = str
+		} else if str, ok := v.(bool); ok {
+			strMap[k] = strconv.FormatBool(str)
 		} else {
 			return nil, false, fmt.Errorf("%v accessor error: contains non-string key in the map: %v is of the type %T, expected string", jsonPath(fields), v, v)
 		}
