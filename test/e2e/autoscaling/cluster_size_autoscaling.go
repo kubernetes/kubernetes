@@ -653,7 +653,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		ReserveMemory(f, "memory-reservation", extraPods, totalMemoryReservation, false, defaultTimeout)
 
 		// Apparently GKE master is restarted couple minutes after the node pool is added
-		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
+		// resetting all the timers in scale down code. Adding 5 extra minutes to workaround
 		// this issue.
 		// TODO: Remove the extra time when GKE restart is fixed.
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes+1, scaleUpTimeout+5*time.Minute))
@@ -703,7 +703,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Some node should be removed")
 		// Apparently GKE master is restarted couple minutes after the node pool is added
-		// reseting all the timers in scale down code. Adding 10 extra minutes to workaround
+		// resetting all the timers in scale down code. Adding 10 extra minutes to workaround
 		// this issue.
 		// TODO: Remove the extra time when GKE restart is fixed.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
