@@ -3,7 +3,7 @@
 This repository implements a simple controller for watching Foo resources as
 defined with a CustomResourceDefinition (CRD).
 
-**Note:** go-get or vendor this package as `k8s.io/sample-controller`.
+:exclamation:**Note:** go-get or vendor this package as `k8s.io/sample-controller`.
 
 This particular example demonstrates how to perform basic operations such as:
 
