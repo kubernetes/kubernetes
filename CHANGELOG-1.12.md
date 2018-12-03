@@ -165,7 +165,7 @@ filename | sha512 hash
 
 ### Other notable changes
 
-* Fixes an issue with stuck connections handling error responses ([#71413](https://github.com/kubernetes/kubernetes/pull/71413), [@liggitt](https://github.com/liggitt))
+* CVE-2018-1002105: Fix critical security issue in kube-apiserver upgrade request proxy handler ([#71411](https://github.com/kubernetes/kubernetes/issues/71411), [@liggitt](https://github.com/liggitt))
 * remove retry operation on attach/detach  azure disk ([#70568](https://github.com/kubernetes/kubernetes/pull/70568), [@andyzhangx](https://github.com/andyzhangx))
 * Fix CSI volume limits not showing up in node's capacity and allocatable ([#70540](https://github.com/kubernetes/kubernetes/pull/70540), [@gnufied](https://github.com/gnufied))
 * kubeadm: fix a panic when calling "alpha phase certs renew all --use-api=false" ([#70768](https://github.com/kubernetes/kubernetes/pull/70768), [@neolit123](https://github.com/neolit123))

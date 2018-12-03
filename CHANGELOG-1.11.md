@@ -196,7 +196,7 @@ filename | sha512 hash
 
 ### Other notable changes
 
-* Fixes an issue with stuck connections handling error responses ([#71414](https://github.com/kubernetes/kubernetes/pull/71414), [@liggitt](https://github.com/liggitt))
+* CVE-2018-1002105: Fix critical security issue in kube-apiserver upgrade request proxy handler ([#71411](https://github.com/kubernetes/kubernetes/issues/71411), [@liggitt](https://github.com/liggitt))
 * IPVS proxier mode now support connection based graceful termination. ([#66012](https://github.com/kubernetes/kubernetes/pull/66012), [@Lion-Wei](https://github.com/Lion-Wei))
 * Update Cluster Autoscaler to 1.3.4 ([#70285](https://github.com/kubernetes/kubernetes/pull/70285), [@losipiuk](https://github.com/losipiuk))
 * Fix cluster autoscaler addon permissions so it can access batch/job. ([#69858](https://github.com/kubernetes/kubernetes/pull/69858), [@losipiuk](https://github.com/losipiuk))
