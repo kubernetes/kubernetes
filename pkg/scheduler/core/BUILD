@@ -16,6 +16,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
