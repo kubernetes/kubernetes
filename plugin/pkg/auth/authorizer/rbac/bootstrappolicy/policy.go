@@ -70,7 +70,7 @@ func addDefaultMetadata(obj runtime.Object) {
 	}
 	metadata.SetLabels(labels)
 
-	annotations := metadata.GetAnnotations()
+	annotations, _ := metadata.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
 	}

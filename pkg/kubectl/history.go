@@ -386,5 +386,6 @@ func getChangeCause(obj runtime.Object) string {
 	if err != nil {
 		return ""
 	}
-	return accessor.GetAnnotations()[ChangeCauseAnnotation]
+	annotations, _ := accessor.GetAnnotations()
+	return annotations[ChangeCauseAnnotation]
 }

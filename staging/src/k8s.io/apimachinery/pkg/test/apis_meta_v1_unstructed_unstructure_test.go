@@ -219,7 +219,8 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetLabels() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetAnnotations(), map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
+	annotations, _ := unstruct.GetAnnotations()
+	if got, want := annotations, map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
 	refs := unstruct.GetOwnerReferences()

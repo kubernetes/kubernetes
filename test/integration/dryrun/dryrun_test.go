@@ -62,15 +62,17 @@ func DryRunPatchTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}
-	if v := obj.GetAnnotations()["patch"]; v != "true" {
-		t.Fatalf("dry-run patched annotations should be returned, got: %v", obj.GetAnnotations())
+	patchedAnnotations, _ := obj.GetAnnotations()
+	if v := patchedAnnotations["patch"]; v != "true" {
+		t.Fatalf("dry-run patched annotations should be returned, got: %v", patchedAnnotations)
 	}
 	obj, err = rsc.Get(obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get object: %v", err)
 	}
-	if v := obj.GetAnnotations()["patch"]; v == "true" {
-		t.Fatalf("dry-run patched annotations should not be persisted, got: %v", obj.GetAnnotations())
+	persistentAnnotations, _ := obj.GetAnnotations()
+	if v := persistentAnnotations["patch"]; v == "true" {
+		t.Fatalf("dry-run patched annotations should not be persisted, got: %v", persistentAnnotations)
 	}
 }
 
@@ -159,16 +161,18 @@ func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 	if err != nil {
 		t.Fatalf("failed to dry-run update resource: %v", err)
 	}
-	if v := obj.GetAnnotations()["update"]; v != "true" {
-		t.Fatalf("dry-run updated annotations should be returned, got: %v", obj.GetAnnotations())
+	updatedAnnotations, _ := obj.GetAnnotations()
+	if v := updatedAnnotations["update"]; v != "true" {
+		t.Fatalf("dry-run updated annotations should be returned, got: %v", updatedAnnotations)
 	}
 
 	obj, err = rsc.Get(obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get object: %v", err)
 	}
-	if v := obj.GetAnnotations()["update"]; v == "true" {
-		t.Fatalf("dry-run updated annotations should not be persisted, got: %v", obj.GetAnnotations())
+	persistentAnnotations, _ := obj.GetAnnotations()
+	if v := persistentAnnotations["update"]; v == "true" {
+		t.Fatalf("dry-run updated annotations should not be persisted, got: %v", persistentAnnotations)
 	}
 }
 

@@ -114,7 +114,7 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 		if a.defaultAllow {
 			attributes.AddAnnotation(AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix, "true")
 			// TODO(wteiken): Remove the annotation code for the 1.13 release
-			annotations := pod.GetAnnotations()
+			annotations, _ := pod.GetAnnotations()
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}

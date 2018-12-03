@@ -71,7 +71,8 @@ func Revision(obj runtime.Object) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	v, ok := acc.GetAnnotations()[RevisionAnnotation]
+	annotations, _ := acc.GetAnnotations()
+	v, ok := annotations[RevisionAnnotation]
 	if !ok {
 		return 0, nil
 	}

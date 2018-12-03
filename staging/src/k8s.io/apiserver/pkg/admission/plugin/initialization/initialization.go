@@ -197,7 +197,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 				if err != nil {
 					return err
 				}
-				annotations := accessor.GetAnnotations()
+				annotations, _ := accessor.GetAnnotations()
 				if _, isMirror := annotations[v1.MirrorPodAnnotationKey]; isMirror {
 					return nil
 				}

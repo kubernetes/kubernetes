@@ -53,7 +53,7 @@ type Object interface {
 	SetDeletionGracePeriodSeconds(*int64)
 	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
-	GetAnnotations() map[string]string
+	GetAnnotations() (map[string]string, error)
 	SetAnnotations(annotations map[string]string)
 	GetInitializers() *Initializers
 	SetInitializers(initializers *Initializers)
@@ -156,7 +156,7 @@ func (meta *ObjectMeta) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds
 }
 func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
-func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
+func (meta *ObjectMeta) GetAnnotations() (map[string]string, error)   { return meta.Annotations, nil }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
 func (meta *ObjectMeta) GetInitializers() *Initializers               { return meta.Initializers }
 func (meta *ObjectMeta) SetInitializers(initializers *Initializers)   { meta.Initializers = initializers }

@@ -374,9 +374,12 @@ func (u *Unstructured) SetLabels(labels map[string]string) {
 	u.setNestedMap(labels, "metadata", "labels")
 }
 
-func (u *Unstructured) GetAnnotations() map[string]string {
-	m, _, _ := NestedStringMap(u.Object, "metadata", "annotations")
-	return m
+func (u *Unstructured) GetAnnotations() (map[string]string, error) {
+	m, _, err := NestedStringMap(u.Object, "metadata", "annotations")
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (u *Unstructured) SetAnnotations(annotations map[string]string) {

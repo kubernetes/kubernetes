@@ -72,7 +72,7 @@ func (cp *Data) GetPod() *v1.Pod {
 
 // checkAnnotations will validate the checkpoint annotations exist on the Pod
 func checkAnnotations(pod *v1.Pod) bool {
-	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
+	if podAnnotations, _ := pod.GetAnnotations(); podAnnotations != nil {
 		if podAnnotations[core.BootstrapCheckpointAnnotationKey] == "true" {
 			return true
 		}

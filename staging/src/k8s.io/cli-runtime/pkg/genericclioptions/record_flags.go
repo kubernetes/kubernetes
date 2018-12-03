@@ -136,7 +136,7 @@ func (r *ChangeCauseRecorder) Record(obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	annotations := accessor.GetAnnotations()
+	annotations, _ := accessor.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}

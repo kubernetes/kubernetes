@@ -340,7 +340,8 @@ func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[stri
 		if key == kubectl.ChangeCauseAnnotation {
 			continue
 		}
-		if value, found := accessor.GetAnnotations()[key]; found {
+		annotations, _ := accessor.GetAnnotations()
+		if value, found := annotations[key]; found {
 			if buf.Len() > 0 {
 				buf.WriteString("; ")
 			}
@@ -365,7 +366,7 @@ func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
 		}
 	}
 
-	annotations := accessor.GetAnnotations()
+	annotations, _ := accessor.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}

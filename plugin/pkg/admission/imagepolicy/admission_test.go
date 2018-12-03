@@ -875,7 +875,7 @@ func TestDefaultAllow(t *testing.T) {
 				t.Errorf("%s: failed to admit: %v", tt.test, err)
 				return
 			}
-			podAnnotations := tt.pod.GetAnnotations()
+			podAnnotations, _ := tt.pod.GetAnnotations()
 			if tt.wantFailOpen {
 				if podAnnotations == nil || podAnnotations[api.ImagePolicyFailedOpenKey] != "true" {
 					t.Errorf("missing expected fail open pod annotation")

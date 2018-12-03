@@ -387,6 +387,7 @@ func (o *ApplyOptions) Run() error {
 				if o.ServerDryRun {
 					options.DryRun = []string{metav1.DryRunAll}
 				}
+
 				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, &options)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -421,7 +422,10 @@ func (o *ApplyOptions) Run() error {
 		visitedUids.Insert(string(metadata.GetUID()))
 
 		if !o.DryRun {
-			annotationMap := metadata.GetAnnotations()
+			annotationMap, err := metadata.GetAnnotations()
+			if err != nil {
+				return err
+			}
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
@@ -451,7 +455,6 @@ func (o *ApplyOptions) Run() error {
 
 			if string(patchBytes) == "{}" && !printObject {
 				count++
-
 				printer, err := o.ToPrinter("unchanged")
 				if err != nil {
 					return err
@@ -640,7 +643,10 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 		if err != nil {
 			return err
 		}
-		annots := metadata.GetAnnotations()
+		annots, err := metadata.GetAnnotations()
+		if err != nil {
+			return err
+		}
 		if _, ok := annots[corev1.LastAppliedConfigAnnotation]; !ok {
 			// don't prune resources not created with apply
 			continue

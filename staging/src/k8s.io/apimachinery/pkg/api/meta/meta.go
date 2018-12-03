@@ -120,6 +120,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 	case *metav1.ObjectMeta:
 		return &metav1beta1.PartialObjectMetadata{ObjectMeta: *t}
 	default:
+		annotations, _ := m.GetAnnotations()
 		return &metav1beta1.PartialObjectMetadata{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:                       m.GetName(),
@@ -133,7 +134,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				DeletionTimestamp:          m.GetDeletionTimestamp(),
 				DeletionGracePeriodSeconds: m.GetDeletionGracePeriodSeconds(),
 				Labels:                     m.GetLabels(),
-				Annotations:                m.GetAnnotations(),
+				Annotations:                annotations,
 				OwnerReferences:            m.GetOwnerReferences(),
 				Finalizers:                 m.GetFinalizers(),
 				ClusterName:                m.GetClusterName(),
@@ -335,7 +336,11 @@ func (resourceAccessor) Annotations(obj runtime.Object) (map[string]string, erro
 	if err != nil {
 		return nil, err
 	}
-	return accessor.GetAnnotations(), nil
+	accessorAnnotations, err := accessor.GetAnnotations()
+	if err != nil {
+		return nil, err
+	}
+	return accessorAnnotations, nil
 }
 
 func (resourceAccessor) SetAnnotations(obj runtime.Object, annotations map[string]string) error {

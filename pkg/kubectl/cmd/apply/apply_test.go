@@ -206,7 +206,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 		t.Fatal(err)
 	}
 
-	currentAnnotations := currentAccessor.GetAnnotations()
+	currentAnnotations, _ := currentAccessor.GetAnnotations()
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}

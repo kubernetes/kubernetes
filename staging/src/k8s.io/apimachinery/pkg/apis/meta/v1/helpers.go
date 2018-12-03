@@ -240,7 +240,8 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 	meta.SetGeneration(existingMeta.GetGeneration())
 	meta.SetSelfLink(existingMeta.GetSelfLink())
 	meta.SetLabels(existingMeta.GetLabels())
-	meta.SetAnnotations(existingMeta.GetAnnotations())
+	annotations, _ := existingMeta.GetAnnotations()
+	meta.SetAnnotations(annotations)
 	meta.SetFinalizers(existingMeta.GetFinalizers())
 	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
 }

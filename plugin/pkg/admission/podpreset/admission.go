@@ -107,7 +107,7 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	}
 
 	// Ignore if exclusion annotation is present
-	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
+	if podAnnotations, _ := pod.GetAnnotations(); podAnnotations != nil {
 		klog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
 		if podAnnotations[api.PodPresetOptOutAnnotationKey] == "true" {
 			return nil
