@@ -204,6 +204,7 @@ filegroup(
         "//staging/src/k8s.io/code-generator/cmd/register-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/set-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/hack:all-srcs",
+        "//staging/src/k8s.io/code-generator/pkg/namer:all-srcs",
         "//staging/src/k8s.io/code-generator/pkg/util:all-srcs",
         "//staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:all-srcs",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:all-srcs",
