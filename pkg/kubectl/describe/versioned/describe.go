@@ -881,8 +881,8 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 				"    ConfigMapOptional:\t%v\n",
 				source.ConfigMap.Name, source.ConfigMap.Optional)
 		} else if source.ServiceAccountToken != nil {
-			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
-				source.ServiceAccountToken.ExpirationSeconds)
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
+				*source.ServiceAccountToken.ExpirationSeconds)
 		}
 	}
 }
