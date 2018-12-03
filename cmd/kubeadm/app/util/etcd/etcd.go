@@ -115,7 +115,7 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	return &client, nil
 }
 
-// NewFromCluster creates an etcd client for the the etcd endpoints defined in the ClusterStatus value stored in
+// NewFromCluster creates an etcd client for the etcd endpoints defined in the ClusterStatus value stored in
 // the kubeadm-config ConfigMap in kube-system namespace.
 // Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
 func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
