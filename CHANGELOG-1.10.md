@@ -235,7 +235,7 @@ filename | sha512 hash
 
 ### Other notable changes
 
-* Fixes an issue with stuck connections handling error responses ([#71415](https://github.com/kubernetes/kubernetes/pull/71415), [@liggitt](https://github.com/liggitt))
+* CVE-2018-1002105: Fix critical security issue in kube-apiserver upgrade request proxy handler ([#71411](https://github.com/kubernetes/kubernetes/issues/71411), [@liggitt](https://github.com/liggitt))
 
 
 
