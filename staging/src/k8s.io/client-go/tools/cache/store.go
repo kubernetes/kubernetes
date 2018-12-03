@@ -29,7 +29,7 @@ import (
 // queue of items yet to be processed.
 //
 // Store makes no assumptions about stored object identity; it is the responsibility
-// of a Store implementation to provide a mechanism to correctly key objects and to
+// of a Store implementation to provide a mechanism to correct key objects and to
 // define the contract for obtaining objects by some arbitrary key type.
 type Store interface {
 	Add(obj interface{}) error
