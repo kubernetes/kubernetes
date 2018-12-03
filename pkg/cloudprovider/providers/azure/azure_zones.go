@@ -18,48 +18,28 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"sync"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-const instanceInfoURL = "http://169.254.169.254/metadata/v1/InstanceInfo"
-
-var faultMutex = &sync.Mutex{}
-var faultDomain *string
-
-type instanceInfo struct {
-	ID           string `json:"ID"`
-	UpdateDomain string `json:"UD"`
-	FaultDomain  string `json:"FD"`
-}
-
-// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+// GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
+// If the node is not running with availability zones, then it will fall back to fault domain.
 func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
-	return az.getZoneFromURL(instanceInfoURL)
-}
+	metadata, err := az.metadata.GetMetadata()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
 
-// This is injectable for testing.
-func (az *Cloud) getZoneFromURL(url string) (cloudprovider.Zone, error) {
-	faultMutex.Lock()
-	defer faultMutex.Unlock()
-	if faultDomain == nil {
-		var err error
-		faultDomain, err = fetchFaultDomain(url)
-		if err != nil {
-			return cloudprovider.Zone{}, err
-		}
+	if metadata.Compute == nil {
+		return cloudprovider.Zone{}, fmt.Errorf("failure of getting compute information from instance metadata")
 	}
-	zone := cloudprovider.Zone{
-		FailureDomain: *faultDomain,
+
+	return cloudprovider.Zone{
+		FailureDomain: metadata.Compute.FaultDomain,
 		Region:        az.Location,
-	}
-	return zone, nil
+	}, nil
 }
 
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
@@ -79,26 +59,4 @@ func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cl
 // does not initialize node data.
 func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	return az.vmSet.GetZoneByNodeName(string(nodeName))
-}
-
-func fetchFaultDomain(url string) (*string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return readFaultDomain(resp.Body)
-}
-
-func readFaultDomain(reader io.Reader) (*string, error) {
-	var instanceInfo instanceInfo
-	body, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(body, &instanceInfo)
-	if err != nil {
-		return nil, err
-	}
-	return &instanceInfo.FaultDomain, nil
 }

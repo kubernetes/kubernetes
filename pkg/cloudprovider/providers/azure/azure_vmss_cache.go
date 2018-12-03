@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -99,7 +100,7 @@ func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 
 			for _, vm := range vms {
 				if vm.OsProfile == nil || vm.OsProfile.ComputerName == nil {
-					glog.Warningf("failed to get computerName for vmssVM (%q)", vm.Name)
+					glog.Warningf("failed to get computerName for vmssVM (%q)", to.String(vm.Name))
 					continue
 				}
 

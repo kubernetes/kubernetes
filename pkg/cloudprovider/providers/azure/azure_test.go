@@ -19,12 +19,10 @@ package azure
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
-	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -1667,60 +1665,55 @@ func validateEmptyConfig(t *testing.T, config string) {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
 	}
 }
+
 func TestGetZone(t *testing.T) {
-	data := `{"ID":"_azdev","UD":"0","FD":"99"}`
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, data)
-	}))
-	defer ts.Close()
-
-	cloud := &Cloud{}
-	cloud.Location = "eastus"
-
-	zone, err := cloud.getZoneFromURL(ts.URL)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	cloud := &Cloud{
+		Config: Config{
+			Location: "eastus",
+		},
 	}
-	if zone.FailureDomain != "99" {
-		t.Errorf("Unexpected value: %s, expected '99'", zone.FailureDomain)
-	}
-	if zone.Region != cloud.Location {
-		t.Errorf("Expected: %s, saw: %s", cloud.Location, zone.Region)
-	}
-}
-
-func TestFetchFaultDomain(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{"ID":"_azdev","UD":"0","FD":"99"}`)
-	}))
-	defer ts.Close()
-
-	faultDomain, err := fetchFaultDomain(ts.URL)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if faultDomain == nil {
-		t.Errorf("Unexpected nil fault domain")
-	}
-	if *faultDomain != "99" {
-		t.Errorf("Expected '99', saw '%s'", *faultDomain)
-	}
-}
-
-func TestDecodeInstanceInfo(t *testing.T) {
-	response := `{"ID":"_azdev","UD":"0","FD":"99"}`
-
-	faultDomain, err := readFaultDomain(strings.NewReader(response))
-	if err != nil {
-		t.Errorf("Unexpected error in ReadFaultDomain: %v", err)
+	testcases := []struct {
+		name        string
+		faultDomain string
+		expected    string
+	}{
+		{
+			name:        "GetZone should get faultDomain if node's zone isn't set",
+			faultDomain: "99",
+			expected:    "99",
+		},
 	}
 
-	if faultDomain == nil {
-		t.Error("Fault domain was unexpectedly nil")
-	}
+	for _, test := range testcases {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
 
-	if *faultDomain != "99" {
-		t.Error("got incorrect fault domain")
+		mux := http.NewServeMux()
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"platformFaultDomain":"%s"}}`, test.faultDomain))
+		}))
+		go func() {
+			http.Serve(listener, mux)
+		}()
+		defer listener.Close()
+
+		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+
+		zone, err := cloud.GetZone(context.Background())
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+		if zone.FailureDomain != test.expected {
+			t.Errorf("Test [%s] unexpected zone: %s, expected %q", test.name, zone.FailureDomain, test.expected)
+		}
+		if zone.Region != cloud.Location {
+			t.Errorf("Test [%s] unexpected region: %s, expected: %s", test.name, zone.Region, cloud.Location)
+		}
 	}
 }
 
@@ -1773,73 +1766,6 @@ func TestGetNodeNameByProviderID(t *testing.T) {
 			t.Errorf("Expected %v, but got %v", test.name, name)
 		}
 
-	}
-}
-
-func TestMetadataURLGeneration(t *testing.T) {
-	metadata := NewInstanceMetadata()
-	fullPath := metadata.makeMetadataURL("some/path")
-	if fullPath != "http://169.254.169.254/metadata/some/path" {
-		t.Errorf("Expected http://169.254.169.254/metadata/some/path saw %s", fullPath)
-	}
-}
-
-func TestMetadataParsing(t *testing.T) {
-	data := `
-{
-    "interface": [
-      {
-        "ipv4": {
-          "ipAddress": [
-            {
-              "privateIpAddress": "10.0.1.4",
-              "publicIpAddress": "X.X.X.X"
-            }
-          ],
-          "subnet": [
-            {
-              "address": "10.0.1.0",
-              "prefix": "24"
-            }
-          ]
-        },
-        "ipv6": {
-          "ipAddress": [
-
-          ]
-        },
-        "macAddress": "002248020E1E"
-      }
-    ]
-}
-`
-
-	network := NetworkMetadata{}
-	if err := json.Unmarshal([]byte(data), &network); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	ip := network.Interface[0].IPV4.IPAddress[0].PrivateIP
-	if ip != "10.0.1.4" {
-		t.Errorf("Unexpected value: %s, expected 10.0.1.4", ip)
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, data)
-	}))
-	defer server.Close()
-
-	metadata := &InstanceMetadata{
-		baseURL: server.URL,
-	}
-
-	networkJSON := NetworkMetadata{}
-	if err := metadata.Object("/some/path", &networkJSON); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if !reflect.DeepEqual(network, networkJSON) {
-		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
 }
 
