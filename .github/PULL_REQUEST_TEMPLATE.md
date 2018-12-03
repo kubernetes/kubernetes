@@ -1,5 +1,6 @@
 <!--  Thanks for sending a pull request!  Here are some tips for you:
-1. If this is your first time, read our contributor guidelines https://git.k8s.io/community/contributors/guide#your-first-contribution and developer guide https://git.k8s.io/community/contributors/devel/development.md#development-guide
+
+1. If this is your first time, please read our contributor guidelines: https://git.k8s.io/community/contributors/guide#your-first-contribution and developer guide https://git.k8s.io/community/contributors/devel/development.md#development-guide
 2. Please label this pull request according to what type of issue you are addressing, especially if this is a release targeted pull request. For reference on required PR/issue labels, read here:
 https://git.k8s.io/community/contributors/devel/release.md#issue-kind-label
 3. Ensure you have added or ran the appropriate tests for your PR: https://git.k8s.io/community/contributors/devel/testing.md
@@ -22,7 +23,12 @@ https://git.k8s.io/community/contributors/devel/release.md#issue-kind-label
 
 **What this PR does / why we need it**:
 
-**Which issue(s) this PR fixes** *(optional, in `fixes #<issue number>(, fixes #<issue_number>, ...)` format, will close the issue(s) when PR gets merged)*:
+**Which issue(s) this PR fixes**:
+<!-- 
+*Automatically closes linked issue when PR is merged.
+Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
+_If PR is about `failing-tests or flakes`, please post the related issues/tests in a comment and do not use `Fixes`_*
+-->
 Fixes #
 
 **Special notes for your reviewer**:
