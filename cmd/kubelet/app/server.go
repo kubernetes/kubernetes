@@ -616,7 +616,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		rawContainerCgroupPathPrefixWhiteList := []string{"/"}
+		if s.RuntimeCgroups != "" && s.KubeletCgroups != "" && s.CgroupRoot != "" {
+			rawContainerCgroupPathPrefixWhiteList = []string{s.RuntimeCgroups, s.KubeletCgroups, s.CgroupRoot}
+		}
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint), rawContainerCgroupPathPrefixWhiteList)
 		if err != nil {
 			return err
 		}
