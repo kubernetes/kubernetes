@@ -38,6 +38,10 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
+const (
+	eventMsgFirewallChange = "Firewall change required by security admin"
+)
+
 func TestEnsureStaticIP(t *testing.T) {
 	t.Parallel()
 
