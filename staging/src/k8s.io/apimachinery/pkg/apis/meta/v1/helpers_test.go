@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/google/gofuzz"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -169,7 +168,7 @@ func TestResetObjectMetaForStatus(t *testing.T) {
 	existingMeta := &ObjectMeta{}
 
 	// fuzz the existingMeta to set every field, no nils
-	f := fuzz.New().NilChance(0).NumElements(1, 1)
+	f := fuzz.New().NilChance(0).NumElements(1, 1).MaxDepth(10)
 	f.Fuzz(existingMeta)
 	ResetObjectMetaForStatus(meta, existingMeta)
 

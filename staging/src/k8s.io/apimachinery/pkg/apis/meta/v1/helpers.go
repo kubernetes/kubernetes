@@ -243,4 +243,5 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 	meta.SetAnnotations(existingMeta.GetAnnotations())
 	meta.SetFinalizers(existingMeta.GetFinalizers())
 	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
+	meta.SetManagedFields(existingMeta.GetManagedFields())
 }
