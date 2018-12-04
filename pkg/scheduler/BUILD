@@ -20,6 +20,7 @@ go_library(
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
+        "//pkg/scheduler/plugins/v1alpha1:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -40,10 +41,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "main_test.go",
-        "scheduler_test.go",
-    ],
+    srcs = ["scheduler_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
@@ -99,6 +97,7 @@ filegroup(
         "//pkg/scheduler/internal/cache:all-srcs",
         "//pkg/scheduler/internal/queue:all-srcs",
         "//pkg/scheduler/metrics:all-srcs",
+        "//pkg/scheduler/plugins:all-srcs",
         "//pkg/scheduler/testing:all-srcs",
         "//pkg/scheduler/util:all-srcs",
         "//pkg/scheduler/volumebinder:all-srcs",

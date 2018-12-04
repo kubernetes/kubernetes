@@ -70,6 +70,8 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+var _ = rest.Patcher(&StatusREST{})
+
 // New creates a new VolumeAttachment resource
 func (r *StatusREST) New() runtime.Object {
 	return &storageapi.VolumeAttachment{}

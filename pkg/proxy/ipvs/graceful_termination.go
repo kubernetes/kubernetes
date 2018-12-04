@@ -75,10 +75,10 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 
 	uniqueRS := rs.String()
 	if _, ok := q.list[uniqueRS]; ok {
-		return false
+		delete(q.list, uniqueRS)
+		return true
 	}
-	delete(q.list, uniqueRS)
-	return true
+	return false
 }
 
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
@@ -164,7 +164,10 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 	}
 	for _, rs := range rss {
 		if rsToDelete.RealServer.Equal(rs) {
-			if rs.ActiveConn != 0 {
+			// Delete RS with no connections
+			// For UDP, ActiveConn is always 0
+			// For TCP, InactiveConn are connections not in ESTABLISHED state
+			if rs.ActiveConn+rs.InactiveConn != 0 {
 				return false, nil
 			}
 			klog.Infof("Deleting rs: %s", rsToDelete.String())

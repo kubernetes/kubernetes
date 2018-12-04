@@ -23,7 +23,8 @@ import (
 	"fmt"
 	"strings"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi"
+	"time"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,7 +41,6 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"time"
 )
 
 const (
@@ -75,7 +75,7 @@ type Interface interface {
 	// Record in the cluster the given node information from the CSI driver with the given name.
 	// Concurrent calls to InstallCSIDriver() is allowed, but they should not be intertwined with calls
 	// to other methods in this interface.
-	InstallCSIDriver(driverName string, driverNodeID string, maxVolumeLimit int64, topology *csipb.Topology) error
+	InstallCSIDriver(driverName string, driverNodeID string, maxVolumeLimit int64, topology map[string]string) error
 
 	// Remove in the cluster node information from the CSI driver with the given name.
 	// Concurrent calls to UninstallCSIDriver() is allowed, but they should not be intertwined with calls
@@ -97,7 +97,7 @@ func NewNodeInfoManager(
 // CSINodeInfo object. If the CSINodeInfo object doesn't yet exist, it will be created.
 // If multiple calls to InstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINodeInfo update conflicts, which causes the function to retry the corresponding update.
-func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology *csipb.Topology) error {
+func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error {
 	if driverNodeID == "" {
 		return fmt.Errorf("error adding CSI driver node info: driverNodeID must not be empty")
 	}
@@ -133,12 +133,14 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 // If multiple calls to UninstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINodeInfo update conflicts, which causes the function to retry the corresponding update.
 func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
-	err := nim.uninstallDriverFromCSINodeInfo(driverName)
-	if err != nil {
-		return fmt.Errorf("error uninstalling CSI driver from CSINodeInfo object %v", err)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		err := nim.uninstallDriverFromCSINodeInfo(driverName)
+		if err != nil {
+			return fmt.Errorf("error uninstalling CSI driver from CSINodeInfo object %v", err)
+		}
 	}
 
-	err = nim.updateNode(
+	err := nim.updateNode(
 		removeMaxAttachLimit(driverName),
 		removeNodeIDFromNode(driverName),
 	)
@@ -320,13 +322,13 @@ func removeNodeIDFromNode(csiDriverName string) nodeUpdateFunc {
 
 // updateTopologyLabels returns a function that updates labels of a Node object with the given
 // topology information.
-func updateTopologyLabels(topology *csipb.Topology) nodeUpdateFunc {
+func updateTopologyLabels(topology map[string]string) nodeUpdateFunc {
 	return func(node *v1.Node) (*v1.Node, bool, error) {
-		if topology == nil || len(topology.Segments) == 0 {
+		if topology == nil || len(topology) == 0 {
 			return node, false, nil
 		}
 
-		for k, v := range topology.Segments {
+		for k, v := range topology {
 			if curVal, exists := node.Labels[k]; exists && curVal != v {
 				return nil, false, fmt.Errorf("detected topology value collision: driver reported %q:%q but existing label is %q:%q", k, v, k, curVal)
 			}
@@ -335,7 +337,7 @@ func updateTopologyLabels(topology *csipb.Topology) nodeUpdateFunc {
 		if node.Labels == nil {
 			node.Labels = make(map[string]string)
 		}
-		for k, v := range topology.Segments {
+		for k, v := range topology {
 			node.Labels[k] = v
 		}
 		return node, true, nil
@@ -345,7 +347,7 @@ func updateTopologyLabels(topology *csipb.Topology) nodeUpdateFunc {
 func (nim *nodeInfoManager) updateCSINodeInfo(
 	driverName string,
 	driverNodeID string,
-	topology *csipb.Topology) error {
+	topology map[string]string) error {
 
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
@@ -370,7 +372,7 @@ func (nim *nodeInfoManager) tryUpdateCSINodeInfo(
 	csiKubeClient csiclientset.Interface,
 	driverName string,
 	driverNodeID string,
-	topology *csipb.Topology) error {
+	topology map[string]string) error {
 
 	nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
@@ -427,7 +429,7 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	nodeInfo *csiv1alpha1.CSINodeInfo,
 	driverName string,
 	driverNodeID string,
-	topology *csipb.Topology) error {
+	topology map[string]string) error {
 
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
@@ -435,10 +437,8 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	}
 
 	topologyKeys := make(sets.String)
-	if topology != nil {
-		for k := range topology.Segments {
-			topologyKeys.Insert(k)
-		}
+	for k := range topology {
+		topologyKeys.Insert(k)
 	}
 
 	specModified := true

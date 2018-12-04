@@ -26,7 +26,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cache_test.go",
-        "main_test.go",
         "node_tree_test.go",
     ],
     embed = [":go_default_library"],

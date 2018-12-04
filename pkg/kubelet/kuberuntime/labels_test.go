@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -67,15 +69,15 @@ func TestContainerLabels(t *testing.T) {
 
 	var tests = []struct {
 		description     string
-		featuresCreated string // Features enabled when container is created
-		featuresStatus  string // Features enabled when container status is read
+		featuresCreated bool // Features enabled when container is created
+		featuresStatus  bool // Features enabled when container status is read
 		typeLabel       kubecontainer.ContainerType
 		expected        *labeledContainerInfo
 	}{
 		{
 			"Debug containers disabled",
-			"DebugContainers=False",
-			"DebugContainers=False",
+			false,
+			false,
 			"ignored",
 			&labeledContainerInfo{
 				PodName:       pod.Name,
@@ -87,8 +89,8 @@ func TestContainerLabels(t *testing.T) {
 		},
 		{
 			"Regular containers",
-			"DebugContainers=True",
-			"DebugContainers=True",
+			true,
+			true,
 			kubecontainer.ContainerTypeRegular,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
@@ -100,8 +102,8 @@ func TestContainerLabels(t *testing.T) {
 		},
 		{
 			"Init containers",
-			"DebugContainers=True",
-			"DebugContainers=True",
+			true,
+			true,
 			kubecontainer.ContainerTypeInit,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
@@ -113,8 +115,8 @@ func TestContainerLabels(t *testing.T) {
 		},
 		{
 			"Created without type label",
-			"DebugContainers=False",
-			"DebugContainers=True",
+			false,
+			true,
 			"ignored",
 			&labeledContainerInfo{
 				PodName:       pod.Name,
@@ -126,8 +128,8 @@ func TestContainerLabels(t *testing.T) {
 		},
 		{
 			"Created with type label, subsequently disabled",
-			"DebugContainers=True",
-			"DebugContainers=False",
+			true,
+			false,
 			kubecontainer.ContainerTypeRegular,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
@@ -141,15 +143,16 @@ func TestContainerLabels(t *testing.T) {
 
 	// Test whether we can get right information from label
 	for _, test := range tests {
-		utilfeature.DefaultFeatureGate.Set(test.featuresCreated)
-		labels := newContainerLabels(container, pod, test.typeLabel)
-		utilfeature.DefaultFeatureGate.Set(test.featuresStatus)
-		containerInfo := getContainerInfoFromLabels(labels)
-		if !reflect.DeepEqual(containerInfo, test.expected) {
-			t.Errorf("%v: expected %v, got %v", test.description, test.expected, containerInfo)
-		}
+		func() {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DebugContainers, test.featuresCreated)()
+			labels := newContainerLabels(container, pod, test.typeLabel)
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DebugContainers, test.featuresStatus)()
+			containerInfo := getContainerInfoFromLabels(labels)
+			if !reflect.DeepEqual(containerInfo, test.expected) {
+				t.Errorf("%v: expected %v, got %v", test.description, test.expected, containerInfo)
+			}
+		}()
 	}
-	utilfeature.DefaultFeatureGate.Set("DebugContainers=False")
 }
 
 func TestContainerAnnotations(t *testing.T) {

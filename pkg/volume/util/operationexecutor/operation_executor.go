@@ -725,7 +725,7 @@ func (oe *operationExecutor) MountVolume(
 	if fsVolume {
 		// Filesystem volume case
 		// Mount/remount a volume when a volume is attached
-		generatedOperations, err = oe.operationGenerator.GenerateMountVolumeFunc(
+		generatedOperations = oe.operationGenerator.GenerateMountVolumeFunc(
 			waitForAttachTimeout, volumeToMount, actualStateOfWorld, isRemount)
 
 	} else {

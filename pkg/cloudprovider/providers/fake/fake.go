@@ -45,6 +45,14 @@ type FakeUpdateBalancerCall struct {
 	Hosts   []*v1.Node
 }
 
+var _ cloudprovider.Interface = (*FakeCloud)(nil)
+var _ cloudprovider.Instances = (*FakeCloud)(nil)
+var _ cloudprovider.LoadBalancer = (*FakeCloud)(nil)
+var _ cloudprovider.Routes = (*FakeCloud)(nil)
+var _ cloudprovider.Zones = (*FakeCloud)(nil)
+var _ cloudprovider.PVLabeler = (*FakeCloud)(nil)
+var _ cloudprovider.Clusters = (*FakeCloud)(nil)
+
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
 	Exists bool

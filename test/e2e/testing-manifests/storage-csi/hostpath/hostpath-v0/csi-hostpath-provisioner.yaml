@@ -1,0 +1,49 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-hostpath-provisioner 
+  labels:
+    app: csi-hostpath-provisioner 
+spec:
+  selector:
+    app: csi-hostpath-provisioner 
+  ports:
+    - name: dummy
+      port: 12345
+
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-hostpath-provisioner
+spec:
+  serviceName: "csi-hostpath-provisioner"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-hostpath-provisioner
+  template:
+    metadata:
+      labels:
+        app: csi-hostpath-provisioner
+    spec:
+      serviceAccountName: csi-provisioner
+      containers:
+        - name: csi-provisioner-v0
+          image: gcr.io/gke-release/csi-provisioner:v0.4.1-gke.0
+          args:
+            - "--provisioner=csi-hostpath-v0"
+            - "--csi-address=$(ADDRESS)"
+            - "--connection-timeout=15s"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-hostpath-v0
+            type: DirectoryOrCreate
+          name: socket-dir

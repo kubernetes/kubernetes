@@ -21,10 +21,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "dns_test.go",
-        "main_test.go",
-    ],
+    srcs = ["dns_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",

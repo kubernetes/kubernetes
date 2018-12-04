@@ -33,7 +33,8 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
+func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 	pv := makeTestPV(specVolumeName, 10, testDriver, testVol)
 	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 	mapper, err := plug.NewBlockVolumeMapper(
@@ -73,7 +74,7 @@ func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		csiMapper, spec, _, err := prepareBlockMapperTest(plug, tc.specVolumeName)
+		csiMapper, spec, _, err := prepareBlockMapperTest(plug, tc.specVolumeName, t)
 		if err != nil {
 			t.Fatalf("Failed to make a new Mapper: %v", err)
 		}
@@ -113,7 +114,7 @@ func TestBlockMapperGetStagingPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		csiMapper, _, _, err := prepareBlockMapperTest(plug, tc.specVolumeName)
+		csiMapper, _, _, err := prepareBlockMapperTest(plug, tc.specVolumeName, t)
 		if err != nil {
 			t.Fatalf("Failed to make a new Mapper: %v", err)
 		}
@@ -150,7 +151,7 @@ func TestBlockMapperGetPublishPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		csiMapper, _, _, err := prepareBlockMapperTest(plug, tc.specVolumeName)
+		csiMapper, _, _, err := prepareBlockMapperTest(plug, tc.specVolumeName, t)
 		if err != nil {
 			t.Fatalf("Failed to make a new Mapper: %v", err)
 		}
@@ -187,7 +188,7 @@ func TestBlockMapperGetDeviceMapPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		csiMapper, _, _, err := prepareBlockMapperTest(plug, tc.specVolumeName)
+		csiMapper, _, _, err := prepareBlockMapperTest(plug, tc.specVolumeName, t)
 		if err != nil {
 			t.Fatalf("Failed to make a new Mapper: %v", err)
 		}
@@ -219,7 +220,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	)
 	plug.host = host
 
-	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv")
+	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
 		t.Fatalf("Failed to make a new Mapper: %v", err)
 	}
@@ -229,7 +230,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, csiMapper.driverName, string(nodeName))
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
@@ -286,7 +287,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	)
 	plug.host = host
 
-	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv")
+	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
 		t.Fatalf("Failed to make a new Mapper: %v", err)
 	}
@@ -296,7 +297,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, csiMapper.driverName, string(nodeName))
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
@@ -369,7 +370,7 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 	)
 	plug.host = host
 
-	_, spec, pv, err := prepareBlockMapperTest(plug, "test-pv")
+	_, spec, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
 		t.Fatalf("Failed to make a new Mapper: %v", err)
 	}

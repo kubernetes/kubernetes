@@ -24,7 +24,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-var TestMinVersion = version.MustParseSemantic("v1.11.0-alpha.1")
+var TestMinVersion = version.MustParseSemantic("v1.12.0-alpha.1")
 
 func TestKnownFeatures(t *testing.T) {
 	var someFeatures = FeatureList{
@@ -144,12 +144,12 @@ func TestValidateVersion(t *testing.T) {
 		},
 		{ //min version but correct value given
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.11.0",
+			requestedVersion:  "v1.12.0",
 			expectedError:     false,
 		},
 		{ //min version and incorrect value given
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.10.2",
+			requestedVersion:  "v1.11.2",
 			expectedError:     true,
 		},
 	}
