@@ -101,6 +101,9 @@ type Port struct {
 
 	// Identifies the list of IP addresses the port will recognize/accept
 	AllowedAddressPairs []AddressPair `json:"allowed_address_pairs"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 // PortPage is the page returned by a pager when traversing over a collection

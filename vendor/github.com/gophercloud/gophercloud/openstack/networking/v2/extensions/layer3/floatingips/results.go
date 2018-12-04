@@ -42,6 +42,9 @@ type FloatingIP struct {
 
 	// RouterID is the ID of the router used for this floating IP.
 	RouterID string `json:"router_id"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 type commonResult struct {

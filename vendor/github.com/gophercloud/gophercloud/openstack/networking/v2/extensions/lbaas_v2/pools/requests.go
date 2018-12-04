@@ -274,7 +274,7 @@ type CreateMemberOpts struct {
 	// that  this member should receive from the pool. For example, a member with
 	// a weight  of 10 receives five times as much traffic as a member with a
 	// weight of 2.
-	Weight int `json:"weight,omitempty"`
+	Weight *int `json:"weight,omitempty"`
 
 	// If you omit this parameter, LBaaS uses the vip_subnet_id parameter value
 	// for the subnet UUID.
@@ -323,7 +323,7 @@ type UpdateMemberOpts struct {
 	// that this member should receive from the pool. For example, a member with
 	// a weight of 10 receives five times as much traffic as a member with a
 	// weight of 2.
-	Weight int `json:"weight,omitempty"`
+	Weight *int `json:"weight,omitempty"`
 
 	// The administrative state of the Pool. A valid value is true (UP)
 	// or false (DOWN).

@@ -24,6 +24,10 @@ type ListOpts struct {
 	SortDir           string `q:"sort_dir"`
 	RouterID          string `q:"router_id"`
 	Status            string `q:"status"`
+	Tags              string `q:"tags"`
+	TagsAny           string `q:"tags-any"`
+	NotTags           string `q:"not-tags"`
+	NotTagsAny        string `q:"not-tags-any"`
 }
 
 // List returns a Pager which allows you to iterate over a collection of
