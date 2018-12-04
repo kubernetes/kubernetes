@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -44,7 +45,7 @@ func RecommendedDefaultLeaderElectionConfiguration(obj *LeaderElectionConfigurat
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
 	}
 	if obj.ResourceLock == "" {
-		obj.ResourceLock = EndpointsResourceLock
+		obj.ResourceLock = resourcelock.ConfigMapsResourceLock
 	}
 	if obj.LeaderElect == nil {
 		obj.LeaderElect = utilpointer.BoolPtr(true)

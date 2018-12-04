@@ -20,8 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const EndpointsResourceLock = "endpoints"
-
 // LeaderElectionConfiguration defines the configuration of leader election
 // clients for components that can run with leader election enabled.
 type LeaderElectionConfiguration struct {
