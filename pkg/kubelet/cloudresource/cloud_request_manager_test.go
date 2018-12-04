@@ -17,6 +17,7 @@ limitations under the License.
 package cloudresource
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -78,4 +79,55 @@ func TestNodeAddressesDelay(t *testing.T) {
 		return
 	}
 	t.Errorf("Timeout waiting for %q address to appear", cloud.Addresses[0].Address)
+}
+
+func TestNodeAddressesUsesLastSuccess(t *testing.T) {
+	cloud := &fake.FakeCloud{}
+	manager := NewSyncManager(cloud, "defaultNode", 0).(*cloudResourceSyncManager)
+
+	// These tests are stateful and order dependant.
+	tests := []struct {
+		name      string
+		addrs     []v1.NodeAddress
+		err       error
+		wantAddrs []v1.NodeAddress
+		wantErr   bool
+	}{
+		{
+			name:    "first sync loop encounters an error",
+			err:     errors.New("bad"),
+			wantErr: true,
+		},
+		{
+			name:      "subsequent sync loop succeeds",
+			addrs:     createNodeInternalIPAddress("10.0.1.12"),
+			wantAddrs: createNodeInternalIPAddress("10.0.1.12"),
+		},
+		{
+			name:      "subsequent sync loop encounters an error, last addresses returned",
+			err:       errors.New("bad"),
+			wantAddrs: createNodeInternalIPAddress("10.0.1.12"),
+		},
+		{
+			name:      "subsequent sync loop succeeds changing addresses",
+			addrs:     createNodeInternalIPAddress("10.0.1.13"),
+			wantAddrs: createNodeInternalIPAddress("10.0.1.13"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cloud.Addresses = test.addrs
+			cloud.Err = test.err
+
+			manager.syncNodeAddresses()
+			nodeAddresses, err := manager.NodeAddresses()
+			if (err != nil) != test.wantErr {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if got, want := nodeAddresses, test.wantAddrs; !reflect.DeepEqual(got, want) {
+				t.Errorf("Unexpected diff of node addresses: %v", diff.ObjectReflectDiff(got, want))
+			}
+		})
+	}
 }
