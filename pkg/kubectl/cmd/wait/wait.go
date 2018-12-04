@@ -44,7 +44,7 @@ import (
 )
 
 var (
-	wait_long = templates.LongDesc(`
+	waitLong = templates.LongDesc(`
 		Experimental: Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
@@ -56,7 +56,7 @@ var (
 		A successful message will be printed to stdout indicating when the specified
         condition has been met. One can use -o option to change to output destination.`)
 
-	wait_example = templates.Examples(`
+	waitExample = templates.Examples(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
 		kubectl wait --for=condition=Ready pod/busybox1
 
@@ -106,8 +106,8 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Use:                   "wait resource.group/name [--for=delete|--for condition=available]",
 		DisableFlagsInUseLine: true,
 		Short:                 "Experimental: Wait for a specific condition on one or many resources.",
-		Long:                  wait_long,
-		Example:               wait_example,
+		Long:                  waitLong,
+		Example:               waitExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
@@ -191,12 +191,14 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	return nil, fmt.Errorf("unrecognized condition: %q", condition)
 }
 
+// ResourceLocation holds the location of a resource
 type ResourceLocation struct {
 	GroupResource schema.GroupResource
 	Namespace     string
 	Name          string
 }
 
+// UIDMap maps ResourceLocation with UID
 type UIDMap map[ResourceLocation]types.UID
 
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait

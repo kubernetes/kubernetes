@@ -153,7 +153,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Use:                   "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Display one or many resources"),
-		Long:                  getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
+		Long:                  getLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
@@ -261,7 +261,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestApiResources(o.CmdParent))
+			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestAPIResources(o.CmdParent))
 			fullCmdName := cmd.Parent().CommandPath()
 			usageString := "Required resource not specified."
 			if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {
@@ -296,16 +296,20 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
+// OriginalPositioner and NopPositioner is required for swap/sort operations of data in table format
 type OriginalPositioner interface {
 	OriginalPosition(int) int
 }
 
+// NopPositioner and OriginalPositioner is required for swap/sort operations of data in table format
 type NopPositioner struct{}
 
+// OriginalPosition returns the original position from NopPositioner object
 func (t *NopPositioner) OriginalPosition(ix int) int {
 	return ix
 }
 
+// RuntimeSorter holds the required objects to perform sorting of runtime objects
 type RuntimeSorter struct {
 	field      string
 	decoder    runtime.Decoder
@@ -313,6 +317,7 @@ type RuntimeSorter struct {
 	positioner OriginalPositioner
 }
 
+// Sort performs the sorting of runtime objects
 func (r *RuntimeSorter) Sort() error {
 	// a list is only considered "sorted" if there are 0 or 1 items in it
 	// AND (if 1 item) the item is not a Table object
@@ -363,6 +368,7 @@ func (r *RuntimeSorter) Sort() error {
 	return nil
 }
 
+// OriginalPosition returns the original position of a runtime object
 func (r *RuntimeSorter) OriginalPosition(ix int) int {
 	if r.positioner == nil {
 		return 0
@@ -370,12 +376,13 @@ func (r *RuntimeSorter) OriginalPosition(ix int) int {
 	return r.positioner.OriginalPosition(ix)
 }
 
-// allows custom decoder to be set for testing
+// WithDecoder allows custom decoder to be set for testing
 func (r *RuntimeSorter) WithDecoder(decoder runtime.Decoder) *RuntimeSorter {
 	r.decoder = decoder
 	return r
 }
 
+// NewRuntimeSorter returns a new instance of RuntimeSorter
 func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 	parsedField, err := RelaxedJSONPathExpression(sortBy)
 	if err != nil {

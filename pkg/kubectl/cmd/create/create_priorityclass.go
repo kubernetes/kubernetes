@@ -39,6 +39,7 @@ var (
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"`))
 )
 
+// PriorityClassOpts holds the options for 'create priorityclass' sub command
 type PriorityClassOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -74,6 +75,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -96,7 +98,7 @@ func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreatePriorityClass implements the behavior to run the create priorityClass command.
+// Run calls the CreateSubcommandOptions.Run in the PriorityClassOpts instance
 func (o *PriorityClassOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

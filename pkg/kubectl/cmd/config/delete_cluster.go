@@ -28,18 +28,19 @@ import (
 )
 
 var (
-	delete_cluster_example = templates.Examples(`
+	deleteClusterExample = templates.Examples(`
 		# Delete the minikube cluster
 		kubectl config delete-cluster minikube`)
 )
 
+// NewCmdConfigDeleteCluster returns a Command instance for 'config delete-cluster' sub command
 func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "delete-cluster NAME",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete the specified cluster from the kubeconfig"),
 		Long:                  "Delete the specified cluster from the kubeconfig",
-		Example:               delete_cluster_example,
+		Example:               deleteClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := runDeleteCluster(out, configAccess, cmd)
 			cmdutil.CheckErr(err)

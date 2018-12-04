@@ -162,9 +162,8 @@ func (o *SetLastAppliedOptions) Validate() error {
 		if err := info.Get(); err != nil {
 			if errors.IsNotFound(err) {
 				return err
-			} else {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
+			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 		}
 		originalBuf, err := kubectl.GetOriginalConfiguration(info.Object)
 		if err != nil {

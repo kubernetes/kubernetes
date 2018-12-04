@@ -1,4 +1,3 @@
-
 cluster/images/etcd-version-monitor
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/hyperkube
@@ -137,15 +136,12 @@ pkg/kubeapiserver/options
 pkg/kubectl
 pkg/kubectl/apps
 pkg/kubectl/cmd/annotate
-pkg/kubectl/cmd/apiresources
 pkg/kubectl/cmd/apply
 pkg/kubectl/cmd/attach
-pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/autoscale
 pkg/kubectl/cmd/certificates
 pkg/kubectl/cmd/clusterinfo
 pkg/kubectl/cmd/completion
-pkg/kubectl/cmd/config
 pkg/kubectl/cmd/convert
 pkg/kubectl/cmd/cp
 pkg/kubectl/cmd/create
@@ -175,9 +171,7 @@ pkg/kubectl/cmd/taint
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/util
-pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/openapi
-pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/version
 pkg/kubectl/cmd/wait
 pkg/kubectl/describe/versioned
