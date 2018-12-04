@@ -72,7 +72,6 @@ go_test(
         "//pkg/scheduler/cache:go_default_library",
         "//pkg/scheduler/internal/cache/fake:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
-        "//pkg/scheduler/testing:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

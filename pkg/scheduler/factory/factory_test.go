@@ -40,7 +40,6 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -366,18 +365,15 @@ func testBind(binding *v1.Binding, t *testing.T) {
 
 	pod := client.CoreV1().Pods(metav1.NamespaceDefault).(*fakeV1.FakePods)
 
-	bind, err := pod.GetBinding(binding.GetName())
+	actualBinding, err := pod.GetBinding(binding.GetName())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 		return
 	}
-
-	expectedBody := runtime.EncodeOrDie(schedulertesting.Test.Codec(), binding)
-	bind.APIVersion = ""
-	bind.Kind = ""
-	body := runtime.EncodeOrDie(schedulertesting.Test.Codec(), bind)
-	if expectedBody != body {
-		t.Errorf("Expected body %s, Got %s", expectedBody, body)
+	if !reflect.DeepEqual(binding, actualBinding) {
+		t.Errorf("Binding did not match expectation")
+		t.Logf("Expected: %v", binding)
+		t.Logf("Actual:   %v", actualBinding)
 	}
 }
 
