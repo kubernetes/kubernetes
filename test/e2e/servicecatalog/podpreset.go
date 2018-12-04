@@ -222,7 +222,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 					{
 						Name:    "init1",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Env:     []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "    value"}},
+						Env:     []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -281,7 +281,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 			framework.Failf("env of pod container does not match the env of the original pod: expected %#v, got: %#v", originalPod.Spec.Containers[0].Env, pod.Spec.Containers[0].Env)
 		}
 		if !reflect.DeepEqual(originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env) {
-			framework.Failf("env of pod init container does not match the env of the original pod: expected %#v, g    ot: %#v", originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env)
+			framework.Failf("env of pod init container does not match the env of the original pod: expected %#v, got: %#v", originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env)
 		}
 
 	})
