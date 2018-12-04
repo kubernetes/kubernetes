@@ -29,6 +29,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -425,8 +426,17 @@ func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
 		return fmt.Errorf("Kubelet needs to run as uid `0`. It is being run as %d", uid)
 	}
-	// TODO: Check if kubelet is running in the `initial` user namespace.
+	// Check if kubelet is running in the `initial` user namespace.
 	// http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+	if ostype := runtime.GOOS; ostype == "linux" {
+		namespace, _ := os.Readlink("/proc/" + strconv.Itoa(os.Getpid()) + "/ns/user")
+		rootNamespace, _ := os.Readlink("/proc/1/ns/user")
+		if namespace != rootNamespace {
+			return fmt.Errorf("kubelet needs to run in the `initial` user namespace. "+
+				"It is being run in namespace:%s and initial namespace is %s", namespace, rootNamespace)
+		}
+	}
+
 	return nil
 }
 
