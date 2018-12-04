@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24 3.3.10] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,15 +26,15 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24
+BUNDLED_ETCD_VERSIONS?=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24 3.3.10
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.2.24
+LATEST_ETCD_VERSION?=3.3.10
 
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=1
+REVISION?=0
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -52,7 +52,7 @@ MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
-GOLANG_VERSION?=1.8.7
+GOLANG_VERSION?=1.10.4
 GOARM=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -159,7 +159,7 @@ build-integration-test-image: build
 
 integration-test:
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -e GOARCH=$(ARCH) etcd-integration-test \
-		/bin/bash -c "CGO_ENABLED=0 go test -tags=integration -v k8s.io/kubernetes/cluster/images/etcd/migrate -args -v 10 -logtostderr true"
+		/bin/bash -c "CGO_ENABLED=0 go test -tags=integration k8s.io/kubernetes/cluster/images/etcd/migrate -args -v 10 -logtostderr true"
 
 integration-build-test: build-integration-test-image integration-test
 test: unit-test integration-build-test
