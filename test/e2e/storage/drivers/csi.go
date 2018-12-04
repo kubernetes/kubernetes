@@ -43,9 +43,46 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+)
+
+// When updating URLs in this file, run "hack/update-url-cache.sh" and include
+// the updated cache under test/e2e/testing-manifests/url-cache in the commit.
+
+// The RBAC manifests for the 0.4.x sidecar containers. Must be kept in sync
+// with the URLs in the https://github.com/kubernetes-csi/docs/blob/master/book/src/ example for 0.4.x
+// (or wherever that example is going to be maintained in the future).
+var csi04SidecarRBAC = testfiles.RegisterFiles(
+	"https://github.com/kubernetes-csi/driver-registrar/blob/87d0059110a8b4a90a6d2b5a8702dd7f3f270b80/deploy/kubernetes/rbac.yaml",
+	"https://github.com/kubernetes-csi/external-attacher/blob/9da8c6d20d58750ee33d61d0faf0946641f50770/deploy/kubernetes/rbac.yaml",
+	"https://github.com/kubernetes-csi/external-provisioner/blob/1cd1c20a6d4b2fcd25c98a008385b436d61d46a4/deploy/kubernetes/rbac.yaml",
+)
+
+// The RBAC manifests for the 1.x sidecar containers. Starting with 1.0.1, each sidecar app
+// releases with its own RBAC file.
+var csi1SidecarRBAC = testfiles.RegisterFiles(
+	"https://github.com/kubernetes-csi/external-attacher/blob/v1.0.1/deploy/kubernetes/rbac.yaml",
+	"https://github.com/kubernetes-csi/external-provisioner/blob/v1.0.1/deploy/kubernetes/rbac.yaml",
+	"https://github.com/kubernetes-csi/node-driver-registrar/blob/v1.0.1/deploy/kubernetes/rbac.yaml",
+)
+
+// These will probably never move.
+var hostpath04Manifests = testfiles.RegisterFiles(
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-provisioner.yaml",
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpathplugin.yaml",
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/e2e-test-rbac.yaml",
+)
+
+// Will eventually move to a separate repo (see https://github.com/kubernetes-csi/csi-driver-host-path/pull/1).
+var hostpath1Manifests = testfiles.RegisterFiles(
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-provisioner.yaml",
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpathplugin.yaml",
+	"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 )
 
 // hostpathCSI
@@ -79,14 +116,12 @@ var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
+	var manifests []string
+	manifests = append(manifests, csi1SidecarRBAC...)
+	manifests = append(manifests, hostpath1Manifests...)
+
 	return initHostPathCSIDriver("csi-hostpath", config,
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
+		manifests...,
 	)
 }
 
@@ -148,15 +183,11 @@ func (h *hostpathCSIDriver) CleanupDriver() {
 
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
 func InitHostPathV0CSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
-	return initHostPathCSIDriver("csi-hostpath-v0", config,
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpathplugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/e2e-test-rbac.yaml",
-	)
+	var manifests []string
+	manifests = append(manifests, csi04SidecarRBAC...)
+	manifests = append(manifests, hostpath04Manifests...)
+
+	return initHostPathCSIDriver("csi-hostpath-v0", config, manifests...)
 }
 
 // gce-pd
@@ -233,14 +264,14 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	// }
 	createGCESecrets(g.driverInfo.Config.Framework.ClientSet, g.driverInfo.Config.Framework.Namespace.Name)
 
-	cleanup, err := g.driverInfo.Config.Framework.CreateFromManifests(nil,
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+	var manifests []string
+	manifests = append(manifests, csi04SidecarRBAC...)
+	manifests = append(manifests,
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	)
+	cleanup, err := g.driverInfo.Config.Framework.CreateFromManifests(nil, manifests...)
 	g.cleanup = cleanup
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)

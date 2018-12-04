@@ -70,7 +70,7 @@ subjects:
     name: csi-controller-sa
     namespace: default
   - kind: ServiceAccount
-    name: csi-node-sa
+    name: csi-driver-registrar
     namespace: default
 roleRef:
   kind: ClusterRole

@@ -11,7 +11,7 @@ spec:
       labels:
         app: gcp-compute-persistent-disk-csi-driver
     spec:
-      serviceAccountName: csi-node-sa
+      serviceAccountName: csi-driver-registrar
       containers:
         - name: csi-driver-registrar
           image: gcr.io/gke-release/csi-driver-registrar:v1.0.1-gke.0
