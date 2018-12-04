@@ -483,15 +483,12 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 
 func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...utilfeature.Feature) {
 	for _, fg := range gates {
-		func() {
-			enabled := utilfeature.DefaultFeatureGate.Enabled(fg)
-			defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled))
-
-			for _, f := range []bool{true, false} {
-				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f))
+                  for _, f := range []bool{true, false} {
+			func() {
+				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
-			}
-		}()
+			}()
+		}
 	}
 }
 
