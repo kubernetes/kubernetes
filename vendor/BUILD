@@ -469,6 +469,7 @@ filegroup(
         "//vendor/k8s.io/utils/exec:all-srcs",
         "//vendor/k8s.io/utils/pointer:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:all-srcs",
+        "//vendor/sigs.k8s.io/structured-merge-diff/merge:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/schema:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/typed:all-srcs",
         "//vendor/sigs.k8s.io/structured-merge-diff/value:all-srcs",
