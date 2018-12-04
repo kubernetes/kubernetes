@@ -671,8 +671,8 @@ func PrioritizeNodes(
 
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
-		for i, priorityConfig := range priorityConfigs {
-			if priorityConfig.Function != nil {
+		for i := range priorityConfigs {
+			if priorityConfigs[i].Function != nil {
 				continue
 			}
 
@@ -685,22 +685,22 @@ func PrioritizeNodes(
 		}
 	})
 
-	for i, priorityConfig := range priorityConfigs {
-		if priorityConfig.Reduce == nil {
+	for i := range priorityConfigs {
+		if priorityConfigs[i].Reduce == nil {
 			continue
 		}
 		wg.Add(1)
-		go func(index int, config algorithm.PriorityConfig) {
+		go func(index int) {
 			defer wg.Done()
-			if err := config.Reduce(pod, meta, nodeNameToInfo, results[index]); err != nil {
+			if err := priorityConfigs[i].Reduce(pod, meta, nodeNameToInfo, results[index]); err != nil {
 				appendError(err)
 			}
 			if klog.V(10) {
 				for _, hostPriority := range results[index] {
-					klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), hostPriority.Host, config.Name, hostPriority.Score)
+					klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), hostPriority.Host, priorityConfigs[i].Name, hostPriority.Score)
 				}
 			}
-		}(i, priorityConfig)
+		}(i)
 	}
 	// Wait for all computations to be finished.
 	wg.Wait()
