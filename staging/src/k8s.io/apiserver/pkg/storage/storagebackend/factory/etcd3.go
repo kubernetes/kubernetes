@@ -78,12 +78,14 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		if err != nil {
 			return fmt.Errorf("error listing etcd members: %v", err)
 		}
-		endpoints := []string{}
-		for _, m := range memberList.Members {
-			endpoints = append(endpoints, m.ClientURLs...)
-		}
-		if sets.NewString(endpoints...).Intersection(serverList).Len() == 0 {
-			return fmt.Errorf("current etcd cluster endpoints should share at least one with `--etcd-servers` flag")
+		if c.AutoSyncInterval > 0 {
+			endpoints := []string{}
+			for _, m := range memberList.Members {
+				endpoints = append(endpoints, m.ClientURLs...)
+			}
+			if sets.NewString(endpoints...).Intersection(serverList).Len() == 0 {
+				return fmt.Errorf("current etcd cluster endpoints should share at least one with `--etcd-servers` flag")
+			}
 		}
 		return nil
 	}, nil
