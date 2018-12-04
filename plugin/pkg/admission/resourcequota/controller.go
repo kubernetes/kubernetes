@@ -40,7 +40,10 @@ import (
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
+	"math/rand"
 )
+
+var retries = 3
 
 // Evaluator is used to see if quota constraints are satisfied.
 type Evaluator interface {
@@ -215,6 +218,13 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 //    and recurse into this method with the subset.  It's safe for us to evaluate ONLY the subset, because the other quota
 //    documents for these waiters have already been evaluated.  Step 1, will mark all the ones that should already have succeeded.
 func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAttributes []*admissionWaiter, remainingRetries int) {
+
+	// delay for random time (0.1ms * random) when retry, to avoid version conflict error
+	if remainingRetries < retries {
+		times := retries - remainingRetries
+		time.Sleep(time.Duration(rand.Intn(times*10)) * 100 * time.Microsecond)
+	}
+
 	// yet another copy to compare against originals to see if we actually have deltas
 	originalQuotas, err := copyQuotas(quotas)
 	if err != nil {
