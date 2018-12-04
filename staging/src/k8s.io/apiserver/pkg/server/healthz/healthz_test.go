@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestInstallHandler(t *testing.T) {
@@ -82,6 +85,10 @@ func TestMulitipleChecks(t *testing.T) {
 		addBadCheck      bool
 	}{
 		{"/healthz?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"/healthz?exclude=dontexist", "ok", http.StatusOK, false},
+		{"/healthz?exclude=bad", "ok", http.StatusOK, true},
+		{"/healthz?verbose=true&exclude=bad", "[+]ping ok\n[+]bad excluded: ok\nhealthz check passed\n", http.StatusOK, true},
+		{"/healthz?verbose=true&exclude=dontexist", "[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\nhealthz check passed\n", http.StatusOK, false},
 		{"/healthz/ping", "ok", http.StatusOK, false},
 		{"/healthz", "ok", http.StatusOK, false},
 		{"/healthz?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
@@ -135,10 +142,72 @@ func TestCheckerNames(t *testing.T) {
 	for _, tc := range testCases {
 		result := checkerNames(tc.have...)
 		t.Run(tc.desc, func(t *testing.T) {
-			if reflect.DeepEqual(tc.want, result) {
+			if !reflect.DeepEqual(tc.want, result) {
 				t.Errorf("want %#v, got %#v", tc.want, result)
 			}
 		})
 	}
+}
 
+func TestFormatQuoted(t *testing.T) {
+	n1 := "n1"
+	n2 := "n2"
+	testCases := []struct {
+		desc     string
+		names    []string
+		expected string
+	}{
+		{"empty", []string{}, ""},
+		{"single name", []string{n1}, "\"n1\""},
+		{"two names", []string{n1, n2}, "\"n1\",\"n2\""},
+		{"two names, reverse order", []string{n2, n1}, "\"n2\",\"n1\""},
+	}
+	for _, tc := range testCases {
+		result := formatQuoted(tc.names...)
+		t.Run(tc.desc, func(t *testing.T) {
+			if result != tc.expected {
+				t.Errorf("expected %#v, got %#v", tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetExcludedChecks(t *testing.T) {
+	type args struct {
+		r *http.Request
+	}
+	tests := []struct {
+		name string
+		r    *http.Request
+		want sets.String
+	}{
+		{"Should have no excluded health checks",
+			createGetRequestWithUrl("/healthz?verbose=true"),
+			sets.NewString(),
+		},
+		{"Should extract out the ping health check",
+			createGetRequestWithUrl("/healthz?exclude=ping"),
+			sets.NewString("ping"),
+		},
+		{"Should extract out ping and log health check",
+			createGetRequestWithUrl("/healthz?exclude=ping&exclude=log"),
+			sets.NewString("ping", "log"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getExcludedChecks(tt.r); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getExcludedChecks() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func createGetRequestWithUrl(rawUrlString string) *http.Request {
+	url, _ := url.Parse(rawUrlString)
+	return &http.Request{
+		Method: http.MethodGet,
+		Proto:  "HTTP/1.1",
+		URL:    url,
+	}
 }

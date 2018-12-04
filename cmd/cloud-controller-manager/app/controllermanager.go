@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -118,17 +119,25 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 		glog.Errorf("unable to register configz: %c", err)
 	}
 
+	// Setup any healthz checks we will want to use.
+	var checks []healthz.HealthzChecker
+	var electionChecker *leaderelection.HealthzAdaptor
+	if c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
+		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
+		checks = append(checks, electionChecker)
+	}
+
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.SecureServing != nil {
-		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging, checks...)
 		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
 		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.InsecureServing != nil {
-		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging, checks...)
 		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
 		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
@@ -194,6 +203,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 				glog.Fatalf("leaderelection lost")
 			},
 		},
+		WatchDog: electionChecker,
+		Name:     "cloud-controller-manager",
 	})
 	panic("unreachable")
 }
