@@ -35,13 +35,12 @@ func createNodeInternalIPAddress(address string) []v1.NodeAddress {
 	}
 }
 
-func TestNodeAddressesRequest(t *testing.T) {
-	syncPeriod := 300 * time.Millisecond
-	maxRetry := 5
+func TestNodeAddressesDelay(t *testing.T) {
+	syncPeriod := 100 * time.Millisecond
 	cloud := &fake.FakeCloud{
 		Addresses: createNodeInternalIPAddress("10.0.1.12"),
 		// Set the request delay so the manager timeouts and collects the node addresses later
-		RequestDelay: 400 * time.Millisecond,
+		RequestDelay: 200 * time.Millisecond,
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -61,6 +60,7 @@ func TestNodeAddressesRequest(t *testing.T) {
 	cloud.SetNodeAddresses(createNodeInternalIPAddress("10.0.1.13"))
 
 	// Wait until the IP address changes
+	maxRetry := 5
 	for i := 0; i < maxRetry; i++ {
 		nodeAddresses, err := manager.NodeAddresses()
 		t.Logf("nodeAddresses: %#v, err: %v", nodeAddresses, err)
@@ -69,7 +69,7 @@ func TestNodeAddressesRequest(t *testing.T) {
 		}
 		// It is safe to read cloud.Addresses since no routine is changing the value at the same time
 		if err == nil && nodeAddresses[0].Address != cloud.Addresses[0].Address {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(syncPeriod)
 			continue
 		}
 		if err != nil {
