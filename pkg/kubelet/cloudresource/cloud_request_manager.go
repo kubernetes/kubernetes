@@ -63,27 +63,27 @@ func NewSyncManager(cloud cloudprovider.Interface, nodeName types.NodeName, sync
 	}
 }
 
-func (manager *cloudResourceSyncManager) getNodeAddressSafe() ([]v1.NodeAddress, error) {
-	manager.nodeAddressesMux.Lock()
-	defer manager.nodeAddressesMux.Unlock()
+func (m *cloudResourceSyncManager) getNodeAddressSafe() ([]v1.NodeAddress, error) {
+	m.nodeAddressesMux.Lock()
+	defer m.nodeAddressesMux.Unlock()
 
-	return manager.nodeAddresses, manager.nodeAddressesErr
+	return m.nodeAddresses, m.nodeAddressesErr
 }
 
-func (manager *cloudResourceSyncManager) setNodeAddressSafe(nodeAddresses []v1.NodeAddress, err error) {
-	manager.nodeAddressesMux.Lock()
-	defer manager.nodeAddressesMux.Unlock()
+func (m *cloudResourceSyncManager) setNodeAddressSafe(nodeAddresses []v1.NodeAddress, err error) {
+	m.nodeAddressesMux.Lock()
+	defer m.nodeAddressesMux.Unlock()
 
-	manager.nodeAddresses = nodeAddresses
-	manager.nodeAddressesErr = err
+	m.nodeAddresses = nodeAddresses
+	m.nodeAddressesErr = err
 }
 
 // NodeAddresses does not wait for cloud provider to return a node addresses.
 // It always returns node addresses or an error.
-func (manager *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, error) {
+func (m *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, error) {
 	// wait until there is something
 	for {
-		nodeAddresses, err := manager.getNodeAddressSafe()
+		nodeAddresses, err := m.getNodeAddressSafe()
 		if len(nodeAddresses) == 0 && err == nil {
 			klog.V(5).Infof("Waiting for %v for cloud provider to provide node addresses", nodeAddressesRetryPeriod)
 			time.Sleep(nodeAddressesRetryPeriod)
@@ -93,12 +93,12 @@ func (manager *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, erro
 	}
 }
 
-func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Context, nodeName types.NodeName) {
+func (m *cloudResourceSyncManager) collectNodeAddresses(ctx context.Context, nodeName types.NodeName) {
 	klog.V(5).Infof("Requesting node addresses from cloud provider for node %q", nodeName)
 
-	instances, ok := manager.cloud.Instances()
+	instances, ok := m.cloud.Instances()
 	if !ok {
-		manager.setNodeAddressSafe(nil, fmt.Errorf("failed to get instances from cloud provider"))
+		m.setNodeAddressSafe(nil, fmt.Errorf("failed to get instances from cloud provider"))
 		return
 	}
 
@@ -109,16 +109,17 @@ func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Contex
 
 	nodeAddresses, err := instances.NodeAddresses(ctx, nodeName)
 	if err != nil {
-		manager.setNodeAddressSafe(nil, fmt.Errorf("failed to get node address from cloud provider: %v", err))
+		m.setNodeAddressSafe(nil, fmt.Errorf("failed to get node address from cloud provider: %v", err))
 		klog.V(2).Infof("Node addresses from cloud provider for node %q not collected", nodeName)
 	} else {
-		manager.setNodeAddressSafe(nodeAddresses, nil)
+		m.setNodeAddressSafe(nodeAddresses, nil)
 		klog.V(5).Infof("Node addresses from cloud provider for node %q collected", nodeName)
 	}
 }
 
-func (manager *cloudResourceSyncManager) Run(stopCh <-chan struct{}) {
+// Run starts the cloud resource sync manager's sync loop.
+func (m *cloudResourceSyncManager) Run(stopCh <-chan struct{}) {
 	wait.Until(func() {
-		manager.collectNodeAddresses(context.TODO(), manager.nodeName)
-	}, manager.syncPeriod, stopCh)
+		m.collectNodeAddresses(context.TODO(), m.nodeName)
+	}, m.syncPeriod, stopCh)
 }

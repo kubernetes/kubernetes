@@ -17,32 +17,14 @@ limitations under the License.
 package cloudresource
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
-
-func collectNodeAddresses(manager *cloudResourceSyncManager) ([]v1.NodeAddress, error) {
-	var nodeAddresses []v1.NodeAddress
-	var err error
-
-	collected := make(chan struct{}, 1)
-	go func() {
-		nodeAddresses, err = manager.NodeAddresses()
-		close(collected)
-	}()
-
-	select {
-	case <-collected:
-		return nodeAddresses, err
-	case <-time.Tick(2 * nodeAddressesRetryPeriod):
-		return nil, fmt.Errorf("Timeout after %v waiting for address to appear", 2*nodeAddressesRetryPeriod)
-	}
-}
 
 func createNodeInternalIPAddress(address string) []v1.NodeAddress {
 	return []v1.NodeAddress{
@@ -67,12 +49,12 @@ func TestNodeAddressesRequest(t *testing.T) {
 	manager := NewSyncManager(cloud, "defaultNode", syncPeriod).(*cloudResourceSyncManager)
 	go manager.Run(stopCh)
 
-	nodeAddresses, err := collectNodeAddresses(manager)
+	nodeAddresses, err := manager.NodeAddresses()
 	if err != nil {
 		t.Errorf("Unexpected err: %q\n", err)
 	}
 	if !reflect.DeepEqual(nodeAddresses, cloud.Addresses) {
-		t.Errorf("Unexpected list of node addresses %#v, expected %#v: %v", nodeAddresses, cloud.Addresses, err)
+		t.Errorf("Unexpected diff of node addresses: %v", diff.ObjectReflectDiff(nodeAddresses, cloud.Addresses))
 	}
 
 	// Change the IP address
@@ -80,7 +62,7 @@ func TestNodeAddressesRequest(t *testing.T) {
 
 	// Wait until the IP address changes
 	for i := 0; i < maxRetry; i++ {
-		nodeAddresses, err := collectNodeAddresses(manager)
+		nodeAddresses, err := manager.NodeAddresses()
 		t.Logf("nodeAddresses: %#v, err: %v", nodeAddresses, err)
 		if err != nil {
 			t.Errorf("Unexpected err: %q\n", err)
