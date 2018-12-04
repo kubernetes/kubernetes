@@ -1,6 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//build:workspace_mirror.bzl", "mirror")
-load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
+load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 http_archive(
     name = "io_bazel_rules_go",
@@ -58,7 +58,7 @@ http_file(
     name = "kubernetes_cni",
     downloaded_file_path = "kubernetes_cni.tgz",
     sha256 = "f04339a21b8edf76d415e7f17b620e63b8f37a76b2f706671587ab6464411f2d",
-    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz"),
+    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v%s.tgz" % CNI_VERSION),
 )
 
 http_file(
