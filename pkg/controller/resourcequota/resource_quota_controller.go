@@ -246,7 +246,7 @@ func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface)
 		}
 		key, quit := queue.Get()
 		if quit {
-			glog.Infof("resource quota controller worker shutting down")
+			klog.Infof("resource quota controller worker shutting down")
 			return true
 		}
 		defer queue.Done(key)
