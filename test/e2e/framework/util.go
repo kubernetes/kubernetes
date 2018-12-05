@@ -3601,44 +3601,43 @@ func DeletePodOrFail(c clientset.Interface, ns, name string) {
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
 // used to SSH to their nodes.
 func GetSigner(provider string) (ssh.Signer, error) {
-	// Get the directory in which SSH keys are located.
-	keydir := filepath.Join(os.Getenv("HOME"), ".ssh")
-
 	// Select the key itself to use. When implementing more providers here,
 	// please also add them to any SSH tests that are disabled because of signer
 	// support.
 	keyfile := ""
-	key := ""
 	switch provider {
 	case "gce", "gke", "kubemark":
-		keyfile = "google_compute_engine"
-	case "aws":
-		// If there is an env. variable override, use that.
-		aws_keyfile := os.Getenv("AWS_SSH_KEY")
-		if len(aws_keyfile) != 0 {
-			return sshutil.MakePrivateKeySignerFromFile(aws_keyfile)
+		keyfile = os.Getenv("GCE_SSH_KEY")
+		if keyfile == "" {
+			keyfile = "google_compute_engine"
 		}
-		// Otherwise revert to home dir
-		keyfile = "kube_aws_rsa"
+	case "aws":
+		keyfile = os.Getenv("AWS_SSH_KEY")
+		if keyfile == "" {
+			keyfile = "kube_aws_rsa"
+		}
 	case "local", "vsphere":
-		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
-		if len(keyfile) == 0 {
+		keyfile = os.Getenv("LOCAL_SSH_KEY")
+		if keyfile == "" {
 			keyfile = "id_rsa"
 		}
 	case "skeleton":
 		keyfile = os.Getenv("KUBE_SSH_KEY")
-		if len(keyfile) == 0 {
+		if keyfile == "" {
 			keyfile = "id_rsa"
 		}
 	default:
 		return nil, fmt.Errorf("GetSigner(...) not implemented for %s", provider)
 	}
 
-	if len(key) == 0 {
-		key = filepath.Join(keydir, keyfile)
+	// Respect absolute paths for keys given by user, fallback to assuming
+	// relative paths are in ~/.ssh
+	if !filepath.IsAbs(keyfile) {
+		keydir := filepath.Join(os.Getenv("HOME"), ".ssh")
+		keyfile = filepath.Join(keydir, keyfile)
 	}
 
-	return sshutil.MakePrivateKeySignerFromFile(key)
+	return sshutil.MakePrivateKeySignerFromFile(keyfile)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
