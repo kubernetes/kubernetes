@@ -526,6 +526,22 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 }
 
+func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
+	proxier.loadBalancer.OnEndpointsAdd(endpoints)
+}
+
+func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
+	proxier.loadBalancer.OnEndpointsUpdate(oldEndpoints, endpoints)
+}
+
+func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
+	proxier.loadBalancer.OnEndpointsDelete(endpoints)
+}
+
+func (proxier *Proxier) OnEndpointsSynced() {
+	proxier.loadBalancer.OnEndpointsSynced()
+}
+
 func sameConfig(info *ServiceInfo, service *v1.Service, port *v1.ServicePort) bool {
 	if info.protocol != port.Protocol || info.portal.port != int(port.Port) || info.nodePort != int(port.NodePort) {
 		return false
