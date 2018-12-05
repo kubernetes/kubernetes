@@ -104,6 +104,7 @@ func NewOptions() (*Options, error) {
 		},
 	}
 
+	o.Authentication.TolerateInClusterLookupFailure = true
 	o.Authentication.RemoteKubeConfigFileOptional = true
 	o.Authorization.RemoteKubeConfigFileOptional = true
 	o.Authorization.AlwaysAllowPaths = []string{"/healthz"}
