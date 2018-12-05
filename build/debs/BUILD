@@ -3,7 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
-load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
+load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
@@ -153,7 +153,7 @@ k8s_deb(
         "ethtool",
         "iproute2",
         "iptables (>= 1.4.21)",
-        "kubernetes-cni (>= 0.6.0)",
+        "kubernetes-cni (>= %s)" % CNI_VERSION,
         "mount",
         "socat",
         "util-linux",
@@ -169,7 +169,7 @@ k8s_deb(
     depends = [
         "kubelet (>= 1.8.0)",
         "kubectl (>= 1.8.0)",
-        "kubernetes-cni (>= 0.6.0)",
+        "kubernetes-cni (>= %s)" % CNI_VERSION,
         "cri-tools (>= 1.11.0)",
     ],
     description = """Kubernetes Cluster Bootstrapping Tool
@@ -184,7 +184,7 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
-    version_file = "//build:cni_package_version",
+    version = CNI_VERSION,
 )
 
 k8s_deb(

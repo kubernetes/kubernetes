@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@bazel_tools//tools/build_defs/pkg:rpm.bzl", "pkg_rpm")
-load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
+load("//build:workspace.bzl", "CNI_VERSION", "CRI_TOOLS_VERSION")
 
 filegroup(
     name = "rpms",
@@ -66,7 +66,7 @@ pkg_rpm(
     ],
     spec_file = "kubernetes-cni.spec",
     tags = ["manual"],
-    version_file = "//build:cni_package_version",
+    version = CNI_VERSION,
 )
 
 pkg_rpm(
