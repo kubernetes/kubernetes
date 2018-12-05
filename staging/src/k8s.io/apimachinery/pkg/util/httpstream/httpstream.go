@@ -17,6 +17,7 @@ limitations under the License.
 package httpstream
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -123,15 +124,11 @@ func negotiateProtocol(clientProtocols, serverProtocols []string) string {
 func Handshake(req *http.Request, w http.ResponseWriter, serverProtocols []string) (string, error) {
 	clientProtocols := req.Header[http.CanonicalHeaderKey(HeaderProtocolVersion)]
 	if len(clientProtocols) == 0 {
-		// Kube 1.0 clients didn't support subprotocol negotiation.
-		// TODO require clientProtocols once Kube 1.0 is no longer supported
-		return "", nil
+		return "", errors.New("client did not propose any subprotocol options")
 	}
 
 	if len(serverProtocols) == 0 {
-		// Kube 1.0 servers didn't support subprotocol negotiation. This is mainly for testing.
-		// TODO require serverProtocols once Kube 1.0 is no longer supported
-		return "", nil
+		return "", errors.New("server did not propose any subprotocol options")
 	}
 
 	negotiatedProtocol := negotiateProtocol(clientProtocols, serverProtocols)
