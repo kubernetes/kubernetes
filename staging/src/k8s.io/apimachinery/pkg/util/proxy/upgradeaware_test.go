@@ -414,7 +414,7 @@ func TestProxyUpgrade(t *testing.T) {
 			},
 			ProxyTransport: utilnet.SetTransportDefaults(&http.Transport{DialContext: d.DialContext, TLSClientConfig: &tls.Config{RootCAs: localhostPool}}),
 			UpgradeTransport: NewUpgradeRequestRoundTripper(
-				utilnet.SetOldTransportDefaults(&http.Transport{DialContext: d.DialContext, TLSClientConfig: &tls.Config{RootCAs: localhostPool}}),
+				utilnet.SetTransportDefaults(&http.Transport{DialContext: d.DialContext, TLSClientConfig: &tls.Config{RootCAs: localhostPool}}),
 				RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 					req = utilnet.CloneRequest(req)
 					req.Header.Set("Authorization", "Bearer 1234")

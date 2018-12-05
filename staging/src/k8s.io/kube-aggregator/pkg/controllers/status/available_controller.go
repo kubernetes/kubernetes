@@ -77,7 +77,7 @@ func NewAvailableConditionController(
 	serviceInformer v1informers.ServiceInformer,
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
-	proxyTransport *http.Transport,
+	proxyTransport http.RoundTripper,
 	serviceResolver ServiceResolver,
 ) *AvailableConditionController {
 	c := &AvailableConditionController{

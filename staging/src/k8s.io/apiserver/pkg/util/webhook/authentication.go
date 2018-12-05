@@ -24,6 +24,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -35,7 +36,7 @@ type AuthenticationInfoResolverWrapper func(AuthenticationInfoResolver) Authenti
 
 // NewDefaultAuthenticationInfoResolverWrapper builds a default authn resolver wrapper
 func NewDefaultAuthenticationInfoResolverWrapper(
-	proxyTransport *http.Transport,
+	proxyTransport http.RoundTripper,
 	kubeapiserverClientConfig *rest.Config) AuthenticationInfoResolverWrapper {
 
 	webhookAuthResolverWrapper := func(delegate AuthenticationInfoResolver) AuthenticationInfoResolver {
@@ -54,8 +55,10 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				if err != nil {
 					return nil, err
 				}
-				if proxyTransport != nil && proxyTransport.DialContext != nil {
-					ret.Dial = proxyTransport.DialContext
+				if proxyTransport != nil {
+					if d, err := utilnet.DialerFor(proxyTransport); err == nil && d != nil {
+						ret.Dial = d
+					}
 				}
 				return ret, err
 			},

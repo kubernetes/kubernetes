@@ -48,7 +48,7 @@ type proxyHandler struct {
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
 	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	proxyTransport  http.RoundTripper
 
 	// Endpoints based routing to map from cluster IP to routable IP
 	serviceResolver ServiceResolver
@@ -208,8 +208,10 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		serviceNamespace: apiService.Spec.Service.Namespace,
 		serviceAvailable: apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available),
 	}
-	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
-		newInfo.restConfig.Dial = r.proxyTransport.DialContext
+	if r.proxyTransport != nil {
+		if d, err := utilnet.DialerFor(r.proxyTransport); err == nil && d != nil {
+			newInfo.restConfig.Dial = d
+		}
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	if newInfo.transportBuildingError != nil {

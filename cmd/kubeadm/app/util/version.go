@@ -161,7 +161,7 @@ func splitVersion(version string) (string, string, error) {
 // Internal helper: return content of URL
 func fetchFromURL(url string, timeout time.Duration) (string, error) {
 	klog.V(2).Infof("fetching Kubernetes version from URL: %s", url)
-	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+	client := &http.Client{Timeout: timeout, Transport: netutil.SetTransportDefaults(&http.Transport{})}
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", pkgerrors.Errorf("unable to get URL %q: %s", url, err.Error())

@@ -55,7 +55,7 @@ type Prober interface {
 }
 
 type httpProber struct {
-	transport *http.Transport
+	transport http.RoundTripper
 }
 
 // Probe returns a ProbeRunner capable of running an HTTP check.

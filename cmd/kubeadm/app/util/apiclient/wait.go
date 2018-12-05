@@ -137,7 +137,7 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 	time.Sleep(initalTimeout)
 	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initalTimeout)
 	return TryRunCommand(func() error {
-		client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+		client := &http.Client{Transport: netutil.SetTransportDefaults(&http.Transport{})}
 		resp, err := client.Get(healthzEndpoint)
 		if err != nil {
 			fmt.Println("[kubelet-check] It seems like the kubelet isn't running or healthy.")

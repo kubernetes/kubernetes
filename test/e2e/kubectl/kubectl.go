@@ -1968,7 +1968,7 @@ func curlUnix(url string, path string) (string, error) {
 	return curlTransport(url, transport)
 }
 
-func curlTransport(url string, transport *http.Transport) (string, error) {
+func curlTransport(url string, transport http.RoundTripper) (string, error) {
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(url)
 	if err != nil {

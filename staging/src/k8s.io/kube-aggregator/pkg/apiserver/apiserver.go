@@ -64,7 +64,7 @@ type ExtraConfig struct {
 
 	// If present, the Dial method will be used for dialing out to delegate
 	// apiservers.
-	ProxyTransport *http.Transport
+	ProxyTransport http.RoundTripper
 
 	// Mechanism by which the Aggregator will resolve services. Required.
 	ServiceResolver ServiceResolver
@@ -95,7 +95,7 @@ type APIAggregator struct {
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
 	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	proxyTransport  http.RoundTripper
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler

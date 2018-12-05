@@ -31,12 +31,12 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports map[tlsCacheKey]http.RoundTripper
 }
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)}
 
 type tlsCacheKey struct {
 	insecure   bool

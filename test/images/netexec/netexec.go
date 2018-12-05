@@ -220,10 +220,11 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func dialHTTP(request, hostPort string) (string, error) {
-	transport := utilnet.SetTransportDefaults(&http.Transport{})
+	transport := utilnet.SetTransportDefaults(&http.Transport{
+		DisableKeepAlives: true,
+	})
 	httpClient := createHTTPClient(transport)
 	resp, err := httpClient.Get(fmt.Sprintf("http://%s/%s", hostPort, request))
-	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
@@ -234,7 +235,7 @@ func dialHTTP(request, hostPort string) (string, error) {
 	return "", err
 }
 
-func createHTTPClient(transport *http.Transport) *http.Client {
+func createHTTPClient(transport http.RoundTripper) *http.Client {
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   5 * time.Second,

@@ -406,11 +406,21 @@ func SetTransportDefaults(t *http.Transport) http.RoundTripper {
 	return newH1FallbackTransport(t)
 }
 
+var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
+
+// isDefault checks to see if the transportProxierFunc is pointing to the default one
+func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
+	transportProxierPointer := fmt.Sprintf("%p", transportProxier)
+	return transportProxierPointer == defaultProxyFuncPointer
+}
+
+var defaultTransport = http.DefaultTransport.(*http.Transport)
+
 func setOldTransportDefaults(t *http.Transport) *http.Transport {
 	if t.Proxy == nil || isDefault(t.Proxy) {
 		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
 		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
-		t.Proxy = utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
+		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 	// If no custom dialer is set, use the default context dialer
 	if t.DialContext == nil && t.Dial == nil {

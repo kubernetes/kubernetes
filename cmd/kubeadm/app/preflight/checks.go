@@ -435,7 +435,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 		return nil, []error{err}
 	}
 
-	proxy, err := netutil.SetOldTransportDefaults(&http.Transport{}).Proxy(req)
+	proxy, err := netutil.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)(req)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -490,7 +490,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 	}
 
 	// Utilize same transport defaults as it will be used by API server
-	proxy, err := netutil.SetOldTransportDefaults(&http.Transport{}).Proxy(req)
+	proxy, err := netutil.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)(req)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -773,7 +773,7 @@ func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.C
 
 func (evc ExternalEtcdVersionCheck) getHTTPClient(config *tls.Config) *http.Client {
 	if config != nil {
-		transport := netutil.SetOldTransportDefaults(&http.Transport{
+		transport := netutil.SetTransportDefaults(&http.Transport{
 			TLSClientConfig: config,
 		})
 		return &http.Client{
@@ -781,7 +781,7 @@ func (evc ExternalEtcdVersionCheck) getHTTPClient(config *tls.Config) *http.Clie
 			Timeout:   externalEtcdRequestTimeout,
 		}
 	}
-	return &http.Client{Timeout: externalEtcdRequestTimeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+	return &http.Client{Timeout: externalEtcdRequestTimeout, Transport: netutil.SetTransportDefaults(&http.Transport{})}
 }
 
 func getEtcdVersionResponse(client *http.Client, url string, target interface{}) error {

@@ -298,7 +298,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 
 // buildTransportWithCA creates a transport for use in executing HTTPS requests with
 // the given certs. Note that the given rootCA must be configured with isCA=true.
-func buildTransportWithCA(serverName string, rootCA []byte) (*http.Transport, error) {
+func buildTransportWithCA(serverName string, rootCA []byte) (http.RoundTripper, error) {
 	pool := x509.NewCertPool()
 	ok := pool.AppendCertsFromPEM(rootCA)
 	if !ok {

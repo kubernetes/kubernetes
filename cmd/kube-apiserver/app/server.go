@@ -222,7 +222,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 }
 
 // CreateNodeDialer creates the dialer infrastructure to connect to the nodes.
-func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
+func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, http.RoundTripper, error) {
 	// Setup nodeTunneler if needed
 	var nodeTunneler tunneler.Tunneler
 	var proxyDialerFn utilnet.DialFunc
@@ -270,7 +270,7 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 func CreateKubeAPIServerConfig(
 	s completedServerRunOptions,
 	nodeTunneler tunneler.Tunneler,
-	proxyTransport *http.Transport,
+	proxyTransport http.RoundTripper,
 ) (
 	config *master.Config,
 	insecureServingInfo *genericapiserver.DeprecatedInsecureServingInfo,
@@ -368,7 +368,7 @@ func CreateKubeAPIServerConfig(
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func buildGenericConfig(
 	s *options.ServerRunOptions,
-	proxyTransport *http.Transport,
+	proxyTransport http.RoundTripper,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,

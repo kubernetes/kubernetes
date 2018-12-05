@@ -166,7 +166,7 @@ func makeUpgradeTransport(config *rest.Config, keepalive time.Duration) (proxy.U
 	if err != nil {
 		return nil, err
 	}
-	rt := utilnet.SetOldTransportDefaults(&http.Transport{
+	rt := utilnet.SetTransportDefaults(&http.Transport{
 		TLSClientConfig: tlsConfig,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,

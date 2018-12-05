@@ -57,7 +57,7 @@ func createAggregatorConfig(
 	commandOptions *options.ServerRunOptions,
 	externalInformers kubeexternalinformers.SharedInformerFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
-	proxyTransport *http.Transport,
+	proxyTransport http.RoundTripper,
 	pluginInitializers []admission.PluginInitializer,
 ) (*aggregatorapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
