@@ -89,10 +89,13 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.Lock == nil {
 		return nil, fmt.Errorf("Lock must not be nil.")
 	}
-	return &LeaderElector{
-		config: lec,
-		clock:  clock.RealClock{},
-	}, nil
+	le := LeaderElector{
+		config:  lec,
+		clock:   clock.RealClock{},
+		metrics: globalMetricsFactory.newLeaderMetrics(),
+	}
+	le.metrics.leaderOff(le.config.Name)
+	return &le, nil
 }
 
 type LeaderElectionConfig struct {
@@ -151,6 +154,8 @@ type LeaderElector struct {
 
 	// clock is wrapper around time to allow for less flaky testing
 	clock clock.Clock
+
+	metrics leaderMetricsAdapter
 
 	// name is the name of the resource lock for debugging
 	name string
@@ -211,6 +216,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
+		le.metrics.leaderOn(le.config.Name)
 		klog.Infof("successfully acquired lease %v", desc)
 		cancel()
 	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())
@@ -246,6 +252,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 			return
 		}
 		le.config.Lock.RecordEvent("stopped leading")
+		le.metrics.leaderOff(le.config.Name)
 		klog.Infof("failed to renew lease %v: %v", desc, err)
 		cancel()
 	}, le.config.RetryPeriod, ctx.Done())

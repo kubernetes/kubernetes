@@ -20,8 +20,8 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager",
     deps = [
         "//cmd/cloud-controller-manager/app:go_default_library",
-        "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
+        "//pkg/util/prometheusclientgo:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
     ],
