@@ -2734,7 +2734,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		// However, we only allow non-ready nodes with some specific reasons.
 		if len(notSchedulable) > 0 {
 			// In large clusters, log them only every 10th pass.
-			if len(nodes.Items) >= largeClusterThreshold && attempt%10 == 0 {
+			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
 				Logf("Unschedulable nodes:")
 				for i := range notSchedulable {
 					Logf("-> %s Ready=%t Network=%t Taints=%v",
