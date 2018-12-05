@@ -756,6 +756,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    resources:
     - replicationcontrollers
     - services
     verbs:
