@@ -19,7 +19,11 @@ package stats
 import (
 	"fmt"
 
+	"k8s.io/klog"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 type SummaryProvider interface {
@@ -32,6 +36,11 @@ type SummaryProvider interface {
 
 // summaryProviderImpl implements the SummaryProvider interface.
 type summaryProviderImpl struct {
+	// kubeletCreationTime is the time at which the summaryProvider was created.
+	kubeletCreationTime metav1.Time
+	// systemBootTime is the time at which the system was started
+	systemBootTime metav1.Time
+
 	provider StatsProvider
 }
 
@@ -40,7 +49,18 @@ var _ SummaryProvider = &summaryProviderImpl{}
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
 func NewSummaryProvider(statsProvider StatsProvider) SummaryProvider {
-	return &summaryProviderImpl{statsProvider}
+	kubeletCreationTime := metav1.Now()
+	bootTime, err := util.GetBootTime()
+	if err != nil {
+		// bootTime will be zero if we encounter an error getting the boot time.
+		klog.Warningf("Error getting system boot time.  Node metrics will have an incorrect start time: %v", err)
+	}
+
+	return &summaryProviderImpl{
+		kubeletCreationTime: kubeletCreationTime,
+		systemBootTime:      metav1.NewTime(bootTime),
+		provider:            statsProvider,
+	}
 }
 
 func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
@@ -77,7 +97,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
 		Network:          networkStats,
-		StartTime:        rootStats.StartTime,
+		StartTime:        sp.systemBootTime,
 		Fs:               rootFsStats,
 		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
 		Rlimit:           rlimit,
