@@ -183,44 +183,87 @@ func TestCreateWithKeyExist(t *testing.T) {
 func TestGet(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
+	// create an object to test
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	// create an additional object to increment the resource version for pods above the resource version of the foo object
+	lastUpdatedObj := &example.Pod{}
+	if err := store.Create(ctx, "bar", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, lastUpdatedObj, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
 
 	tests := []struct {
+		name              string
 		key               string
 		ignoreNotFound    bool
 		expectNotFoundErr bool
+		expectRVTooLarge  bool
 		expectedOut       *example.Pod
+		rv                string
 	}{{ // test get on existing item
+		name:              "get existing",
 		key:               key,
 		ignoreNotFound:    false,
 		expectNotFoundErr: false,
 		expectedOut:       storedObj,
+	}, { // test get on existing item with minimum resource version set to 0
+		name:        "resource version 0",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          "0",
+	}, { // test get on existing item with minimum resource version set to current resource version of the object
+		name:        "current object resource version",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          fmt.Sprintf("%d", currentRV),
+	}, { // test get on existing item with minimum resource version set to latest pod resource version
+		name:        "latest resource version",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          fmt.Sprintf("%d", lastUpdatedCurrentRV),
+	}, { // test get on existing item with minimum resource version set too high
+		name:             "too high resource version",
+		key:              key,
+		expectRVTooLarge: true,
+		rv:               fmt.Sprintf("%d", lastUpdatedCurrentRV+1),
 	}, { // test get on non-existing item with ignoreNotFound=false
+		name:              "get non-existing",
 		key:               "/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
 	}, { // test get on non-existing item with ignoreNotFound=true
+		name:              "get non-existing, ignore not found",
 		key:               "/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
 		expectedOut:       &example.Pod{},
 	}}
 
-	for i, tt := range tests {
-		out := &example.Pod{}
-		err := store.Get(ctx, tt.key, "", out, tt.ignoreNotFound)
-		if tt.expectNotFoundErr {
-			if err == nil || !storage.IsNotFound(err) {
-				t.Errorf("#%d: expecting not found error, but get: %s", i, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{}
+			err := store.Get(ctx, tt.key, tt.rv, out, tt.ignoreNotFound)
+			if tt.expectNotFoundErr {
+				if err == nil || !storage.IsNotFound(err) {
+					t.Errorf("expecting not found error, but get: %v", err)
+				}
+				return
 			}
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Get failed: %v", err)
-		}
-		if !reflect.DeepEqual(tt.expectedOut, out) {
-			t.Errorf("#%d: pod want=%#v, get=%#v", i, tt.expectedOut, out)
-		}
+			if tt.expectRVTooLarge {
+				if err == nil || !storage.IsTooLargeResourceVersion(err) {
+					t.Errorf("expecting resource version too high error, but get: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get failed: %v", err)
+			}
+			if !reflect.DeepEqual(tt.expectedOut, out) {
+				t.Errorf("pod want=%#v, get=%#v", tt.expectedOut, out)
+			}
+		})
 	}
 }
 
@@ -301,14 +344,34 @@ func TestGetToList(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
+	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+
 	tests := []struct {
-		key         string
-		pred        storage.SelectionPredicate
-		expectedOut []*example.Pod
+		key              string
+		pred             storage.SelectionPredicate
+		expectedOut      []*example.Pod
+		rv               string
+		expectRVTooLarge bool
 	}{{ // test GetToList on existing key
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
+	}, { // test GetToList on existing key with minimum resource version set to 0
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          "0",
+	}, { // test GetToList on existing key with minimum resource version set to current resource version
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          fmt.Sprintf("%d", currentRV),
+	}, { // test GetToList on existing key with minimum resource version set too high
+		key:              key,
+		pred:             storage.Everything,
+		expectedOut:      []*example.Pod{storedObj},
+		rv:               fmt.Sprintf("%d", currentRV+1),
+		expectRVTooLarge: true,
 	}, { // test GetToList on non-existing key
 		key:         "/non-existing",
 		pred:        storage.Everything,
@@ -328,7 +391,15 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := store.GetToList(ctx, tt.key, "", tt.pred, out)
+		err := store.GetToList(ctx, tt.key, tt.rv, tt.pred, out)
+
+		if tt.expectRVTooLarge {
+			if err == nil || !storage.IsTooLargeResourceVersion(err) {
+				t.Errorf("#%d: expecting resource version too high error, but get: %s", i, err)
+			}
+			continue
+		}
+
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
@@ -838,6 +909,7 @@ func TestList(t *testing.T) {
 		expectContinue             bool
 		expectedRemainingItemCount *int64
 		expectError                bool
+		expectRVTooLarge           bool
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -859,10 +931,30 @@ func TestList(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:             "rejects resource version set too high",
+			prefix:           "/",
+			rv:               fmt.Sprintf("%d", continueRV+1),
+			expectRVTooLarge: true,
+		},
+		{
 			name:        "test List on existing key",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
+		},
+		{
+			name:        "test List on existing key with minimum resource version set to 0",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          "0",
+		},
+		{
+			name:        "test List on existing key with minimum resource version set to current resource version",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          list.ResourceVersion,
 		},
 		{
 			name:        "test List on non-existing key",
@@ -1054,6 +1146,13 @@ func TestList(t *testing.T) {
 		} else {
 			err = store.List(ctx, tt.prefix, tt.rv, tt.pred, out)
 		}
+		if tt.expectRVTooLarge {
+			if err == nil || !storage.IsTooLargeResourceVersion(err) {
+				t.Errorf("(%s): expecting resource version too high error, but get: %s", tt.name, err)
+			}
+			continue
+		}
+
 		if (err != nil) != tt.expectError {
 			t.Errorf("(%s): List failed: %v", tt.name, err)
 		}
