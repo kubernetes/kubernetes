@@ -228,10 +228,6 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 
 type fakeTLSEtcdClient struct{ TLS bool }
 
-func (c fakeTLSEtcdClient) HasTLS() bool {
-	return c.TLS
-}
-
 func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
 func (c fakeTLSEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
@@ -262,11 +258,6 @@ func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.
 }
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
-
-func (c fakePodManifestEtcdClient) HasTLS() bool {
-	hasTLS, _ := etcdutil.PodManifestsHaveTLS(c.ManifestDir)
-	return hasTLS
-}
 
 func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
