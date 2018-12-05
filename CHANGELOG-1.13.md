@@ -240,7 +240,7 @@ For detailed release notes on the three alpha features from SIG AWS, please refe
 
 - [aws-alb-ingress-controller v1.0.0](https://github.com/kubernetes-sigs/aws-alb-ingress-controller/releases/tag/v1.0.0)
 - [aws-ebs-csi-driver v0.1](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/CHANGELOG-0.1.md)
-- [cloudprovider-aws external v0.1.0] (https://github.com/kubernetes/cloud-provider-aws/blob/master/changelogs/CHANGELOG-0.1.md)
+- [cloudprovider-aws external v0.1.0](https://github.com/kubernetes/cloud-provider-aws/blob/master/changelogs/CHANGELOG-0.1.md)
 
 ### SIG Azure
 
@@ -613,15 +613,6 @@ SIG Windows focused on improving reliability for Windows and Kubernetes support
 - GLBC remains unchanged at v1.2.3 since Kubernetes 1.12 ([#66793](https://github.com/kubernetes/kubernetes/pull/66793))
 - Ingress-gce remains unchanged at v1.2.3 since Kubernetes 1.12 ([#66793](https://github.com/kubernetes/kubernetes/pull/66793))
 - ip-masq-agen remains unchanged at v2.1.1 since Kubernetes 1.12 ([#67916](https://github.com/kubernetes/kubernetes/pull/67916))
-- [v1.13.0-rc.2](#v1130-rc2)
-- [v1.13.0-rc.1](#v1130-rc1)
-- [v1.13.0-beta.2](#v1130-beta2)
-- [v1.13.0-beta.1](#v1130-beta1)
-- [v1.13.0-alpha.3](#v1130-alpha3)
-- [v1.13.0-alpha.2](#v1130-alpha2)
-- [v1.13.0-alpha.1](#v1130-alpha1)
-
-
 
 # v1.13.0-rc.2
 
