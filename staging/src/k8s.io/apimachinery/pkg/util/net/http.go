@@ -32,6 +32,8 @@ import (
 	"strings"
 
 	"golang.org/x/net/http2"
+
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog"
 )
 
@@ -79,41 +81,6 @@ func IsProbableEOF(err error) bool {
 		return true
 	}
 	return false
-}
-
-var defaultTransport = http.DefaultTransport.(*http.Transport)
-
-// SetOldTransportDefaults applies the defaults from http.DefaultTransport
-// for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
-func SetOldTransportDefaults(t *http.Transport) *http.Transport {
-	if t.Proxy == nil || isDefault(t.Proxy) {
-		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
-		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
-		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
-	}
-	// If no custom dialer is set, use the default context dialer
-	if t.DialContext == nil && t.Dial == nil {
-		t.DialContext = defaultTransport.DialContext
-	}
-	if t.TLSHandshakeTimeout == 0 {
-		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
-	}
-	return t
-}
-
-// SetTransportDefaults applies the defaults from http.DefaultTransport
-// for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
-func SetTransportDefaults(t *http.Transport) *http.Transport {
-	t = SetOldTransportDefaults(t)
-	// Allow clients to disable http2 if needed.
-	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		klog.Infof("HTTP2 has been explicitly disabled")
-	} else {
-		if err := http2.ConfigureTransport(t); err != nil {
-			klog.Warningf("Transport failed http2 configuration: %v", err)
-		}
-	}
-	return t
 }
 
 type RoundTripperWrapper interface {
@@ -257,14 +224,6 @@ func AppendForwardedForHeader(req *http.Request) {
 		}
 		req.Header.Set("X-Forwarded-For", clientIP)
 	}
-}
-
-var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
-
-// isDefault checks to see if the transportProxierFunc is pointing to the default one
-func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
-	transportProxierPointer := fmt.Sprintf("%p", transportProxier)
-	return transportProxierPointer == defaultProxyFuncPointer
 }
 
 // NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
@@ -439,4 +398,93 @@ func CloneHeader(in http.Header) http.Header {
 		out[key] = newValues
 	}
 	return out
+}
+
+// SetTransportDefaults applies the defaults from http.DefaultTransport
+// for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
+func SetTransportDefaults(t *http.Transport) http.RoundTripper {
+	return newH1FallbackTransport(t)
+}
+
+func setOldTransportDefaults(t *http.Transport) *http.Transport {
+	if t.Proxy == nil || isDefault(t.Proxy) {
+		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
+		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
+		t.Proxy = utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
+	}
+	// If no custom dialer is set, use the default context dialer
+	if t.DialContext == nil && t.Dial == nil {
+		t.DialContext = defaultTransport.DialContext
+	}
+	if t.TLSHandshakeTimeout == 0 {
+		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
+	}
+	return t
+}
+
+func setTransportDefaults(t *http.Transport) *http.Transport {
+	t = setOldTransportDefaults(t)
+	// Allow clients to disable http2 if needed.
+	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
+		klog.Infof("HTTP2 has been explicitly disabled")
+	} else {
+		if err := http2.ConfigureTransport(t); err != nil {
+			klog.Warningf("Transport failed http2 configuration: %v", err)
+		}
+	}
+	return t
+}
+
+func newH1FallbackTransport(rt *http.Transport) http.RoundTripper {
+	return &h1FallbackTransport{
+		h1rt: setOldTransportDefaults(cloneTransport(rt)),
+		h2rt: setTransportDefaults(cloneTransport(rt)),
+	}
+}
+
+type h1FallbackTransport struct {
+	h1rt, h2rt *http.Transport
+}
+
+func (rt *h1FallbackTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if httpstream.IsUpgradeRequest(req) {
+		return rt.h1rt.RoundTrip(req)
+	}
+	return rt.h2rt.RoundTrip(req)
+}
+
+func (rt *h1FallbackTransport) WrappedRoundTripper() http.RoundTripper {
+	return rt.h1rt
+}
+
+func cloneTransport(t *http.Transport) *http.Transport {
+	clone := &http.Transport{
+		Proxy:                  t.Proxy,
+		DialContext:            t.DialContext,
+		Dial:                   t.Dial,
+		DialTLS:                t.DialTLS,
+		TLSHandshakeTimeout:    t.TLSHandshakeTimeout,
+		DisableKeepAlives:      t.DisableKeepAlives,
+		DisableCompression:     t.DisableCompression,
+		MaxIdleConns:           t.MaxIdleConns,
+		MaxIdleConnsPerHost:    t.MaxIdleConnsPerHost,
+		MaxConnsPerHost:        t.MaxConnsPerHost,
+		IdleConnTimeout:        t.IdleConnTimeout,
+		ResponseHeaderTimeout:  t.ResponseHeaderTimeout,
+		ExpectContinueTimeout:  t.ExpectContinueTimeout,
+		ProxyConnectHeader:     t.ProxyConnectHeader,
+		MaxResponseHeaderBytes: t.MaxResponseHeaderBytes,
+	}
+
+	if t.TLSNextProto != nil {
+		clone.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+		for k, v := range t.TLSNextProto {
+			clone.TLSNextProto[k] = v
+		}
+	}
+	if t.TLSClientConfig != nil {
+		clone.TLSClientConfig = t.TLSClientConfig.Clone()
+	}
+
+	return clone
 }
