@@ -51,6 +51,7 @@ source "${KUBE_ROOT}/test/cmd/save-config.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
 source "${KUBE_ROOT}/test/cmd/template-output.sh"
 source "${KUBE_ROOT}/test/cmd/version.sh"
+source "${KUBE_ROOT}/test/cmd/wait.sh"
 
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -831,6 +832,12 @@ runTests() {
   # Impersonation #
   #################
   record_command run_impersonation_tests
+
+  ####################
+  # kubectl wait     #
+  ####################
+
+  record_command run_wait_tests
 
   kube::test::clear_all
 
