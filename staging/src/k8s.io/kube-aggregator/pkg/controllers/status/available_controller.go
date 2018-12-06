@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -151,8 +152,9 @@ func (c *AvailableConditionController) sync(key string) error {
 	apiService := originalAPIService.DeepCopy()
 
 	availableCondition := apiregistration.APIServiceCondition{
-		Type:   apiregistration.Available,
-		Status: apiregistration.ConditionTrue,
+		Type:               apiregistration.Available,
+		Status:             apiregistration.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
 	}
 
 	// local API services are always considered available
