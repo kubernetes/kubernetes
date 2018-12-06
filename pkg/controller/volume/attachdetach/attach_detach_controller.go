@@ -78,7 +78,7 @@ type TimerConfig struct {
 // timers.
 var DefaultTimerConfig TimerConfig = TimerConfig{
 	ReconcilerLoopPeriod:                              100 * time.Millisecond,
-	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
+	ReconcilerMaxWaitForUnmountDuration:               2 * time.Minute,
 	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
 }
