@@ -214,7 +214,8 @@ func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName str
 			invalidPredicates.Insert(
 				predicates.MaxEBSVolumeCountPred,
 				predicates.MaxGCEPDVolumeCountPred,
-				predicates.MaxAzureDiskVolumeCountPred)
+				predicates.MaxAzureDiskVolumeCountPred,
+				predicates.MaxCinderVolumeCountPred)
 			if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 				invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
 			}
@@ -229,6 +230,9 @@ func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName str
 			}
 			if vol.AzureDisk != nil {
 				invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
+			}
+			if vol.Cinder != nil {
+				invalidPredicates.Insert(predicates.MaxCinderVolumeCountPred)
 			}
 		}
 	}

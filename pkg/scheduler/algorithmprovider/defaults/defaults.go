@@ -133,6 +133,13 @@ func defaultPredicates() sets.String {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
+		// Fit is determined by whether or not there would be too many Cinder volumes attached to the node
+		factory.RegisterFitPredicateFactory(
+			predicates.MaxCinderVolumeCountPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.PVInfo, args.PVCInfo)
+			},
+		),
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxCSIVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
