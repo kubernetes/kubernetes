@@ -144,7 +144,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			}
 		}
 		requestInfo, _ := request.RequestInfoFrom(ctx)
-		metrics.RecordLongRunning(req, requestInfo, func() {
+		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 			handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, w: w})
 			if err != nil {
 				scope.err(err, w, req)

@@ -64,7 +64,7 @@ func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSer
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
-		metrics.RecordLongRunning(req, requestInfo, func() {
+		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 			StreamObject(statusCode, gv, s, stream, w, req)
 		})
 		return
