@@ -143,7 +143,7 @@ func (p *PodBackoff) BackoffPod(podID ktypes.NamespacedName) time.Duration {
 }
 
 // TryBackoffAndWait tries to acquire the backoff lock
-func (p *PodBackoff) TryBackoffAndWait(podID ktypes.NamespacedName) bool {
+func (p *PodBackoff) TryBackoffAndWait(podID ktypes.NamespacedName, stop <-chan struct{}) bool {
 	p.lock.Lock()
 	entry := p.getEntry(podID)
 
@@ -154,8 +154,12 @@ func (p *PodBackoff) TryBackoffAndWait(podID ktypes.NamespacedName) bool {
 	defer entry.unlock()
 	duration := entry.getBackoff(p.maxDuration)
 	p.lock.Unlock()
-	time.Sleep(duration)
-	return true
+	select {
+	case <-time.After(duration):
+		return true
+	case <-stop:
+		return false
+	}
 }
 
 // Gc execute garbage collection on the pod back-off.

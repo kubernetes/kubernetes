@@ -111,3 +111,28 @@ func TestClearPodBackoff(t *testing.T) {
 		t.Errorf("Expected backoff time for pod %s of %s, got %s", podID, expectBoTime, boTime)
 	}
 }
+
+func TestTryBackoffAndWait(t *testing.T) {
+	clock := fakeClock{}
+	backoff := CreatePodBackoffWithClock(1*time.Second, 60*time.Second, &clock)
+
+	stopCh := make(chan struct{})
+	podID := ktypes.NamespacedName{Namespace: "ns", Name: "pod"}
+	if !backoff.TryBackoffAndWait(podID, stopCh) {
+		t.Error("Expected TryBackoffAndWait success for new pod, got failure.")
+	}
+
+	be := backoff.getEntry(podID)
+	if !be.tryLock() {
+		t.Error("Failed to acquire lock for backoffentry")
+	}
+
+	if backoff.TryBackoffAndWait(podID, stopCh) {
+		t.Error("Expected TryBackoffAndWait failure with lock acquired, got success.")
+	}
+
+	close(stopCh)
+	if backoff.TryBackoffAndWait(podID, stopCh) {
+		t.Error("Expected TryBackoffAndWait failure with closed stopCh, got success.")
+	}
+}
