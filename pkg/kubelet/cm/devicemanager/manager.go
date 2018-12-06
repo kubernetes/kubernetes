@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
@@ -245,7 +246,7 @@ func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
 }
 
 // ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
-func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
 	klog.V(2).Infof("Got Plugin %s at endpoint %s with versions %v", pluginName, endpoint, versions)
 
 	if !m.isVersionCompatibleWithPlugin(versions) {
@@ -262,7 +263,7 @@ func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, version
 // RegisterPlugin starts the endpoint and registers it
 // TODO: Start the endpoint and wait for the First ListAndWatch call
 //       before registering the plugin
-func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string) error {
+func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
 	klog.V(2).Infof("Registering Plugin %s at endpoint %s", pluginName, endpoint)
 
 	e, err := newEndpointImpl(endpoint, pluginName, m.callback)
@@ -801,4 +802,11 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 		return true
 	}
 	return false
+}
+
+// GetDevices returns the devices used by the specified container
+func (m *ManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.podDevices.getContainerDevices(podUID, containerName)
 }

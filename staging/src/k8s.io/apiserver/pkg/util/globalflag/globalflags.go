@@ -19,7 +19,6 @@ package globalflag
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -28,7 +27,7 @@ import (
 )
 
 // AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
-// against the global flagsets from "flag" and "github.com/spf13/pflag".
+// against the global flagsets from "flag" and "k8s.io/klog".
 // We do this in order to prevent unwanted flags from leaking into the component's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet, name string) {
 	addGlogFlags(fs)
@@ -39,21 +38,16 @@ func AddGlobalFlags(fs *pflag.FlagSet, name string) {
 
 // addGlogFlags explicitly registers flags that klog libraries(k8s.io/klog) register.
 func addGlogFlags(fs *pflag.FlagSet) {
-	// lookup flags in global flag set and re-register the values with our flagset
-	global := flag.CommandLine
-	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
-
-	register(global, local, "logtostderr")
-	register(global, local, "alsologtostderr")
-	register(global, local, "v")
-	register(global, local, "skip_headers")
-	register(global, local, "stderrthreshold")
-	register(global, local, "vmodule")
-	register(global, local, "log_backtrace_at")
-	register(global, local, "log_dir")
-	register(global, local, "log_file")
-
-	fs.AddFlagSet(local)
+	// lookup flags of klog libraries in global flag set and re-register the values with our flagset
+	Register(fs, "logtostderr")
+	Register(fs, "alsologtostderr")
+	Register(fs, "v")
+	Register(fs, "skip_headers")
+	Register(fs, "stderrthreshold")
+	Register(fs, "vmodule")
+	Register(fs, "log_backtrace_at")
+	Register(fs, "log_dir")
+	Register(fs, "log_file")
 }
 
 // normalize replaces underscores with hyphens
@@ -62,9 +56,9 @@ func normalize(s string) string {
 	return strings.Replace(s, "_", "-", -1)
 }
 
-// register adds a flag to local that targets the Value associated with the Flag named globalName in global
-func register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
-	if f := global.Lookup(globalName); f != nil {
+// Register adds a flag to local that targets the Value associated with the Flag named globalName in flag.CommandLine.
+func Register(local *pflag.FlagSet, globalName string) {
+	if f := flag.CommandLine.Lookup(globalName); f != nil {
 		pflagFlag := pflag.PFlagFromGoFlag(f)
 		pflagFlag.Name = normalize(pflagFlag.Name)
 		local.AddFlag(pflagFlag)

@@ -59,7 +59,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
+	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -97,6 +98,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
@@ -192,6 +194,7 @@ type Bootstrap interface {
 	StartGarbageCollection()
 	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool)
 	ListenAndServeReadOnly(address net.IP, port uint)
+	ListenAndServePodResources()
 	Run(<-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
 }
@@ -786,7 +789,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, err
 	}
 	if klet.enablePluginsWatcher {
-		klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
+		klet.pluginWatcher = pluginwatcher.NewWatcher(
+			klet.getPluginsRegistrationDir(), /* sockDir */
+			klet.getPluginsDir(),             /* deprecatedSockDir */
+		)
 	}
 
 	// If the experimentalMounterPathFlag is set, we do not want to
@@ -1058,15 +1064,15 @@ type Kubelet struct {
 	lastStatusReportTime time.Time
 
 	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
-	// This lock is used by Kublet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	syncNodeStatusMux sync.Mutex
 
 	// updatePodCIDRMux is a lock on updating pod CIDR, because this path is not thread-safe.
-	// This lock is used by Kublet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	updatePodCIDRMux sync.Mutex
 
 	// updateRuntimeMux is a lock on updating runtime, because this path is not thread-safe.
-	// This lock is used by Kublet.updateRuntimeUp function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.updateRuntimeUp function and shouldn't be used anywhere else.
 	updateRuntimeMux sync.Mutex
 
 	// nodeLeaseController claims and renews the node lease for this Kubelet
@@ -1242,6 +1248,7 @@ func allGlobalUnicastIPs() ([]net.IP, error) {
 // 1.  the root directory
 // 2.  the pods directory
 // 3.  the plugins directory
+// 4.  the pod-resources directory
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
@@ -1255,6 +1262,12 @@ func (kl *Kubelet) setupDataDirs() error {
 	}
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating plugins directory: %v", err)
+	}
+	if err := os.MkdirAll(kl.getPluginsRegistrationDir(), 0750); err != nil {
+		return fmt.Errorf("error creating plugins registry directory: %v", err)
+	}
+	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
+		return fmt.Errorf("error creating podresources directory: %v", err)
 	}
 	return nil
 }
@@ -1378,7 +1391,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.containerLogManager.Start()
 	if kl.enablePluginsWatcher {
 		// Adding Registration Callback function for CSI Driver
-		kl.pluginWatcher.AddHandler("CSIPlugin", pluginwatcher.PluginHandler(csi.PluginHandler))
+		kl.pluginWatcher.AddHandler(pluginwatcherapi.CSIPlugin, pluginwatcher.PluginHandler(csi.PluginHandler))
 		// Adding Registration Callback function for Device Manager
 		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 		// Start the plugin watcher
@@ -2219,6 +2232,11 @@ func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port)
+}
+
+// ListenAndServePodResources runs the kubelet podresources grpc service
+func (kl *Kubelet) ListenAndServePodResources() {
+	server.ListenAndServePodResources(util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket), kl.podManager, kl.containerManager)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.

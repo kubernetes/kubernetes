@@ -47,6 +47,7 @@ go_library(
         "errors.go",
         "event.go",
         "lease_manager.go",
+        "logger.go",
         "store.go",
         "watcher.go",
     ],

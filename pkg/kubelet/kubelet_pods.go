@@ -356,11 +356,9 @@ func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString("\n")
 	buffer.WriteString("# Entries added by HostAliases.\n")
-	// write each IP/hostname pair as an entry into hosts file
+	// for each IP, write all aliases onto single line in hosts file
 	for _, hostAlias := range hostAliases {
-		for _, hostname := range hostAlias.Hostnames {
-			buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostAlias.IP, hostname))
-		}
+		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostAlias.IP, strings.Join(hostAlias.Hostnames, "\t")))
 	}
 	return buffer.Bytes()
 }

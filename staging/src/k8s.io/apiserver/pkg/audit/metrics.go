@@ -52,12 +52,22 @@ var (
 		},
 		[]string{"level"},
 	)
+
+	ApiserverAuditDroppedCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: subsystem,
+			Name:      "requests_rejected_total",
+			Help: "Counter of apiserver requests rejected due to an error " +
+				"in audit logging backend.",
+		},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(eventCounter)
 	prometheus.MustRegister(errorCounter)
 	prometheus.MustRegister(levelCounter)
+	prometheus.MustRegister(ApiserverAuditDroppedCounter)
 }
 
 // ObserveEvent updates the relevant prometheus metrics for the generated audit event.

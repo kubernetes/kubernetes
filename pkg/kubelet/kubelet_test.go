@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -2254,17 +2255,12 @@ func runVolumeManager(kubelet *Kubelet) chan struct{} {
 
 func forEachFeatureGate(t *testing.T, fs []utilfeature.Feature, tf func(t *testing.T)) {
 	for _, fg := range fs {
-		func() {
-			enabled := utilfeature.DefaultFeatureGate.Enabled(fg)
-			defer func() {
-				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled))
-			}()
-
-			for _, f := range []bool{true, false} {
-				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f))
+		for _, f := range []bool{true, false} {
+			func() {
+				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v(%t)", fg, f), tf)
-			}
-		}()
+			}()
+		}
 	}
 }
 

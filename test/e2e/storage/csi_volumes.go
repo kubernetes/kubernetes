@@ -47,6 +47,7 @@ var csiTestDrivers = []func() drivers.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	drivers.InitGcePDExternalCSIDriver,
+	drivers.InitHostV0PathCSIDriver,
 }
 
 // List of testSuites to be executed in below loop
@@ -144,7 +145,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	}
 
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
-	Context("CSI attach test using HostPath driver [Feature:CSISkipAttach]", func() {
+	Context("CSI attach test using HostPath driver [Feature:CSIDriverRegistry]", func() {
 		var (
 			cs     clientset.Interface
 			csics  csiclient.Interface

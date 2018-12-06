@@ -235,9 +235,6 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if len(args) > 0 && len(o.Selector) > 0 {
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
 	}
-	if len(args) > 0 && len(args) != 1 {
-		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
-	}
 
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 

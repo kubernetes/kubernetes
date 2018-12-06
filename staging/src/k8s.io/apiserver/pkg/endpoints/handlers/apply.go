@@ -35,7 +35,7 @@ import (
 type applyPatcher struct {
 	*patcher
 
-	model proto.Schema
+	models proto.Models
 }
 
 // TODO(apelisse): workflowId needs to be passed as a query
@@ -133,7 +133,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to get new intent: %v", err)
 	}
 
-	element, err := parse.CreateElement(lastIntent, newIntent, current, p.model)
+	element, err := parse.CreateElement(lastIntent, newIntent, current, p.models.LookupModel(""))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse elements: %v", err)
 	}

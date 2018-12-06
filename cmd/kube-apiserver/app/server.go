@@ -50,6 +50,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/globalflag"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -117,6 +118,9 @@ cluster's shared state through which all other components interact.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
+	verflag.AddFlags(namedFlagSets.FlagSet("global"))
+	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -391,9 +395,6 @@ func buildGenericConfig(
 	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.Audit.ApplyTo(genericConfig); lastErr != nil {
-		return
-	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -463,6 +464,22 @@ func buildGenericConfig(
 		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+
+	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.LoopbackClientConfig)
+
+	lastErr = s.Audit.ApplyTo(
+		genericConfig,
+		genericConfig.LoopbackClientConfig,
+		versionedInformers,
+		serveroptions.NewProcessInfo("kube-apiserver", "kube-system"),
+		&serveroptions.WebhookOptions{
+			AuthInfoResolverWrapper: authInfoResolverWrapper,
+			ServiceResolver:         serviceResolver,
+		},
+	)
+	if lastErr != nil {
+		return
+	}
 
 	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)
 	if err != nil {

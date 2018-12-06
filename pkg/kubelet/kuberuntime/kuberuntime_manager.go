@@ -59,6 +59,8 @@ const (
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
+	// How frequently to report identical errors
+	identicalErrorDelay = 1 * time.Minute
 )
 
 var (
@@ -123,6 +125,12 @@ type kubeGenericRuntimeManager struct {
 
 	// Manage RuntimeClass resources.
 	runtimeClassManager *runtimeclass.Manager
+
+	// Cache last per-container error message to reduce log spam
+	lastError map[string]string
+
+	// Time last per-container error message was printed
+	errorPrinted map[string]time.Time
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -177,6 +185,8 @@ func NewKubeGenericRuntimeManager(
 		internalLifecycle:   internalLifecycle,
 		legacyLogProvider:   legacyLogProvider,
 		runtimeClassManager: runtimeClassManager,
+		lastError:           make(map[string]string),
+		errorPrinted:        make(map[string]time.Time),
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
@@ -819,6 +829,15 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	return
 }
 
+func (m *kubeGenericRuntimeManager) cleanupErrorTimeouts() {
+	for name, timeout := range m.errorPrinted {
+		if time.Now().Sub(timeout) >= identicalErrorDelay {
+			delete(m.errorPrinted, name)
+			delete(m.lastError, name)
+		}
+	}
+}
+
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
@@ -868,9 +887,16 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	// Get statuses of all containers visible in the pod.
 	containerStatuses, err := m.getPodContainerStatuses(uid, name, namespace)
 	if err != nil {
-		klog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
+		lastMsg, ok := m.lastError[podFullName]
+		if !ok || err.Error() != lastMsg || time.Now().Sub(m.errorPrinted[podFullName]) >= identicalErrorDelay {
+			klog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
+			m.errorPrinted[podFullName] = time.Now()
+			m.lastError[podFullName] = err.Error()
+		}
 		return nil, err
 	}
+	delete(m.errorPrinted, podFullName)
+	delete(m.lastError, podFullName)
 
 	return &kubecontainer.PodStatus{
 		ID:                uid,

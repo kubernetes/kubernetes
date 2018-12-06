@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
@@ -115,5 +116,7 @@ func createGCESecrets(client clientset.Interface, config framework.VolumeTestCon
 	}
 
 	_, err = client.CoreV1().Secrets(config.Namespace).Create(s)
-	framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
+	if !apierrors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
+	}
 }

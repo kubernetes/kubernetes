@@ -291,6 +291,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/storage/v1
+		gvr("storage.k8s.io", "v1", "volumeattachments"): {
+			Stub:             `{"metadata": {"name": "va3"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv3"}}}`,
+			ExpectedEtcdPath: "/registry/volumeattachments/va3",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		gvr("storage.k8s.io", "v1beta1", "storageclasses"): {
 			Stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,
@@ -447,6 +455,13 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 			Stub:             `{"kind": "Panda", "apiVersion": "awesome.bears.com/v3", "metadata": {"name": "cr4panda"}, "weight": 300}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
 			ExpectedEtcdPath: "/registry/awesome.bears.com/pandas/cr4panda",
 			ExpectedGVK:      gvkP("awesome.bears.com", "v1", "Panda"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/auditregistration/v1alpha1
+		gvr("auditregistration.k8s.io", "v1alpha1", "auditsinks"): {
+			Stub:             `{"metadata":{"name":"sink1"},"spec":{"policy":{"level":"Metadata","stages":["ResponseStarted"]},"webhook":{"clientConfig":{"url":"http://localhost:4444","service":null,"caBundle":null}}}}`,
+			ExpectedEtcdPath: "/registry/auditsinks/sink1",
 		},
 		// --
 	}

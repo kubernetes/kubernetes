@@ -161,6 +161,7 @@ var ipsetWithIptablesChain = []struct {
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
+const sysctlConnReuse = "net/ipv4/vs/conn_reuse_mode"
 const sysctlForward = "net/ipv4/ip_forward"
 const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
 const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
@@ -310,6 +311,13 @@ func NewProxier(ipt utiliptables.Interface,
 	if val, _ := sysctl.GetSysctl(sysctlVSConnTrack); val != 1 {
 		if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
+		}
+	}
+
+	// Set the connection reuse mode
+	if val, _ := sysctl.GetSysctl(sysctlConnReuse); val != 0 {
+		if err := sysctl.SetSysctl(sysctlConnReuse, 0); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlConnReuse, err)
 		}
 	}
 
@@ -1594,7 +1602,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			Port:    uint16(portNum),
 		}
 
-		klog.V(5).Infof("Using graceful delete to delete: %v", delDest)
+		klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
 		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest)
 		if err != nil {
 			klog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)

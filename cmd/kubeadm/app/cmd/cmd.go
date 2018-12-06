@@ -39,8 +39,8 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		Long: dedent.Dedent(`
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    | KUBEADM                                                  │
-			    | Easily bootstrap a secure Kubernetes cluster             |
+			    │ KUBEADM                                                  │
+			    │ Easily bootstrap a secure Kubernetes cluster             │
 			    │                                                          │
 			    │ Please give us feedback at:                              │
 			    │ https://github.com/kubernetes/kubeadm/issues             │

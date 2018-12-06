@@ -19,11 +19,14 @@ package encryptionconfig
 import (
 	"bytes"
 	"encoding/base64"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 )
@@ -33,9 +36,40 @@ const (
 
 	sampleContextText = "0123456789"
 
+	legacyV1Config = `
+  kind: EncryptionConfig
+  apiVersion: v1
+  resources:
+    - resources:
+      - secrets
+      - namespaces
+      providers:
+      - identity: {}
+      - aesgcm:
+          keys:
+          - name: key1
+            secret: c2VjcmV0IGlzIHNlY3VyZQ==
+          - name: key2
+            secret: dGhpcyBpcyBwYXNzd29yZA==
+      - kms:
+          name: testprovider
+          endpoint: unix:///tmp/testprovider.sock
+          cachesize: 10
+      - aescbc:
+          keys:
+          - name: key1
+            secret: c2VjcmV0IGlzIHNlY3VyZQ==
+          - name: key2
+            secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:
+          keys:
+          - name: key1
+            secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+  `
+
 	correctConfigWithIdentityFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -65,8 +99,8 @@ resources:
 `
 
 	correctConfigWithAesGcmFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -95,8 +129,8 @@ resources:
 `
 
 	correctConfigWithAesCbcFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -125,8 +159,8 @@ resources:
 `
 
 	correctConfigWithSecretboxFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -155,8 +189,8 @@ resources:
 `
 
 	correctConfigWithKMSFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -185,8 +219,8 @@ resources:
 `
 
 	incorrectConfigNoSecretForKey = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - namespaces
@@ -198,8 +232,8 @@ resources:
 `
 
 	incorrectConfigInvalidKey = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - namespaces
@@ -214,8 +248,8 @@ resources:
 `
 
 	incorrectConfigNoEndpointForKMS = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -244,6 +278,48 @@ func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Se
 	return &testEnvelopeService{}, nil
 }
 
+func TestLegacyConfig(t *testing.T) {
+	legacyConfigObject, err := loadConfig([]byte(legacyV1Config))
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
+	}
+
+	expected := &apiserverconfig.EncryptionConfiguration{
+		Resources: []apiserverconfig.ResourceConfiguration{
+			{
+				Resources: []string{"secrets", "namespaces"},
+				Providers: []apiserverconfig.ProviderConfiguration{
+					{Identity: &apiserverconfig.IdentityConfiguration{}},
+					{AESGCM: &apiserverconfig.AESConfiguration{
+						Keys: []apiserverconfig.Key{
+							{Name: "key1", Secret: "c2VjcmV0IGlzIHNlY3VyZQ=="},
+							{Name: "key2", Secret: "dGhpcyBpcyBwYXNzd29yZA=="},
+						},
+					}},
+					{KMS: &apiserverconfig.KMSConfiguration{
+						Name:      "testprovider",
+						Endpoint:  "unix:///tmp/testprovider.sock",
+						CacheSize: 10,
+					}},
+					{AESCBC: &apiserverconfig.AESConfiguration{
+						Keys: []apiserverconfig.Key{
+							{Name: "key1", Secret: "c2VjcmV0IGlzIHNlY3VyZQ=="},
+							{Name: "key2", Secret: "dGhpcyBpcyBwYXNzd29yZA=="},
+						},
+					}},
+					{Secretbox: &apiserverconfig.SecretboxConfiguration{
+						Keys: []apiserverconfig.Key{
+							{Name: "key1", Secret: "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="},
+						},
+					}},
+				},
+			},
+		},
+	}
+	if !reflect.DeepEqual(legacyConfigObject, expected) {
+		t.Fatal(diff.ObjectReflectDiff(expected, legacyConfigObject))
+	}
+}
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Set factory for mock envelope service
 	factory := envelopeServiceFactory

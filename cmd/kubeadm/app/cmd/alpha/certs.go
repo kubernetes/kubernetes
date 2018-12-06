@@ -76,6 +76,8 @@ type renewConfig struct {
 	kubeconfigPath string
 	cfg            kubeadmapiv1beta1.InitConfiguration
 	useAPI         bool
+	useCSR         bool
+	csrPath        string
 }
 
 func getRenewSubCommands() []*cobra.Command {
@@ -126,6 +128,8 @@ func addFlags(cmd *cobra.Command, cfg *renewConfig) {
 	options.AddConfigFlag(cmd.Flags(), &cfg.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &cfg.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &cfg.kubeconfigPath)
+	options.AddCSRFlag(cmd.Flags(), &cfg.useCSR)
+	options.AddCSRDirFlag(cmd.Flags(), &cfg.csrPath)
 	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
@@ -133,6 +137,17 @@ func generateRenewalFunction(cert *certsphase.KubeadmCert, caCert *certsphase.Ku
 	return func() {
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
 		kubeadmutil.CheckErr(err)
+
+		if cfg.useCSR {
+			path := cfg.csrPath
+			if path == "" {
+				path = cfg.cfg.CertificatesDir
+			}
+			err := certsphase.CreateCSR(cert, internalcfg, path)
+			kubeadmutil.CheckErr(err)
+			return
+		}
+
 		renewer, err := getRenewer(cfg, caCert.BaseName)
 		kubeadmutil.CheckErr(err)
 

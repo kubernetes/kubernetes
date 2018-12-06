@@ -56,7 +56,7 @@ func (b Backend) Shutdown() {
 
 // ProcessEvents enforces policy on a shallow copy of the given event
 // dropping any sections that don't conform
-func (b Backend) ProcessEvents(events ...*auditinternal.Event) {
+func (b Backend) ProcessEvents(events ...*auditinternal.Event) bool {
 	for _, event := range events {
 		if event == nil {
 			continue
@@ -82,6 +82,9 @@ func (b Backend) ProcessEvents(events ...*auditinternal.Event) {
 		}
 		b.delegateBackend.ProcessEvents(e)
 	}
+	// Returning true regardless of results, since dynamic audit backends
+	// can never cause apiserver request to fail.
+	return true
 }
 
 // String returns a string representation of the backend

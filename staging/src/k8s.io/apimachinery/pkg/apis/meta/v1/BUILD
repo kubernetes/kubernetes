@@ -9,6 +9,10 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        # "controller_ref_test.go",
+        # "conversion_test.go",
+        # "duration_test.go",
+        # "group_version_test.go",
         "controller_ref_test.go",
         "conversion_test.go",
         "duration_test.go",
@@ -26,6 +30,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],

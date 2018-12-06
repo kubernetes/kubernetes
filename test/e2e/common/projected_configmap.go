@@ -18,7 +18,6 @@ package common
 
 import (
 	"fmt"
-	"os"
 	"path"
 
 	"k8s.io/api/core/v1"
@@ -481,6 +480,26 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 		})
 
 	})
+
+	//The pod is in pending during volume creation until the configMap objects are available
+	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/projected-configmap-volumes"
+		podName := "pod-projected-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
+
+	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
+	// the volume setup will error unless it is marked optional, during the pod creation.
+	//Slow (~5 mins)
+	It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
+		volumeMountPath := "/etc/configmap-volumes"
+		podName := "pod-configmaps-" + string(uuid.NewUUID())
+		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
+		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+	})
 })
 
 func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
@@ -554,17 +573,14 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 	if defaultMode != nil {
 		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
-	} else {
-		mode := int32(0644)
-		defaultMode = &mode
 	}
 
-	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
+	fileModeRegexp := framework.GetFileModeRegex("/etc/projected-configmap-volume/data-1", defaultMode)
 	output := []string{
 		"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
-		"mode of file \"/etc/projected-configmap-volume/data-1\": " + modeString,
+		fileModeRegexp,
 	}
-	f.TestContainerOutput("consume configMaps", pod, 0, output)
+	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
 func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
@@ -645,9 +661,6 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 	if itemMode != nil {
 		//pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = itemMode
-	} else {
-		mode := int32(0644)
-		itemMode = &mode
 	}
 
 	// Just check file mode if fsGroup is not set. If fsGroup is set, the
@@ -656,8 +669,8 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 		"content of file \"/etc/projected-configmap-volume/path/to/data-2\": value-2",
 	}
 	if fsGroup == 0 {
-		modeString := fmt.Sprintf("%v", os.FileMode(*itemMode))
-		output = append(output, "mode of file \"/etc/projected-configmap-volume/path/to/data-2\": "+modeString)
+		fileModeRegexp := framework.GetFileModeRegex("/etc/projected-configmap-volume/path/to/data-2", itemMode)
+		output = append(output, fileModeRegexp)
 	}
-	f.TestContainerOutput("consume configMaps", pod, 0, output)
+	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }

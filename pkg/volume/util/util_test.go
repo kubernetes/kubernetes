@@ -24,12 +24,15 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	utiltesting "k8s.io/client-go/util/testing"
+
 	// util.go uses api.Codecs.LegacyCodec so import this package to do some
 	// resource initialization.
 	"hash/fnv"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 
 	"reflect"
@@ -1426,59 +1429,54 @@ func TestSelectZoneForVolume(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-		if test.VolumeScheduling {
-			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, test.VolumeScheduling)()
 
-		var zonesParameter, zonesWithNodes sets.String
-		var err error
+			var zonesParameter, zonesWithNodes sets.String
+			var err error
 
-		if test.Zones != "" {
-			zonesParameter, err = ZonesToSet(test.Zones)
-			if err != nil {
-				t.Errorf("Could not convert Zones to a set: %s. This is a test error %s", test.Zones, test.Name)
-				continue
-			}
-		}
-
-		if test.ZonesWithNodes != "" {
-			zonesWithNodes, err = ZonesToSet(test.ZonesWithNodes)
-			if err != nil {
-				t.Errorf("Could not convert specified ZonesWithNodes to a set: %s. This is a test error %s", test.ZonesWithNodes, test.Name)
-				continue
-			}
-		}
-
-		zone, err := SelectZoneForVolume(test.ZonePresent, test.ZonesPresent, test.Zone, zonesParameter, zonesWithNodes, test.Node, test.AllowedTopologies, test.Name)
-
-		if test.Reject && err == nil {
-			t.Errorf("Unexpected zone from SelectZoneForVolume for %s", zone)
-			continue
-		}
-
-		if !test.Reject {
-			if err != nil {
-				t.Errorf("Unexpected error from SelectZoneForVolume for %s; Error: %v", test.Name, err)
-				continue
-			}
-
-			if test.ExpectSpecificZone == true {
-				if zone != test.ExpectedZone {
-					t.Errorf("Expected zone %v does not match obtained zone %v for %s", test.ExpectedZone, zone, test.Name)
+			if test.Zones != "" {
+				zonesParameter, err = ZonesToSet(test.Zones)
+				if err != nil {
+					t.Fatalf("Could not convert Zones to a set: %s. This is a test error %s", test.Zones, test.Name)
 				}
-				continue
 			}
 
-			expectedZones, err := ZonesToSet(test.ExpectedZones)
-			if err != nil {
-				t.Errorf("Could not convert ExpectedZones to a set: %s. This is a test error", test.ExpectedZones)
-				continue
+			if test.ZonesWithNodes != "" {
+				zonesWithNodes, err = ZonesToSet(test.ZonesWithNodes)
+				if err != nil {
+					t.Fatalf("Could not convert specified ZonesWithNodes to a set: %s. This is a test error %s", test.ZonesWithNodes, test.Name)
+				}
 			}
-			if !expectedZones.Has(zone) {
-				t.Errorf("Obtained zone %s not member of expectedZones %s", zone, expectedZones)
+
+			zone, err := SelectZoneForVolume(test.ZonePresent, test.ZonesPresent, test.Zone, zonesParameter, zonesWithNodes, test.Node, test.AllowedTopologies, test.Name)
+
+			if test.Reject && err == nil {
+				t.Errorf("Unexpected zone from SelectZoneForVolume for %s", zone)
 			}
-		}
+
+			if !test.Reject {
+				if err != nil {
+					t.Errorf("Unexpected error from SelectZoneForVolume for %s; Error: %v", test.Name, err)
+				}
+
+				if test.ExpectSpecificZone == true {
+					if zone != test.ExpectedZone {
+						t.Errorf("Expected zone %v does not match obtained zone %v for %s", test.ExpectedZone, zone, test.Name)
+					}
+				}
+
+				if test.ExpectedZones != "" {
+					expectedZones, err := ZonesToSet(test.ExpectedZones)
+					if err != nil {
+						t.Fatalf("Could not convert ExpectedZones to a set: %s. This is a test error", test.ExpectedZones)
+					}
+					if !expectedZones.Has(zone) {
+						t.Errorf("Obtained zone %s not member of expectedZones %s", zone, expectedZones)
+					}
+				}
+			}
+		})
 	}
 }
 

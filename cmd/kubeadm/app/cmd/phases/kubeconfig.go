@@ -23,6 +23,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -77,25 +78,31 @@ func NewKubeConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kubeconfig",
 		Short: "Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
+		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
+			{
+				Name:           "all",
+				Short:          "Generates all kubeconfig files",
+				InheritFlags:   getKubeConfigPhaseFlags("all"),
+				RunAllSiblings: true,
+			},
 			NewKubeConfigFilePhase(kubeadmconstants.AdminKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.KubeletKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.SchedulerKubeConfigFileName),
 		},
-		Run:      runKubeConfig,
-		CmdFlags: getKubeConfigPhaseFlags("all"),
+		Run: runKubeConfig,
 	}
 }
 
 // NewKubeConfigFilePhase creates a kubeadm workflow phase that creates a kubeconfig file.
 func NewKubeConfigFilePhase(kubeConfigFileName string) workflow.Phase {
 	return workflow.Phase{
-		Name:     kubeconfigFilePhaseProperties[kubeConfigFileName].name,
-		Short:    kubeconfigFilePhaseProperties[kubeConfigFileName].short,
-		Long:     fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
-		Run:      runKubeConfigFile(kubeConfigFileName),
-		CmdFlags: getKubeConfigPhaseFlags(kubeConfigFileName),
+		Name:         kubeconfigFilePhaseProperties[kubeConfigFileName].name,
+		Short:        kubeconfigFilePhaseProperties[kubeConfigFileName].short,
+		Long:         fmt.Sprintf(kubeconfigFilePhaseProperties[kubeConfigFileName].long, kubeConfigFileName),
+		Run:          runKubeConfigFile(kubeConfigFileName),
+		InheritFlags: getKubeConfigPhaseFlags(kubeConfigFileName),
 	}
 }
 

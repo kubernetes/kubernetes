@@ -387,8 +387,8 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.SplitUniqueName failed", err)
 		}
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(pluginName)
-		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
+		if err != nil || attachableVolumePlugin == nil {
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginByName failed", err)
 		}
 	}
 
@@ -1045,7 +1045,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	}
 
 	blockVolumeUnmapper, newUnmapperErr := blockVolumePlugin.NewBlockVolumeUnmapper(
-		string(deviceToDetach.VolumeName),
+		deviceToDetach.VolumeSpec.Name(),
 		"" /* podUID */)
 	if newUnmapperErr != nil {
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)

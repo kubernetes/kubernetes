@@ -24,6 +24,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestGetValidatedSources(t *testing.T) {
@@ -116,9 +118,7 @@ func TestString(t *testing.T) {
 }
 
 func TestIsCriticalPod(t *testing.T) {
-	if err := utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=true"); err != nil {
-		t.Errorf("failed to set ExperimentalCriticalPodAnnotation to true: %v", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	cases := []struct {
 		pod      v1.Pod
 		expected bool

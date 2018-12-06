@@ -176,10 +176,13 @@ func (s syncedDelegates) Names() []string {
 }
 
 // ProcessEvents proccesses the given events per current delegate map
-func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
+func (b *backend) ProcessEvents(events ...*auditinternal.Event) bool {
 	for _, d := range b.GetDelegates() {
 		d.ProcessEvents(events...)
 	}
+	// Returning true regardless of results, since dynamic audit backends
+	// can never cause apiserver request to fail.
+	return true
 }
 
 // Run starts a goroutine that propagates the shutdown signal,

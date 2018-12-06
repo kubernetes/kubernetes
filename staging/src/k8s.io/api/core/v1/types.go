@@ -326,7 +326,7 @@ type PersistentVolumeSpec struct {
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,7,opt,name=mountOptions"`
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -455,7 +455,7 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
@@ -2114,7 +2114,7 @@ type Container struct {
 	// +patchStrategy=merge
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
 	// +optional

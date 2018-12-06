@@ -289,7 +289,7 @@ type PodStatus struct {
 	ID types.UID
 	// Name of the pod.
 	Name string
-	// Namspace of the pod.
+	// Namespace of the pod.
 	Namespace string
 	// IP of the pod.
 	IP string

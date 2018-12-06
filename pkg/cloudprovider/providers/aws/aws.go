@@ -2324,6 +2324,11 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 
 // GetLabelsForVolume gets the volume labels for a volume
 func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore if not AWSElasticBlockStore.
+	if pv.Spec.AWSElasticBlockStore == nil {
+		return nil, nil
+	}
+
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
 		return nil, nil

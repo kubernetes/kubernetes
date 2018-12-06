@@ -71,8 +71,14 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
+
+	// Invalidate the cache right after updating
+	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
+	defer ss.vmssVMCache.Delete(key)
+
 	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s)", nodeResourceGroup, nodeName, diskName)
-	if _, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, vm); err != nil {
+	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, vm)
+	if err != nil {
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
 			// if lease cannot be acquired or disk not found, immediately detach the disk and return the original error
@@ -81,9 +87,6 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 		}
 	} else {
 		klog.V(2).Infof("azureDisk - attach disk(%s) succeeded", diskName)
-		// Invalidate the cache right after updating
-		key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
-		ss.vmssVMCache.Delete(key)
 	}
 	return err
 }
@@ -126,14 +129,17 @@ func (ss *scaleSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 	vm.StorageProfile.DataDisks = &disks
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
+
+	// Invalidate the cache right after updating
+	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
+	defer ss.vmssVMCache.Delete(key)
+
 	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s)", nodeResourceGroup, nodeName, diskName)
-	if _, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, vm); err != nil {
+	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, vm)
+	if err != nil {
 		klog.Errorf("azureDisk - detach disk(%s) from %s failed, err: %v", diskName, nodeName, err)
 	} else {
 		klog.V(2).Infof("azureDisk - detach disk(%s) succeeded", diskName)
-		// Invalidate the cache right after updating
-		key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
-		ss.vmssVMCache.Delete(key)
 	}
 
 	return err

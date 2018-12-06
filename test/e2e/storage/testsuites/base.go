@@ -18,7 +18,6 @@ package testsuites
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -323,17 +322,5 @@ func deleteStorageClass(cs clientset.Interface, className string) {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
 		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
-func skipTestUntilBugfix(issueID string, driverName string, prefixes []string) {
-	var needSkip bool
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(driverName, prefix) {
-			needSkip = true
-		}
-	}
-	if needSkip {
-		framework.Skipf("Due to issue #%s, this test with %s doesn't pass, skipping until it fixes", issueID, driverName)
 	}
 }
