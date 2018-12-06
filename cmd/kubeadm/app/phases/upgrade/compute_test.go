@@ -76,8 +76,6 @@ type fakeEtcdClient struct {
 	mismatchedVersions bool
 }
 
-func (f fakeEtcdClient) HasTLS() bool { return f.TLS }
-
 func (f fakeEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
 func (f fakeEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {

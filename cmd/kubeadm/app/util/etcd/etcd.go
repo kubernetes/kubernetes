@@ -43,7 +43,6 @@ type ClusterInterrogator interface {
 	GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
 	GetClusterVersions() (map[string]string, error)
 	GetVersion() (string, error)
-	HasTLS() bool
 	WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error)
 	Sync() error
 	AddMember(name string, peerAddrs string) ([]Member, error)
@@ -53,11 +52,6 @@ type ClusterInterrogator interface {
 type Client struct {
 	Endpoints []string
 	TLS       *tls.Config
-}
-
-// HasTLS returns true if etcd is configured for TLS
-func (c Client) HasTLS() bool {
-	return c.TLS != nil
 }
 
 // PodManifestsHaveTLS reads the etcd staticpod manifest from disk and returns false if the TLS flags
