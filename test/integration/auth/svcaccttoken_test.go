@@ -39,6 +39,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -83,7 +85,18 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			iss,
 			[]interface{}{&pk},
 			aud,
-			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(gcs)),
+			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(
+				gcs,
+				v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return gcs.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+				})),
+				v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return gcs.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+				})),
+				v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return gcs.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+				})),
+			)),
 		),
 	)
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
@@ -682,4 +695,24 @@ func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*
 			t.Fatalf("err: %v", err)
 		}
 	}
+}
+
+func newIndexer(get func(namespace, name string) (interface{}, error)) cache.Indexer {
+	return &fakeIndexer{get: get}
+}
+
+type fakeIndexer struct {
+	cache.Indexer
+	get func(namespace, name string) (interface{}, error)
+}
+
+func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
+	parts := strings.SplitN(key, "/", 2)
+	namespace := parts[0]
+	name := ""
+	if len(parts) == 2 {
+		name = parts[1]
+	}
+	obj, err := f.get(namespace, name)
+	return obj, err == nil, err
 }
