@@ -14,20 +14,59 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// conversion-gen is a tool for auto-generating Conversion functions.
+// conversion-gen is a tool for auto-generating functions that convert
+// between internal and external types.  A general conversion code
+// generation task involves three sets of packages: (1) a set of
+// packages containing internal types, (2) a single package containing
+// the external types, and (3) a single destination package (i.e.,
+// where the generated conversion functions go, and where the
+// developer-authored conversion functions are).  The packages
+// containing the internal types play the role known as "peer
+// packages" in the general code-generation framework of Kubernetes.
 //
-// Given a list of input directories, it will scan for "peer" packages and
-// generate functions that efficiently convert between same-name types in each
-// package.  For any pair of types that has a
-//     `Convert_<pkg1>_<type>_To_<pkg2>_<Type()`
-// function (and its reciprocal), it will simply call that.  use standard value
-// assignment whenever possible.  The resulting file will be stored in the same
-// directory as the processed source package.
+// For each conversion task, `conversion-gen` will generate functions
+// that efficiently convert between same-name types in the two
+// (internal, external) packages.  The generated functions include
+// ones named
+//     autoConvert_<pkg1>_<type>_To_<pkg2>_<type>
+// for each such pair of types --- both with (pkg1,pkg2) =
+// (internal,external) and (pkg1,pkg2) = (external,internal).
+// Additionally: if the destination package does not contain one in a
+// non-generated file then a function named
+//     Convert_<pkg1>_<type>_To_<pkg2>_<type>
+// is also generated and it simply calls the `autoConvert...`
+// function.  The generated conversion functions use standard value
+// assignment wherever possible.  For compound types, the generated
+// conversion functions call the `Convert...` functions for the
+// subsidiary types.  Thus developers can override the behavior for
+// selected types.  For a top-level object type (i.e., the type of an
+// object that will be input to an apiserver), for such an override to
+// be used by the apiserver the developer-maintained conversion
+// functions must also be registered by invoking the
+// `AddConversionFuncs` method of the relevant `Scheme` object from
+// k8s.io/apimachinery/pkg/runtime.
 //
-// Generation is governed by comment tags in the source.  Any package may
-// request Conversion generation by including a comment in the file-comments of
-// one file, of the form:
-//   // +k8s:conversion-gen=<import-path-of-peer-package>
+// `conversion-gen` will scan its `--input-dirs`, looking at the
+// package defined in each of those directories for comment tags that
+// define a conversion code generation task.  A package requests
+// conversion code generation by including one or more comment in the
+// package's `doc.go` file (currently anywhere in that file is
+// acceptable, but the recommended location is above the `package`
+// statement), of the form:
+//   // +k8s:conversion-gen=<import-path-of-internal-package>
+// This introduces a conversion task, for which the destination
+// package is the one containing the file with the tag and the tag
+// identifies a package containing internal types.  If there is also a
+// tag of the form
+//   // +k8s:conversion-gen-external-types=<import-path-of-external-package>
+// then it identifies the package containing the external types;
+// otherwise they are in the destination package.
+//
+// For each conversion code generation task, the full set of internal
+// packages (AKA peer packages) consists of the ones specified in the
+// `k8s:conversion-gen` tags PLUS any specified in the
+// `--base-peer-dirs` and `--extra-peer-dirs` flags on the command
+// line.
 //
 // When generating for a package, individual types or fields of structs may opt
 // out of Conversion generation by specifying a comment on the of the form:
