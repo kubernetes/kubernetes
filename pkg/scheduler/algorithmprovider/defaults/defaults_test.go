@@ -74,6 +74,7 @@ func TestDefaultPredicates(t *testing.T) {
 		predicates.MaxEBSVolumeCountPred,
 		predicates.MaxGCEPDVolumeCountPred,
 		predicates.MaxAzureDiskVolumeCountPred,
+		predicates.MaxCinderVolumeCountPred,
 		predicates.MaxCSIVolumeCountPred,
 		predicates.MatchInterPodAffinityPred,
 		predicates.NoDiskConflictPred,
