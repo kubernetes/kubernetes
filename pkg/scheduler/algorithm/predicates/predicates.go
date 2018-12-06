@@ -137,6 +137,12 @@ var (
 		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
 
+// Kubelet uses these mandatoryPredicates. If they are not configured to scheduler, scheduler might
+// schedule a pod to kubelet that will reject it constantly.
+var (
+	mandatoryPredicates = []string{GeneralPred}
+)
+
 // NodeInfo interface represents anything that can get node object from node ID.
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)
@@ -155,6 +161,10 @@ type CachedPersistentVolumeInfo struct {
 // Ordering returns the ordering of predicates.
 func Ordering() []string {
 	return predicatesOrdering
+}
+
+func MandatoryPredicates() []string {
+	return mandatoryPredicates
 }
 
 // SetPredicatesOrdering sets the ordering of predicates.

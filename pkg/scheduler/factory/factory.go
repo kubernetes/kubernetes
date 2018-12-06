@@ -1136,6 +1136,10 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 			klog.V(2).Infof("Registering predicate: %s", predicate.Name)
 			predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
 		}
+		for _, predicate := range predicates.MandatoryPredicates() {
+			klog.V(2).Infof("Registering mandatory predicate: %s", predicate)
+			predicateKeys.Insert(predicate)
+		}
 	}
 
 	priorityKeys := sets.NewString()

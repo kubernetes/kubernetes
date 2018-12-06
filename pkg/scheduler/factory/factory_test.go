@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -202,6 +203,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterFitPredicate(predicates.GeneralPred, predicates.GeneralPredicates)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
@@ -221,8 +223,8 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
-	if len(config.Algorithm.Predicates()) != 0 {
-		t.Error("Expected empty predicate sets")
+	if len(config.Algorithm.Predicates()) != 1 {
+		t.Error("Expected only mandatory predicate sets")
 	}
 	if len(config.Algorithm.Prioritizers()) != 0 {
 		t.Error("Expected empty priority sets")
