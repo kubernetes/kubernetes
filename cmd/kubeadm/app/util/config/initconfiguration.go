@@ -208,16 +208,17 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 	var clustercfg *kubeadmapi.ClusterConfiguration
 	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
 
-	if err := DetectUnsupportedVersion(b); err != nil {
-		return nil, err
-	}
-
 	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
 	if err != nil {
 		return nil, err
 	}
 
 	for gvk, fileContent := range gvkmap {
+		// first, check if this GVK is supported one
+		if err := ValidateSupportedVersion(gvk.GroupVersion()); err != nil {
+			return nil, err
+		}
+
 		// verify the validity of the YAML
 		strict.VerifyUnmarshalStrict(fileContent, gvk)
 
