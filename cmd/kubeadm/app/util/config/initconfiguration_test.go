@@ -19,6 +19,8 @@ package config
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -27,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
@@ -51,13 +54,84 @@ func diff(expected, actual []byte) string {
 	return diffBytes.String()
 }
 
-func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
+func TestLoadInitConfigurationFromFile(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	// cfgFiles is in cluster_test.go
+	var tests = []struct {
+		name         string
+		fileContents []byte
+	}{
+		{
+			name:         "v1beta1.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta1"],
+		},
+		{
+			name:         "v1beta1.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta1"],
+		},
+		{
+			name: "v1beta1.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta1"],
+				cfgFiles["ClusterConfiguration_v1beta1"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name:         "v1alpha3.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1alpha3"],
+		},
+		{
+			name:         "v1alpha3.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1alpha3"],
+		},
+		{
+			name: "v1alpha3.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1alpha3"],
+				cfgFiles["ClusterConfiguration_v1alpha3"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			cfgPath := filepath.Join(tmpdir, rt.name)
+			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+			if err != nil {
+				t.Errorf("Couldn't create file")
+				return
+			}
+
+			obj, err := LoadInitConfigurationFromFile(cfgPath)
+			if err != nil {
+				t.Errorf("Error reading file: %v", err)
+				return
+			}
+
+			if obj == nil {
+				t.Errorf("Unexpected nil return value")
+			}
+		})
+	}
+}
+
+func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 	var tests = []struct {
 		name, in, out string
 		groupVersion  schema.GroupVersion
 		expectedErr   bool
 	}{
-		// These tests are reading one file, loading it using ConfigFileAndDefaultsToInternalConfig that all of kubeadm is using for unmarshal of our API types,
+		// These tests are reading one file, loading it using LoadInitConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha3 -> internal
 			name:         "v1alpha3ToInternal",
@@ -83,7 +157,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			out:          master_v1beta1YAML,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		// These tests are reading one file that has only a subset of the fields populated, loading it using ConfigFileAndDefaultsToInternalConfig,
+		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadInitConfigurationFromFile,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1beta1 -> default -> validate -> internal -> v1beta1
 			name:         "incompleteYAMLToDefaultedv1beta1",
@@ -101,7 +175,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1beta1.InitConfiguration{})
+			internalcfg, err := LoadInitConfigurationFromFile(rt.in)
 			if err != nil {
 				if rt.expectedErr {
 					return

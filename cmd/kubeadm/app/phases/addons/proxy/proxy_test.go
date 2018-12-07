@@ -201,7 +201,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 			masterConfig.Networking.PodSubnet = "2001:101::/96"
 		}
 
-		intMaster, err := configutil.ConfigFileAndDefaultsToInternalConfig("", masterConfig)
+		intMaster, err := configutil.DefaultedInitConfiguration(masterConfig)
 		if err != nil {
 			t.Errorf("test failed to convert external to internal version")
 			break

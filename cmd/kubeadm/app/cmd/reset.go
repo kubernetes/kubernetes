@@ -208,7 +208,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 	var dataDir string
 
 	if client != nil {
-		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
 		if err == nil && cfg.Etcd.Local != nil {
 			return cfg.Etcd.Local.DataDir, nil
 		}
@@ -299,7 +299,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 
 func resetDetectCRISocket(client clientset.Interface) (string, error) {
 	// first try to connect to the cluster for the CRI socket
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
 	if err == nil {
 		return cfg.NodeRegistration.CRISocket, nil
 	}

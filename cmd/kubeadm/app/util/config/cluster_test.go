@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -170,76 +169,6 @@ Yp37NIbHJllGQnKTp9i89iqxYuaHDjfWbTyDcpy6WMV7UhV/cZesyF/CAjcGwUzb
 G+2/lm8TaVjoU7Fi5Ka5G5HY2GLaR7P+IxYcrMHCl62Y7Rqcrnc=
 -----END CERTIFICATE-----
 `),
-}
-
-func TestLoadInitConfigurationFromFile(t *testing.T) {
-	// Create temp folder for the test case
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
-	}
-	defer os.RemoveAll(tmpdir)
-
-	var tests = []struct {
-		name         string
-		fileContents []byte
-	}{
-		{
-			name:         "v1beta1.partial1",
-			fileContents: cfgFiles["InitConfiguration_v1beta1"],
-		},
-		{
-			name:         "v1beta1.partial2",
-			fileContents: cfgFiles["ClusterConfiguration_v1beta1"],
-		},
-		{
-			name: "v1beta1.full",
-			fileContents: bytes.Join([][]byte{
-				cfgFiles["InitConfiguration_v1beta1"],
-				cfgFiles["ClusterConfiguration_v1beta1"],
-				cfgFiles["Kube-proxy_componentconfig"],
-				cfgFiles["Kubelet_componentconfig"],
-			}, []byte(kubeadmconstants.YAMLDocumentSeparator)),
-		},
-		{
-			name:         "v1alpha3.partial1",
-			fileContents: cfgFiles["InitConfiguration_v1alpha3"],
-		},
-		{
-			name:         "v1alpha3.partial2",
-			fileContents: cfgFiles["ClusterConfiguration_v1alpha3"],
-		},
-		{
-			name: "v1alpha3.full",
-			fileContents: bytes.Join([][]byte{
-				cfgFiles["InitConfiguration_v1alpha3"],
-				cfgFiles["ClusterConfiguration_v1alpha3"],
-				cfgFiles["Kube-proxy_componentconfig"],
-				cfgFiles["Kubelet_componentconfig"],
-			}, []byte(kubeadmconstants.YAMLDocumentSeparator)),
-		},
-	}
-
-	for _, rt := range tests {
-		t.Run(rt.name, func(t2 *testing.T) {
-			cfgPath := filepath.Join(tmpdir, rt.name)
-			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
-			if err != nil {
-				t.Errorf("Couldn't create file")
-				return
-			}
-
-			obj, err := loadInitConfigurationFromFile(cfgPath)
-			if err != nil {
-				t.Errorf("Error reading file: %v", err)
-				return
-			}
-
-			if obj == nil {
-				t.Errorf("Unexpected nil return value")
-			}
-		})
-	}
 }
 
 func TestGetNodeNameFromKubeletConfig(t *testing.T) {
