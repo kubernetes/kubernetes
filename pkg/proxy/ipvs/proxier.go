@@ -1649,7 +1649,7 @@ func (proxier *Proxier) cleanLegacyBindAddr(activeBindAddrs map[string]bool, cur
 	isIpv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for _, addr := range currentBindAddrs {
 		addrIsIpv6 := utilnet.IsIPv6(net.ParseIP(addr))
-		if addrIsIpv6 && ! isIpv6 || ! addrIsIpv6 && isIpv6 {
+		if addrIsIpv6 && !isIpv6 || !addrIsIpv6 && isIpv6 {
 			continue
 		}
 		if _, ok := activeBindAddrs[addr]; !ok {
