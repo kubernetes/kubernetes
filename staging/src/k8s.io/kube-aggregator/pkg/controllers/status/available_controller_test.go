@@ -228,6 +228,9 @@ func TestSync(t *testing.T) {
 		if e, a := tc.expectedAvailability.Message, condition.Message; e != a {
 			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
 		}
+		if condition.LastTransitionTime.IsZero() {
+			t.Error("expected lastTransitionTime to be non-zero")
+		}
 	}
 }
 
