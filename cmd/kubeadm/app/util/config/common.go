@@ -167,7 +167,7 @@ func MigrateOldConfigFromFile(cfgPath string) ([]byte, error) {
 
 	// Migrate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		o, err := JoinConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1beta1.JoinConfiguration{})
+		o, err := LoadJoinConfigurationFromFile(cfgPath)
 		if err != nil {
 			return []byte{}, err
 		}
