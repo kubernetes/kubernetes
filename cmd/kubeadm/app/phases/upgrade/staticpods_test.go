@@ -230,7 +230,7 @@ type fakeTLSEtcdClient struct{ TLS bool }
 
 func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
-func (c fakeTLSEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
@@ -261,7 +261,7 @@ type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
 func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
-func (c fakePodManifestEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 

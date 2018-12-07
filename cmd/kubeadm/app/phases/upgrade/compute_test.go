@@ -78,7 +78,7 @@ type fakeEtcdClient struct {
 
 func (f fakeEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
-func (f fakeEtcdClient) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
+func (f fakeEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
