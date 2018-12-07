@@ -807,7 +807,12 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 		Message:           "kubelet is posting ready status",
 		LastHeartbeatTime: currentTime,
 	}
-	rs := append(kl.runtimeState.runtimeErrors(), kl.runtimeState.networkErrors()...)
+	var rs []string
+	if kl.runtimeState.isInitialized() {
+		glog.V(5).Infof("runtime initialized [%s], try report runtime status.", kl.runtimeState.lastBaseRuntimeSync)
+		// only report container runtime status after container runtimeState is initialized.
+		rs = append(kl.runtimeState.runtimeErrors(), kl.runtimeState.networkErrors()...)
+	}
 	requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
@@ -822,6 +827,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 		rs = append(rs, fmt.Sprintf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
 	}
 	if len(rs) > 0 {
+		glog.V(5).Infof("runtime status not ready: %s",rs)
 		newNodeReadyCondition = v1.NodeCondition{
 			Type:              v1.NodeReady,
 			Status:            v1.ConditionFalse,

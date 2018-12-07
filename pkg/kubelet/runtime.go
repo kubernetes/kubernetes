@@ -53,6 +53,10 @@ func (s *runtimeState) setRuntimeSync(t time.Time) {
 	s.lastBaseRuntimeSync = t
 }
 
+func (s *runtimeState) isInitialized() bool {
+	return s.lastBaseRuntimeSync != time.Time{}
+}
+
 func (s *runtimeState) setInternalError(err error) {
 	s.Lock()
 	defer s.Unlock()
