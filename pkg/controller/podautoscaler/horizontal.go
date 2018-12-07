@@ -179,7 +179,7 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 		return
 	}
 
-	// always add rate-limitted so we don't fetch metrics more that once per resync interval
+	// always add rate-limited so we don't fetch metrics more that once per resync interval
 	a.queue.AddRateLimited(key)
 }
 
