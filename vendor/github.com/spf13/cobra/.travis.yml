@@ -2,8 +2,8 @@ language: go
 
 matrix:
   include:
-    - go: 1.7.6
-    - go: 1.8.3
+    - go: 1.9.4
+    - go: 1.10.0
     - go: tip
   allow_failures:
     - go: tip

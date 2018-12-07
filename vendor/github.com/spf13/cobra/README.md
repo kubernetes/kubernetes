@@ -152,8 +152,6 @@ In a Cobra app, typically the main.go file is very bare. It serves one purpose: 
 package main
 
 import (
-  "fmt"
-  "os"
 
   "{pathToYourApp}/cmd"
 )
