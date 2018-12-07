@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net"
 	"reflect"
 	"strings"
@@ -138,23 +137,24 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	return ip, nil
 }
 
-// MigrateOldConfigFromFile migrates an old configuration from a file into a new one (returned as a byte slice). Only kubeadm kinds are migrated. Others are silently ignored.
-func MigrateOldConfigFromFile(cfgPath string) ([]byte, error) {
+// MigrateOldConfig migrates an old configuration from a byte slice into a new one (returned again as a byte slice).
+// Only kubeadm kinds are migrated. Others are silently ignored.
+func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 	newConfig := [][]byte{}
 
-	cfgBytes, err := ioutil.ReadFile(cfgPath)
+	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	gvks, err := kubeadmutil.GroupVersionKindsFromBytes(cfgBytes)
-	if err != nil {
-		return []byte{}, err
+	gvks := []schema.GroupVersionKind{}
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
 	}
 
 	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		o, err := LoadInitConfigurationFromFile(cfgPath)
+		o, err := documentMapToInitConfiguration(gvkmap)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -167,7 +167,7 @@ func MigrateOldConfigFromFile(cfgPath string) ([]byte, error) {
 
 	// Migrate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		o, err := LoadJoinConfigurationFromFile(cfgPath)
+		o, err := documentMapToJoinConfiguration(gvkmap)
 		if err != nil {
 			return []byte{}, err
 		}

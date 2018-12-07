@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -352,20 +350,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			file, err := ioutil.TempFile("", "")
-			if err != nil {
-				t.Fatalf("could not create temporary test file: %v", err)
-			}
-			fileName := file.Name()
-			defer os.Remove(fileName)
-
-			_, err = file.WriteString(test.oldCfg)
-			file.Close()
-			if err != nil {
-				t.Fatalf("could not write contents of old config: %v", err)
-			}
-
-			b, err := MigrateOldConfigFromFile(fileName)
+			b, err := MigrateOldConfig([]byte(test.oldCfg))
 			if test.expectErr {
 				if err == nil {
 					t.Fatalf("unexpected success:\n%s", b)

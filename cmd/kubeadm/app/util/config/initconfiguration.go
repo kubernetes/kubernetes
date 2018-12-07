@@ -190,17 +190,8 @@ func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
-	internalcfg, err := BytesToInternalConfig(b)
+	internalcfg, err := BytesToInitConfiguration(b)
 	if err != nil {
-		return nil, err
-	}
-
-	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(internalcfg); err != nil {
-		return nil, err
-	}
-	// Validates cfg (flags/configs + defaults + dynamic defaults)
-	if err := validation.ValidateInitConfiguration(internalcfg).ToAggregate(); err != nil {
 		return nil, err
 	}
 	return internalcfg, nil
@@ -221,18 +212,24 @@ func LoadOrDefaultInitConfiguration(cfgPath string, defaultversionedcfg *kubeadm
 	return DefaultedInitConfiguration(defaultversionedcfg)
 }
 
-// BytesToInternalConfig converts a byte slice to an internal, defaulted and validated configuration object.
-// The byte slice may contain one or many different YAML documents. These YAML documents are parsed one-by-one
-// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct
-func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
-	var initcfg *kubeadmapi.InitConfiguration
-	var clustercfg *kubeadmapi.ClusterConfiguration
-	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
-
+// BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
+// The map may contain many different YAML documents. These YAML documents are parsed one-by-one
+// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct.
+// The resulting InitConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToInitConfiguration(b []byte) (*kubeadmapi.InitConfiguration, error) {
 	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
 	if err != nil {
 		return nil, err
 	}
+
+	return documentMapToInitConfiguration(gvkmap)
+}
+
+// documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
+func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte) (*kubeadmapi.InitConfiguration, error) {
+	var initcfg *kubeadmapi.InitConfiguration
+	var clustercfg *kubeadmapi.ClusterConfiguration
+	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
 
 	for gvk, fileContent := range gvkmap {
 		// first, check if this GVK is supported one
@@ -308,6 +305,17 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 			fmt.Printf("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
 		}
 	}
+
+	// Applies dynamic defaults to settings not provided with flags
+	if err := SetInitDynamicDefaults(initcfg); err != nil {
+		return nil, err
+	}
+
+	// Validates cfg (flags/configs + defaults + dynamic defaults)
+	if err := validation.ValidateInitConfiguration(initcfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+
 	return initcfg, nil
 }
 
