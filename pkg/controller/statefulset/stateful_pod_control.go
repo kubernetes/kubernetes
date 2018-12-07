@@ -217,14 +217,17 @@ func (spc *realStatefulPodControl) updatePersistentVolumeClaims(set *apps.Statef
 
 		currentStorageRequest := currentClaim.Spec.Resources.Requests[v1.ResourceStorage]
 		updatedStorageRequest := updatedClaim.Spec.Resources.Requests[v1.ResourceStorage]
-		if updatedStorageRequest.Cmp(currentStorageRequest) != 0 {
+		if updatedStorageRequest.Cmp(currentStorageRequest) > 0 {
 			currentClaim.Spec.Resources.Requests[v1.ResourceStorage] = updatedStorageRequest
-			_, err = spc.client.CoreV1().PersistentVolumeClaims(currentClaim.Namespace).Update(currentClaim)
+			currentClaim, err = spc.client.CoreV1().PersistentVolumeClaims(currentClaim.Namespace).Update(currentClaim)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("Failed to update PVC %s: %s", currentClaim.Name, err))
 				spc.recordClaimEvent("update", set, pod, currentClaim, err)
 			}
-			// Add wait for the FileSystemResizePending condition? So pods are restarted after underlying volume has expanded
+		}
+
+		if !resizePending(currentClaim) {
+			errs = append(errs, fmt.Errorf("Controller resize pending for PVC %s", currentClaim.Name))
 		}
 	}
 	return errorutils.NewAggregate(errs)

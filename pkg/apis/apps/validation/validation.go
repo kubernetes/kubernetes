@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.
@@ -154,21 +156,30 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
 	restoreVolumeClaimTemplates := make([]api.PersistentVolumeClaim, len(statefulSet.Spec.VolumeClaimTemplates))
+	volumeExpansionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes)
 	if len(oldStatefulSet.Spec.VolumeClaimTemplates) == len(statefulSet.Spec.VolumeClaimTemplates) {
 		for index, oldVolumeClaimTemplate := range oldStatefulSet.Spec.VolumeClaimTemplates {
-			oldStorageRequest := oldVolumeClaimTemplate.Spec.Resources.Requests[api.ResourceStorage]
-			newStorageRequest := statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage]
-			if newStorageRequest.Cmp(oldStorageRequest) < 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeClaimTemplates", fmt.Sprint(index), "spec", "resources", "requests", "storage"), "storage request can not be less than previous value"))
-			}
-
 			restoreVolumeClaimTemplates[index] = *statefulSet.Spec.VolumeClaimTemplates[index].DeepCopy()
-			statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage] = oldStorageRequest
+			if volumeExpansionEnabled {
+				oldStorageRequest := oldVolumeClaimTemplate.Spec.Resources.Requests[api.ResourceStorage]
+				newStorageRequest := statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage]
+				if newStorageRequest.Cmp(oldStorageRequest) < 0 {
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeClaimTemplates", fmt.Sprint(index), "spec", "resources", "requests", "storage"), "storage request can not be less than previous value"))
+				}
+				statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage] = oldStorageRequest
+			}
 		}
 	}
 
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template' ,'updateStrategy' and 'volumeClaimTemplate.Spec.Resources.Requests[storage]' are forbidden"))
+		var errMsg string
+		if volumeExpansionEnabled {
+			errMsg = "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy' and 'volumeClaimTemplate.Spec.Resources.Requests[storage]' are forbidden"
+		} else {
+			errMsg = "updates to statefulset spec for fields other than 'replicas', 'template' and 'updateStrategy' are forbidden"
+		}
+
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), errMsg))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate

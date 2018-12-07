@@ -236,6 +236,15 @@ func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
+func resizePending(pvc *v1.PersistentVolumeClaim) bool {
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == v1.PersistentVolumeClaimFileSystemResizePending && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
 // allowsBurst is true if the alpha burst annotation is set.
 func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
