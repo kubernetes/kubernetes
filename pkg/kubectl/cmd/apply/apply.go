@@ -344,6 +344,13 @@ func (o *ApplyOptions) Run() error {
 			return err
 		}
 
+		// If server-dry-run is requested but the type doesn't support it, fail right away.
+		if o.ServerDryRun {
+			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
+
 		if info.Namespaced() {
 			visitedNamespaces.Insert(info.Namespace)
 		}
@@ -366,12 +373,6 @@ func (o *ApplyOptions) Run() error {
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
-			}
-			// If server-dry-run is requested but the type doesn't support it, fail right away.
-			if o.ServerDryRun {
-				if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return err
-				}
 			}
 
 			// Create the resource if it doesn't exist
