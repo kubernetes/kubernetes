@@ -240,7 +240,7 @@ __kubectl_cp()
     esac
 }
 
-__custom_func() {
+__kubectl_custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
         kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_* |\
