@@ -318,13 +318,18 @@ func (t *TableSorter) Len() int {
 
 func (t *TableSorter) Swap(i, j int) {
 	t.obj.Rows[i], t.obj.Rows[j] = t.obj.Rows[j], t.obj.Rows[i]
+	t.parsedRows[i], t.parsedRows[j] = t.parsedRows[j], t.parsedRows[i]
 }
 
 func (t *TableSorter) Less(i, j int) bool {
 	iValues := t.parsedRows[i]
 	jValues := t.parsedRows[j]
-	if len(iValues) == 0 || len(iValues[0]) == 0 || len(jValues) == 0 || len(jValues[0]) == 0 {
-		klog.Fatalf("couldn't find any field with path %q in the list of objects", t.field)
+
+	if len(iValues) == 0 || len(iValues[0]) == 0 {
+		return true
+	}
+	if len(jValues) == 0 || len(jValues[0]) == 0 {
+		return false
 	}
 
 	iField := iValues[0][0]
@@ -342,28 +347,36 @@ func (t *TableSorter) Sort() error {
 	return nil
 }
 
-func NewTableSorter(table *metav1beta1.Table, field string) *TableSorter {
+func NewTableSorter(table *metav1beta1.Table, field string) (*TableSorter, error) {
 	var parsedRows [][][]reflect.Value
 
 	parser := jsonpath.New("sorting").AllowMissingKeys(true)
 	err := parser.Parse(field)
 	if err != nil {
-		klog.Fatalf("sorting error: %v\n", err)
+		return nil, fmt.Errorf("sorting error: %v", err)
 	}
 
+	fieldFoundOnce := false
 	for i := range table.Rows {
 		parsedRow, err := findJSONPathResults(parser, table.Rows[i].Object.Object)
 		if err != nil {
-			klog.Fatalf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
+			return nil, fmt.Errorf("Failed to get values for %#v using %s (%#v)", parsedRow, field, err)
 		}
 		parsedRows = append(parsedRows, parsedRow)
+		if len(parsedRow) > 0 && len(parsedRow[0]) > 0 {
+			fieldFoundOnce = true
+		}
+	}
+
+	if len(table.Rows) > 0 && !fieldFoundOnce {
+		return nil, fmt.Errorf("couldn't find any field with path %q in the list of objects", field)
 	}
 
 	return &TableSorter{
 		obj:        table,
 		field:      field,
 		parsedRows: parsedRows,
-	}
+	}, nil
 }
 func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
 	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
