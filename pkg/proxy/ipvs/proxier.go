@@ -1646,7 +1646,12 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 }
 
 func (proxier *Proxier) cleanLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) {
+	isIpv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for _, addr := range currentBindAddrs {
+		addrIsIpv6 := utilnet.IsIPv6(net.ParseIP(addr))
+		if addrIsIpv6 && ! isIpv6 || ! addrIsIpv6 && isIpv6 {
+			continue
+		}
 		if _, ok := activeBindAddrs[addr]; !ok {
 			// This address was not processed in the latest sync loop
 			klog.V(4).Infof("Unbind addr %s", addr)
