@@ -878,6 +878,8 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
+		PortOpenCheck{port: 10257},
+		PortOpenCheck{port: 10259},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
