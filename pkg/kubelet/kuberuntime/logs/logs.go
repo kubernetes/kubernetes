@@ -32,7 +32,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/tail"
@@ -248,6 +248,7 @@ func (w *logWriter) write(msg *logMessage) error {
 	default:
 		return fmt.Errorf("unexpected stream type %q", msg.stream)
 	}
+
 	n, err := stream.Write(line)
 	w.remain -= int64(n)
 	if err != nil {
@@ -273,7 +274,6 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
 	defer f.Close()
-
 	// Search start point based on tail line.
 	start, err := tail.FindTailLineStartIndex(f, opts.tail)
 	if err != nil {
@@ -328,7 +328,6 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 			if len(l) == 0 {
 				continue
 			}
-			klog.Warningf("Incomplete line in log file %q: %q", path, l)
 		}
 		if parse == nil {
 			// Initialize the log parsing function.

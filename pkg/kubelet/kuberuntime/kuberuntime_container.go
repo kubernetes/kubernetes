@@ -35,7 +35,7 @@ import (
 	"github.com/armon/circbuf"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -419,6 +419,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			}
 			// Use the termination message written by the application is not empty
 			if len(tMessage) != 0 {
+				klog.Info("termination message :  ", tMessage, "--")
 				cStatus.Message = tMessage
 			}
 		}
