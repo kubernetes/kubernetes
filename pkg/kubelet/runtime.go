@@ -32,6 +32,25 @@ type runtimeState struct {
 	networkError             error
 	cidr                     string
 	healthChecks             []*healthCheck
+	runtimeUpInitialized     bool
+}
+
+func (s *runtimeState) setRuntimeSync(t time.Time) {
+	s.Lock()
+	defer s.Unlock()
+	s.lastBaseRuntimeSync = t
+}
+
+func (s *runtimeState) isInitialized() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return s.runtimeUpInitialized
+}
+
+func (s *runtimeState) setInitialized() {
+	s.Lock()
+	defer s.Unlock()
+	s.runtimeUpInitialized = true
 }
 
 // A health check function should be efficient and not rely on external
@@ -47,12 +66,6 @@ func (s *runtimeState) addHealthCheck(name string, f healthCheckFnType) {
 	s.Lock()
 	defer s.Unlock()
 	s.healthChecks = append(s.healthChecks, &healthCheck{name: name, fn: f})
-}
-
-func (s *runtimeState) setRuntimeSync(t time.Time) {
-	s.Lock()
-	defer s.Unlock()
-	s.lastBaseRuntimeSync = t
 }
 
 func (s *runtimeState) setNetworkState(err error) {

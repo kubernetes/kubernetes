@@ -444,6 +444,7 @@ func ReadyCondition(
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	isRuntimeInitialized func() bool,
 ) Setter {
 	return func(node *v1.Node) error {
 		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
@@ -456,6 +457,10 @@ func ReadyCondition(
 			Reason:            "KubeletReady",
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
+		}
+		if !isRuntimeInitialized() {
+			// do not update node condition until container runtime is initialized.
+			return fmt.Errorf("container runtime is not initialized, will try to update nodeready status later")
 		}
 		errs := []error{runtimeErrorsFunc(), networkErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}

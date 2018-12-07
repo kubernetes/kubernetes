@@ -897,11 +897,13 @@ func TestReadyCondition(t *testing.T) {
 		cmStatus                 cm.Status
 		expectConditions         []v1.NodeCondition
 		expectEvents             []testEvent
+		isRuntimeInitialized     bool
 	}{
 		{
-			desc:             "new, ready",
-			node:             withCapacity.DeepCopy(),
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
+			desc:                 "new, ready",
+			isRuntimeInitialized: true,
+			node:                 withCapacity.DeepCopy(),
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
 			// TODO(mtaufen): The current behavior is that we don't send an event for the initial NodeReady condition,
 			// the reason for this is unclear, so we may want to actually send an event, and change these test cases
 			// to ensure an event is sent.
@@ -911,9 +913,11 @@ func TestReadyCondition(t *testing.T) {
 			node:                     withCapacity.DeepCopy(),
 			appArmorValidateHostFunc: func() error { return nil },
 			expectConditions:         []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. AppArmor enabled", now, now)},
+			isRuntimeInitialized:     true,
 		},
 		{
 			desc:                     "new, ready: apparmor validator failed",
+			isRuntimeInitialized:     true,
 			node:                     withCapacity.DeepCopy(),
 			appArmorValidateHostFunc: func() error { return fmt.Errorf("foo") },
 			// absence of an additional message is understood to mean that AppArmor is disabled
@@ -925,23 +929,27 @@ func TestReadyCondition(t *testing.T) {
 			cmStatus: cm.Status{
 				SoftRequirements: fmt.Errorf("foo"),
 			},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. WARNING: foo", now, now)},
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. WARNING: foo", now, now)},
+			isRuntimeInitialized: true,
 		},
 		{
-			desc:             "new, not ready: runtime and network errors",
-			node:             withCapacity.DeepCopy(),
-			runtimeErrors:    errors.New("runtime"),
-			networkErrors:    errors.New("network"),
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "[runtime, network]", now, now)},
+			desc:                 "new, not ready: runtime and network errors",
+			node:                 withCapacity.DeepCopy(),
+			runtimeErrors:        errors.New("runtime"),
+			networkErrors:        errors.New("network"),
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(false, "[runtime, network]", now, now)},
+			isRuntimeInitialized: true,
 		},
 		{
-			desc:             "new, not ready: missing capacities",
-			node:             &v1.Node{},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "Missing node capacity for resources: cpu, memory, pods, ephemeral-storage", now, now)},
+			desc:                 "new, not ready: missing capacities",
+			node:                 &v1.Node{},
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(false, "Missing node capacity for resources: cpu, memory, pods, ephemeral-storage", now, now)},
+			isRuntimeInitialized: true,
 		},
 		// the transition tests ensure timestamps are set correctly, no need to test the entire condition matrix in this section
 		{
-			desc: "transition to ready",
+			desc:                 "transition to ready",
+			isRuntimeInitialized: true,
 			node: func() *v1.Node {
 				node := withCapacity.DeepCopy()
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
@@ -956,7 +964,8 @@ func TestReadyCondition(t *testing.T) {
 			},
 		},
 		{
-			desc: "transition to not ready",
+			desc:                 "transition to not ready",
+			isRuntimeInitialized: true,
 			node: func() *v1.Node {
 				node := withCapacity.DeepCopy()
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(true, "", before, before)}
@@ -978,8 +987,9 @@ func TestReadyCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(true, "", before, before)}
 				return node
 			}(),
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", before, now)},
-			expectEvents:     []testEvent{},
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", before, now)},
+			expectEvents:         []testEvent{},
+			isRuntimeInitialized: true,
 		},
 		{
 			desc: "not ready, no transition",
@@ -988,9 +998,22 @@ func TestReadyCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
 				return node
 			}(),
-			runtimeErrors:    errors.New("foo"),
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", before, now)},
-			expectEvents:     []testEvent{},
+			runtimeErrors:        errors.New("foo"),
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(false, "foo", before, now)},
+			expectEvents:         []testEvent{},
+			isRuntimeInitialized: true,
+		},
+		{
+			desc: "runtime uninitialized, no transition",
+			node: func() *v1.Node {
+				node := withCapacity.DeepCopy()
+				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
+				return node
+			}(),
+			runtimeErrors:        nil,
+			expectConditions:     []v1.NodeCondition{*makeReadyCondition(false, "", before, before)},
+			expectEvents:         []testEvent{},
+			isRuntimeInitialized: false,
 		},
 	}
 	for _, tc := range cases {
@@ -1004,6 +1027,9 @@ func TestReadyCondition(t *testing.T) {
 			cmStatusFunc := func() cm.Status {
 				return tc.cmStatus
 			}
+			isRuntimeInitialized := func() bool {
+				return tc.isRuntimeInitialized
+			}
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1012,10 +1038,14 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc, isRuntimeInitialized)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				if !tc.isRuntimeInitialized {
+					assert.EqualError(t, err, "container runtime is not initialized, will try to update nodeready status later")
+				} else {
+					t.Fatalf("unexpected error: %v", err)
+				}
 			}
 			// check expected condition
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),

@@ -2147,6 +2147,7 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 func (kl *Kubelet) updateRuntimeUp() {
 	kl.updateRuntimeMux.Lock()
 	defer kl.updateRuntimeMux.Unlock()
+	defer kl.runtimeState.setInitialized()
 
 	s, err := kl.containerRuntime.Status()
 	if err != nil {
