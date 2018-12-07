@@ -1218,10 +1218,9 @@ func TestBackoffLifecycle(t *testing.T) {
 		if count == 5 || count == 9 {
 			w.WriteHeader(http.StatusOK)
 			return
-		} else {
-			w.WriteHeader(http.StatusGatewayTimeout)
-			return
 		}
+		w.WriteHeader(http.StatusGatewayTimeout)
+		return
 	}))
 	defer testServer.Close()
 	c := testRESTClient(t, testServer)
