@@ -222,7 +222,7 @@ Before upgrading to Kubernetes 1.13, you must keep the following in mind:
 
 ### SIG API Machinery
 
-For the 1.13 release, SIG API Machinery is happy to announce that the [dry-run functionality](https://kubernetes.io//docs/reference/using-api/api-concepts/#dry-run) is now beta.
+For the 1.13 release, SIG API Machinery is happy to announce that the [dry-run functionality](https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run) is now beta.
 
 ### SIG Auth
 
