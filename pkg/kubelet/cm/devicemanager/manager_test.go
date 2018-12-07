@@ -78,6 +78,7 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 	m, _, p, w := setupInProbeMode(t, []*pluginapi.Device{}, func(n string, d []pluginapi.Device) {}, socketName, pluginSocketName)
+	time.Sleep(10 * time.Millisecond)
 	cleanup(t, m, p, w)
 }
 
