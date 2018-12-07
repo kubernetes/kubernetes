@@ -31,5 +31,11 @@ ${CODEGEN_PKG}/generate-groups.sh all \
   --output-base "$(dirname ${BASH_SOURCE})/../../.." \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
 
+${CODEGEN_PKG}/generate-internal-groups.sh "deepcopy,defaulter,conversion" \
+  k8s.io/sample-apiserver/pkg/client k8s.io/sample-apiserver/pkg/apis k8s.io/sample-apiserver/pkg/apis \
+  "wardle:v1alpha1,v1beta1" \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.." \
+  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
+
 # To use your own boilerplate text use:
 #   --go-header-file ${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt
