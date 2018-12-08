@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/scheduler/util"
+	schedulerinternalpodinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 )
 
 var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int32(-100), int32(0), int32(100), int32(1000), int32(10000)
@@ -598,35 +598,35 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
 			expectedMapAfterAdd: map[string]*v1.Pod{
-				util.GetPodFullName(pods[0]): pods[0],
-				util.GetPodFullName(pods[1]): pods[1],
-				util.GetPodFullName(pods[2]): pods[2],
-				util.GetPodFullName(pods[3]): pods[3],
+				schedulerinternalpodinfo.GetPodFullName(pods[0]): pods[0],
+				schedulerinternalpodinfo.GetPodFullName(pods[1]): pods[1],
+				schedulerinternalpodinfo.GetPodFullName(pods[2]): pods[2],
+				schedulerinternalpodinfo.GetPodFullName(pods[3]): pods[3],
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
 			expectedMapAfterUpdate: map[string]*v1.Pod{
-				util.GetPodFullName(pods[0]): updatedPods[0],
-				util.GetPodFullName(pods[1]): pods[1],
-				util.GetPodFullName(pods[2]): pods[2],
-				util.GetPodFullName(pods[3]): pods[3],
+				schedulerinternalpodinfo.GetPodFullName(pods[0]): updatedPods[0],
+				schedulerinternalpodinfo.GetPodFullName(pods[1]): pods[1],
+				schedulerinternalpodinfo.GetPodFullName(pods[2]): pods[2],
+				schedulerinternalpodinfo.GetPodFullName(pods[3]): pods[3],
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
 			expectedMapAfterDelete: map[string]*v1.Pod{
-				util.GetPodFullName(pods[2]): pods[2],
-				util.GetPodFullName(pods[3]): pods[3],
+				schedulerinternalpodinfo.GetPodFullName(pods[2]): pods[2],
+				schedulerinternalpodinfo.GetPodFullName(pods[3]): pods[3],
 			},
 		},
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterAdd: map[string]*v1.Pod{
-				util.GetPodFullName(pods[0]): pods[0],
-				util.GetPodFullName(pods[3]): pods[3],
+				schedulerinternalpodinfo.GetPodFullName(pods[0]): pods[0],
+				schedulerinternalpodinfo.GetPodFullName(pods[3]): pods[3],
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
 			expectedMapAfterUpdate: map[string]*v1.Pod{
-				util.GetPodFullName(pods[0]): pods[0],
-				util.GetPodFullName(pods[3]): updatedPods[3],
+				schedulerinternalpodinfo.GetPodFullName(pods[0]): pods[0],
+				schedulerinternalpodinfo.GetPodFullName(pods[3]): updatedPods[3],
 			},
 			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterDelete: map[string]*v1.Pod{},
@@ -635,17 +635,17 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
 			expectedMapAfterAdd: map[string]*v1.Pod{
-				util.GetPodFullName(pods[1]): pods[1],
-				util.GetPodFullName(pods[2]): pods[2],
+				schedulerinternalpodinfo.GetPodFullName(pods[1]): pods[1],
+				schedulerinternalpodinfo.GetPodFullName(pods[2]): pods[2],
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
 			expectedMapAfterUpdate: map[string]*v1.Pod{
-				util.GetPodFullName(pods[1]): updatedPods[1],
-				util.GetPodFullName(pods[2]): pods[2],
+				schedulerinternalpodinfo.GetPodFullName(pods[1]): updatedPods[1],
+				schedulerinternalpodinfo.GetPodFullName(pods[2]): pods[2],
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
 			expectedMapAfterDelete: map[string]*v1.Pod{
-				util.GetPodFullName(pods[1]): updatedPods[1],
+				schedulerinternalpodinfo.GetPodFullName(pods[1]): updatedPods[1],
 			},
 		},
 	}

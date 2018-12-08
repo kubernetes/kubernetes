@@ -18,13 +18,14 @@ limitations under the License.
 // as cache.heap, however, this heap does not perform synchronization. It leaves
 // synchronization to the SchedulingQueue.
 
-package util
+package heap
 
 import (
 	"container/heap"
 	"fmt"
 
 	"k8s.io/client-go/tools/cache"
+	schedulerinternalpodinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 )
 
 // KeyFunc is a function type to get the key from an object.
@@ -55,7 +56,7 @@ type heapData struct {
 	// should be deterministic.
 	keyFunc KeyFunc
 	// lessFunc is used to compare two objects in the heap.
-	lessFunc LessFunc
+	lessFunc schedulerinternalpodinfo.LessFunc
 }
 
 var (
@@ -224,7 +225,7 @@ func (h *Heap) Len() int {
 }
 
 // NewHeap returns a Heap which can be used to queue up items to process.
-func NewHeap(keyFn KeyFunc, lessFn LessFunc) *Heap {
+func NewHeap(keyFn KeyFunc, lessFn schedulerinternalpodinfo.LessFunc) *Heap {
 	return &Heap{
 		data: &heapData{
 			items:    map[string]*heapItem{},

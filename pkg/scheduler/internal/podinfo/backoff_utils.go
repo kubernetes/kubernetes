@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package podinfo
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/klog"
+	schedulerinternalheap "k8s.io/kubernetes/pkg/scheduler/internal/heap"
 )
 
 type clock interface {
@@ -83,7 +84,7 @@ func (b *backoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
 // PodBackoff is used to restart a pod with back-off delay.
 type PodBackoff struct {
 	// expiryQ stores backoffEntry orderedy by lastUpdate until they reach maxDuration and are GC'd
-	expiryQ         *Heap
+	expiryQ         *schedulerinternalheap.Heap
 	lock            sync.Mutex
 	clock           clock
 	defaultDuration time.Duration
@@ -108,7 +109,7 @@ func CreatePodBackoff(defaultDuration, maxDuration time.Duration) *PodBackoff {
 // CreatePodBackoffWithClock creates a pod back-off object by default duration, max duration and clock.
 func CreatePodBackoffWithClock(defaultDuration, maxDuration time.Duration, clock clock) *PodBackoff {
 	return &PodBackoff{
-		expiryQ:         NewHeap(backoffEntryKeyFunc, backoffEntryCompareUpdate),
+		expiryQ:         schedulerinternalheap.NewHeap(backoffEntryKeyFunc, backoffEntryCompareUpdate),
 		clock:           clock,
 		defaultDuration: defaultDuration,
 		maxDuration:     maxDuration,

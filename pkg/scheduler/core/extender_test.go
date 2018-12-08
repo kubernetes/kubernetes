@@ -30,10 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulerinternalpodinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -197,7 +197,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	// and get cached node info by given node name.
 	nodeInfoCopy := f.cachedNodeNameToInfo[node.GetName()].Clone()
 
-	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
+	potentialVictims := schedulerinternalpodinfo.SortableList{CompFunc: schedulerinternalpodinfo.HigherPriorityPod}
 
 	removePod := func(rp *v1.Pod) {
 		nodeInfoCopy.RemovePod(rp)
@@ -207,9 +207,9 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
-	podPriority := util.GetPodPriority(pod)
+	podPriority := schedulerinternalpodinfo.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
-		if util.GetPodPriority(p) < podPriority {
+		if schedulerinternalpodinfo.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			removePod(p)
 		}

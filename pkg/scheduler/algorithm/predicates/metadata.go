@@ -30,8 +30,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	"k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // PredicateMetadata interface represents anything that can access a predicate metadata.
@@ -163,7 +163,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		pod:                                    pod,
 		podBestEffort:                          isPodBestEffort(pod),
 		podRequest:                             GetResourceRequest(pod),
-		podPorts:                               schedutil.GetContainerPorts(pod),
+		podPorts:                               podinfo.GetContainerPorts(pod),
 		topologyPairsPotentialAffinityPods:     incomingPodAffinityMap,
 		topologyPairsPotentialAntiAffinityPods: incomingPodAntiAffinityMap,
 		topologyPairsAntiAffinityPodsMap:       existingPodAntiAffinityMap,
@@ -182,7 +182,7 @@ func newTopologyPairsMaps() *topologyPairsMaps {
 }
 
 func (topologyPairsMaps *topologyPairsMaps) addTopologyPair(pair topologyPair, pod *v1.Pod) {
-	podFullName := schedutil.GetPodFullName(pod)
+	podFullName := podinfo.GetPodFullName(pod)
 	if topologyPairsMaps.topologyPairToPods[pair] == nil {
 		topologyPairsMaps.topologyPairToPods[pair] = make(map[*v1.Pod]struct{})
 	}
@@ -194,7 +194,7 @@ func (topologyPairsMaps *topologyPairsMaps) addTopologyPair(pair topologyPair, p
 }
 
 func (topologyPairsMaps *topologyPairsMaps) removePod(deletedPod *v1.Pod) {
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
+	deletedPodFullName := podinfo.GetPodFullName(deletedPod)
 	for pair := range topologyPairsMaps.podToTopologyPairs[deletedPodFullName] {
 		delete(topologyPairsMaps.topologyPairToPods[pair], deletedPod)
 		if len(topologyPairsMaps.topologyPairToPods[pair]) == 0 {
@@ -218,8 +218,8 @@ func (topologyPairsMaps *topologyPairsMaps) appendMaps(toAppend *topologyPairsMa
 // RemovePod changes predicateMetadata assuming that the given `deletedPod` is
 // deleted from the system.
 func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
-	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
+	deletedPodFullName := podinfo.GetPodFullName(deletedPod)
+	if deletedPodFullName == podinfo.GetPodFullName(meta.pod) {
 		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
 	meta.topologyPairsAntiAffinityPodsMap.removePod(deletedPod)
@@ -233,7 +233,7 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 		len(meta.serviceAffinityMatchingPodList) > 0 &&
 		deletedPod.Namespace == meta.serviceAffinityMatchingPodList[0].Namespace {
 		for i, pod := range meta.serviceAffinityMatchingPodList {
-			if schedutil.GetPodFullName(pod) == deletedPodFullName {
+			if podinfo.GetPodFullName(pod) == deletedPodFullName {
 				meta.serviceAffinityMatchingPodList = append(
 					meta.serviceAffinityMatchingPodList[:i],
 					meta.serviceAffinityMatchingPodList[i+1:]...)
@@ -247,8 +247,8 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 // AddPod changes predicateMetadata assuming that `newPod` is added to the
 // system.
 func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) error {
-	addedPodFullName := schedutil.GetPodFullName(addedPod)
-	if addedPodFullName == schedutil.GetPodFullName(meta.pod) {
+	addedPodFullName := podinfo.GetPodFullName(addedPod)
+	if addedPodFullName == podinfo.GetPodFullName(meta.pod) {
 		return fmt.Errorf("addedPod and meta.pod must not be the same")
 	}
 	if nodeInfo.Node() == nil {

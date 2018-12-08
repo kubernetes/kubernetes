@@ -22,7 +22,7 @@ limitations under the License.
 // pods that are already tried and are determined to be unschedulable. The latter
 // is called unschedulableQ.
 // FIFO is here for flag-gating purposes and allows us to use the traditional
-// scheduling queue when util.PodPriorityEnabled() returns false.
+// scheduling queue when schedulerinternalpodinfo.PodPriorityEnabled() returns false.
 
 package queue
 
@@ -42,7 +42,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/pkg/scheduler/util"
+	schedulerinternalpodinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 )
 
 var (
@@ -92,7 +92,7 @@ type SchedulingQueue interface {
 // NewSchedulingQueue initializes a new scheduling queue. If pod priority is
 // enabled a priority queue is returned. If it is disabled, a FIFO is returned.
 func NewSchedulingQueue(stop <-chan struct{}) SchedulingQueue {
-	if util.PodPriorityEnabled() {
+	if schedulerinternalpodinfo.PodPriorityEnabled() {
 		return NewPriorityQueue(stop)
 	}
 	return NewFIFO()
@@ -212,19 +212,19 @@ func NominatedNodeName(pod *v1.Pod) string {
 // unschedulable queues and will be moved to active queue when backoff are completed.
 type PriorityQueue struct {
 	stop  <-chan struct{}
-	clock util.Clock
+	clock schedulerinternalpodinfo.Clock
 	// podBackoff tracks backoff for pods attempting to be rescheduled
-	podBackoff *util.PodBackoff
+	podBackoff *schedulerinternalpodinfo.PodBackoff
 
 	lock sync.RWMutex
 	cond sync.Cond
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
-	activeQ *util.Heap
+	activeQ *schedulerinternalheap.Heap
 	// podBackoffQ is a heap ordered by backoff expiry. Pods which have completed backoff
 	// are popped from this heap before the scheduler looks at activeQ
-	podBackoffQ *util.Heap
+	podBackoffQ *schedulerinternalheap.Heap
 	// unschedulableQ holds pods that have been tried and determined unschedulable.
 	unschedulableQ *UnschedulablePodsMap
 	// nominatedPods is a structures that stores pods which are nominated to run
@@ -266,29 +266,29 @@ func podTimestamp(pod *v1.Pod) *metav1.Time {
 func activeQComp(pod1, pod2 interface{}) bool {
 	p1 := pod1.(*v1.Pod)
 	p2 := pod2.(*v1.Pod)
-	prio1 := util.GetPodPriority(p1)
-	prio2 := util.GetPodPriority(p2)
+	prio1 := schedulerinternalpodinfo.GetPodPriority(p1)
+	prio2 := schedulerinternalpodinfo.GetPodPriority(p2)
 	return (prio1 > prio2) || (prio1 == prio2 && podTimestamp(p1).Before(podTimestamp(p2)))
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(stop <-chan struct{}) *PriorityQueue {
-	return NewPriorityQueueWithClock(stop, util.RealClock{})
+	return NewPriorityQueueWithClock(stop, schedulerinternalpodinfo.RealClock{})
 }
 
 // NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
-func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *PriorityQueue {
+func NewPriorityQueueWithClock(stop <-chan struct{}, clock schedulerinternalpodinfo.Clock) *PriorityQueue {
 	pq := &PriorityQueue{
 		clock:            clock,
 		stop:             stop,
-		podBackoff:       util.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
-		activeQ:          util.NewHeap(cache.MetaNamespaceKeyFunc, activeQComp),
+		podBackoff:       schedulerinternalpodinfo.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
+		activeQ:          schedulerinternalheap.NewHeap(cache.MetaNamespaceKeyFunc, activeQComp),
 		unschedulableQ:   newUnschedulablePodsMap(),
 		nominatedPods:    newNominatedPodMap(),
 		moveRequestCycle: -1,
 	}
 	pq.cond.L = &pq.lock
-	pq.podBackoffQ = util.NewHeap(cache.MetaNamespaceKeyFunc, pq.podsCompareBackoffCompleted)
+	pq.podBackoffQ = schedulerinternalheap.NewHeap(cache.MetaNamespaceKeyFunc, pq.podsCompareBackoffCompleted)
 
 	pq.run()
 
@@ -781,7 +781,7 @@ func (u *UnschedulablePodsMap) clear() {
 func newUnschedulablePodsMap() *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
 		pods:    make(map[string]*v1.Pod),
-		keyFunc: util.GetPodFullName,
+		keyFunc: schedulerinternalpodinfo.GetPodFullName,
 	}
 }
 

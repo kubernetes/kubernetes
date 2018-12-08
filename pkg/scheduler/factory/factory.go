@@ -53,10 +53,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
+	schedulerinternalpodinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/plugins"
 	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -455,7 +455,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.percentageOfNodesToScore,
 	)
 
-	podBackoff := util.CreateDefaultPodBackoff()
+	podBackoff := schedulerinternalpodinfo.CreateDefaultPodBackoff()
 	return &Config{
 		SchedulerCache: c.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
@@ -638,7 +638,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache schedulerinternalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, backoff *schedulerinternalpodinfo.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache schedulerinternalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
@@ -676,7 +676,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			// pod in the unschedulable queue. This ensures that if the pod is nominated
 			// to run on a node, scheduler takes the pod into account when running
 			// predicates for the node.
-			if !util.PodPriorityEnabled() {
+			if !schedulerinternalpodinfo.PodPriorityEnabled() {
 				if !backoff.TryBackoffAndWait(podID, stopEverything) {
 					klog.Warningf("Request for pod %v already in flight, abandoning", podID)
 					return

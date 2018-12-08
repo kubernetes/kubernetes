@@ -17,7 +17,7 @@ limitations under the License.
 // This file was copied from client-go/tools/cache/heap.go and modified
 // for our non thread-safe heap
 
-package util
+package heap
 
 import (
 	"testing"

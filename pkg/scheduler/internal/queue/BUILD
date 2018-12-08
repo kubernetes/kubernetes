@@ -9,7 +9,7 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
-        "//pkg/scheduler/util:go_default_library",
+        "//pkg/scheduler/internal/podinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -25,7 +25,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/scheduler/util:go_default_library",
+        "//pkg/scheduler/internal/podinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

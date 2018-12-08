@@ -249,7 +249,7 @@
         "k8s.io/kubernetes/pkg/capabilities",
         "k8s.io/kubernetes/pkg/master/ports",
         "k8s.io/kubernetes/pkg/scheduler/api",
-        "k8s.io/kubernetes/pkg/scheduler/util",
+        "k8s.io/kubernetes/pkg/scheduler/internal/podinfo",
         "k8s.io/kubernetes/pkg/security/apparmor",
         "k8s.io/kubernetes/pkg/util/parsers",
         "k8s.io/kubernetes/pkg/fieldpath",
