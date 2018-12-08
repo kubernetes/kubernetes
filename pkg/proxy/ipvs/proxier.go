@@ -1595,7 +1595,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		glog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
 		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest)
 		if err != nil {
-			glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
+			glog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 			continue
 		}
 	}
@@ -1607,17 +1607,22 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 		svc := currentServices[cs]
 		if _, ok := activeServices[cs]; !ok {
 			// This service was not processed in the latest sync loop so before deleting it,
-			// make sure it does not fall within an excluded CIDR range.
 			okayToDelete := true
 			rsList, _ := proxier.ipvs.GetRealServers(svc)
+
+			// If we still have real servers graceful termination is not done
+			if len(rsList) > 0 {
+				okayToDelete = false
+			}
+			// Applying graceful termination to all real servers
 			for _, rs := range rsList {
 				uniqueRS := GetUniqueRSName(svc, rs)
-				// if there are in terminating real server in this service, then handle it later
-				if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
-					okayToDelete = false
-					break
+				klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
+				if err := proxier.gracefuldeleteManager.GracefulDeleteRS(svc, rs); err != nil {
+					klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 				}
 			}
+			// make sure it does not fall within an excluded CIDR range.
 			for _, excludedCIDR := range proxier.excludeCIDRs {
 				// Any validation of this CIDR already should have occurred.
 				_, n, _ := net.ParseCIDR(excludedCIDR)
