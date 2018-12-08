@@ -1641,6 +1641,9 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 					klog.V(4).Infof("Unbinding address %s", addr)
 					if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
 						klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+					} else {
+						// In case we delete a multi-port service, avoid trying to unbind multiple times
+						delete(legacyBindAddrs,addr)
 					}
 				}
 			}
