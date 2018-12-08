@@ -21,7 +21,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
-// hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
+// hardEvictionReservation returns a resource list that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
 	if len(thresholds) == 0 {
 		return nil
