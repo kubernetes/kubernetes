@@ -174,20 +174,6 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		recoverEtcd = true
 	}
 
-	// We currently depend on getting the Etcd mirror Pod hash from the KubeAPIServer;
-	// Upgrading the Etcd protocol takes down the apiserver, so we can't verify component restarts if we restart Etcd independently.
-	// Skip waiting for Etcd to restart and immediately move on to updating the apiserver.
-	if component == constants.Etcd {
-		waitForComponentRestart = false
-	}
-	// Normally, if an Etcd upgrade is successful, but the apiserver upgrade fails, Etcd is not rolled back.
-	// In the case of a TLS upgrade, the old KubeAPIServer config is incompatible with the new Etcd confg, so we rollback Etcd
-	// if the APIServer upgrade fails.
-	if component == constants.KubeAPIServer {
-		recoverEtcd = true
-		fmt.Printf("[upgrade/staticpods] The %s manifest will be restored if component %q fails to upgrade\n", constants.Etcd, component)
-	}
-
 	if err := renewCerts(cfg, component); err != nil {
 		return errors.Wrapf(err, "failed to renew certificates for component %q", component)
 	}
@@ -311,14 +297,6 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
-	// Waiter configurations for checking etcd status
-	// If we are upgrading TLS we need to wait for old static pod to be removed.
-	// This is needed because we are not able to currently verify that the static pod
-	// has been updated through the apiserver across an etcd TLS upgrade.
-	// This value is arbitrary but seems to be long enough in manual testing.
-	noDelay := 0 * time.Second
-	podRestartDelay := 30 * time.Second
-
 	retries := 10
 	retryInterval := 15 * time.Second
 
@@ -328,7 +306,7 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 		// Since upgrade component failed, the old etcd manifest has either been restored or was never touched
 		// Now we need to check the health of etcd cluster if it is up with old manifest
 		fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
-		if _, err := oldEtcdClient.WaitForClusterAvailable(noDelay, retries, retryInterval); err != nil {
+		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
 			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
 
 			// At this point we know that etcd cluster is dead and it is safe to copy backup datastore and to rollback old etcd manifest
@@ -341,7 +319,7 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 
 			// Now that we've rolled back the data, let's check if the cluster comes up
 			fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
-			if _, err := oldEtcdClient.WaitForClusterAvailable(noDelay, retries, retryInterval); err != nil {
+			if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
 				fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
 				// Nothing else left to try to recover etcd cluster
 				return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
@@ -366,7 +344,7 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 
 	// Checking health state of etcd after the upgrade
 	fmt.Println("[upgrade/etcd] Waiting for etcd to become available")
-	if _, err = newEtcdClient.WaitForClusterAvailable(podRestartDelay, retries, retryInterval); err != nil {
+	if _, err = newEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
 		fmt.Printf("[upgrade/etcd] Failed to healthcheck etcd: %v\n", err)
 		// Despite the fact that upgradeComponent was successful, there is something wrong with the etcd cluster
 		// First step is to restore back up of datastore
@@ -384,7 +362,7 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 
 		// Assuming rollback of the old etcd manifest was successful, check the status of etcd cluster again
 		fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
-		if _, err := oldEtcdClient.WaitForClusterAvailable(noDelay, retries, retryInterval); err != nil {
+		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
 			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
 			// Nothing else left to try to recover etcd cluster
 			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)

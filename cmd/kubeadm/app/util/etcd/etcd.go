@@ -43,7 +43,7 @@ type ClusterInterrogator interface {
 	GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
 	GetClusterVersions() (map[string]string, error)
 	GetVersion() (string, error)
-	WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error)
+	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
 	Sync() error
 	AddMember(name string, peerAddrs string) ([]Member, error)
 }
@@ -328,10 +328,8 @@ func (c Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) 
 	return clusterStatus, nil
 }
 
-// WaitForClusterAvailable returns true if all endpoints in the cluster are available after an initial delay and retry attempts, an error is returned otherwise
-func (c Client) WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error) {
-	fmt.Printf("[util/etcd] Waiting %v for initial delay\n", delay)
-	time.Sleep(delay)
+// WaitForClusterAvailable returns true if all endpoints in the cluster are available after retry attempts, an error is returned otherwise
+func (c Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	for i := 0; i < retries; i++ {
 		if i > 0 {
 			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
