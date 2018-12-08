@@ -2871,10 +2871,10 @@ func TestCleanLegacyService(t *testing.T) {
 	activeBindAddrs := map[string]bool{"1.1.1.1": true, "2.2.2.2": true, "3.3.3.3": true, "4.4.4.4": true}
 	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5", "6.6.6.6"}
 	for i := range currentBindAddrs {
-	      fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
 	}
 
-	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5.5.5.5":true,"6.6.6.6":true})
+	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5.5.5.5": true, "6.6.6.6": true})
 	// ipvs4 and ipvs5 should have been cleaned.
 	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
 	if len(remainingVirtualServers) != 4 {
