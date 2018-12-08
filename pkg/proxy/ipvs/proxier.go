@@ -1186,7 +1186,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil {
 		klog.Errorf("Failed to get bind address, err: %v", err)
 	}
-	legacyBindAddrs := proxier.getLegacyBindAddr(activeBindAddrs,currentBindAddrs)
+	legacyBindAddrs := proxier.getLegacyBindAddr(activeBindAddrs, currentBindAddrs)
 
 	// Clean up legacy IPVS services and unbind addresses
 	appliedSvcs, err := proxier.ipvs.GetVirtualServers()
@@ -1636,14 +1636,14 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 				if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
 					glog.Errorf("Failed to delete service %s, error: %v", svc.String(), err)
 				}
-				addr:=svc.Address.String()
+				addr := svc.Address.String()
 				if _, ok := legacyBindAddrs[addr]; ok {
 					klog.V(4).Infof("Unbinding address %s", addr)
 					if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
 						klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
 					} else {
 						// In case we delete a multi-port service, avoid trying to unbind multiple times
-						delete(legacyBindAddrs,addr)
+						delete(legacyBindAddrs, addr)
 					}
 				}
 			}
@@ -1652,10 +1652,10 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 }
 
 func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
-	legacyAddrs :=  make(map[string]bool)
+	legacyAddrs := make(map[string]bool)
 	for _, addr := range currentBindAddrs {
 		if _, ok := activeBindAddrs[addr]; !ok {
-			legacyAddrs[addr]=true
+			legacyAddrs[addr] = true
 		}
 	}
 	return legacyAddrs
