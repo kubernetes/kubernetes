@@ -7,7 +7,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kube-scheduler/app:go_default_library",
-        "//cmd/kube-scheduler/app/config:go_default_library",
         "//cmd/kube-scheduler/app/options:go_default_library",
         "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

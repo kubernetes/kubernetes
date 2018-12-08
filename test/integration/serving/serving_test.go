@@ -73,7 +73,7 @@ func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFl
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Options.SecureServingInfo, gotResult.Options.InsecureServingInfo, gotResult.TearDownFn, err
 }
 
 func TestComponentSecureServingAndAuth(t *testing.T) {

@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
-	kubeschedulerconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 
 	// import DefaultProvider
@@ -43,7 +42,6 @@ type TearDownFunc func()
 type TestServer struct {
 	LoopbackClientConfig *restclient.Config // Rest client config using the magic token
 	Options              *options.Options
-	Config               *kubeschedulerconfig.Config
 	TearDownFn           TearDownFunc // TearDown function
 	TmpDir               string       // Temp Dir used, by the apiserver
 }
@@ -113,20 +111,20 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		s.CombinedInsecureServing.Metrics.Listener = listener
 		t.Logf("kube-scheduler will listen insecurely on port %d...", s.CombinedInsecureServing.BindPort)
 	}
-	config, err := s.Config()
-	if err != nil {
-		return result, fmt.Errorf("failed to create config from options: %v", err)
+
+	if err = s.Initialize(); err != nil {
+		return result, fmt.Errorf("failed to initialize options: %v", err)
 	}
 
 	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
-		if err := app.Run(config.Complete(), stopCh); err != nil {
+		if err := app.Run(s, stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)
 
 	t.Logf("Waiting for /healthz to be ok...")
-	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)
+	client, err := kubernetes.NewForConfig(s.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
@@ -150,9 +148,8 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	}
 
 	// from here the caller must call tearDown
-	result.LoopbackClientConfig = config.LoopbackClientConfig
+	result.LoopbackClientConfig = s.LoopbackClientConfig
 	result.Options = s
-	result.Config = config
 	result.TearDownFn = tearDown
 
 	return result, nil

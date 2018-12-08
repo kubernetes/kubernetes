@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/rand"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -196,10 +195,6 @@ func TestOptions_ApplyTo(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d-%s", i, tt.name), func(t *testing.T) {
-			c := schedulerappconfig.Config{
-				ComponentConfig: tt.options.ComponentConfig,
-			}
-
 			if tt.options.CombinedInsecureServing != nil {
 				if tt.options.CombinedInsecureServing.Healthz != nil {
 					tt.options.CombinedInsecureServing.Healthz.ListenFunc = createMockListener
@@ -210,37 +205,37 @@ func TestOptions_ApplyTo(t *testing.T) {
 			}
 
 			if tt.configLoaded {
-				if err := tt.options.CombinedInsecureServing.ApplyToFromLoadedConfig(&c, &c.ComponentConfig); (err != nil) != tt.wantErr {
+				if err := tt.options.CombinedInsecureServing.ApplyToFromLoadedConfig(&tt.options, &tt.options.ComponentConfig); (err != nil) != tt.wantErr {
 					t.Fatalf("%d - Options.ApplyTo() error = %v, wantErr %v", i, err, tt.wantErr)
 				}
 			} else {
-				if err := tt.options.CombinedInsecureServing.ApplyTo(&c, &c.ComponentConfig); (err != nil) != tt.wantErr {
+				if err := tt.options.CombinedInsecureServing.ApplyTo(&tt.options, &tt.options.ComponentConfig); (err != nil) != tt.wantErr {
 					t.Fatalf("%d - Options.ApplyTo() error = %v, wantErr %v", i, err, tt.wantErr)
 				}
 			}
-			if got, expect := c.ComponentConfig.HealthzBindAddress, tt.expectHealthzBindAddress; got != expect {
+			if got, expect := tt.options.ComponentConfig.HealthzBindAddress, tt.expectHealthzBindAddress; got != expect {
 				t.Errorf("%d - expected HealthzBindAddress %q, got %q", i, expect, got)
 			}
-			if got, expect := c.ComponentConfig.MetricsBindAddress, tt.expectMetricsBindAddress; got != expect {
+			if got, expect := tt.options.ComponentConfig.MetricsBindAddress, tt.expectMetricsBindAddress; got != expect {
 				t.Errorf("%d - expected MetricsBindAddress %q, got %q", i, expect, got)
 			}
-			if got, expect := c.InsecureServing != nil, tt.expectInsecureServingPort != 0; got != expect {
+			if got, expect := tt.options.InsecureServingInfo != nil, tt.expectInsecureServingPort != 0; got != expect {
 				t.Errorf("%d - expected InsecureServing != nil to be %v, got %v", i, expect, got)
-			} else if c.InsecureServing != nil {
-				if got, expect := c.InsecureServing.Listener.(*mockListener).address, tt.expectInsecureServingAddress; got != expect {
+			} else if tt.options.InsecureServingInfo != nil {
+				if got, expect := tt.options.InsecureServingInfo.Listener.(*mockListener).address, tt.expectInsecureServingAddress; got != expect {
 					t.Errorf("%d - expected healthz address %q, got %q", i, expect, got)
 				}
-				if got, expect := c.InsecureServing.Listener.(*mockListener).port, tt.expectInsecureServingPort; got != expect {
+				if got, expect := tt.options.InsecureServingInfo.Listener.(*mockListener).port, tt.expectInsecureServingPort; got != expect {
 					t.Errorf("%d - expected healthz port %v, got %v", i, expect, got)
 				}
 			}
-			if got, expect := c.InsecureMetricsServing != nil, tt.expectInsecureMetricsServingPort != 0; got != expect {
+			if got, expect := tt.options.InsecureMetricsServingInfo != nil, tt.expectInsecureMetricsServingPort != 0; got != expect {
 				t.Errorf("%d - expected Metrics != nil to be %v, got %v", i, expect, got)
-			} else if c.InsecureMetricsServing != nil {
-				if got, expect := c.InsecureMetricsServing.Listener.(*mockListener).address, tt.expectInsecureMetricsServingAddress; got != expect {
+			} else if tt.options.InsecureMetricsServingInfo != nil {
+				if got, expect := tt.options.InsecureMetricsServingInfo.Listener.(*mockListener).address, tt.expectInsecureMetricsServingAddress; got != expect {
 					t.Errorf("%d - expected metrics address %q, got %q", i, expect, got)
 				}
-				if got, expect := c.InsecureMetricsServing.Listener.(*mockListener).port, tt.expectInsecureMetricsServingPort; got != expect {
+				if got, expect := tt.options.InsecureMetricsServingInfo.Listener.(*mockListener).port, tt.expectInsecureMetricsServingPort; got != expect {
 					t.Errorf("%d - expected metrics port %v, got %v", i, expect, got)
 				}
 			}

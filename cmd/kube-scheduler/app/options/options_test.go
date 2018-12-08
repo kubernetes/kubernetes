@@ -345,8 +345,7 @@ users:
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			// create the config
-			config, err := tc.options.Config()
+			err := tc.options.Initialize()
 
 			// handle errors
 			if err != nil {
@@ -358,25 +357,8 @@ users:
 				return
 			}
 
-			if !reflect.DeepEqual(config.ComponentConfig, tc.expectedConfig) {
-				t.Errorf("config.diff:\n%s", diff.ObjectReflectDiff(tc.expectedConfig, config.ComponentConfig))
-			}
-
-			// ensure we have a client
-			if config.Client == nil {
-				t.Error("unexpected nil client")
-				return
-			}
-
-			// test the client talks to the endpoint we expect with the credentials we expect
-			username = ""
-			_, err = config.Client.Discovery().RESTClient().Get().AbsPath("/").DoRaw()
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			if username != tc.expectedUsername {
-				t.Errorf("expected server call with user %s, got %s", tc.expectedUsername, username)
+			if !reflect.DeepEqual(tc.options.ComponentConfig, tc.expectedConfig) {
+				t.Errorf("config.diff:\n%s", diff.ObjectReflectDiff(tc.expectedConfig, tc.options.ComponentConfig))
 			}
 		})
 	}

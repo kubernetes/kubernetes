@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/pflag"
 
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -52,19 +51,18 @@ func (o *CombinedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	// fs.MarkDeprecated("port", "see --secure-port instead.")
 }
 
-func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
+func (o *CombinedInsecureServingOptions) applyTo(opts *Options, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if err := updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.HealthzBindAddress, o.Healthz); err != nil {
 		return err
 	}
 	if err := updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.MetricsBindAddress, o.Metrics); err != nil {
 		return err
 	}
-
-	if err := o.Healthz.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := o.Healthz.ApplyTo(&opts.InsecureServingInfo, &opts.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if o.Metrics != nil && (c.ComponentConfig.MetricsBindAddress != c.ComponentConfig.HealthzBindAddress || o.Healthz == nil) {
-		if err := o.Metrics.ApplyTo(&c.InsecureMetricsServing, &c.LoopbackClientConfig); err != nil {
+	if o.Metrics != nil && (opts.ComponentConfig.MetricsBindAddress != opts.ComponentConfig.HealthzBindAddress || o.Healthz == nil) {
+		if err := o.Metrics.ApplyTo(&opts.InsecureMetricsServingInfo, &opts.LoopbackClientConfig); err != nil {
 			return err
 		}
 	}
@@ -73,7 +71,7 @@ func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, c
 }
 
 // ApplyTo applies the insecure serving options to the given scheduler app configuration, and updates the componentConfig.
-func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
+func (o *CombinedInsecureServingOptions) ApplyTo(opts *Options, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		componentConfig.HealthzBindAddress = ""
 		componentConfig.MetricsBindAddress = ""
@@ -89,11 +87,11 @@ func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, c
 		o.Metrics.BindAddress = net.ParseIP(o.BindAddress)
 	}
 
-	return o.applyTo(c, componentConfig)
+	return o.applyTo(opts, componentConfig)
 }
 
 // ApplyToFromLoadedConfig updates the insecure serving options from the component config and then appies it to the given scheduler app configuration.
-func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
+func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(opts *Options, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		return nil
 	}
@@ -105,7 +103,7 @@ func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerapp
 		return fmt.Errorf("invalid metrics address: %v", err)
 	}
 
-	return o.applyTo(c, componentConfig)
+	return o.applyTo(opts, componentConfig)
 }
 
 func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback) error {

@@ -24,28 +24,44 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/leaderelection"
-	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/record"
+	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -126,16 +142,11 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 		klog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
 	}
 
-	c, err := opts.Config()
-	if err != nil {
+	if err := opts.Initialize(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-
 	stopCh := make(chan struct{})
-
-	// Get the completed config
-	cc := c.Complete()
 
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
@@ -146,81 +157,66 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
-		cz.Set(cc.ComponentConfig)
+		cz.Set(opts.ComponentConfig)
 	} else {
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	return Run(cc, stopCh)
+	return Run(opts, stopCh)
 }
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
-func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
-	// Create the scheduler.
-	sched, err := scheduler.New(cc.Client,
-		cc.InformerFactory.Core().V1().Nodes(),
-		cc.PodInformer,
-		cc.InformerFactory.Core().V1().PersistentVolumes(),
-		cc.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		cc.InformerFactory.Core().V1().ReplicationControllers(),
-		cc.InformerFactory.Apps().V1().ReplicaSets(),
-		cc.InformerFactory.Apps().V1().StatefulSets(),
-		cc.InformerFactory.Core().V1().Services(),
-		cc.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		cc.InformerFactory.Storage().V1().StorageClasses(),
-		cc.Recorder,
-		cc.ComponentConfig.AlgorithmSource,
-		stopCh,
-		scheduler.WithName(cc.ComponentConfig.SchedulerName),
-		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
-		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
-		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds))
+func Run(opts *options.Options, stopCh <-chan struct{}) error {
+	client, recorder, podInformer, informerFactory, leaderElectionConfig, err := createClientsAndInformers(opts)
 	if err != nil {
 		return err
 	}
 
-	// Prepare the event broadcaster.
-	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartLogging(klog.V(6).Infof)
-		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
+	var storageClassInformer storageinformers.StorageClassInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		storageClassInformer = informerFactory.Storage().V1().StorageClasses()
+	}
+
+	// Create the scheduler.
+	sched, err := scheduler.New(client,
+		informerFactory.Core().V1().Nodes(),
+		podInformer,
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		storageClassInformer,
+		recorder,
+		opts.ComponentConfig.AlgorithmSource,
+		stopCh,
+		scheduler.WithName(opts.ComponentConfig.SchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(opts.ComponentConfig.HardPodAffinitySymmetricWeight),
+		scheduler.WithPreemptionDisabled(opts.ComponentConfig.DisablePreemption),
+		scheduler.WithPercentageOfNodesToScore(opts.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithBindTimeoutSeconds(*opts.ComponentConfig.BindTimeoutSeconds))
+	if err != nil {
+		return err
 	}
 
 	// Setup healthz checks.
 	var checks []healthz.HealthzChecker
-	if cc.ComponentConfig.LeaderElection.LeaderElect {
-		checks = append(checks, cc.LeaderElection.WatchDog)
+	if opts.ComponentConfig.LeaderElection.LeaderElect {
+		checks = append(checks, leaderElectionConfig.WatchDog)
 	}
-
-	// Start up the healthz server.
-	if cc.InsecureServing != nil {
-		separateMetrics := cc.InsecureMetricsServing != nil
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics, checks...), nil, nil)
-		if err := cc.InsecureServing.Serve(handler, 0, stopCh); err != nil {
-			return fmt.Errorf("failed to start healthz server: %v", err)
-		}
-	}
-	if cc.InsecureMetricsServing != nil {
-		handler := buildHandlerChain(newMetricsHandler(&cc.ComponentConfig), nil, nil)
-		if err := cc.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
-			return fmt.Errorf("failed to start metrics server: %v", err)
-		}
-	}
-	if cc.SecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		if err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
-			// fail early for secure handlers, removing the old error loop from above
-			return fmt.Errorf("failed to start healthz server: %v", err)
-		}
+	if err = startHealthzServer(opts, checks, stopCh); err != nil {
+		return err
 	}
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(stopCh)
-	cc.InformerFactory.Start(stopCh)
+	go podInformer.Informer().Run(stopCh)
+	informerFactory.Start(stopCh)
 
 	// Wait for all caches to sync before scheduling.
-	cc.InformerFactory.WaitForCacheSync(stopCh)
-	controller.WaitForCacheSync("scheduler", stopCh, cc.PodInformer.Informer().HasSynced)
+	informerFactory.WaitForCacheSync(stopCh)
+	controller.WaitForCacheSync("scheduler", stopCh, podInformer.Informer().HasSynced)
 
 	// Prepare a reusable runCommand function.
 	run := func(ctx context.Context) {
@@ -240,14 +236,14 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 	}()
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
-	if cc.LeaderElection != nil {
-		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
+	if leaderElectionConfig != nil {
+		leaderElectionConfig.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
 				utilruntime.HandleError(fmt.Errorf("lost master"))
 			},
 		}
-		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
+		leaderElector, err := leaderelection.NewLeaderElector(*leaderElectionConfig)
 		if err != nil {
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
@@ -318,4 +314,157 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 		}
 	}
 	return pathRecorderMux
+}
+
+func createClientsAndInformers(opts *options.Options) (
+	clientset.Interface,
+	record.EventRecorder,
+	coreinformers.PodInformer,
+	informers.SharedInformerFactory,
+	*leaderelection.LeaderElectionConfig,
+	error) {
+	client, leaderElectionClient, eventClient, err := createClients(opts.ComponentConfig.ClientConnection, opts.Master, opts.ComponentConfig.LeaderElection.RenewDeadline.Duration)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	// Prepare event clients.
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, corev1.EventSource{Component: opts.ComponentConfig.SchedulerName})
+
+	// Prepare the event broadcaster.
+	if eventBroadcaster != nil && eventClient != nil {
+		eventBroadcaster.StartLogging(klog.V(6).Infof)
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: eventClient.Events("")})
+	}
+
+	// Set up leader election if enabled.
+	var leaderElectionConfig *leaderelection.LeaderElectionConfig
+	if opts.ComponentConfig.LeaderElection.LeaderElect {
+		leaderElectionConfig, err = makeLeaderElectionConfig(opts.ComponentConfig.LeaderElection, leaderElectionClient, recorder)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+	}
+
+	podInformer := factory.NewPodInformer(client, 0)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	return client, recorder, podInformer, informerFactory, leaderElectionConfig, nil
+}
+
+// makeLeaderElectionConfig builds a leader election configuration. It will
+// create a new resource lock associated with the configuration.
+func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get hostname: %v", err)
+	}
+	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	id := hostname + "_" + string(uuid.NewUUID())
+
+	rl, err := resourcelock.New(config.ResourceLock,
+		config.LockObjectNamespace,
+		config.LockObjectName,
+		client.CoreV1(),
+		resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: recorder,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create resource lock: %v", err)
+	}
+
+	return &leaderelection.LeaderElectionConfig{
+		Lock:          rl,
+		LeaseDuration: config.LeaseDuration.Duration,
+		RenewDeadline: config.RenewDeadline.Duration,
+		RetryPeriod:   config.RetryPeriod.Duration,
+		WatchDog:      leaderelection.NewLeaderHealthzAdaptor(time.Second * 20),
+		Name:          "kube-scheduler",
+	}, nil
+}
+
+// createClients creates a kube client and an event client from the given config and masterOverride.
+// TODO remove masterOverride when CLI flags are removed.
+func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
+		klog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
+	}
+
+	// This creates a client, first loading any specified kubeconfig
+	// file, and then overriding the Master flag, if non-empty.
+	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
+	kubeConfig.ContentType = config.ContentType
+	kubeConfig.QPS = config.QPS
+	//TODO make config struct use int instead of int32?
+	kubeConfig.Burst = int(config.Burst)
+
+	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// shallow copy, do not modify the kubeConfig.Timeout.
+	restConfig := *kubeConfig
+	restConfig.Timeout = timeout
+	leaderElectionClient, err := clientset.NewForConfig(restclient.AddUserAgent(&restConfig, "leader-election"))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	eventClient, err := clientset.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return client, leaderElectionClient, eventClient.CoreV1(), nil
+}
+
+// Start up the healthz server.
+func startHealthzServer(opts *options.Options, checks []healthz.HealthzChecker, stopCh <-chan struct{}) error {
+	var (
+		authorizationInfo  apiserver.AuthorizationInfo
+		authenticationInfo apiserver.AuthenticationInfo
+	)
+	if opts.SecureServing != nil && (opts.SecureServing.BindPort != 0 || opts.SecureServing.Listener != nil) {
+		if err := opts.Authentication.ApplyTo(&authenticationInfo, opts.SecureServingInfo, nil); err != nil {
+			return err
+		}
+		if err := opts.Authorization.ApplyTo(&authorizationInfo); err != nil {
+			return err
+		}
+	}
+	apiserver.AuthorizeClientBearerToken(opts.LoopbackClientConfig, &authenticationInfo, &authorizationInfo)
+
+	// Start up the healthz server.
+	if opts.InsecureServingInfo != nil {
+		separateMetrics := opts.InsecureMetricsServingInfo != nil
+		handler := buildHandlerChain(newHealthzHandler(&opts.ComponentConfig, separateMetrics, checks...), nil, nil)
+		if err := opts.InsecureServingInfo.Serve(handler, 0, stopCh); err != nil {
+			return fmt.Errorf("failed to start healthz server: %v", err)
+		}
+	}
+	if opts.InsecureMetricsServingInfo != nil {
+		handler := buildHandlerChain(newMetricsHandler(&opts.ComponentConfig), nil, nil)
+		if err := opts.InsecureMetricsServingInfo.Serve(handler, 0, stopCh); err != nil {
+			return fmt.Errorf("failed to start metrics server: %v", err)
+		}
+	}
+	if opts.SecureServingInfo != nil {
+		handler := buildHandlerChain(newHealthzHandler(&opts.ComponentConfig, false, checks...), authenticationInfo.Authenticator, authorizationInfo.Authorizer)
+		if err := opts.SecureServingInfo.Serve(handler, 0, stopCh); err != nil {
+			// fail early for secure handlers, removing the old error loop from above
+			return fmt.Errorf("failed to start healthz server: %v", err)
+		}
+	}
+
+	return nil
 }
