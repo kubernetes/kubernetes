@@ -266,39 +266,36 @@ func TestScheduler(t *testing.T) {
 			var gotForgetPod *v1.Pod
 			var gotAssumedPod *v1.Pod
 			var gotBinding *v1.Binding
-			configurator := &FakeConfigurator{
-				Config: &factory.Config{
-					SchedulerCache: &fakecache.Cache{
-						ForgetFunc: func(pod *v1.Pod) {
-							gotForgetPod = pod
-						},
-						AssumeFunc: func(pod *v1.Pod) {
-							gotAssumedPod = pod
-						},
-					},
-					NodeLister: &nodeLister{nl},
-					Algorithm:  item.algo,
-					GetBinder: func(pod *v1.Pod) factory.Binder {
-						return fakeBinder{func(b *v1.Binding) error {
-							gotBinding = b
-							return item.injectBindError
-						}}
-					},
-					PodConditionUpdater: fakePodConditionUpdater{},
-					Error: func(p *v1.Pod, err error) {
-						gotPod = p
-						gotError = err
-					},
-					NextPod: func() *v1.Pod {
-						return item.sendPod
-					},
-					PluginSet:    &EmptyPluginSet{},
-					Recorder:     eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
-					VolumeBinder: volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
-				},
-			}
 
-			s, _ := NewFromConfigurator(configurator, nil...)
+			s := NewFromConfig(&factory.Config{
+				SchedulerCache: &fakecache.Cache{
+					ForgetFunc: func(pod *v1.Pod) {
+						gotForgetPod = pod
+					},
+					AssumeFunc: func(pod *v1.Pod) {
+						gotAssumedPod = pod
+					},
+				},
+				NodeLister: &nodeLister{nl},
+				Algorithm:  item.algo,
+				GetBinder: func(pod *v1.Pod) factory.Binder {
+					return fakeBinder{func(b *v1.Binding) error {
+						gotBinding = b
+						return item.injectBindError
+					}}
+				},
+				PodConditionUpdater: fakePodConditionUpdater{},
+				Error: func(p *v1.Pod, err error) {
+					gotPod = p
+					gotError = err
+				},
+				NextPod: func() *v1.Pod {
+					return item.sendPod
+				},
+				PluginSet:    &EmptyPluginSet{},
+				Recorder:     eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
+				VolumeBinder: volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
+			})
 			called := make(chan struct{})
 			events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 				if e, a := item.eventReason, e.Reason; e != a {
@@ -650,36 +647,35 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 		api.DefaultPercentageOfNodesToScore)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
-	configurator := &FakeConfigurator{
-		Config: &factory.Config{
-			SchedulerCache: scache,
-			NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
-			Algorithm:      algo,
-			GetBinder: func(pod *v1.Pod) factory.Binder {
-				return fakeBinder{func(b *v1.Binding) error {
-					bindingChan <- b
-					return nil
-				}}
-			},
-			NextPod: func() *v1.Pod {
-				return clientcache.Pop(queuedPodStore).(*v1.Pod)
-			},
-			Error: func(p *v1.Pod, err error) {
-				errChan <- err
-			},
-			Recorder:            &record.FakeRecorder{},
-			PodConditionUpdater: fakePodConditionUpdater{},
-			PodPreemptor:        fakePodPreemptor{},
-			PluginSet:           &EmptyPluginSet{},
-			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
+
+	config := &factory.Config{
+		SchedulerCache: scache,
+		NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
+		Algorithm:      algo,
+		GetBinder: func(pod *v1.Pod) factory.Binder {
+			return fakeBinder{func(b *v1.Binding) error {
+				bindingChan <- b
+				return nil
+			}}
 		},
+		NextPod: func() *v1.Pod {
+			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		},
+		Error: func(p *v1.Pod, err error) {
+			errChan <- err
+		},
+		Recorder:            &record.FakeRecorder{},
+		PodConditionUpdater: fakePodConditionUpdater{},
+		PodPreemptor:        fakePodPreemptor{},
+		PluginSet:           &EmptyPluginSet{},
+		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 	}
 
 	if recorder != nil {
-		configurator.Config.Recorder = recorder
+		config.Recorder = recorder
 	}
 
-	sched, _ := NewFromConfigurator(configurator, nil...)
+	sched := NewFromConfig(config)
 
 	return sched, bindingChan, errChan
 }
@@ -701,37 +697,34 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		false,
 		api.DefaultPercentageOfNodesToScore)
 	bindingChan := make(chan *v1.Binding, 2)
-	configurator := &FakeConfigurator{
-		Config: &factory.Config{
-			SchedulerCache: scache,
-			NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
-			Algorithm:      algo,
-			GetBinder: func(pod *v1.Pod) factory.Binder {
-				return fakeBinder{func(b *v1.Binding) error {
-					time.Sleep(bindingTime)
-					bindingChan <- b
-					return nil
-				}}
-			},
-			WaitForCacheSync: func() bool {
-				return true
-			},
-			NextPod: func() *v1.Pod {
-				return clientcache.Pop(queuedPodStore).(*v1.Pod)
-			},
-			Error: func(p *v1.Pod, err error) {
-				queuedPodStore.AddIfNotPresent(p)
-			},
-			Recorder:            &record.FakeRecorder{},
-			PodConditionUpdater: fakePodConditionUpdater{},
-			PodPreemptor:        fakePodPreemptor{},
-			StopEverything:      stop,
-			PluginSet:           &EmptyPluginSet{},
-			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
-		},
-	}
 
-	sched, _ := NewFromConfigurator(configurator, nil...)
+	sched := NewFromConfig(&factory.Config{
+		SchedulerCache: scache,
+		NodeLister:     &nodeLister{informerFactory.Core().V1().Nodes().Lister()},
+		Algorithm:      algo,
+		GetBinder: func(pod *v1.Pod) factory.Binder {
+			return fakeBinder{func(b *v1.Binding) error {
+				time.Sleep(bindingTime)
+				bindingChan <- b
+				return nil
+			}}
+		},
+		WaitForCacheSync: func() bool {
+			return true
+		},
+		NextPod: func() *v1.Pod {
+			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		},
+		Error: func(p *v1.Pod, err error) {
+			queuedPodStore.AddIfNotPresent(p)
+		},
+		Recorder:            &record.FakeRecorder{},
+		PodConditionUpdater: fakePodConditionUpdater{},
+		PodPreemptor:        fakePodPreemptor{},
+		StopEverything:      stop,
+		PluginSet:           &EmptyPluginSet{},
+		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
+	})
 
 	return sched, bindingChan
 }

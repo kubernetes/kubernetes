@@ -212,12 +212,7 @@ func initTestSchedulerWithOptions(
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
 	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
 
-	context.scheduler, err = scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{
-		Config: context.schedulerConfig},
-		nil...)
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler: %v", err)
-	}
+	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
 	context.scheduler.Run()
 	return context
 }
