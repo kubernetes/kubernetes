@@ -148,16 +148,6 @@ func (c *Clientset) Admissionregistration() admissionregistrationv1beta1.Admissi
 	return &fakeadmissionregistrationv1beta1.FakeAdmissionregistrationV1beta1{Fake: &c.Fake}
 }
 
-// AppsV1beta1 retrieves the AppsV1beta1Client
-func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
-	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
-}
-
-// AppsV1beta2 retrieves the AppsV1beta2Client
-func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
-	return &fakeappsv1beta2.FakeAppsV1beta2{Fake: &c.Fake}
-}
-
 // AppsV1 retrieves the AppsV1Client
 func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
 	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
@@ -166,6 +156,16 @@ func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
 // Apps retrieves the AppsV1Client
 func (c *Clientset) Apps() appsv1.AppsV1Interface {
 	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
+}
+
+// AppsV1beta1 retrieves the AppsV1beta1Client
+func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
+	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
+}
+
+// AppsV1beta2 retrieves the AppsV1beta2Client
+func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
+	return &fakeappsv1beta2.FakeAppsV1beta2{Fake: &c.Fake}
 }
 
 // AuditregistrationV1alpha1 retrieves the AuditregistrationV1alpha1Client

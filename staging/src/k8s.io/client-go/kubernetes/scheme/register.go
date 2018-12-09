@@ -64,9 +64,9 @@ var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	admissionregistrationv1alpha1.AddToScheme,
 	admissionregistrationv1beta1.AddToScheme,
+	appsv1.AddToScheme,
 	appsv1beta1.AddToScheme,
 	appsv1beta2.AddToScheme,
-	appsv1.AddToScheme,
 	auditregistrationv1alpha1.AddToScheme,
 	authenticationv1.AddToScheme,
 	authenticationv1beta1.AddToScheme,
