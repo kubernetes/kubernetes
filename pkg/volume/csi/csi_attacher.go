@@ -588,24 +588,6 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func hasStageUnstageCapability(ctx context.Context, csi csiClient) (bool, error) {
-	capabilities, err := csi.NodeGetCapabilities(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	stageUnstageSet := false
-	if capabilities == nil {
-		return false, nil
-	}
-	for _, capability := range capabilities {
-		if capability.GetRpc().GetType() == csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
-			stageUnstageSet = true
-		}
-	}
-	return stageUnstageSet, nil
-}
-
 // getAttachmentName returns csi-<sha256(volName,csiDriverName,NodeName)>
 func getAttachmentName(volName, csiDriverName, nodeName string) string {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
