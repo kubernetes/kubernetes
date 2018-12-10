@@ -401,7 +401,7 @@ const (
 	CSIMigrationGCE utilfeature.Feature = "CSIMigrationGCE"
 
 	// owner: @leakingtapan
-	// alpha: v1.13
+	// alpha: v1.14
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
