@@ -2915,9 +2915,10 @@ func TestCleanLegacyBindAddr(t *testing.T) {
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 
 	// All ipvs service addresses that were bound to ipvs0 in the latest sync loop.
-	activeBindAddrs := map[string]bool{"1.2.3.4": true, "1002:ab8::2:1": true}
+	// The proxier is in "ipv4-only" mode so only ipv4 addresses are bound.
+	activeBindAddrs := map[string]bool{"1.2.3.4": true, "1.2.3.7": true}
 	// All service addresses that were bound to ipvs0 in system
-	currentBindAddrs := []string{"1.2.3.4", "1.2.3.5", "1.2.3.6", "1002:ab8::2:1", "1002:ab8::2:2"}
+	currentBindAddrs := []string{"1.2.3.4", "1.2.3.5", "1.2.3.6", "1.2.3.7", "1002:ab8::2:1", "1002:ab8::2:2"}
 
 	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 
@@ -2927,14 +2928,56 @@ func TestCleanLegacyBindAddr(t *testing.T) {
 	fp.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
 
 	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
-	// should only remain "1.2.3.4" and "1002:ab8::2:1"
-	if len(remainingAddrs) != 2 {
-		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 2, len(remainingAddrs))
+	// should only remain "1.2.3.4" and "1.2.3.7" + 2 ipv6 addresses
+	if len(remainingAddrs) != 4 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 4, len(remainingAddrs))
 	}
 
-	// check that address "1.2.3.4" and "1002:ab8::2:1" remain
+	// check that address "1.2.3.4" and "1.2.3.7" remain. Ignore ipv6 addresses.
 	remainingAddrsMap := make(map[string]bool)
-	for i := range remainingAddrs {
+	for i, a := range remainingAddrs {
+		if net.ParseIP(a).To4() == nil {
+			continue
+		}
+		remainingAddrsMap[remainingAddrs[i]] = true
+	}
+	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
+		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
+	}
+}
+
+func TestCleanLegacyBindAddr6(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp.nodeIP = net.ParseIP("::1") // This indicate ipv6-only mode
+
+	// All ipvs service addresses that were bound to ipvs0 in the latest sync loop.
+	// The proxier is in "ipv6-only" mode so only ipv6 addresses are bound.
+	activeBindAddrs := map[string]bool{"1002:ab8::2:1": true}
+	// All service addresses that were bound to ipvs0 in system
+	currentBindAddrs := []string{"1.2.3.4", "1.2.3.5", "1002:ab8::2:1", "1002:ab8::2:2", "1002:ab8::2:3"}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+
+	for i := range currentBindAddrs {
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+	}
+	fp.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
+
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// should only remain "1002:ab8::2:1". Ipv4 addresses should be ignored.
+	if len(remainingAddrs) != 3 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 3, len(remainingAddrs))
+	}
+
+	// check that address "1002:ab8::2:1" remain. Ignore ipv4 addresses.
+	remainingAddrsMap := make(map[string]bool)
+	for i, a := range remainingAddrs {
+		if net.ParseIP(a).To4() != nil {
+			continue
+		}
 		remainingAddrsMap[remainingAddrs[i]] = true
 	}
 	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
