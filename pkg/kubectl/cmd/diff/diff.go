@@ -289,7 +289,17 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 }
 
 func (obj InfoObject) Name() string {
-	return obj.Info.Name
+	group := ""
+	if obj.Info.Mapping.GroupVersionKind.Group != "" {
+		group = fmt.Sprintf("%v.", obj.Info.Mapping.GroupVersionKind.Group)
+	}
+	return group + fmt.Sprintf(
+		"%v.%v:%v.%v",
+		obj.Info.Mapping.GroupVersionKind.Version,
+		obj.Info.Mapping.GroupVersionKind.Kind,
+		obj.Info.Namespace,
+		obj.Info.Name,
+	)
 }
 
 // Differ creates two DiffVersion and diffs them.
