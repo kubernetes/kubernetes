@@ -85,7 +85,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/transport:go_default_library",
-        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",

@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -206,13 +207,17 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 		return nil, errors.Wrapf(err, "failure while creating %s client certificate", spec.ClientName)
 	}
 
+	encodedClientKey, err := keyutil.MarshalPrivateKeyToPEM(clientKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshal private key to PEM")
+	}
 	// create a kubeconfig with the client certs
 	return kubeconfigutil.CreateWithCerts(
 		spec.APIServer,
 		clustername,
 		spec.ClientName,
 		pkiutil.EncodeCertPEM(spec.CACert),
-		certutil.EncodePrivateKeyPEM(clientKey),
+		encodedClientKey,
 		pkiutil.EncodeCertPEM(clientCert),
 	), nil
 }

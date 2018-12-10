@@ -8,23 +8,15 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["csr_test.go"],
-    data = glob(["testdata/**"]),
+    srcs = ["key_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/client-go/util/keyutil:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "cert.go",
-        "csr.go",
-        "io.go",
-        "pem.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/cert",
-    importpath = "k8s.io/client-go/util/cert",
-    deps = ["//staging/src/k8s.io/client-go/util/keyutil:go_default_library"],
+    srcs = ["key.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/keyutil",
+    importpath = "k8s.io/client-go/util/keyutil",
 )
 
 filegroup(
