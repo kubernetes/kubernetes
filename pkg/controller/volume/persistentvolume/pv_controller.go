@@ -290,7 +290,9 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 	}
 
 	if class.VolumeBindingMode == nil {
-		return false, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", className)
+		// In an HA upgrade scenario, the API server may still be on a lower version
+		// than the controller-manager. Default to behavior as if the feature is off.
+		return false, nil
 	}
 
 	// TODO: add check to handle dynamic provisioning later

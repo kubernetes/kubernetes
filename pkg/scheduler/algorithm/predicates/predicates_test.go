@@ -3692,6 +3692,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestVolumeZonePredicate(t *testing.T) {
+	scName := "SC_1"
 	pvInfo := FakePersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
@@ -3721,13 +3722,24 @@ func TestVolumeZonePredicate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_5", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "", StorageClassName: &scName},
+		},
+	}
+
+	scInfo := FakeStorageClassInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: scName},
+		},
 	}
 
 	tests := []struct {
-		Name string
-		Pod  *v1.Pod
-		Fits bool
-		Node *v1.Node
+		Name        string
+		Pod         *v1.Pod
+		Fits        bool
+		Node        *v1.Node
+		ExpectError bool
 	}{
 		{
 			Name: "pod without volume",
@@ -3796,26 +3808,45 @@ func TestVolumeZonePredicate(t *testing.T) {
 			},
 			Fits: false,
 		},
+		{
+			Name: "pvc not bound",
+			Pod:  createPodWithVolume("pod_1", "nothing", "PVC_5"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
+				},
+			},
+			Fits:        false,
+			ExpectError: true,
+		},
 	}
 
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
 
 	for _, test := range tests {
-		fit := NewVolumeZonePredicate(pvInfo, pvcInfo, nil)
-		node := &schedulercache.NodeInfo{}
-		node.SetNode(test.Node)
+		t.Run(test.Name, func(t *testing.T) {
+			fit := NewVolumeZonePredicate(pvInfo, pvcInfo, scInfo)
+			node := &schedulercache.NodeInfo{}
+			node.SetNode(test.Node)
 
-		fits, reasons, err := fit(test.Pod, nil, node)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.Name, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
-		}
-		if fits != test.Fits {
-			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
-		}
+			fits, reasons, err := fit(test.Pod, nil, node)
+			if test.ExpectError && err == nil {
+				t.Errorf("expected error, got success")
+			}
+			if !test.ExpectError {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+					t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+				}
+			}
 
+			if fits != test.Fits {
+				t.Errorf("expected %v got %v", test.Fits, fits)
+			}
+		})
 	}
 }
 

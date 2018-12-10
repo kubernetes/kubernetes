@@ -588,12 +588,14 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 					if scName != nil && len(*scName) > 0 {
 						class, _ := c.classInfo.GetStorageClassInfo(*scName)
 						if class != nil {
-							if class.VolumeBindingMode == nil {
-								return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
-							}
-							if *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-								// Skip unbound volumes
-								continue
+							if class.VolumeBindingMode != nil {
+								// In an HA Upgrade scenario, the API server may still be
+								// on a lower version than the scheduler. Default to
+								// behavior as if the feature is off
+								if *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+									// Skip unbound volumes
+									continue
+								}
 							}
 						}
 					}
