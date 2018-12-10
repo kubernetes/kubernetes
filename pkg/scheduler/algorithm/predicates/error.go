@@ -80,6 +80,8 @@ var (
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
+	// ErrHostOutOfMaxReplicasLimit is used for HostOutOfMaxReplicasLimit predicate error.
+	ErrHostOutOfMaxReplicasLimit = newPredicateFailureError("HostOutOfMaxReplicasLimit", "The number of replicas exceeds maxReplicasNumberPerHost limit")
 )
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is

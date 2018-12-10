@@ -112,6 +112,13 @@ func defaultPredicates() sets.String {
 				return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
+		// Fit is determined by maximum replicas per node requirement.
+		factory.RegisterFitPredicateFactory(
+			predicates.CheckMaxReplicasPerHostPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewReplicasSpreadPredicate()
+			},
+		),
 		// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxEBSVolumeCountPred,
