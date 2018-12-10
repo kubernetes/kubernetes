@@ -1579,7 +1579,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			Port:    uint16(portNum),
 		}
 
-		glog.V(5).Infof("Using graceful delete to delete: %v", delDest)
+		glog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
 		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest)
 		if err != nil {
 			glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
