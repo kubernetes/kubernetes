@@ -1679,7 +1679,12 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 
 func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
 	legacyAddrs := make(map[string]bool)
+	isIpv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for _, addr := range currentBindAddrs {
+		addrIsIpv6 := utilnet.IsIPv6(net.ParseIP(addr))
+		if addrIsIpv6 && !isIpv6 || !addrIsIpv6 && isIpv6 {
+			continue
+		}
 		if _, ok := activeBindAddrs[addr]; !ok {
 			legacyAddrs[addr] = true
 		}
