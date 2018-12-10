@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1668,6 +1669,11 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 	}
 	pcm := kl.containerManager.NewPodContainerManager()
 
+	// Do not delete immediately cgroups for a pod when it is first seen but leave
+	// a reasonable amount of time to the runtime to complete the cleanup.
+	delayTime := time.Second * 10
+	now := time.Now()
+
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
 		// if the pod is in the running set, its not a candidate for cleanup
@@ -1687,6 +1693,18 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 			}
 			continue
 		}
+
+		if firstSeen, found := kl.orphanedCgroupsFirstSeen[uid]; !found {
+			if err := pcm.ReduceCPULimits(val); err != nil {
+				klog.Warningf("Failed to reduce cpu time for pod %q pending cleanup due to %v", uid, err)
+			}
+			kl.orphanedCgroupsFirstSeen[uid] = now
+			continue
+		} else if now.Sub(firstSeen) < delayTime {
+			continue
+		}
+		delete(kl.orphanedCgroupsFirstSeen, uid)
+
 		klog.V(3).Infof("Orphaned pod %q found, removing pod cgroups", uid)
 		// Destroy all cgroups of pod that should not be running,
 		// by first killing all the attached processes to these cgroups.

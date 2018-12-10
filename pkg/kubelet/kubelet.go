@@ -542,6 +542,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
+		orphanedCgroupsFirstSeen:                make(map[types.UID]time.Time),
 	}
 
 	if klet.cloud != nil {
@@ -1219,6 +1220,9 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// Used by cleanupOrphanedPodCgroups for delayed cleanups.
+	orphanedCgroupsFirstSeen map[types.UID]time.Time
 }
 
 // setupDataDirs creates:
