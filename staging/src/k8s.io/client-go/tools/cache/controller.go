@@ -261,6 +261,14 @@ func (r FilteringResourceEventHandler) OnDelete(obj interface{}) {
 	r.Handler.OnDelete(obj)
 }
 
+// OnSync calls the nested handler during syncs
+func (r FilteringResourceEventHandler) OnSync(obj interface{}) {
+	if !r.FilterFunc(obj) {
+		return
+	}
+	r.Handler.OnSync(obj)
+}
+
 // DeletionHandlingMetaNamespaceKeyFunc checks for
 // DeletedFinalStateUnknown objects before calling
 // MetaNamespaceKeyFunc.
