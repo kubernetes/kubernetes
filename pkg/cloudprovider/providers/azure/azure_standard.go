@@ -236,11 +236,6 @@ func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, s
 		safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
 		return fmt.Sprintf("shared-%s-%d-%s", port.Protocol, port.Port, safePrefix)
 	}
-	if sourceAddrPrefix == "" {
-		rulePrefix := az.getRulePrefix(service)
-		return fmt.Sprintf("%s-%s-%d", rulePrefix, port.Protocol, port.Port)
-	}
-	// ensure backward compatibility
 	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
 	rulePrefix := az.getRulePrefix(service)
 	return fmt.Sprintf("%s-%s-%d-%s", rulePrefix, port.Protocol, port.Port, safePrefix)
