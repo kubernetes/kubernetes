@@ -208,6 +208,10 @@ func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 }
 
 func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	// if PVC is Pending, should be deleted
+	if pvc.Status.Phase == v1.ClaimPending || pvc.Spec.VolumeName == "" {
+		return false, nil
+	}
 	pods, err := c.podLister.Pods(pvc.Namespace).List(labels.Everything())
 	if err != nil {
 		return false, err
