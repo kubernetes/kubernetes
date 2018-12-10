@@ -54,8 +54,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
-	jwt "github.com/dgrijalva/jwt-go"
 )
 
 type authDirective struct {
@@ -140,23 +138,6 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 		service: (*authParams)["service"],
 		realm:   (*authParams)["realm"],
 	}, nil
-}
-
-func parseAcrToken(identityToken string) (token *acrTokenPayload, err error) {
-	tokenSegments := strings.Split(identityToken, ".")
-	if len(tokenSegments) < 2 {
-		return nil, fmt.Errorf("Invalid existing refresh token length: %d", len(tokenSegments))
-	}
-	payloadSegmentEncoded := tokenSegments[1]
-	var payloadBytes []byte
-	if payloadBytes, err = jwt.DecodeSegment(payloadSegmentEncoded); err != nil {
-		return nil, fmt.Errorf("Error decoding payload segment from refresh token, error: %s", err)
-	}
-	var payload acrTokenPayload
-	if err = json.Unmarshal(payloadBytes, &payload); err != nil {
-		return nil, fmt.Errorf("Error unmarshalling acr payload, error: %s", err)
-	}
-	return &payload, nil
 }
 
 func performTokenExchange(
