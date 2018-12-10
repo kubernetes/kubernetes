@@ -998,7 +998,14 @@ func (c *configFactory) updateNodeInCache(oldObj, newObj interface{}) {
 	}
 
 	c.invalidateCachedPredicatesOnNodeUpdate(newNode, oldNode)
-	c.podQueue.MoveAllToActiveQueue()
+	// Only activate unschedulable pods if the node became more schedulable.
+	// We skip the node property comparison when there is no unschedulable pods in the queue
+	// to save processing cycles. We still trigger a move to active queue to cover the case
+	// that a pod being processed by the scheduler is determined unschedulable. We want this
+	// pod to be reevaluated when a change in the cluster happens.
+	if c.podQueue.NumUnschedulablePods() == 0 || nodeSchedulingPropertiesChanged(newNode, oldNode) {
+		c.podQueue.MoveAllToActiveQueue()
+	}
 }
 
 func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node, oldNode *v1.Node) {
@@ -1068,6 +1075,53 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		}
 		c.equivalencePodCache.InvalidatePredicatesOnNode(newNode.GetName(), invalidPredicates)
 	}
+}
+
+func nodeSchedulingPropertiesChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	if nodeSpecUnschedulableChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeAllocatableChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeLabelsChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeTaintsChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeConditionsChanged(newNode, oldNode) {
+		return true
+	}
+
+	return false
+}
+
+func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
+}
+
+func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+}
+
+func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !reflect.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
+}
+
+func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	strip := func(conditions []v1.NodeCondition) map[v1.NodeConditionType]v1.ConditionStatus {
+		conditionStatuses := make(map[v1.NodeConditionType]v1.ConditionStatus, len(conditions))
+		for i := range conditions {
+			conditionStatuses[conditions[i].Type] = conditions[i].Status
+		}
+		return conditionStatuses
+	}
+	return !reflect.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
+}
+
+func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && newNode.Spec.Unschedulable == false
 }
 
 func (c *configFactory) deleteNodeFromCache(obj interface{}) {
