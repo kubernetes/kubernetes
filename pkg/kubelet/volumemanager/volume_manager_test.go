@@ -43,7 +43,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/kubelet/log/manager"
+	logpolicy "k8s.io/kubernetes/pkg/kubelet/log/policy"
 )
 
 const (
@@ -230,7 +230,7 @@ func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient 
 		&mount.FakeMounter{},
 		"",
 		fakeRecorder,
-		&manager.ManagerImpl{},
+		logpolicy.NewPolicyStatusManager(),
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false /* keepTerminatedPodVolumes */)
 

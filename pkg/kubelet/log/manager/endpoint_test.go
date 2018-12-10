@@ -46,16 +46,17 @@ func TestEndpoint(t *testing.T) {
 	// add config
 	config := &pluginapi.Config{
 		Metadata: &pluginapi.ConfigMeta{
-			Name:          "config-1",
-			PodNamespace:  "test",
-			PodName:       "test-pod",
-			PodUID:        "test-uid",
-			ContainerName: "container-1",
+			Name:                   "config-1",
+			PodNamespace:           "test",
+			PodName:                "test-pod",
+			PodUID:                 "test-uid",
+			ContainerName:          "container-1",
+			ContainerLogPolicyName: "std",
+			LogType:                pluginapi.LogType_DockerJsonFile,
+			HostPath:               "/path/to/log",
 		},
 		Spec: &pluginapi.ConfigSpec{
-			Content:  "",
-			Category: "std",
-			Path:     "-",
+			Content: "",
 		},
 	}
 	_, err := ep.addConfig(config)
@@ -73,11 +74,11 @@ func TestEndpoint(t *testing.T) {
 		if !reflect.DeepEqual(c.Metadata, config.Metadata) {
 			t.Errorf("unexpected metadata, expected: %s, actual: %s", config.Metadata, c.Metadata)
 		}
-		if c.Spec.Category != config.Spec.Category {
-			t.Errorf("unexpected category, expected: %s, actual: %s", config.Spec.Category, c.Spec.Category)
+		if c.Metadata.ContainerLogPolicyName != config.Metadata.ContainerLogPolicyName {
+			t.Errorf("unexpected container log policy name, expected: %s, actual: %s", config.Metadata.ContainerLogPolicyName, c.Metadata.ContainerLogPolicyName)
 		}
-		if c.Spec.Path != config.Spec.Path {
-			t.Errorf("unexpected path, expected: %s, actual: %s", config.Spec.Path, c.Spec.Path)
+		if c.Metadata.HostPath != config.Metadata.HostPath {
+			t.Errorf("unexpected host path, expected: %s, actual: %s", config.Metadata.HostPath, c.Metadata.HostPath)
 		}
 	}
 
@@ -113,11 +114,11 @@ func TestEndpoint(t *testing.T) {
 		if reflect.DeepEqual(c.Metadata, config.Metadata) {
 			t.Errorf("unexpected metadata, expected: %s, actual: %s", config.Metadata, c.Metadata)
 		}
-		if c.Spec.Category != config.Spec.Category {
-			t.Errorf("unexpected category, expected: %s, actual: %s", config.Spec.Category, c.Spec.Category)
+		if c.Metadata.ContainerLogPolicyName != config.Metadata.ContainerLogPolicyName {
+			t.Errorf("unexpected container log policy name, expected: %s, actual: %s", config.Metadata.ContainerLogPolicyName, c.Metadata.ContainerLogPolicyName)
 		}
-		if c.Spec.Path != config.Spec.Path {
-			t.Errorf("unexpected path, expected: %s, actual: %s", config.Spec.Path, c.Spec.Path)
+		if c.Metadata.HostPath != config.Metadata.HostPath {
+			t.Errorf("unexpected path, expected: %s, actual: %s", config.Metadata.HostPath, c.Metadata.HostPath)
 		}
 	}
 }
