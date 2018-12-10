@@ -164,6 +164,9 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 
