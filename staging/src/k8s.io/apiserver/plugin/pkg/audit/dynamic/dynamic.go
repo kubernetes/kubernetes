@@ -36,6 +36,7 @@ import (
 	webhook "k8s.io/apiserver/pkg/util/webhook"
 	bufferedplugin "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	auditinformer "k8s.io/client-go/informers/auditregistration/v1alpha1"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 )
@@ -53,6 +54,7 @@ type Config struct {
 	BufferedConfig *bufferedplugin.BatchConfig
 	// WebhookConfig holds the configuration for outgoing webhooks
 	WebhookConfig WebhookConfig
+	SecretLister  corev1listers.SecretLister
 }
 
 // WebhookConfig holds the configurations for outgoing webhooks

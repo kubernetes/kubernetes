@@ -117,6 +117,9 @@ type Webhook struct {
 	// ClientConfig holds the connection parameters for the webhook
 	// required
 	ClientConfig WebhookClientConfig
+
+	// SecretName is the secret name which stores webhook client information
+	SecretName string
 }
 
 // WebhookThrottleConfig holds the configuration for throttling

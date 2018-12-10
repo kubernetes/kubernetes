@@ -630,6 +630,7 @@ func (o *AuditDynamicOptions) newBackend(
 	}
 	checker := policy.NewDynamicChecker()
 	informer := informers.Auditregistration().V1alpha1().AuditSinks()
+	secretLister := informers.Core().V1().Secrets().Lister()
 	eventSink := &v1core.EventSinkImpl{Interface: clientset.CoreV1().Events(processInfo.Namespace)}
 
 	dc := &plugindynamic.Config{
@@ -646,6 +647,7 @@ func (o *AuditDynamicOptions) newBackend(
 			AuthInfoResolverWrapper: webhookOptions.AuthInfoResolverWrapper,
 			ServiceResolver:         webhookOptions.ServiceResolver,
 		},
+		SecretLister: secretLister,
 	}
 	backend, err := plugindynamic.NewBackend(dc)
 	if err != nil {

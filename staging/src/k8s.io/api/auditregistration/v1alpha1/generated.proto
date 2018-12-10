@@ -94,6 +94,9 @@ message Webhook {
   // ClientConfig holds the connection parameters for the webhook
   // required
   optional WebhookClientConfig clientConfig = 2;
+
+  // SecretName is the secret name which stores webhook client information
+  optional string secretName = 3;
 }
 
 // WebhookClientConfig contains the information to make a connection with the webhook

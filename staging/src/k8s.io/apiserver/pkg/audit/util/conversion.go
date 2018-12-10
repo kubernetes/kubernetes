@@ -18,17 +18,36 @@ package util
 
 import (
 	"k8s.io/api/auditregistration/v1alpha1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 // HookClientConfigForSink constructs a webhook.ClientConfig using a v1alpha1.AuditSink API object.
 // webhook.ClientConfig is used to create a HookClient and the purpose of the config struct is to
 // share that with other packages that need to create a HookClient.
-func HookClientConfigForSink(a *v1alpha1.AuditSink) webhook.ClientConfig {
+func HookClientConfigForSink(a *v1alpha1.AuditSink, secret *v1.Secret) webhook.ClientConfig {
 	c := a.Spec.Webhook.ClientConfig
-	ret := webhook.ClientConfig{Name: a.Name, CABundle: c.CABundle}
-	if c.URL != nil {
-		ret.URL = *c.URL
+	var (
+		url      string
+		CABundle []byte
+	)
+	if len(c.CABundle) == 0 && c.URL == nil && secret != nil {
+		scb, scbOK := secret.Data["cabundle"]
+		surl, surlOK := secret.Data["url"]
+		if scbOK || surlOK {
+			url = string(surl)
+			CABundle = scb
+		}
+	} else {
+		if c.URL != nil {
+			url = *c.URL
+		}
+		CABundle = c.CABundle
+	}
+
+	ret := webhook.ClientConfig{Name: a.Name, CABundle: CABundle}
+	if url != "" {
+		ret.URL = url
 	}
 	if c.Service != nil {
 		ret.Service = &webhook.ClientConfigService{

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	auditutil "k8s.io/apiserver/pkg/audit/util"
@@ -28,6 +29,7 @@ import (
 	bufferedplugin "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	enforcedplugin "k8s.io/apiserver/plugin/pkg/audit/dynamic/enforced"
 	webhookplugin "k8s.io/apiserver/plugin/pkg/audit/webhook"
+	"k8s.io/klog"
 )
 
 // TODO: find a common place for all the default retry backoffs
@@ -57,7 +59,18 @@ func (f *factory) BuildDelegate() (*delegate, error) {
 }
 
 func (f *factory) buildWebhookBackend() (audit.Backend, error) {
-	hookClient := auditutil.HookClientConfigForSink(f.sink)
+	var secret *v1.Secret
+	klog.V(1).Infof("the sink is %#v\n", f.sink)
+	if f.sink.Spec.Webhook.SecretName != "" {
+		var err error
+		secret, err = f.config.SecretLister.Secrets("kube-system").Get(f.sink.Spec.Webhook.SecretName)
+		if err != nil {
+			klog.V(1).Infof("audit sink %s get secret %s failed in kube-system:%v", f.sink.Name, f.sink.Spec.Webhook.SecretName, err)
+			secret = nil
+		}
+	}
+	klog.V(1).Infof("the secret is %#v\n", secret)
+	hookClient := auditutil.HookClientConfigForSink(f.sink, secret)
 	client, err := f.webhookClientManager.HookClient(hookClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not create webhook client: %v", err)

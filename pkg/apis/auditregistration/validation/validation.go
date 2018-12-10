@@ -50,8 +50,8 @@ func ValidateWebhook(w auditregistration.Webhook, fldPath *field.Path) field.Err
 
 	cc := w.ClientConfig
 	switch {
-	case (cc.URL == nil) == (cc.Service == nil):
-		allErrs = append(allErrs, field.Required(fldPath.Child("clientConfig"), "exactly one of url or service is required"))
+	// case (cc.URL == nil) == (cc.Service == nil):
+	// 	allErrs = append(allErrs, field.Required(fldPath.Child("clientConfig"), "exactly one of url or service is required"))
 	case cc.URL != nil:
 		allErrs = append(allErrs, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, false)...)
 	case cc.Service != nil:

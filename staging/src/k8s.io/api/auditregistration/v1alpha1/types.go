@@ -115,6 +115,9 @@ type Webhook struct {
 	// ClientConfig holds the connection parameters for the webhook
 	// required
 	ClientConfig WebhookClientConfig `json:"clientConfig" protobuf:"bytes,2,opt,name=clientConfig"`
+
+	// SecretName is the secret name which stores webhook client information
+	SecretName string `json:"secretName" protobuf:"bytes,3,opt,name=secretName"`
 }
 
 // WebhookThrottleConfig holds the configuration for throttling events
