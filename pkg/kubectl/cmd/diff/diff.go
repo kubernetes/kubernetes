@@ -294,7 +294,7 @@ func (obj InfoObject) Name() string {
 		group = fmt.Sprintf("%v.", obj.Info.Mapping.GroupVersionKind.Group)
 	}
 	return group + fmt.Sprintf(
-		"%v.%v:%v.%v",
+		"%v.%v.%v.%v",
 		obj.Info.Mapping.GroupVersionKind.Version,
 		obj.Info.Mapping.GroupVersionKind.Kind,
 		obj.Info.Namespace,
