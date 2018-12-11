@@ -32,6 +32,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
@@ -175,7 +176,7 @@ func TestRunCreateToken(t *testing.T) {
 			ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 				// KubernetesVersion is not used, but we set this explicitly to avoid
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-				KubernetesVersion: "v1.12.0",
+				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
 			},
 			BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
 				{

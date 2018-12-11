@@ -35,7 +35,7 @@ go_test(
     srcs = ["features_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
