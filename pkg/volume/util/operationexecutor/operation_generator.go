@@ -40,7 +40,7 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 
-	csiMigration "github.com/kubernetes-csi/kubernetes-csi-migration-library"
+	csimig "github.com/kubernetes-csi/kubernetes-csi-migration-library"
 )
 
 const (
@@ -434,7 +434,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// TODO(dyzz): This case can't distinguish between PV and In-line which is necessary because
 		// if it was PV it may have been migrated, but the same plugin with in-line may not have been.
 		// Suggestions welcome...
-		if csiMigration.IsMigratableByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if csimig.IsMigratableByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -1497,7 +1497,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 }
 
 func isMigrated(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
-	if csiMigration.IsPVMigratable(spec.PersistentVolume) || csiMigration.IsInlineMigratable(spec.Volume) {
+	if csimig.IsPVMigratable(spec.PersistentVolume) || csimig.IsInlineMigratable(spec.Volume) {
 		migratable, err := vpm.IsPluginMigratableBySpec(spec)
 		if err == nil && migratable {
 			return true
@@ -1509,7 +1509,7 @@ func isMigrated(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
 	if spec.PersistentVolume != nil {
 		// TranslateInTreePVToCSI will create a new PV
-		csiPV, err := csiMigration.TranslateInTreePVToCSI(spec.PersistentVolume)
+		csiPV, err := csimig.TranslateInTreePVToCSI(spec.PersistentVolume)
 		if err != nil {
 			return nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
 		}
