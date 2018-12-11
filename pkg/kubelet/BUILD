@@ -208,7 +208,7 @@ go_test(
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
         "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",

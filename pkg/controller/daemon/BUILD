@@ -22,7 +22,7 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
