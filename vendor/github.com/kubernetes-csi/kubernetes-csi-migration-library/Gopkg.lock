@@ -12,13 +12,6 @@
   revision = "c0656edd0d9eab7c66d1eb0c568f9039345796f7"
 
 [[projects]]
-  digest = "1:2edd2416f89b4e841df0e4a78802ce14d2bc7ad79eba1a45986e39f0f8cb7d87"
-  name = "github.com/golang/glog"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "44145f04b68cf362d9c4df2182967c2275eaefed"
-
-[[projects]]
   digest = "1:41bfd4219241b7f7d6e6fdb13fc712576f1337e68e6b895136283b76928fdd66"
   name = "github.com/google/gofuzz"
   packages = ["."]
@@ -69,15 +62,15 @@
   version = "v0.9.0"
 
 [[projects]]
-  digest = "1:a9cc0da277e05cba6bc1bc058842acee0943a37146d42dc172fd701b1e7c50b3"
+  digest = "1:cccacf95f7aaf1878275a6a9be7e31221ec1b14262c98c80ace3dfb9baf01641"
   name = "k8s.io/api"
   packages = ["core/v1"]
   pruneopts = "UT"
-  revision = "357ec6384fa7e10d6ea160d2299a98ddfdc3ab3c"
-  version = "kubernetes-1.12.1"
+  revision = "a61488babbd64b32da2ed985e2e70fe7b4ffc05a"
+  version = "kubernetes-1.13.0-beta.2"
 
 [[projects]]
-  digest = "1:01926916f6f34e7cc6230e36e66f9690013adcfd32755aebf03ceb91f9c16864"
+  digest = "1:64cc55bfc7c794bc04562c22daf8486dc65c84251d820e41672d76893205ad45"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/resource",
@@ -103,8 +96,16 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "UT"
-  revision = "6dd46049f39503a1fc8d65de4bd566829e95faff"
-  version = "kubernetes-1.12.0"
+  revision = "a6dc8e30bd0d613be6277952802c814768ed60c9"
+  version = "kubernetes-1.13.0-beta.2"
+
+[[projects]]
+  digest = "1:e2999bf1bb6eddc2a6aa03fe5e6629120a53088926520ca3b4765f77d7ff7eab"
+  name = "k8s.io/klog"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "a5bc97fbc634d635061f3146511332c7e313a55a"
+  version = "v0.1.0"
 
 [solve-meta]
   analyzer-name = "dep"

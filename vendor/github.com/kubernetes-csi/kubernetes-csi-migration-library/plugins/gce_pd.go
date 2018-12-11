@@ -25,7 +25,7 @@ import (
 
 const (
 	// GCE PD CSI driver constants
-	GCEPDDriverName       = "com.google.csi.gcepd"
+	GCEPDDriverName       = "pd.csi.storage.gke.io"
 	GCEPDInTreePluginName = "kubernetes.io/gce-pd"
 
 	UnspecifiedValue = "UNSPECIFIED"

@@ -27,11 +27,11 @@
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.12.1"
+  version = "kubernetes-1.13.0-beta.2"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.12.0"
+  version = "kubernetes-1.13.0-beta.2"
 
 [prune]
   go-tests = true
