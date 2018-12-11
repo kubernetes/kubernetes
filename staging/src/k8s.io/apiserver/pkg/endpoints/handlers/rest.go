@@ -280,23 +280,26 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 	return nil
 }
 
-// setListSelfLink sets the self link of a list to the base URL, then sets the self links
-// on all child objects returned. Returns the number of items in the list.
-func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request, namer ScopeNamer) (int, error) {
+// setObjectSelfLink sets the self link of an object as needed.
+func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if !meta.IsListType(obj) {
-		return 0, nil
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			return fmt.Errorf("missing requestInfo")
+		}
+		return setSelfLink(obj, requestInfo, namer)
 	}
 
 	uri, err := namer.GenerateListLink(req)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
 		klog.V(4).Infof("Unable to set self link on object: %v", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
-		return 0, fmt.Errorf("missing requestInfo")
+		return fmt.Errorf("missing requestInfo")
 	}
 
 	count := 0
@@ -304,7 +307,14 @@ func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request,
 		count++
 		return setSelfLink(obj, requestInfo, namer)
 	})
-	return count, err
+
+	if count == 0 {
+		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 func summarizeData(data []byte, maxLength int) string {
