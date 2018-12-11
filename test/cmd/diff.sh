@@ -40,3 +40,20 @@ run_kubectl_diff_tests() {
     set +o nounset
     set +o errexit
 }
+
+run_kubectl_diff_same_names() {
+    set -o nounset
+    set -o errexit
+
+    create_and_use_new_namespace
+    kube::log::status "Test kubectl diff with multiple resources with the same name"
+
+    output_message=$(KUBECTL_EXTERNAL_DIFF=find kubectl diff -Rf hack/testdata/diff/)
+    kube::test::if_has_string "${output_message}" 'v1.Pod:.*.test'
+    kube::test::if_has_string "${output_message}" 'apps.v1.Deployment:.*.test'
+    kube::test::if_has_string "${output_message}" 'v1.ConfigMap:.*.test'
+    kube::test::if_has_string "${output_message}" 'v1.Secret:.*.test'
+
+    set +o nounset
+    set +o errexit
+}
