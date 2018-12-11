@@ -1754,7 +1754,7 @@ filename | sha256 hash
 * Added block volume support to Cinder volume plugin. ([#64879](https://github.com/kubernetes/kubernetes/pull/64879), [@bertinatto](https://github.com/bertinatto))
 * fixed incorrect OpenAPI schema for CustomResourceDefinition objects ([#65256](https://github.com/kubernetes/kubernetes/pull/65256), [@liggitt](https://github.com/liggitt))
 * ignore not found file error when watching manifests ([#64880](https://github.com/kubernetes/kubernetes/pull/64880), [@dixudx](https://github.com/dixudx))
-* add port-forward examples for sevice ([#64773](https://github.com/kubernetes/kubernetes/pull/64773), [@MasayaAoyama](https://github.com/MasayaAoyama))
+* add port-forward examples for service ([#64773](https://github.com/kubernetes/kubernetes/pull/64773), [@MasayaAoyama](https://github.com/MasayaAoyama))
 * Fix issues for block device not mapped to container. ([#64555](https://github.com/kubernetes/kubernetes/pull/64555), [@wenlxie](https://github.com/wenlxie))
 * Update crictl on GCE to v1.11.0. ([#65254](https://github.com/kubernetes/kubernetes/pull/65254), [@Random-Liu](https://github.com/Random-Liu))
 * Fixes missing nodes lines when kubectl top nodes ([#64389](https://github.com/kubernetes/kubernetes/pull/64389), [@yue9944882](https://github.com/yue9944882))
