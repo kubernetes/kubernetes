@@ -256,6 +256,14 @@ func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.
 	return []etcdutil.Member{}, nil
 }
 
+func (c fakeTLSEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+	return 0, nil
+}
+
+func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
 func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
@@ -294,6 +302,14 @@ func (c fakePodManifestEtcdClient) GetVersion() (string, error) {
 func (c fakePodManifestEtcdClient) Sync() error { return nil }
 
 func (c fakePodManifestEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
+func (c fakePodManifestEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+	return 0, nil
+}
+
+func (c fakePodManifestEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 

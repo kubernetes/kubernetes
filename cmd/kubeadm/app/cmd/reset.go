@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -139,6 +140,9 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, client)
 	if err == nil {
 		dirsToClean = append(dirsToClean, etcdDataDir)
+		if err := removeEtcdMember(client); err != nil {
+			klog.Warningf("[reset] failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
+		}
 	} else {
 		fmt.Println("[reset] no etcd config found. Assuming external etcd")
 		fmt.Println("[reset] please manually reset etcd to prevent further issues")
@@ -203,6 +207,14 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 	fmt.Print(msg)
 
 	return nil
+}
+
+func removeEtcdMember(client clientset.Interface) error {
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+	if err != nil {
+		return err
+	}
+	return etcdphase.RemoveStackedEtcdMemberFromCluster(client, cfg)
 }
 
 func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, error) {
