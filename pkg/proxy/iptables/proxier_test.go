@@ -205,7 +205,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			endpoint:     "10.240.0.3:80",
 			simulatedErr: conntrack.NoConnectionToDelete,
 		}, {
-			description:  "V4 UDP, unexpected error, should be glogged",
+			description:  "V4 UDP, unexpected error, should be klogged",
 			svcName:      "v4-udp-simulated-error",
 			svcIP:        "10.96.1.1",
 			svcPort:      80,
@@ -281,7 +281,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	// Run the test cases
 	for _, tc := range testCases {
 		priorExecs := fexec.CommandCalls
-		priorGlogErrs := klog.Stats.Error.Lines()
+		priorLogErrs := klog.Stats.Error.Lines()
 
 		input := []proxy.ServiceEndpoint{tc.epSvcPair}
 		fakeProxier.deleteEndpointConnections(input)
@@ -314,14 +314,14 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			t.Errorf("%s: Expected conntrack to be executed %d times, but got %d", tc.description, expExecs, execs)
 		}
 
-		// Check the number of new glog errors
-		var expGlogErrs int64
+		// Check the number of new klog errors
+		var expKlogErrs int64
 		if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
-			expGlogErrs = 1
+			expKlogErrs = 1
 		}
-		glogErrs := klog.Stats.Error.Lines() - priorGlogErrs
-		if glogErrs != expGlogErrs {
-			t.Errorf("%s: Expected %d glogged errors, but got %d", tc.description, expGlogErrs, glogErrs)
+		klogErrs := klog.Stats.Error.Lines() - priorLogErrs
+		if klogErrs != expKlogErrs {
+			t.Errorf("%s: Expected %d klogged errors, but got %d", tc.description, expKlogErrs, klogErrs)
 		}
 	}
 }

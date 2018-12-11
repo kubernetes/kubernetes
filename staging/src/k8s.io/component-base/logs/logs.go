@@ -43,7 +43,7 @@ func AddFlags(fs *pflag.FlagSet) {
 	fs.AddFlag(pflag.Lookup(logFlushFreqFlagName))
 }
 
-// KlogWriter serves as a bridge between the standard log package and the glog package.
+// KlogWriter serves as a bridge between the standard log package and the klog package.
 type KlogWriter struct{}
 
 // Write implements the io.Writer interface.
@@ -56,7 +56,7 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
-	// The default glog flush interval is 5 seconds.
+	// The default klog flush interval is 5 seconds.
 	go wait.Forever(klog.Flush, *logFlushFreq)
 }
 
@@ -70,7 +70,7 @@ func NewLogger(prefix string) *log.Logger {
 	return log.New(KlogWriter{}, prefix, 0)
 }
 
-// GlogSetter is a setter to set glog level.
+// GlogSetter is a setter to set klog level.
 func GlogSetter(val string) (string, error) {
 	var level klog.Level
 	if err := level.Set(val); err != nil {

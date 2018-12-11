@@ -82,7 +82,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 				framework.ExpectNoError(err)
 			})
 
-			ginkgo.By("Checking ingesting logs in glog format", func() {
+			ginkgo.By("Checking ingesting logs in klog format", func() {
 				logUnformatted := "Text"
 				logRaw := fmt.Sprintf("I0101 00:00:00.000000       1 main.go:1] %s", logUnformatted)
 				pod, err := utils.StartAndReturnSelf(utils.NewRepeatingLoggingPod("synthlogger-3", logRaw), f)

@@ -418,7 +418,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
+	// a.k.a. change all "_" to "-". e.g. klog package
 	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
