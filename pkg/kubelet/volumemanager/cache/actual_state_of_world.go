@@ -148,6 +148,11 @@ type ActualStateOfWorld interface {
 	// with pod's unique name. This map can be used to determine which pod is currently
 	// in actual state of world.
 	GetPods() map[volumetypes.UniquePodName]bool
+
+	// GetAttachedVolumes returns a list of volumes that is known to be attached
+	// to the node. This list can be used to determine volumes that are either in-use
+	// or have a mount/unmount operation pending.
+	GetAttachedVolumes() []AttachedVolume
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -622,6 +627,20 @@ func (asw *actualStateOfWorld) GetGloballyMountedVolumes() []AttachedVolume {
 	}
 
 	return globallyMountedVolumes
+}
+
+func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
+	asw.RLock()
+	defer asw.RUnlock()
+	allAttachedVolumes := make(
+		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	for _, volumeObj := range asw.attachedVolumes {
+		allAttachedVolumes = append(
+			allAttachedVolumes,
+			asw.newAttachedVolume(&volumeObj))
+	}
+
+	return allAttachedVolumes
 }
 
 func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
