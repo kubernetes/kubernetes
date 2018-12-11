@@ -190,12 +190,13 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	if err != nil {
 		return nil, errors.Wrap(err, "error syncing endpoints with etc")
 	}
+	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 
 	return etcdClient, nil
 }
 
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
-func (c Client) Sync() error {
+func (c *Client) Sync() error {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
 		DialTimeout: 20 * time.Second,
