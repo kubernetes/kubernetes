@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -35,11 +37,56 @@ const (
 	IPv6ZeroCIDR = "::/0"
 )
 
+var (
+	ErrAddressNotAllowed = errors.New("address not allowed")
+	ErrNoAddresses       = errors.New("No addresses for hostname")
+)
+
 func IsZeroCIDR(cidr string) bool {
 	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
 		return true
 	}
 	return false
+}
+
+// IsProxyableIP checks if a given IP address is permitted to be proxied
+func IsProxyableIP(ip string) error {
+	netIP := net.ParseIP(ip)
+	if netIP == nil {
+		return ErrAddressNotAllowed
+	}
+	return isProxyableIP(netIP)
+}
+
+func isProxyableIP(ip net.IP) error {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast() {
+		return ErrAddressNotAllowed
+	}
+	return nil
+}
+
+// Resolver is an interface for net.Resolver
+type Resolver interface {
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
+
+// IsProxyableHostname checks if the IP addresses for a given hostname are permitted to be proxied
+func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) error {
+	resp, err := resolv.LookupIPAddr(ctx, hostname)
+	if err != nil {
+		return err
+	}
+
+	if len(resp) == 0 {
+		return ErrNoAddresses
+	}
+
+	for _, host := range resp {
+		if err := isProxyableIP(host.IP); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func IsLocalIP(ip string) (bool, error) {
