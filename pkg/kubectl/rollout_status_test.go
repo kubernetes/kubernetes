@@ -357,6 +357,28 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			err:  false,
 		},
 		{
+			name:       "partition update is ignored if partition is zero",
+			generation: 1,
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					partition := int32(0)
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
+				}()},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: 2,
+				Replicas:           3,
+				ReadyReplicas:      3,
+				CurrentReplicas:    3,
+				UpdatedReplicas:    0,
+				CurrentRevision:    "foo",
+				UpdateRevision:     "foo",
+			},
+
+			msg:  fmt.Sprintf("statefulset rolling update complete %d pods at revision %s...\n", 3, "foo"),
+			done: true,
+			err:  false,
+		},
+		{
 			name:       "update completes when all replicas are current",
 			generation: 1,
 			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},

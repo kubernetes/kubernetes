@@ -135,14 +135,14 @@ func (s *StatefulSetStatusViewer) Status(obj runtime.Unstructured, revision int6
 		return fmt.Sprintf("Waiting for %d pods to be ready...\n", *sts.Spec.Replicas-sts.Status.ReadyReplicas), false, nil
 	}
 	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType && sts.Spec.UpdateStrategy.RollingUpdate != nil {
-		if sts.Spec.Replicas != nil && sts.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+		if sts.Spec.Replicas != nil && *sts.Spec.UpdateStrategy.RollingUpdate.Partition > 0 {
 			if sts.Status.UpdatedReplicas < (*sts.Spec.Replicas - *sts.Spec.UpdateStrategy.RollingUpdate.Partition) {
 				return fmt.Sprintf("Waiting for partitioned roll out to finish: %d out of %d new pods have been updated...\n",
-					sts.Status.UpdatedReplicas, *sts.Spec.Replicas-*sts.Spec.UpdateStrategy.RollingUpdate.Partition), false, nil
+					sts.Status.UpdatedReplicas, (*sts.Spec.Replicas - *sts.Spec.UpdateStrategy.RollingUpdate.Partition)), false, nil
 			}
+			return fmt.Sprintf("partitioned roll out complete: %d new pods have been updated...\n",
+				sts.Status.UpdatedReplicas), true, nil
 		}
-		return fmt.Sprintf("partitioned roll out complete: %d new pods have been updated...\n",
-			sts.Status.UpdatedReplicas), true, nil
 	}
 	if sts.Status.UpdateRevision != sts.Status.CurrentRevision {
 		return fmt.Sprintf("waiting for statefulset rolling update to complete %d pods at revision %s...\n",
