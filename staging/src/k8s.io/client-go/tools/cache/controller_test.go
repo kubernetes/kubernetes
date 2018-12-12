@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -55,6 +56,7 @@ func Example() {
 		ObjectType:       &v1.Pod{},
 		FullResyncPeriod: time.Millisecond * 100,
 		RetryOnError:     false,
+		clock:            &clock.RealClock{},
 
 		// Let's implement a simple controller that just deletes
 		// everything that comes in.

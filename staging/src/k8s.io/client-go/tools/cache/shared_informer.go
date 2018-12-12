@@ -251,6 +251,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		FullResyncPeriod: s.resyncCheckPeriod,
 		RetryOnError:     false,
 		ShouldResync:     s.processor.shouldResync,
+		clock:            s.clock,
 
 		Process: s.HandleDeltas,
 	}
@@ -260,7 +261,6 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		defer s.startedLock.Unlock()
 
 		s.controller = New(cfg)
-		s.controller.(*controller).clock = s.clock
 		s.started = true
 	}()
 
@@ -271,6 +271,9 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer close(processorStopCh) // Tell Processor to stop
 	wg.StartWithChannel(processorStopCh, s.cacheMutationDetector.Run)
 	wg.StartWithChannel(processorStopCh, s.processor.run)
+
+	lwHealth := newDefaultListWatchLockFreeHealth(fmt.Sprintf("informer_health_for_%s", s.controller.(*controller).reflector.name), s.controller.(*controller).reflector.consistentErrorsCh)
+	lwHealth.run(stopCh)
 
 	defer func() {
 		s.startedLock.Lock()

@@ -72,6 +72,10 @@ type Reflector struct {
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
 	// Defaults to pager.PageSize.
 	WatchListPageSize int64
+
+	// consistentErrorsCh channel on which we send List&Watch related errors
+	// it is meant to represent a gauge, that is a number that can go up and down
+	consistentErrorsCh chan error
 }
 
 var (
@@ -101,13 +105,14 @@ func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyn
 // NewNamedReflector same as NewReflector, but with a specified name for logging
 func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	r := &Reflector{
-		name:          name,
-		listerWatcher: lw,
-		store:         store,
-		expectedType:  reflect.TypeOf(expectedType),
-		period:        time.Second,
-		resyncPeriod:  resyncPeriod,
-		clock:         &clock.RealClock{},
+		name:               name,
+		listerWatcher:      lw,
+		store:              store,
+		expectedType:       reflect.TypeOf(expectedType),
+		period:             time.Second,
+		resyncPeriod:       resyncPeriod,
+		clock:              &clock.RealClock{},
+		consistentErrorsCh: make(chan error, 20),
 	}
 	return r
 }
@@ -274,6 +279,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 
 		w, err := r.listerWatcher.Watch(options)
 		if err != nil {
+			r.incrementAndUpdateConsistentErrors(stopCh, err)
 			switch err {
 			case io.EOF:
 				// watch closed normally
@@ -296,7 +302,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
-
+		if err == nil {
+			r.resetAndUpdateConsistentErrors(stopCh)
+		}
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
 				switch {
@@ -403,4 +411,23 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v
+}
+
+func (r *Reflector) incrementAndUpdateConsistentErrors(stopCh <-chan struct{}, err error) {
+	r.updateConsistentErrors(stopCh, err)
+}
+
+func (r *Reflector) resetAndUpdateConsistentErrors(stopCh <-chan struct{}) {
+	// sending a nil error sets the counter to zero
+	r.updateConsistentErrors(stopCh, nil)
+}
+
+func (r *Reflector) updateConsistentErrors(stopCh <-chan struct{}, err error) {
+	select {
+	case <-stopCh:
+		return
+	case r.consistentErrorsCh <- err:
+	default:
+		klog.Warningf("unable to report health status for %s, is the receiving end dead ? the error will be ignored.", r.name)
+	}
 }

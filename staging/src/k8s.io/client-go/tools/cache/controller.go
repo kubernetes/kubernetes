@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,6 +60,8 @@ type Config struct {
 	//       the object completely if desired. Pass the object in
 	//       question to this interface as a parameter.
 	RetryOnError bool
+
+	clock clock.Clock
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -73,10 +74,9 @@ type ProcessFunc func(obj interface{}) error
 
 // Controller is a generic controller framework.
 type controller struct {
-	config         Config
-	reflector      *Reflector
-	reflectorMutex sync.RWMutex
-	clock          clock.Clock
+	config    Config
+	reflector *Reflector
+	clock     clock.Clock
 }
 
 type Controller interface {
@@ -87,9 +87,18 @@ type Controller interface {
 
 // New makes a new Controller from the given Config.
 func New(c *Config) Controller {
+	r := NewReflector(
+		c.ListerWatcher,
+		c.ObjectType,
+		c.Queue,
+		c.FullResyncPeriod,
+	)
+	r.ShouldResync = c.ShouldResync
+	r.clock = c.clock
 	ctlr := &controller{
-		config: *c,
-		clock:  &clock.RealClock{},
+		config:    *c,
+		clock:     c.clock,
+		reflector: r,
 	}
 	return ctlr
 }
@@ -103,23 +112,10 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		<-stopCh
 		c.config.Queue.Close()
 	}()
-	r := NewReflector(
-		c.config.ListerWatcher,
-		c.config.ObjectType,
-		c.config.Queue,
-		c.config.FullResyncPeriod,
-	)
-	r.ShouldResync = c.config.ShouldResync
-	r.clock = c.clock
-
-	c.reflectorMutex.Lock()
-	c.reflector = r
-	c.reflectorMutex.Unlock()
-
 	var wg wait.Group
 	defer wg.Wait()
 
-	wg.StartWithChannel(stopCh, r.Run)
+	wg.StartWithChannel(stopCh, c.reflector.Run)
 
 	wait.Until(c.processLoop, time.Second, stopCh)
 }
@@ -349,6 +345,7 @@ func newInformer(
 		ObjectType:       objType,
 		FullResyncPeriod: resyncPeriod,
 		RetryOnError:     false,
+		clock:            &clock.RealClock{},
 
 		Process: func(obj interface{}) error {
 			// from oldest to newest
