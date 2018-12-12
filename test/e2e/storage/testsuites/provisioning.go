@@ -88,10 +88,9 @@ func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPat
 			ClaimSize:    resource.claimSize,
 			ExpectedSize: resource.claimSize,
 		},
-		cs:    driver.GetDriverInfo().Config.Framework.ClientSet,
-		pvc:   resource.pvc,
-		sc:    resource.sc,
-		dInfo: driver.GetDriverInfo(),
+		cs:  driver.GetDriverInfo().Config.Framework.ClientSet,
+		pvc: resource.pvc,
+		sc:  resource.sc,
 	}
 
 	if driver.GetDriverInfo().Config.ClientNodeName != "" {
@@ -120,13 +119,11 @@ func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns
 		// Ginkgo's "Global Shared Behaviors" require arguments for a shared function
 		// to be a single struct and to be passed as a pointer.
 		// Please see https://onsi.github.io/ginkgo/#global-shared-behaviors for details.
-		testProvisioning(&input)
+		testProvisioning(driver, &input)
 	})
 }
 
 type provisioningTestResource struct {
-	driver TestDriver
-
 	claimSize string
 	sc        *storage.StorageClass
 	pvc       *v1.PersistentVolumeClaim
@@ -143,7 +140,6 @@ func (p *provisioningTestResource) setupResource(driver TestDriver, pattern test
 			if p.sc == nil {
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
-			p.driver = driver
 			p.claimSize = dDriver.GetClaimSize()
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
@@ -163,33 +159,30 @@ type provisioningTestInput struct {
 	cs       clientset.Interface
 	pvc      *v1.PersistentVolumeClaim
 	sc       *storage.StorageClass
-	dInfo    *DriverInfo
 }
 
-func testProvisioning(input *provisioningTestInput) {
+func testProvisioning(driver TestDriver, input *provisioningTestInput) {
 	It("should provision storage with defaults", func() {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
-	It("should provision storage with mount options", func() {
-		if input.dInfo.SupportedMountOption == nil {
-			framework.Skipf("Driver %q does not define supported mount option - skipping", input.dInfo.Name)
-		}
+	supportedMountOptions := driver.GetDriverInfo().SupportedMountOption
+	if supportedMountOptions != nil {
+		It("should provision storage with mount options", func() {
+			input.sc.MountOptions = supportedMountOptions.Union(driver.GetDriverInfo().RequiredMountOption).List()
+			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		})
+	}
 
-		input.sc.MountOptions = input.dInfo.SupportedMountOption.Union(input.dInfo.RequiredMountOption).List()
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-	})
-
-	It("should create and delete block persistent volumes", func() {
-		if !input.dInfo.Capabilities[CapBlock] {
-			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
-		}
-		block := v1.PersistentVolumeBlock
-		input.testCase.VolumeMode = &block
-		input.testCase.SkipWriteReadCheck = true
-		input.pvc.Spec.VolumeMode = &block
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-	})
+	if driver.GetDriverInfo().Capabilities[CapBlock] {
+		It("should create and delete block persistent volumes", func() {
+			block := v1.PersistentVolumeBlock
+			input.testCase.VolumeMode = &block
+			input.testCase.SkipWriteReadCheck = true
+			input.pvc.Spec.VolumeMode = &block
+			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		})
+	}
 }
 
 // TestDynamicProvisioning tests dynamic provisioning with specified StorageClassTest and storageClass
