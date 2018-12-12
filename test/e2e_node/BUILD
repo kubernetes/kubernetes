@@ -53,6 +53,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/api/v1/node:go_default_library",
+            "//pkg/kubelet/util:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
