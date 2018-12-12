@@ -65,23 +65,25 @@ func (prometheusMetricsProvider) NewAddsMetric(name string) workqueue.CounterMet
 	return adds
 }
 
-func (prometheusMetricsProvider) NewLatencyMetric(name string) workqueue.SummaryMetric {
-	latency := prometheus.NewSummary(prometheus.SummaryOpts{
+func (prometheusMetricsProvider) NewLatencyMetric(name string) workqueue.HistogramMetric {
+	latency := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Subsystem:   WorkQueueSubsystem,
 		Name:        QueueLatencyKey,
 		Help:        "How long in seconds an item stays in workqueue before being requested.",
 		ConstLabels: prometheus.Labels{"name": name},
+		Buckets:     prometheus.ExponentialBuckets(10e-9, 10, 10),
 	})
 	prometheus.Register(latency)
 	return latency
 }
 
-func (prometheusMetricsProvider) NewWorkDurationMetric(name string) workqueue.SummaryMetric {
-	workDuration := prometheus.NewSummary(prometheus.SummaryOpts{
+func (prometheusMetricsProvider) NewWorkDurationMetric(name string) workqueue.HistogramMetric {
+	workDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Subsystem:   WorkQueueSubsystem,
 		Name:        WorkDurationKey,
 		Help:        "How long in seconds processing an item from workqueue takes.",
 		ConstLabels: prometheus.Labels{"name": name},
+		Buckets:     prometheus.ExponentialBuckets(10e-9, 10, 10),
 	})
 	prometheus.Register(workDuration)
 	return workDuration

@@ -155,11 +155,11 @@ func (m *testMetricsProvider) NewAddsMetric(name string) CounterMetric {
 	return &m.adds
 }
 
-func (m *testMetricsProvider) NewLatencyMetric(name string) SummaryMetric {
+func (m *testMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
 	return &m.latency
 }
 
-func (m *testMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
+func (m *testMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
 	return &m.duration
 }
 

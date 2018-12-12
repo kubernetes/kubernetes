@@ -57,6 +57,11 @@ type SummaryMetric interface {
 	Observe(float64)
 }
 
+// HistogramMetric counts individual observations.
+type HistogramMetric interface {
+	Observe(float64)
+}
+
 type noopMetric struct{}
 
 func (noopMetric) Inc()            {}
@@ -73,9 +78,9 @@ type defaultQueueMetrics struct {
 	// total number of adds handled by a workqueue
 	adds CounterMetric
 	// how long an item stays in a workqueue
-	latency SummaryMetric
+	latency HistogramMetric
 	// how long processing an item from a workqueue takes
-	workDuration         SummaryMetric
+	workDuration         HistogramMetric
 	addTimes             map[t]time.Time
 	processingStartTimes map[t]time.Time
 
@@ -190,8 +195,8 @@ func (m *defaultRetryMetrics) retry() {
 type MetricsProvider interface {
 	NewDepthMetric(name string) GaugeMetric
 	NewAddsMetric(name string) CounterMetric
-	NewLatencyMetric(name string) SummaryMetric
-	NewWorkDurationMetric(name string) SummaryMetric
+	NewLatencyMetric(name string) HistogramMetric
+	NewWorkDurationMetric(name string) HistogramMetric
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
@@ -214,11 +219,11 @@ func (_ noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLatencyMetric(name string) SummaryMetric {
+func (_ noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
+func (_ noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
