@@ -213,10 +213,18 @@ func (c *convert) VisitPrimitive(p *proto.Primitive) {
 	case proto.Number:
 		a.Scalar = ptr(schema.Numeric)
 	case proto.String:
-		if p.Format == "int-or-string" {
-			a.Untyped = &schema.Untyped{}
-		} else {
+		switch p.Format {
+		case "":
 			a.Scalar = ptr(schema.String)
+		case "byte":
+			// byte really means []byte and is encoded as a string.
+			a.Scalar = ptr(schema.String)
+		case "int-or-string":
+			a.Untyped = &schema.Untyped{}
+		case "date-time":
+			a.Untyped = &schema.Untyped{}
+		default:
+			a.Untyped = &schema.Untyped{}
 		}
 	case proto.Boolean:
 		a.Scalar = ptr(schema.Boolean)
