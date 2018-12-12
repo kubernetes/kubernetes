@@ -74,7 +74,8 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 }
 
 func (p *provisioningTestSuite) isTestSupported(pattern testpatterns.TestPattern, driver TestDriver) bool {
-	return true
+	_, ok := driver.(DynamicPVTestDriver)
+	return ok
 }
 
 func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
@@ -149,6 +150,7 @@ func (p *provisioningTestResource) setupResource(driver TestDriver, pattern test
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
 		}
 	default:
+		// Should never get here because of the check in skipUnsupportedTest above.
 		framework.Failf("Dynamic Provision test doesn't support: %s", pattern.VolType)
 	}
 }
