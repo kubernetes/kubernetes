@@ -1432,7 +1432,7 @@ Service Level Indicators (SLIs) and Service Level Objectives (SLOs) for the syst
 Here's the release [scalability validation report].
 
 [SIG Scalability]: https://github.com/kubernetes/community/tree/master/sig-scalability
-[scalability validation report]: https://github.com/kubernetes/features/tree/master/release-1.8/scalability_validation_report.md
+[scalability validation report]: https://github.com/kubernetes/enhancements/tree/master/release-1.8/scalability_validation_report.md
 
 ### SIG Scheduling
 
@@ -1611,7 +1611,7 @@ Kubernetes 1.8 adds the apps/v1beta2 group and version, which now consists of th
 DaemonSet, Deployment, ReplicaSet and StatefulSet kinds. This group and version are part
 of the Kubernetes Workloads API. We plan to move them to v1 in an upcoming release, so you might want to plan your migration accordingly.
 
-For more information, see [the issue that describes this work in detail](https://github.com/kubernetes/features/issues/353)
+For more information, see [the issue that describes this work in detail](https://github.com/kubernetes/enhancements/issues/353)
 
 #### API Object Additions and Migrations
 
@@ -1837,7 +1837,7 @@ that they span multiple clusters. Creating a Federated HPA targeting
 multiple clusters ensures that cluster-level autoscalers are
 consistently deployed across those clusters, and dynamically managed
 to ensure that autoscaling can occur optimially in all clusters,
-within a set of global constraints on the total number of replicas
+within a set of global constraints on the the total number of replicas
 permitted across all clusters.  If replicas are not
 required in some clusters due to low system load or insufficient quota
 or capacity in those clusters, additional replicas are made available
@@ -1862,7 +1862,7 @@ to the autoscalers in other clusters if required.
 
 #### Container Runtime Interface (CRI)
 
-* [alpha] Add a CRI validation test suite and CRI command-line tools. ([#292](https://github.com/kubernetes/features/issues/292), [@feiskyer](https://github.com/feiskyer))
+* [alpha] Add a CRI validation test suite and CRI command-line tools. ([#292](https://github.com/kubernetes/enhancements/issues/292), [@feiskyer](https://github.com/feiskyer))
 
 * [stable] [cri-o](https://github.com/kubernetes-incubator/cri-o): CRI implementation for OCI-based runtimes [[@mrunalp](https://github.com/mrunalp)]
 
@@ -1886,13 +1886,13 @@ to the autoscalers in other clusters if required.
 
 #### kubelet
 
-* [alpha] Kubelet now supports alternative container-level CPU affinity policies by using the new CPU manager. ([#375](https://github.com/kubernetes/features/issues/375), [@sjenning](https://github.com/sjenning), [@ConnorDoyle](https://github.com/ConnorDoyle))
+* [alpha] Kubelet now supports alternative container-level CPU affinity policies by using the new CPU manager. ([#375](https://github.com/kubernetes/enhancements/issues/375), [@sjenning](https://github.com/sjenning), [@ConnorDoyle](https://github.com/ConnorDoyle))
 
-* [alpha] Applications may now request pre-allocated hugepages by using the new `hugepages` resource in the container resource requests. ([#275](https://github.com/kubernetes/features/issues/275), [@derekwaynecarr](https://github.com/derekwaynecarr))
+* [alpha] Applications may now request pre-allocated hugepages by using the new `hugepages` resource in the container resource requests. ([#275](https://github.com/kubernetes/enhancements/issues/275), [@derekwaynecarr](https://github.com/derekwaynecarr))
 
-* [alpha] Add support for dynamic Kubelet configuration. ([#281](https://github.com/kubernetes/features/issues/281), [@mtaufen](https://github.com/mtaufen))
+* [alpha] Add support for dynamic Kubelet configuration. ([#281](https://github.com/kubernetes/enhancements/issues/281), [@mtaufen](https://github.com/mtaufen))
 
-* [alpha] Add the Hardware Device Plugins API. ([#368](https://github.com/kubernetes/features/issues/368), [[@jiayingz](https://github.com/jiayingz)], [[@RenaudWasTaken](https://github.com/RenaudWasTaken)])
+* [alpha] Add the Hardware Device Plugins API. ([#368](https://github.com/kubernetes/enhancements/issues/368), [[@jiayingz](https://github.com/jiayingz)], [[@RenaudWasTaken](https://github.com/RenaudWasTaken)])
 
 * [stable] Upgrade cAdvisor to v0.27.1 with the enhancement for node monitoring. [[@dashpole](https://github.com/dashpole)]
 
@@ -1958,33 +1958,33 @@ to the autoscalers in other clusters if required.
 
 #### kubeadm
 
-* [beta] A new `upgrade` subcommand allows you to automatically upgrade a self-hosted cluster created with kubeadm. ([#296](https://github.com/kubernetes/features/issues/296), [@luxas](https://github.com/luxas))
+* [beta] A new `upgrade` subcommand allows you to automatically upgrade a self-hosted cluster created with kubeadm. ([#296](https://github.com/kubernetes/enhancements/issues/296), [@luxas](https://github.com/luxas))
 
-* [alpha] An experimental self-hosted cluster can now easily be created with `kubeadm init`. Enable the feature by setting the SelfHosting feature gate to true: `--feature-gates=SelfHosting=true` ([#296](https://github.com/kubernetes/features/issues/296), [@luxas](https://github.com/luxas))
+* [alpha] An experimental self-hosted cluster can now easily be created with `kubeadm init`. Enable the feature by setting the SelfHosting feature gate to true: `--feature-gates=SelfHosting=true` ([#296](https://github.com/kubernetes/enhancements/issues/296), [@luxas](https://github.com/luxas))
    * **NOTE:** Self-hosting will be the default way to host the control plane in the next release, v1.9
 
-* [alpha] A new `phase` subcommand supports performing only subtasks of the full `kubeadm init` flow. Combined with fine-grained configuration, kubeadm is now more easily consumable by higher-level provisioning tools like kops or GKE. ([#356](https://github.com/kubernetes/features/issues/356), [@luxas](https://github.com/luxas))
+* [alpha] A new `phase` subcommand supports performing only subtasks of the full `kubeadm init` flow. Combined with fine-grained configuration, kubeadm is now more easily consumable by higher-level provisioning tools like kops or GKE. ([#356](https://github.com/kubernetes/enhancements/issues/356), [@luxas](https://github.com/luxas))
    * **NOTE:** This command is currently staged under `kubeadm alpha phase` and will be graduated to top level in a future release.
 
 #### kops
 
-* [alpha] Added support for targeting bare metal (or non-cloudprovider) machines. ([#360](https://github.com/kubernetes/features/issues/360), [@justinsb](https://github.com/justinsb)).
+* [alpha] Added support for targeting bare metal (or non-cloudprovider) machines. ([#360](https://github.com/kubernetes/enhancements/issues/360), [@justinsb](https://github.com/justinsb)).
 
-* [alpha] kops now supports [running as a server](https://github.com/kubernetes/kops/blob/master/docs/api-server/README.md). ([#359](https://github.com/kubernetes/features/issues/359), [@justinsb](https://github.com/justinsb))
+* [alpha] kops now supports [running as a server](https://github.com/kubernetes/kops/blob/master/docs/api-server/README.md). ([#359](https://github.com/kubernetes/enhancements/issues/359), [@justinsb](https://github.com/justinsb))
 
-* [beta] GCE support is promoted from alpha to beta. ([#358](https://github.com/kubernetes/features/issues/358), [@justinsb](https://github.com/justinsb)).
+* [beta] GCE support is promoted from alpha to beta. ([#358](https://github.com/kubernetes/enhancements/issues/358), [@justinsb](https://github.com/justinsb)).
 
 #### Cluster Discovery/Bootstrap
 
-* [beta] The authentication and verification mechanism called Bootstrap Tokens is improved. Use Bootstrap Tokens to easily add new node identities to a cluster. ([#130](https://github.com/kubernetes/features/issues/130), [@luxas](https://github.com/luxas), [@jbeda](https://github.com/jbeda)).
+* [beta] The authentication and verification mechanism called Bootstrap Tokens is improved. Use Bootstrap Tokens to easily add new node identities to a cluster. ([#130](https://github.com/kubernetes/enhancements/issues/130), [@luxas](https://github.com/luxas), [@jbeda](https://github.com/jbeda)).
 
 #### Multi-platform
 
-* [alpha] The Conformance e2e test suite now passes on the arm, arm64, and ppc64le platforms. ([#288](https://github.com/kubernetes/features/issues/288), [@luxas](https://github.com/luxas), [@mkumatag](https://github.com/mkumatag), [@ixdy](https://github.com/ixdy))
+* [alpha] The Conformance e2e test suite now passes on the arm, arm64, and ppc64le platforms. ([#288](https://github.com/kubernetes/enhancements/issues/288), [@luxas](https://github.com/luxas), [@mkumatag](https://github.com/mkumatag), [@ixdy](https://github.com/ixdy))
 
 #### Cloud Providers
 
-* [alpha] Support is improved for the pluggable, out-of-tree and out-of-core cloud providers. ([#88](https://github.com/kubernetes/features/issues/88), [@wlan0](https://github.com/wlan0))
+* [alpha] Support is improved for the pluggable, out-of-tree and out-of-core cloud providers. ([#88](https://github.com/kubernetes/enhancements/issues/88), [@wlan0](https://github.com/wlan0))
 
 ### Network
 
@@ -2660,7 +2660,7 @@ filename | sha256 hash
 * azure: support retrieving access tokens via managed identity extension ([#48854](https://github.com/kubernetes/kubernetes/pull/48854), [@colemickens](https://github.com/colemickens))
 * Add a runtime warning about the kubeadm default token TTL changes. ([#48838](https://github.com/kubernetes/kubernetes/pull/48838), [@mattmoyer](https://github.com/mattmoyer))
 * Azure PD (Managed/Blob) ([#46360](https://github.com/kubernetes/kubernetes/pull/46360), [@khenidak](https://github.com/khenidak))
-* Redirect all examples README to the kubernetes/examples repo ([#46362](https://github.com/kubernetes/kubernetes/pull/46362), [@sebgoa](https://github.com/sebgoa))
+* Redirect all examples README to the the kubernetes/examples repo ([#46362](https://github.com/kubernetes/kubernetes/pull/46362), [@sebgoa](https://github.com/sebgoa))
 * Fix a regression that broke the `--config` flag for `kubeadm init`. ([#48915](https://github.com/kubernetes/kubernetes/pull/48915), [@mattmoyer](https://github.com/mattmoyer))
 * Fluentd-gcp DaemonSet exposes different set of metrics. ([#48812](https://github.com/kubernetes/kubernetes/pull/48812), [@crassirostris](https://github.com/crassirostris))
 * MountPath should be absolute ([#48815](https://github.com/kubernetes/kubernetes/pull/48815), [@dixudx](https://github.com/dixudx))
@@ -2930,7 +2930,7 @@ filename | sha256 hash
 ### Other notable changes
 
 * kubectl logs with label selector supports specifying a container name ([#44282](https://github.com/kubernetes/kubernetes/pull/44282), [@derekwaynecarr](https://github.com/derekwaynecarr))
-* Adds an approval work flow to the certificate approver that will approve certificate signing requests from kubelets that meet all the criteria of kubelet server certificates. ([#46884](https://github.com/kubernetes/kubernetes/pull/46884), [@jcbsmpsn](https://github.com/jcbsmpsn))
+* Adds an approval work flow to the the certificate approver that will approve certificate signing requests from kubelets that meet all the criteria of kubelet server certificates. ([#46884](https://github.com/kubernetes/kubernetes/pull/46884), [@jcbsmpsn](https://github.com/jcbsmpsn))
 * AWS: Maintain a cache of all instances, to fix problem with > 200 nodes with ELBs ([#47410](https://github.com/kubernetes/kubernetes/pull/47410), [@justinsb](https://github.com/justinsb))
 * Bump GLBC version to 0.9.5 - fixes [loss of manually modified GCLB health check settings](https://github.com/kubernetes/kubernetes/issues/47559) upon upgrade from pre-1.6.4 to either 1.6.4 or 1.6.5. ([#47567](https://github.com/kubernetes/kubernetes/pull/47567), [@nicksardo](https://github.com/nicksardo))
 * Update cluster-proportional-autoscaler, metadata-proxy, and fluentd-gcp addons with fixes for CVE-2016-4448, CVE-2016-8859, CVE-2016-9841, CVE-2016-9843, and CVE-2017-9526. ([#47545](https://github.com/kubernetes/kubernetes/pull/47545), [@ixdy](https://github.com/ixdy))

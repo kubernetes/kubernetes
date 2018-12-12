@@ -1,0 +1,26 @@
+{
+	"metadata": {
+		"labels": {
+			"new-label": "new-value"
+		}
+	},
+	"spec": {
+		"$setElementOrder/ports": [
+			{
+				"port": 81
+			}
+		],
+		"ports": [
+			{
+				"name": "80",
+				"port": 81,
+				"protocol": "TCP",
+				"targetPort": 80
+			},
+			{
+				"$patch": "delete",
+				"port": 80
+			}
+		]
+	}
+}
