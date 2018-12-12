@@ -74,3 +74,13 @@ func BoolPtr(b bool) *bool {
 func StringPtr(s string) *string {
 	return &s
 }
+
+// Float32Ptr returns a pointer to the passed float32.
+func Float32Ptr(i float32) *float32 {
+	return &i
+}
+
+// Float64Ptr returns a pointer to the passed float64.
+func Float64Ptr(i float64) *float64 {
+	return &i
+}

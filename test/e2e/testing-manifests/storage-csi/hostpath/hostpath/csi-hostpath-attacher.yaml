@@ -1,0 +1,48 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-hostpath-attacher
+  labels:
+    app: csi-hostpath-attacher
+spec:
+  selector:
+    app: csi-hostpath-attacher
+  ports:
+    - name: dummy
+      port: 12345
+
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-hostpath-attacher
+spec:
+  serviceName: "csi-hostpath-attacher"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-hostpath-attacher
+  template:
+    metadata:
+      labels:
+        app: csi-hostpath-attacher
+    spec:
+      serviceAccountName: csi-attacher
+      containers:
+        - name: csi-attacher
+          image: gcr.io/gke-release/csi-attacher:v1.0.0-gke.0
+          args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: Always
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-hostpath
+            type: DirectoryOrCreate
+          name: socket-dir

@@ -17,12 +17,14 @@ limitations under the License.
 package constants
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"github.com/pkg/errors"
+
+	"k8s.io/apimachinery/pkg/util/version"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -151,12 +153,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		{
 			kubernetesVersion: "1.99.0",
 			expectedVersion:   nil,
-			expectedError:     fmt.Errorf("Unsupported or unknown kubernetes version(1.99.0)"),
-		},
-		{
-			kubernetesVersion: "1.10.0",
-			expectedVersion:   version.MustParseSemantic("3.1.12"),
-			expectedError:     nil,
+			expectedError:     errors.New("Unsupported or unknown Kubernetes version(1.99.0)"),
 		},
 		{
 			kubernetesVersion: "1.10.2",
@@ -171,6 +168,16 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		{
 			kubernetesVersion: "1.12.1",
 			expectedVersion:   version.MustParseSemantic("3.2.24"),
+			expectedError:     nil,
+		},
+		{
+			kubernetesVersion: "1.13.1",
+			expectedVersion:   version.MustParseSemantic("3.2.24"),
+			expectedError:     nil,
+		},
+		{
+			kubernetesVersion: "1.14.0",
+			expectedVersion:   version.MustParseSemantic("3.3.10"),
 			expectedError:     nil,
 		},
 	}
@@ -202,15 +209,15 @@ func TestEtcdSupportedVersion(t *testing.T) {
 
 func TestGetKubeDNSVersion(t *testing.T) {
 	var tests = []struct {
-		dns      string
+		dns      kubeadmapi.DNSAddOnType
 		expected string
 	}{
 		{
-			dns:      KubeDNS,
+			dns:      kubeadmapi.KubeDNS,
 			expected: KubeDNSVersion,
 		},
 		{
-			dns:      CoreDNS,
+			dns:      kubeadmapi.CoreDNS,
 			expected: CoreDNSVersion,
 		},
 	}

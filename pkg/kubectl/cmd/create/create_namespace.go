@@ -20,10 +20,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -35,6 +36,7 @@ var (
 	  kubectl create namespace my-namespace`))
 )
 
+// NamespaceOpts is the options for 'create namespare' sub command
 type NamespaceOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -46,7 +48,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	}
 
 	cmd := &cobra.Command{
-		Use: "namespace NAME [--dry-run]",
+		Use:                   "namespace NAME [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"ns"},
 		Short:                 i18n.T("Create a namespace with the specified name"),
@@ -62,21 +64,22 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.NamespaceV1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.NamespaceV1GeneratorName)
 
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *NamespaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	var generator kubectl.StructuredGenerator
+	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.NamespaceV1GeneratorName:
-		generator = &kubectl.NamespaceGeneratorV1{Name: name}
+	case generateversioned.NamespaceV1GeneratorName:
+		generator = &generateversioned.NamespaceGeneratorV1{Name: name}
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
@@ -84,7 +87,7 @@ func (o *NamespaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateNamespace implements the behavior to run the create namespace command
+// Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
 func (o *NamespaceOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

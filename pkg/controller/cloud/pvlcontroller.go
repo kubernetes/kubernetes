@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 
@@ -45,7 +45,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -109,8 +109,8 @@ func (pvlc *PersistentVolumeLabelController) Run(threadiness int, stopCh <-chan 
 	defer utilruntime.HandleCrash()
 	defer pvlc.queue.ShutDown()
 
-	glog.Infof("Starting PersistentVolumeLabelController")
-	defer glog.Infof("Shutting down PersistentVolumeLabelController")
+	klog.Infof("Starting PersistentVolumeLabelController")
+	defer klog.Infof("Shutting down PersistentVolumeLabelController")
 
 	go pvlc.pvlController.Run(stopCh)
 
@@ -197,7 +197,7 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v
 			}
 			volumeLabels = labels
 		} else {
-			glog.V(4).Info("cloud provider does not support PVLabeler")
+			klog.V(4).Info("cloud provider does not support PVLabeler")
 		}
 		return pvlc.updateVolume(vol, volumeLabels)
 	}
@@ -239,12 +239,12 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 			newVolume.Spec.NodeAffinity.Required = new(v1.NodeSelector)
 		}
 		if len(newVolume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-			// Need atleast one term pre-allocated whose MatchExpressions can be appended to
+			// Need at least one term pre-allocated whose MatchExpressions can be appended to
 			newVolume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
 		}
 		// Populate NodeAffinity with requirements if there are no conflicting keys found
 		if v1helper.NodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, newVolume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-			glog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+			klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
 				requirements, newVolume.Spec.NodeAffinity)
 		} else {
 			for _, req := range requirements {
@@ -255,7 +255,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 		}
 	}
 	newVolume.Initializers = removeInitializer(newVolume.Initializers, initializerName)
-	glog.V(4).Infof("removed initializer on PersistentVolume %s", newVolume.Name)
+	klog.V(4).Infof("removed initializer on PersistentVolume %s", newVolume.Name)
 
 	oldData, err := json.Marshal(vol)
 	if err != nil {
@@ -276,7 +276,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 
 func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolume, volLabels map[string]string) error {
 	volName := vol.Name
-	glog.V(4).Infof("updating PersistentVolume %s", volName)
+	klog.V(4).Infof("updating PersistentVolume %s", volName)
 	patchBytes, err := pvlc.createPatch(vol, volLabels)
 	if err != nil {
 		return err
@@ -286,7 +286,7 @@ func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolu
 	if err != nil {
 		return fmt.Errorf("failed to update PersistentVolume %s: %v", volName, err)
 	}
-	glog.V(4).Infof("updated PersistentVolume %s", volName)
+	klog.V(4).Infof("updated PersistentVolume %s", volName)
 
 	return nil
 }

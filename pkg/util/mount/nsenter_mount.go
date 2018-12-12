@@ -25,8 +25,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/nsenter"
 )
@@ -61,10 +61,10 @@ var _ = Interface(&NsenterMounter{})
 // Mount runs mount(8) in the host's root mount namespace.  Aside from this
 // aspect, Mount has the same semantics as the mounter returned by mount.New()
 func (n *NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := isBind(options)
 
 	if bind {
-		err := n.doNsenterMount(source, target, fstype, []string{"bind"})
+		err := n.doNsenterMount(source, target, fstype, bindOpts)
 		if err != nil {
 			return err
 		}
@@ -77,11 +77,11 @@ func (n *NsenterMounter) Mount(source string, target string, fstype string, opti
 // doNsenterMount nsenters the host's mount namespace and performs the
 // requested mount.
 func (n *NsenterMounter) doNsenterMount(source, target, fstype string, options []string) error {
-	glog.V(5).Infof("nsenter mount %s %s %s %v", source, target, fstype, options)
+	klog.V(5).Infof("nsenter mount %s %s %s %v", source, target, fstype, options)
 	cmd, args := n.makeNsenterArgs(source, target, fstype, options)
 	outputBytes, err := n.ne.Exec(cmd, args).CombinedOutput()
 	if len(outputBytes) != 0 {
-		glog.V(5).Infof("Output of mounting %s to %s: %v", source, target, string(outputBytes))
+		klog.V(5).Infof("Output of mounting %s to %s: %v", source, target, string(outputBytes))
 	}
 	return err
 }
@@ -131,10 +131,10 @@ func (n *NsenterMounter) Unmount(target string) error {
 	// No need to execute systemd-run here, it's enough that unmount is executed
 	// in the host's mount namespace. It will finish appropriate fuse daemon(s)
 	// running in any scope.
-	glog.V(5).Infof("nsenter unmount args: %v", args)
+	klog.V(5).Infof("nsenter unmount args: %v", args)
 	outputBytes, err := n.ne.Exec("umount", args).CombinedOutput()
 	if len(outputBytes) != 0 {
-		glog.V(5).Infof("Output of unmounting %s: %v", target, string(outputBytes))
+		klog.V(5).Infof("Output of unmounting %s: %v", target, string(outputBytes))
 	}
 	return err
 }
@@ -163,18 +163,25 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 
 	// Check the directory exists
 	if _, err = os.Stat(file); os.IsNotExist(err) {
-		glog.V(5).Infof("findmnt: directory %s does not exist", file)
+		klog.V(5).Infof("findmnt: directory %s does not exist", file)
 		return true, err
 	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	resolvedFile, err := n.EvalHostSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
 	// Add --first-only option: since we are testing for the absence of a mountpoint, it is sufficient to get only
 	// the first of multiple possible mountpoints using --first-only.
 	// Also add fstype output to make sure that the output of target file will give the full path
 	// TODO: Need more refactoring for this function. Track the solution with issue #26996
-	args := []string{"-o", "target,fstype", "--noheadings", "--first-only", "--target", file}
-	glog.V(5).Infof("nsenter findmnt args: %v", args)
+	args := []string{"-o", "target,fstype", "--noheadings", "--first-only", "--target", resolvedFile}
+	klog.V(5).Infof("nsenter findmnt args: %v", args)
 	out, err := n.ne.Exec("findmnt", args).CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed findmnt command for path %s: %s %v", file, out, err)
+		klog.V(2).Infof("Failed findmnt command for path %s: %s %v", resolvedFile, out, err)
 		// Different operating systems behave differently for paths which are not mount points.
 		// On older versions (e.g. 2.20.1) we'd get error, on newer ones (e.g. 2.26.2) we'd get "/".
 		// It's safer to assume that it's not a mount point.
@@ -185,13 +192,13 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return false, err
 	}
 
-	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output for path %s: %v:", file, mountTarget)
+	klog.V(5).Infof("IsLikelyNotMountPoint findmnt output for path %s: %v:", resolvedFile, mountTarget)
 
-	if mountTarget == file {
-		glog.V(5).Infof("IsLikelyNotMountPoint: %s is a mount point", file)
+	if mountTarget == resolvedFile {
+		klog.V(5).Infof("IsLikelyNotMountPoint: %s is a mount point", resolvedFile)
 		return false, nil
 	}
-	glog.V(5).Infof("IsLikelyNotMountPoint: %s is not a mount point", file)
+	klog.V(5).Infof("IsLikelyNotMountPoint: %s is not a mount point", resolvedFile)
 	return true, nil
 }
 
@@ -368,7 +375,7 @@ func doNsEnterBindSubPath(mounter *NsenterMounter, subpath Subpath) (hostPath st
 	if err != nil {
 		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
 	}
-	glog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, evaluatedHostSubpath, subpath.VolumePath)
+	klog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, evaluatedHostSubpath, subpath.VolumePath)
 	subpath.VolumePath = mounter.ne.KubeletPath(evaluatedHostVolumePath)
 	subpath.Path = mounter.ne.KubeletPath(evaluatedHostSubpath)
 
@@ -391,9 +398,9 @@ func doNsEnterBindSubPath(mounter *NsenterMounter, subpath Subpath) (hostPath st
 	defer func() {
 		// Cleanup subpath on error
 		if !success {
-			glog.V(4).Infof("doNsEnterBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
+			klog.V(4).Infof("doNsEnterBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
 			if cleanErr := cleanSubPath(mounter, subpath); cleanErr != nil {
-				glog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
+				klog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
 			}
 		}
 	}()
@@ -401,7 +408,7 @@ func doNsEnterBindSubPath(mounter *NsenterMounter, subpath Subpath) (hostPath st
 	// Leap of faith: optimistically expect that nobody has modified previously
 	// expanded evalSubPath with evil symlinks and bind-mount it.
 	// Mount is done on the host! don't use kubelet path!
-	glog.V(5).Infof("bind mounting %q at %q", evaluatedHostSubpath, bindPathTarget)
+	klog.V(5).Infof("bind mounting %q at %q", evaluatedHostSubpath, bindPathTarget)
 	if err = mounter.Mount(evaluatedHostSubpath, bindPathTarget, "" /*fstype*/, []string{"bind"}); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", evaluatedHostSubpath, err)
 	}
@@ -414,7 +421,7 @@ func doNsEnterBindSubPath(mounter *NsenterMounter, subpath Subpath) (hostPath st
 	}
 
 	success = true
-	glog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
+	klog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
 	return bindPathTarget, nil
 }
 

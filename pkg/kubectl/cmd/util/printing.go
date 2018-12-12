@@ -19,11 +19,11 @@ package util
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
-// SuggestApiResources returns a suggestion to use the "api-resources" command
+// SuggestAPIResources returns a suggestion to use the "api-resources" command
 // to retrieve a supported list of resources
-func SuggestApiResources(parent string) string {
+func SuggestAPIResources(parent string) string {
 	return templates.LongDesc(fmt.Sprintf("Use \"%s api-resources\" for a complete list of supported resources.", parent))
 }

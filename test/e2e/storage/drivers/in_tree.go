@@ -88,9 +88,12 @@ func InitNFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
+			RequiredMountOption:  sets.NewString("vers=4.1"),
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -233,9 +236,10 @@ func InitGlusterFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -272,7 +276,7 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 
 	name := gtr.prefix + "-server"
 	return &v1.PersistentVolumeSource{
-		Glusterfs: &v1.GlusterfsVolumeSource{
+		Glusterfs: &v1.GlusterfsPersistentVolumeSource{
 			EndpointsName: name,
 			// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 			Path:     "test_vol",
@@ -354,9 +358,12 @@ func InitISCSIDriver() TestDriver {
 				//"ext3",
 				"ext4",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapBlock:       true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -463,9 +470,13 @@ func InitRbdDriver() TestDriver {
 				//"ext3",
 				"ext4",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true},
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapBlock:       true,
+				CapExec:        true,
+			},
+		},
 	}
 }
 
@@ -583,9 +594,10 @@ func InitCephFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -673,7 +685,7 @@ var _ TestDriver = &hostPathDriver{}
 var _ PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ InlineVolumeTestDriver = &hostPathDriver{}
 
-// InitHostpathDriver returns hostPathDriver that implements TestDriver interface
+// InitHostPathDriver returns hostPathDriver that implements TestDriver interface
 func InitHostPathDriver() TestDriver {
 	return &hostPathDriver{
 		driverInfo: DriverInfo{
@@ -682,9 +694,9 @@ func InitHostPathDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+			},
 		},
 	}
 }
@@ -754,9 +766,9 @@ func InitHostPathSymlinkDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+			},
 		},
 	}
 }
@@ -894,9 +906,9 @@ func InitEmptydirDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			IsPersistent:       false,
-			IsFsGroupSupported: false,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapExec: true,
+			},
 		},
 	}
 }
@@ -961,9 +973,11 @@ func InitCinderDriver() TestDriver {
 				"", // Default fsType
 				"ext3",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -1118,9 +1132,13 @@ func InitGcePdDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true,
+			SupportedMountOption: sets.NewString("debug", "nouid32"),
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapBlock:       true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -1232,9 +1250,11 @@ func InitVSphereDriver() TestDriver {
 				"", // Default fsType
 				"ext4",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   false,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -1348,9 +1368,12 @@ func InitAzureDriver() TestDriver {
 				"", // Default fsType
 				"ext4",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true,
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapBlock:       true,
+				CapExec:        true,
+			},
 		},
 	}
 }
@@ -1460,9 +1483,13 @@ func InitAwsDriver() TestDriver {
 				"", // Default fsType
 				"ext3",
 			),
-			IsPersistent:       true,
-			IsFsGroupSupported: true,
-			IsBlockSupported:   true,
+			SupportedMountOption: sets.NewString("debug", "nouid32"),
+			Capabilities: map[Capability]bool{
+				CapPersistence: true,
+				CapFsGroup:     true,
+				CapBlock:       true,
+				CapExec:        true,
+			},
 		},
 	}
 }

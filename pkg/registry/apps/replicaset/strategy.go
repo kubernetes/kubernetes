@@ -39,8 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/apps/validation"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -52,19 +52,20 @@ type rsStrategy struct {
 // Strategy is the default logic that applies when creating and updating ReplicaSet objects.
 var Strategy = rsStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+// DefaultGarbageCollectionPolicy returns OrphanDependents for extensions/v1beta1 and apps/v1beta2 for backwards compatibility,
+// and DeleteDependents for all other versions.
 func (rsStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		switch groupVersion {
-		case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
-			// for back compatibility
-			return rest.OrphanDependents
-		default:
-			return rest.DeleteDependents
-		}
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
-	return rest.OrphanDependents
+	switch groupVersion {
+	case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all ReplicaSets need to be within a namespace.
@@ -74,8 +75,8 @@ func (rsStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
 func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	rs := obj.(*extensions.ReplicaSet)
-	rs.Status = extensions.ReplicaSetStatus{}
+	rs := obj.(*apps.ReplicaSet)
+	rs.Status = apps.ReplicaSetStatus{}
 
 	rs.Generation = 1
 
@@ -84,8 +85,8 @@ func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newRS := obj.(*extensions.ReplicaSet)
-	oldRS := old.(*extensions.ReplicaSet)
+	newRS := obj.(*apps.ReplicaSet)
+	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set status
 	newRS.Status = oldRS.Status
 
@@ -107,7 +108,7 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	rs := obj.(*extensions.ReplicaSet)
+	rs := obj.(*apps.ReplicaSet)
 	return validation.ValidateReplicaSet(rs)
 }
 
@@ -123,9 +124,9 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newReplicaSet := obj.(*extensions.ReplicaSet)
-	oldReplicaSet := old.(*extensions.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet))
+	newReplicaSet := obj.(*apps.ReplicaSet)
+	oldReplicaSet := old.(*apps.ReplicaSet)
+	allErrs := validation.ValidateReplicaSet(obj.(*apps.ReplicaSet))
 	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet)...)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
@@ -151,7 +152,7 @@ func (rsStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // ReplicaSetToSelectableFields returns a field set that represents the object.
-func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
+func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
@@ -161,7 +162,7 @@ func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	rs, ok := obj.(*extensions.ReplicaSet)
+	rs, ok := obj.(*apps.ReplicaSet)
 	if !ok {
 		return nil, nil, false, fmt.Errorf("given object is not a ReplicaSet.")
 	}
@@ -186,12 +187,12 @@ type rsStatusStrategy struct {
 var StatusStrategy = rsStatusStrategy{Strategy}
 
 func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newRS := obj.(*extensions.ReplicaSet)
-	oldRS := old.(*extensions.ReplicaSet)
+	newRS := obj.(*apps.ReplicaSet)
+	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set spec
 	newRS.Spec = oldRS.Spec
 }
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateReplicaSetStatusUpdate(obj.(*extensions.ReplicaSet), old.(*extensions.ReplicaSet))
+	return validation.ValidateReplicaSetStatusUpdate(obj.(*apps.ReplicaSet), old.(*apps.ReplicaSet))
 }

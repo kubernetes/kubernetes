@@ -4,6 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "base.go",
+        "csi.go",
+        "csi_objects.go",
         "in_tree.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/drivers",
@@ -17,7 +19,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",
         "//test/e2e/storage/utils:go_default_library",

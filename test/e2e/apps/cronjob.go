@@ -180,8 +180,8 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring no unexpected event has happened")
-		err = checkNoEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
-		Expect(err).NotTo(HaveOccurred())
+		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
+		Expect(err).To(HaveOccurred())
 
 		By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -214,13 +214,13 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 
-		By("Ensuring there are no active jobs in the cronjob")
-		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, true)
+		By("Ensuring the job is not in the cronjob active list")
+		err = waitForJobNotActive(f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring MissingJob event has occurred")
-		err = checkNoEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
-		Expect(err).To(HaveOccurred())
+		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -250,8 +250,10 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(len(finishedJobs) == 1).To(BeTrue())
 
 		// Job should get deleted when the next job finishes the next minute
-		By("Ensuring this job does not exist anymore")
-		err = waitForJobNotExist(f.ClientSet, f.Namespace.Name, finishedJobs[0])
+		By("Ensuring this job and its pods does not exist anymore")
+		err = waitForJobToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForJobsPodToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring there is 1 finished job by listing jobs explicitly")
@@ -336,7 +338,7 @@ func deleteCronJob(c clientset.Interface, ns, name string) error {
 // Wait for at least given amount of active jobs.
 func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+		curr, err := getCronJob(c, ns, cronJobName)
 		if err != nil {
 			return false, err
 		}
@@ -350,7 +352,7 @@ func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int
 // empty after the timeout.
 func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty bool) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := getCronJob(c, ns, jobName)
 		if err != nil {
 			return false, err
 		}
@@ -363,8 +365,25 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty boo
 	})
 }
 
-// Wait for a job to not exist by listing jobs explicitly.
-func waitForJobNotExist(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
+// Wait till a given job actually goes away from the Active list for a given cronjob
+func waitForJobNotActive(c clientset.Interface, ns, cronJobName, jobName string) error {
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		curr, err := getCronJob(c, ns, cronJobName)
+		if err != nil {
+			return false, err
+		}
+
+		for _, j := range curr.Status.Active {
+			if j.Name == jobName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+// Wait for a job to disappear by listing them explicitly.
+func waitForJobToDisappear(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
 		jobs, err := c.BatchV1().Jobs(ns).List(metav1.ListOptions{})
 		if err != nil {
@@ -377,6 +396,18 @@ func waitForJobNotExist(c clientset.Interface, ns string, targetJob *batchv1.Job
 			}
 		}
 		return true, nil
+	})
+}
+
+// Wait for a pod to disappear by listing them explicitly.
+func waitForJobsPodToDisappear(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		options := metav1.ListOptions{LabelSelector: fmt.Sprintf("controller-uid=%s", targetJob.UID)}
+		pods, err := c.CoreV1().Pods(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		return len(pods.Items) == 0, nil
 	})
 }
 
@@ -426,24 +457,26 @@ func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 	})
 }
 
-// checkNoEventWithReason checks no events with a reason within a list has occurred
-func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
-	sj, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("Error in getting cronjob %s/%s: %v", ns, cronJobName, err)
-	}
-	events, err := c.CoreV1().Events(ns).Search(legacyscheme.Scheme, sj)
-	if err != nil {
-		return fmt.Errorf("Error in listing events: %s", err)
-	}
-	for _, e := range events.Items {
-		for _, reason := range reasons {
-			if e.Reason == reason {
-				return fmt.Errorf("Found event with reason %s: %#v", reason, e)
+// waitForEventWithReason waits for events with a reason within a list has occurred
+func waitForEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
+	return wait.Poll(framework.Poll, 30*time.Second, func() (bool, error) {
+		sj, err := getCronJob(c, ns, cronJobName)
+		if err != nil {
+			return false, err
+		}
+		events, err := c.CoreV1().Events(ns).Search(legacyscheme.Scheme, sj)
+		if err != nil {
+			return false, err
+		}
+		for _, e := range events.Items {
+			for _, reason := range reasons {
+				if e.Reason == reason {
+					return true, nil
+				}
 			}
 		}
-	}
-	return nil
+		return false, nil
+	})
 }
 
 // filterNotDeletedJobs returns the job list without any jobs that are pending

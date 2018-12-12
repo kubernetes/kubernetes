@@ -77,6 +77,16 @@ var _ = SIGDescribe("Network", func() {
 
 		zero := int64(0)
 
+		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
+		_, err := framework.IssueSSHCommandWithResult(
+			"ls /proc/net/nf_conntrack",
+			framework.TestContext.Provider,
+			clientNodeInfo.node)
+		if err != nil && strings.Contains(err.Error(), "No such file or directory") {
+			framework.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
+		}
+		framework.ExpectNoError(err)
+
 		clientPodSpec := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "e2e-net-client",

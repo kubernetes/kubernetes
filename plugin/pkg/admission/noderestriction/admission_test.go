@@ -17,15 +17,17 @@ limitations under the License.
 package noderestriction
 
 import (
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/utils/pointer"
 )
 
@@ -117,6 +120,99 @@ func makeTokenRequest(podname string, poduid types.UID) *authenticationapi.Token
 		}
 	}
 	return tr
+}
+
+func setAllLabels(node *api.Node, value string) *api.Node {
+	node = setAllowedCreateLabels(node, value)
+	node = setAllowedUpdateLabels(node, value)
+	node = setForbiddenCreateLabels(node, value)
+	node = setForbiddenUpdateLabels(node, value)
+	return node
+}
+
+func setAllowedCreateLabels(node *api.Node, value string) *api.Node {
+	node = setAllowedUpdateLabels(node, value)
+	// also allow other kubernetes labels on create until 1.17 (TODO: remove this in 1.17)
+	node.Labels["other.kubernetes.io/foo"] = value
+	node.Labels["other.k8s.io/foo"] = value
+	return node
+}
+
+func setAllowedUpdateLabels(node *api.Node, value string) *api.Node {
+	node = node.DeepCopy()
+	if node.Labels == nil {
+		node.Labels = map[string]string{}
+	}
+	if value == "" {
+		value = "value"
+	}
+	// non-kube labels
+	node.Labels["foo"] = value
+	node.Labels["example.com/foo"] = value
+
+	// kubelet labels
+	node.Labels["kubernetes.io/hostname"] = value
+	node.Labels["failure-domain.beta.kubernetes.io/zone"] = value
+	node.Labels["failure-domain.beta.kubernetes.io/region"] = value
+	node.Labels["beta.kubernetes.io/instance-type"] = value
+	node.Labels["beta.kubernetes.io/os"] = value
+	node.Labels["beta.kubernetes.io/arch"] = value
+	node.Labels["failure-domain.kubernetes.io/zone"] = value
+	node.Labels["failure-domain.kubernetes.io/region"] = value
+	node.Labels["kubernetes.io/instance-type"] = value
+	node.Labels["kubernetes.io/os"] = value
+	node.Labels["kubernetes.io/arch"] = value
+
+	// kubelet label prefixes
+	node.Labels["kubelet.kubernetes.io/foo"] = value
+	node.Labels["foo.kubelet.kubernetes.io/foo"] = value
+	node.Labels["node.kubernetes.io/foo"] = value
+	node.Labels["foo.node.kubernetes.io/foo"] = value
+
+	// test all explicitly allowed labels and prefixes
+	for _, key := range kubeletapis.KubeletLabels() {
+		node.Labels[key] = value
+	}
+	for _, namespace := range kubeletapis.KubeletLabelNamespaces() {
+		node.Labels[namespace+"/foo"] = value
+		node.Labels["foo."+namespace+"/foo"] = value
+	}
+
+	return node
+}
+
+func setForbiddenCreateLabels(node *api.Node, value string) *api.Node {
+	node = node.DeepCopy()
+	if node.Labels == nil {
+		node.Labels = map[string]string{}
+	}
+	if value == "" {
+		value = "value"
+	}
+	// node restriction labels are forbidden
+	node.Labels["node-restriction.kubernetes.io/foo"] = value
+	node.Labels["foo.node-restriction.kubernetes.io/foo"] = value
+	// TODO: in 1.17, forbid arbitrary kubernetes labels on create
+	// node.Labels["other.kubernetes.io/foo"] = value
+	// node.Labels["other.k8s.io/foo"] = value
+	return node
+}
+
+func setForbiddenUpdateLabels(node *api.Node, value string) *api.Node {
+	node = node.DeepCopy()
+	if node.Labels == nil {
+		node.Labels = map[string]string{}
+	}
+	if value == "" {
+		value = "value"
+	}
+	// node restriction labels are forbidden
+	node.Labels["node-restriction.kubernetes.io/foo"] = value
+	node.Labels["foo.node-restriction.kubernetes.io/foo"] = value
+	// arbitrary kubernetes labels are forbidden on update
+	node.Labels["other.kubernetes.io/foo"] = value
+	node.Labels["other.k8s.io/foo"] = value
+	return node
 }
 
 func Test_nodePlugin_Admit(t *testing.T) {
@@ -216,11 +312,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "mynode",
 			},
-			CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-				{
-					Driver:       "com.example.csi/mydriver",
-					NodeID:       "com.example.csi/mynode",
-					TopologyKeys: []string{"com.example.csi/zone"},
+			Spec: csiv1alpha1.CSINodeInfoSpec{
+				Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+					{
+						Name:         "com.example.csi/mydriver",
+						NodeID:       "com.example.csi/mynode",
+						TopologyKeys: []string{"com.example.csi/zone"},
+					},
+				},
+			},
+			Status: csiv1alpha1.CSINodeInfoStatus{
+				Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+					{
+						Name:                  "com.example.csi/mydriver",
+						Available:             true,
+						VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+					},
 				},
 			},
 		}
@@ -228,11 +335,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
-			CSIDrivers: []csiv1alpha1.CSIDriverInfo{
-				{
-					Driver:       "com.example.csi/mydriver",
-					NodeID:       "com.example.csi/foo",
-					TopologyKeys: []string{"com.example.csi/zone"},
+			Spec: csiv1alpha1.CSINodeInfoSpec{
+				Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+					{
+						Name:         "com.example.csi/mydriver",
+						NodeID:       "com.example.csi/foo",
+						TopologyKeys: []string{"com.example.csi/zone"},
+					},
+				},
+			},
+			Status: csiv1alpha1.CSINodeInfoStatus{
+				Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+					{
+						Name:                  "com.example.csi/mydriver",
+						Available:             true,
+						VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+					},
 				},
 			},
 		}
@@ -741,6 +859,18 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "",
 		},
 		{
+			name:       "allow create of my node with labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, false, mynode),
+			err:        "",
+		},
+		{
+			name:       "forbid create of my node with forbidden labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, false, mynode),
+			err:        `is not allowed to set the following labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo`,
+		},
+		{
 			name:       "allow update of my node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
@@ -762,7 +892,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of my node with non-nil configSource",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(mynodeObjConfigA, nil, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Create, false, mynode),
-			err:        "create with non-nil configSource",
+			err:        "is not allowed to create pods with a non-nil configSource",
 		},
 		{
 			name:       "forbid update of my node: nil configSource to new non-nil configSource",
@@ -795,22 +925,76 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "",
 		},
 		{
+			name:       "allow update of my node: add allowed labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setAllowedUpdateLabels(mynodeObj, ""), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow update of my node: remove allowed labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, setAllowedUpdateLabels(mynodeObj, ""), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow update of my node: modify allowed labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setAllowedUpdateLabels(mynodeObj, "b"), setAllowedUpdateLabels(mynodeObj, "a"), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow update of my node: no change to labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setAllLabels(mynodeObj, ""), setAllLabels(mynodeObj, ""), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow update of my node: add allowed labels while forbidden labels exist unmodified",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setAllLabels(mynodeObj, ""), setForbiddenUpdateLabels(mynodeObj, ""), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow update of my node: remove allowed labels while forbidden labels exist unmodified",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setForbiddenUpdateLabels(mynodeObj, ""), setAllLabels(mynodeObj, ""), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        "",
+		},
+		{
 			name:       "forbid update of my node: add taints",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify taints",
+			err:        "is not allowed to modify taints",
 		},
 		{
 			name:       "forbid update of my node: remove taints",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjTaintA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify taints",
+			err:        "is not allowed to modify taints",
 		},
 		{
 			name:       "forbid update of my node: change taints",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintB, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify taints",
+			err:        "is not allowed to modify taints",
+		},
+		{
+			name:       "forbid update of my node: add labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setForbiddenUpdateLabels(mynodeObj, ""), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
+		},
+		{
+			name:       "forbid update of my node: remove labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, setForbiddenUpdateLabels(mynodeObj, ""), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
+		},
+		{
+			name:       "forbid update of my node: change labels",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(setForbiddenUpdateLabels(mynodeObj, "new"), setForbiddenUpdateLabels(mynodeObj, "old"), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
+			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 
 		// Other node object
@@ -818,31 +1002,31 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of other node",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, nil, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Create, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid create of other node pulling name from object",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, nil, nodeKind, othernodeObj.Namespace, "", nodeResource, "", admission.Create, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid update of other node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, othernodeObj, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid delete of other node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Delete, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid update of other node status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, othernodeObj, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "status", admission.Update, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 
 		// Service accounts
@@ -1057,6 +1241,83 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			}
 			if len(tt.err) > 0 && !strings.Contains(err.Error(), tt.err) {
 				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
+			}
+		})
+	}
+}
+
+func Test_getModifiedLabels(t *testing.T) {
+	tests := []struct {
+		name string
+		a    map[string]string
+		b    map[string]string
+		want sets.String
+	}{
+		{
+			name: "empty",
+			a:    nil,
+			b:    nil,
+			want: sets.NewString(),
+		},
+		{
+			name: "no change",
+			a:    map[string]string{"x": "1", "y": "2", "z": "3"},
+			b:    map[string]string{"x": "1", "y": "2", "z": "3"},
+			want: sets.NewString(),
+		},
+		{
+			name: "added",
+			a:    map[string]string{},
+			b:    map[string]string{"a": "0"},
+			want: sets.NewString("a"),
+		},
+		{
+			name: "removed",
+			a:    map[string]string{"z": "3"},
+			b:    map[string]string{},
+			want: sets.NewString("z"),
+		},
+		{
+			name: "changed",
+			a:    map[string]string{"z": "3"},
+			b:    map[string]string{"z": "4"},
+			want: sets.NewString("z"),
+		},
+		{
+			name: "added empty",
+			a:    map[string]string{},
+			b:    map[string]string{"a": ""},
+			want: sets.NewString("a"),
+		},
+		{
+			name: "removed empty",
+			a:    map[string]string{"z": ""},
+			b:    map[string]string{},
+			want: sets.NewString("z"),
+		},
+		{
+			name: "changed to empty",
+			a:    map[string]string{"z": "3"},
+			b:    map[string]string{"z": ""},
+			want: sets.NewString("z"),
+		},
+		{
+			name: "changed from empty",
+			a:    map[string]string{"z": ""},
+			b:    map[string]string{"z": "3"},
+			want: sets.NewString("z"),
+		},
+		{
+			name: "added, removed, and changed",
+			a:    map[string]string{"a": "1", "b": "2"},
+			b:    map[string]string{"a": "2", "c": "3"},
+			want: sets.NewString("a", "b", "c"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getModifiedLabels(tt.a, tt.b); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getModifiedLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}

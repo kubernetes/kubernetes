@@ -24,8 +24,8 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/golang/glog"
 	"golang.org/x/crypto/pkcs12"
+	"k8s.io/klog"
 )
 
 // AzureAuthConfig holds auth related part of cloud config
@@ -55,18 +55,18 @@ type AzureAuthConfig struct {
 // GetServicePrincipalToken creates a new service principal token based on the configuration
 func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
 	if config.UseManagedIdentityExtension {
-		glog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
+		klog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
 		msiEndpoint, err := adal.GetMSIVMEndpoint()
 		if err != nil {
 			return nil, fmt.Errorf("Getting the managed service identity endpoint: %v", err)
 		}
 		if len(config.UserAssignedIdentityID) > 0 {
-			glog.V(4).Info("azure: using User Assigned MSI ID to retrieve access token")
+			klog.V(4).Info("azure: using User Assigned MSI ID to retrieve access token")
 			return adal.NewServicePrincipalTokenFromMSIWithUserAssignedID(msiEndpoint,
 				env.ServiceManagementEndpoint,
 				config.UserAssignedIdentityID)
 		}
-		glog.V(4).Info("azure: using System Assigned MSI to retrieve access token")
+		klog.V(4).Info("azure: using System Assigned MSI to retrieve access token")
 		return adal.NewServicePrincipalTokenFromMSI(
 			msiEndpoint,
 			env.ServiceManagementEndpoint)
@@ -78,7 +78,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 	}
 
 	if len(config.AADClientSecret) > 0 {
-		glog.V(2).Infoln("azure: using client_id+client_secret to retrieve access token")
+		klog.V(2).Infoln("azure: using client_id+client_secret to retrieve access token")
 		return adal.NewServicePrincipalToken(
 			*oauthConfig,
 			config.AADClientID,
@@ -87,7 +87,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 	}
 
 	if len(config.AADClientCertPath) > 0 && len(config.AADClientCertPassword) > 0 {
-		glog.V(2).Infoln("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
+		klog.V(2).Infoln("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
 		certData, err := ioutil.ReadFile(config.AADClientCertPath)
 		if err != nil {
 			return nil, fmt.Errorf("reading the client certificate from file %s: %v", config.AADClientCertPath, err)

@@ -906,14 +906,14 @@ func TestReadyCondition(t *testing.T) {
 			// to ensure an event is sent.
 		},
 		{
-			desc: "new, ready: apparmor validator passed",
-			node: withCapacity.DeepCopy(),
+			desc:                     "new, ready: apparmor validator passed",
+			node:                     withCapacity.DeepCopy(),
 			appArmorValidateHostFunc: func() error { return nil },
 			expectConditions:         []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. AppArmor enabled", now, now)},
 		},
 		{
-			desc: "new, ready: apparmor validator failed",
-			node: withCapacity.DeepCopy(),
+			desc:                     "new, ready: apparmor validator failed",
+			node:                     withCapacity.DeepCopy(),
 			appArmorValidateHostFunc: func() error { return fmt.Errorf("foo") },
 			// absence of an additional message is understood to mean that AppArmor is disabled
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},

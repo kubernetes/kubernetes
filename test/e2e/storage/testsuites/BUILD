@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "base.go",
+        "provisioning.go",
         "subpath.go",
         "volume_io.go",
         "volumemode.go",
@@ -17,7 +18,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

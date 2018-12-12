@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 const (
@@ -63,17 +63,17 @@ func TestStatusUpdates(t *testing.T) {
 	}
 }
 
-func newDeployment(labels, annotations map[string]string) *extensions.Deployment {
-	return &extensions.Deployment{
+func newDeployment(labels, annotations map[string]string) *apps.Deployment {
+	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test",
 			Labels:      labels,
 			Annotations: annotations,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: 1,
-			Strategy: extensions.DeploymentStrategy{
-				Type: extensions.RecreateDeploymentStrategyType,
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
 			},
 			Template: api.PodTemplateSpec{
 				Spec: api.PodSpec{
@@ -152,21 +152,21 @@ func TestSelectorImmutability(t *testing.T) {
 	}
 }
 
-func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *extensions.Deployment {
-	return &extensions.Deployment{
+func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Deployment {
+	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            deploymentName,
 			Namespace:       namespace,
 			ResourceVersion: "1",
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels:      selectorLabels,
 				MatchExpressions: []metav1.LabelSelectorRequirement{},
 			},
-			Strategy: extensions.DeploymentStrategy{
-				Type: extensions.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &extensions.RollingUpdateDeployment{
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
 					MaxSurge:       intstr.FromInt(1),
 					MaxUnavailable: intstr.FromInt(1),
 				},
@@ -231,7 +231,7 @@ func TestDeploymentDefaultGarbageCollectionPolicy(t *testing.T) {
 			false,
 		},
 		{
-			expectedGCPolicy: rest.OrphanDependents,
+			expectedGCPolicy: rest.DeleteDependents,
 			isNilRequestInfo: true,
 		},
 	}

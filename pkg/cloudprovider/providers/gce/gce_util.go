@@ -24,16 +24,54 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 
 	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
+
+func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
+	gce := NewFakeGCECloud(vals)
+
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	mockGCE := gce.c.(*cloud.MockGCE)
+	mockGCE.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
+	mockGCE.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+	mockGCE.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
+	mockGCE.MockAddresses.InsertHook = mock.InsertAddressHook
+	mockGCE.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
+	mockGCE.MockAlphaAddresses.X = mock.AddressAttributes{}
+	mockGCE.MockAddresses.X = mock.AddressAttributes{}
+
+	mockGCE.MockInstanceGroups.X = mock.InstanceGroupAttributes{
+		InstanceMap: make(map[meta.Key]map[string]*compute.InstanceWithNamedPorts),
+		Lock:        &sync.Mutex{},
+	}
+	mockGCE.MockInstanceGroups.AddInstancesHook = mock.AddInstancesHook
+	mockGCE.MockInstanceGroups.RemoveInstancesHook = mock.RemoveInstancesHook
+	mockGCE.MockInstanceGroups.ListInstancesHook = mock.ListInstancesHook
+
+	mockGCE.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
+	mockGCE.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
+	mockGCE.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
+
+	keyGA := meta.GlobalKey("key-ga")
+	mockGCE.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
+		Obj: &compute.Zone{Name: vals.ZoneName, Region: gce.getRegionLink(vals.Region)},
+	}
+
+	return gce, nil
+}
 
 type gceInstance struct {
 	Zone  string
@@ -50,7 +88,7 @@ var (
 	}
 )
 
-var providerIdRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
+var providerIDRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
 
 func getProjectAndZone() (string, string, error) {
 	result, err := metadata.Get("instance/zone")
@@ -69,10 +107,10 @@ func getProjectAndZone() (string, string, error) {
 	return projectID, zone, nil
 }
 
-func (gce *GCECloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
+func (g *Cloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
 	msg := fmt.Sprintf("Firewall change required by network admin: `%v`", cmd)
-	if gce.eventRecorder != nil && svc != nil {
-		gce.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
+	if g.eventRecorder != nil && svc != nil {
+		g.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
 	}
 }
 
@@ -82,13 +120,13 @@ func FirewallToGCloudCreateCmd(fw *compute.Firewall, projectID string) string {
 	return fmt.Sprintf("gcloud compute firewall-rules create %v --network %v %v", fw.Name, getNameFromLink(fw.Network), args)
 }
 
-// FirewallToGCloudCreateCmd generates a gcloud command to update a firewall to specified params
+// FirewallToGCloudUpdateCmd generates a gcloud command to update a firewall to specified params
 func FirewallToGCloudUpdateCmd(fw *compute.Firewall, projectID string) string {
 	args := firewallToGcloudArgs(fw, projectID)
 	return fmt.Sprintf("gcloud compute firewall-rules update %v %v", fw.Name, args)
 }
 
-// FirewallToGCloudCreateCmd generates a gcloud command to delete a firewall to specified params
+// FirewallToGCloudDeleteCmd generates a gcloud command to delete a firewall to specified params
 func FirewallToGCloudDeleteCmd(fwName, projectID string) string {
 	return fmt.Sprintf("gcloud compute firewall-rules delete %v --project %v", fwName, projectID)
 }
@@ -138,11 +176,6 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 	return string(nodeName)
 }
 
-// mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
-func mapInstanceToNodeName(instance *compute.Instance) types.NodeName {
-	return types.NodeName(instance.Name)
-}
-
 // GetGCERegion returns region of the gce zone. Zone names
 // are of the form: ${region-name}-${ix}.
 // For example, "us-central1-b" has a region of "us-central1".
@@ -172,7 +205,7 @@ func isInUsedByError(err error) bool {
 // A providerID is build out of '${ProviderName}://${project-id}/${zone}/${instance-name}'
 // See cloudprovider.GetInstanceProviderID.
 func splitProviderID(providerID string) (project, zone, instance string, err error) {
-	matches := providerIdRE.FindStringSubmatch(providerID)
+	matches := providerIDRE.FindStringSubmatch(providerID)
 	if len(matches) != 4 {
 		return "", "", "", errors.New("error splitting providerID")
 	}
@@ -280,4 +313,8 @@ func typeOfNetwork(network *compute.Network) netType {
 	}
 
 	return netTypeCustom
+}
+
+func getLocationName(project, zoneOrRegion string) string {
+	return fmt.Sprintf("projects/%s/locations/%s", project, zoneOrRegion)
 }

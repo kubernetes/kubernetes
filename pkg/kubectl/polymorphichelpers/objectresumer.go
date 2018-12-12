@@ -25,19 +25,11 @@ import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func defaultObjectResumer(obj runtime.Object) ([]byte, error) {
 	switch obj := obj.(type) {
-	case *extensions.Deployment:
-		if !obj.Spec.Paused {
-			return nil, errors.New("is not paused")
-		}
-		obj.Spec.Paused = false
-		return runtime.Encode(internalVersionJSONEncoder(), obj)
-
 	case *extensionsv1beta1.Deployment:
 		if !obj.Spec.Paused {
 			return nil, errors.New("is not paused")

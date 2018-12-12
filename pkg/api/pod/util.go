@@ -248,13 +248,6 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 		}
 	}
 
-	for i := range podSpec.Containers {
-		DropDisabledVolumeMountsAlphaFields(podSpec.Containers[i].VolumeMounts)
-	}
-	for i := range podSpec.InitContainers {
-		DropDisabledVolumeMountsAlphaFields(podSpec.InitContainers[i].VolumeMounts)
-	}
-
 	DropDisabledVolumeDevicesAlphaFields(podSpec)
 
 	DropDisabledRunAsGroupField(podSpec)
@@ -300,16 +293,6 @@ func DropDisabledProcMountField(podSpec *api.PodSpec) {
 			if podSpec.InitContainers[i].SecurityContext != nil {
 				podSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
 			}
-		}
-	}
-}
-
-// DropDisabledVolumeMountsAlphaFields removes disabled fields from []VolumeMount.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeMount
-func DropDisabledVolumeMountsAlphaFields(volumeMounts []api.VolumeMount) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
-		for i := range volumeMounts {
-			volumeMounts[i].MountPropagation = nil
 		}
 	}
 }

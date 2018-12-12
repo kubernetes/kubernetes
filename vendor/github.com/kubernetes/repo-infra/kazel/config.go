@@ -28,6 +28,9 @@ type Cfg struct {
 	SrcDirs []string
 	// regexps that match packages to skip
 	SkippedPaths []string
+	// regexps that match packages to skip for K8SOpenAPIGen.
+	// note that this skips anything matched by SkippedPaths as well.
+	SkippedOpenAPIGenPaths []string
 	// whether to add "pkg-srcs" and "all-srcs" filegroups
 	// note that this operates on the entire tree (not just SrcsDirs) but skips anything matching SkippedPaths
 	AddSourcesRules bool

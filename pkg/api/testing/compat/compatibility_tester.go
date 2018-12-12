@@ -31,11 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
-// Based on: https://github.com/openshift/origin/blob/master/pkg/api/compatibility_test.go
-//
 // TestCompatibility reencodes the input using the codec for the given
 // version and checks for the presence of the expected keys and absent
 // keys in the resulting JSON.
+// Based on: https://github.com/openshift/origin/blob/master/pkg/api/compatibility_test.go
 func TestCompatibility(
 	t *testing.T,
 	version schema.GroupVersion,

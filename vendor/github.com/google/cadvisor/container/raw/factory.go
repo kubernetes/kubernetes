@@ -26,7 +26,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	watch "github.com/google/cadvisor/manager/watcher"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
@@ -94,7 +94,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, incl
 		return err
 	}
 
-	glog.V(1).Infof("Registering Raw factory")
+	klog.V(1).Infof("Registering Raw factory")
 	factory := &rawFactory{
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,

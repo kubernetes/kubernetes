@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -80,17 +80,18 @@ var (
 		kubectl auth can-i get /logs/`)
 )
 
+// NewCmdCanI returns an initialized Command for 'auth can-i' sub command
 func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
 		IOStreams: streams,
 	}
 
 	cmd := &cobra.Command{
-		Use: "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
+		Use:                   "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
 		DisableFlagsInUseLine: true,
-		Short:   "Check whether an action is allowed",
-		Long:    canILong,
-		Example: canIExample,
+		Short:                 "Check whether an action is allowed",
+		Long:                  canILong,
+		Example:               canIExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())
@@ -112,6 +113,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	if o.Quiet {
 		o.Out = ioutil.Discard
@@ -155,6 +157,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	return nil
 }
 
+// Validate makes sure provided values for CanIOptions are valid
 func (o *CanIOptions) Validate() error {
 	if o.NonResourceURL != "" {
 		if o.Subresource != "" {
@@ -167,6 +170,7 @@ func (o *CanIOptions) Validate() error {
 	return nil
 }
 
+// RunAccessCheck checks if user has access to a certain resource or non resource URL
 func (o *CanIOptions) RunAccessCheck() (bool, error) {
 	var sar *authorizationv1.SelfSubjectAccessReview
 	if o.NonResourceURL == "" {

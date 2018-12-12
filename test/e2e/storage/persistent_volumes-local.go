@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -218,11 +218,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		if testVolType == GCELocalSSDVolumeType {
 			serialStr = " [Serial]"
 		}
-		alphaStr := ""
-		if testVolType == BlockLocalVolumeType {
-			alphaStr = " [Feature:BlockVolume]"
-		}
-		ctxString := fmt.Sprintf("[Volume type: %s]%v%v", testVolType, serialStr, alphaStr)
+		ctxString := fmt.Sprintf("[Volume type: %s]%v", testVolType, serialStr)
 		testMode := immediateMode
 
 		Context(ctxString, func() {
@@ -535,7 +531,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
-	Context("StatefulSet with pod affinity", func() {
+	Context("StatefulSet with pod affinity [Slow]", func() {
 		var testVols map[string][]*localTestVolume
 		const (
 			ssReplicas  = 3
@@ -1290,7 +1286,7 @@ func makeLocalPod(config *localTestConfig, volume *localTestVolume, cmd string) 
 		return pod
 	}
 	if volume.localVolumeType == BlockLocalVolumeType {
-		// Block e2e tests require utilities for writing to block devices (e.g. dd), and nginx has this utilites.
+		// Block e2e tests require utilities for writing to block devices (e.g. dd), and nginx has this utilities.
 		pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
 	}
 	return pod
@@ -1464,6 +1460,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 	By("Bootstrapping local volume provisioner")
 	createServiceAccount(config)
 	createProvisionerClusterRoleBinding(config)
+	utils.PrivilegedTestPSPClusterRoleBinding(config.client, config.ns, false /* teardown */, []string{testServiceAccount})
 	createVolumeConfigMap(config)
 
 	for _, node := range config.nodes {
@@ -1477,6 +1474,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 func cleanupLocalVolumeProvisioner(config *localTestConfig) {
 	By("Cleaning up cluster role binding")
 	deleteClusterRoleBinding(config)
+	utils.PrivilegedTestPSPClusterRoleBinding(config.client, config.ns, true /* teardown */, []string{testServiceAccount})
 
 	for _, node := range config.nodes {
 		By(fmt.Sprintf("Removing the test discovery directory on node %v", node.Name))

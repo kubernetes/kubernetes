@@ -19,9 +19,9 @@ package priorities
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -64,9 +64,9 @@ func (r *ResourceAllocationPriority) PriorityMap(
 		score = r.scorer(&requested, &allocatable, false, 0, 0)
 	}
 
-	if glog.V(10) {
+	if klog.V(10) {
 		if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
-			glog.Infof(
+			klog.Infof(
 				"%v -> %v: %v, capacity %d millicores %d memory bytes, %d volumes, total request %d millicores %d memory bytes %d volumes, score %d",
 				pod.Name, node.Name, r.Name,
 				allocatable.MilliCPU, allocatable.Memory, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount,
@@ -75,7 +75,7 @@ func (r *ResourceAllocationPriority) PriorityMap(
 				score,
 			)
 		} else {
-			glog.Infof(
+			klog.Infof(
 				"%v -> %v: %v, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
 				pod.Name, node.Name, r.Name,
 				allocatable.MilliCPU, allocatable.Memory,

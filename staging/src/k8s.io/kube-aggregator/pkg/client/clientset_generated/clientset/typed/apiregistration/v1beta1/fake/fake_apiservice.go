@@ -123,7 +123,7 @@ func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOption
 // Patch applies the patch and returns the patched aPIService.
 func (c *FakeAPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &v1beta1.APIService{})
+		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, pt, data, subresources...), &v1beta1.APIService{})
 	if obj == nil {
 		return nil, err
 	}

@@ -19,11 +19,8 @@ package v1beta1
 import (
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
-
-var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&CustomResourceDefinition{}, func(obj interface{}) { SetDefaults_CustomResourceDefinition(obj.(*CustomResourceDefinition)) })
@@ -66,9 +63,19 @@ func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec)
 	if len(obj.Version) == 0 && len(obj.Versions) != 0 {
 		obj.Version = obj.Versions[0].Name
 	}
-	if len(obj.AdditionalPrinterColumns) == 0 {
-		obj.AdditionalPrinterColumns = []CustomResourceColumnDefinition{
-			{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
+	if obj.Conversion == nil {
+		obj.Conversion = &CustomResourceConversion{
+			Strategy: NoneConverter,
 		}
 	}
+}
+
+// hasPerVersionColumns returns true if a CRD uses per-version columns.
+func hasPerVersionColumns(versions []CustomResourceDefinitionVersion) bool {
+	for _, v := range versions {
+		if len(v.AdditionalPrinterColumns) > 0 {
+			return true
+		}
+	}
+	return false
 }

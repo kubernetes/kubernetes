@@ -12,4 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CRI_TOOLS_VERSION = "1.11.1"
+CRI_TOOLS_VERSION = "1.12.0"
+
+CNI_VERSION = "0.6.0"

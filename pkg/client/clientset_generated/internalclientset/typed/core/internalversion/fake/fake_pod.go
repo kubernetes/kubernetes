@@ -131,7 +131,7 @@ func (c *FakePods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 // Patch applies the patch and returns the patched pod.
 func (c *FakePods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, data, subresources...), &core.Pod{})
+		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, pt, data, subresources...), &core.Pod{})
 
 	if obj == nil {
 		return nil, err

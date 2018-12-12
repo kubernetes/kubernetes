@@ -21,7 +21,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/api/core/v1"
@@ -56,6 +56,7 @@ type initializerOptions struct {
 	Initializers []string
 }
 
+// InitializationConfig specifies initialization config
 type InitializationConfig interface {
 	Run(stopCh <-chan struct{})
 	Initializers() (*v1alpha1.InitializerConfiguration, error)
@@ -84,10 +85,10 @@ func (i *initializer) ValidateInitialization() error {
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		if err := utilfeature.DefaultFeatureGate.Set(string(features.Initializers) + "=true"); err != nil {
-			glog.Errorf("error enabling Initializers feature as part of admission plugin setup: %v", err)
+		if err := utilfeature.DefaultMutableFeatureGate.Set(string(features.Initializers) + "=true"); err != nil {
+			klog.Errorf("error enabling Initializers feature as part of admission plugin setup: %v", err)
 		} else {
-			glog.Infof("enabled Initializers feature as part of admission plugin setup")
+			klog.Infof("enabled Initializers feature as part of admission plugin setup")
 		}
 	}
 
@@ -169,7 +170,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 		}
 		existing := accessor.GetInitializers()
 		if existing != nil {
-			glog.V(5).Infof("Admin bypassing initialization for %s", a.GetResource())
+			klog.V(5).Infof("Admin bypassing initialization for %s", a.GetResource())
 
 			// it must be possible for some users to bypass initialization - for now, check the initialize operation
 			if err := i.canInitialize(a, "create with initializers denied"); err != nil {
@@ -181,7 +182,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 				return nil
 			}
 		} else {
-			glog.V(5).Infof("Checking initialization for %s", a.GetResource())
+			klog.V(5).Infof("Checking initialization for %s", a.GetResource())
 
 			config, err := i.readConfig(a)
 			if err != nil {
@@ -204,11 +205,11 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 
 			names := findInitializers(config, a.GetResource())
 			if len(names) == 0 {
-				glog.V(5).Infof("No initializers needed")
+				klog.V(5).Infof("No initializers needed")
 				return nil
 			}
 
-			glog.V(5).Infof("Found initializers for %s: %v", a.GetResource(), names)
+			klog.V(5).Infof("Found initializers for %s: %v", a.GetResource(), names)
 			accessor.SetInitializers(newInitializers(names))
 		}
 
@@ -240,7 +241,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 			return nil
 		}
 
-		glog.V(5).Infof("Modifying uninitialized resource %s", a.GetResource())
+		klog.V(5).Infof("Modifying uninitialized resource %s", a.GetResource())
 
 		// because we are called before validation, we need to ensure the update transition is valid.
 		if errs := validation.ValidateInitializersUpdate(updated, existing, initializerFieldPath); len(errs) > 0 {

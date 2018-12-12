@@ -47,7 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -501,7 +501,7 @@ func (e *Store) shouldDeleteForFailedInitialization(ctx context.Context, obj run
 // Used for objects that are either been finalized or have never initialized.
 func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, dryRun bool) (runtime.Object, bool, error) {
 	out := e.NewFunc()
-	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
+	klog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions, dryRun); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
@@ -909,7 +909,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
 				if pendingFinalizers {
-					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
+					klog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
 					err = markAsDeleting(existing)
 					if err != nil {
 						return nil, err
@@ -1017,7 +1017,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	}
 
 	// delete immediately, or no graceful deletion supported
-	glog.V(6).Infof("going to delete %s from registry: ", name)
+	klog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out, &preconditions, dryrun.IsDryRun(options.DryRun)); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
@@ -1103,7 +1103,7 @@ func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 					return
 				}
 				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
-					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
 				}
@@ -1246,7 +1246,7 @@ func (e *Store) Export(ctx context.Context, name string, opts metav1.ExportOptio
 	if accessor, err := meta.Accessor(obj); err == nil {
 		exportObjectMeta(accessor, opts.Exact)
 	} else {
-		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
+		klog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}
 
 	if e.ExportStrategy != nil {
@@ -1411,12 +1411,12 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 func (e *Store) startObservingCount(period time.Duration) func() {
 	prefix := e.KeyRootFunc(genericapirequest.NewContext())
 	resourceName := e.DefaultQualifiedResource.String()
-	glog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
+	klog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
 	stopCh := make(chan struct{})
 	go wait.JitterUntil(func() {
 		count, err := e.Storage.Count(prefix)
 		if err != nil {
-			glog.V(5).Infof("Failed to update storage count metric: %v", err)
+			klog.V(5).Infof("Failed to update storage count metric: %v", err)
 			metrics.UpdateObjectCount(resourceName, -1)
 		} else {
 			metrics.UpdateObjectCount(resourceName, count)

@@ -17,13 +17,17 @@ limitations under the License.
 package fake
 
 import (
+	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+// TODO: Should take a PatchType as an argument probably.
 func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*api.Node, error) {
+	// TODO: Should be configurable to support additional patch strategies.
+	pt := types.StrategicMergePatchType
 	obj, err := c.Fake.Invokes(
-		core.NewRootPatchSubresourceAction(nodesResource, nodeName, data, "status"), &api.Node{})
+		core.NewRootPatchSubresourceAction(nodesResource, nodeName, pt, data, "status"), &api.Node{})
 	if obj == nil {
 		return nil, err
 	}

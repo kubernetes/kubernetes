@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -47,8 +48,8 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		By("Creating a PVC")
 		suffix := "pvc-protection"
 		defaultSC := getDefaultStorageClassName(client)
-		testStorageClass := storageClassTest{
-			claimSize: "1Gi",
+		testStorageClass := testsuites.StorageClassTest{
+			ClaimSize: "1Gi",
 		}
 		pvc = newClaim(testStorageClass, nameSpace, suffix)
 		pvc.Spec.StorageClassName = &defaultSC
@@ -63,7 +64,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		By("Checking that PVC Protection finalizer is set")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PVC status")
-		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue())
+		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue(), "PVC Protection finalizer(%v) is not set in %v", volumeutil.PVCProtectionFinalizer, pvc.ObjectMeta.Finalizers)
 	})
 
 	AfterEach(func() {

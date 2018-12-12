@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/kube-cross:v1.10.4-1 as build_k8s_1_7_sample_apiserver
+FROM k8s.gcr.io/kube-cross:v1.10.4-1 as build_k8s_1_10_sample_apiserver
 
 ENV GOPATH /go
 RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
@@ -23,7 +23,7 @@ ENV PATH $GOPATH/bin:$PATH
 # API Server using the current Aggregator"
 RUN go get -d k8s.io/sample-apiserver \
     && cd ${GOPATH}/src/k8s.io/sample-apiserver \
-    && git checkout --track origin/release-1.7 \
+    && git checkout --track origin/release-1.10 \
     && CGO_ENABLED=0 GOOS=linux GOARCH=BASEARCH go install .
 
 # for arm, go install uses go/bin/linux_arm, so just find the file and copy it to the root so
@@ -31,6 +31,6 @@ RUN go get -d k8s.io/sample-apiserver \
 RUN find /go/bin -name sample-apiserver -exec cp {} / \;
 
 FROM BASEIMAGE
-COPY --from=build_k8s_1_7_sample_apiserver /sample-apiserver /sample-apiserver
+COPY --from=build_k8s_1_10_sample_apiserver /sample-apiserver /sample-apiserver
 
 ENTRYPOINT ["/sample-apiserver"]

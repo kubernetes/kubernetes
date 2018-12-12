@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -200,7 +201,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
 	}
 
-	info, err := connection.GetConnectionInfo(types.NodeName(name))
+	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -215,6 +216,10 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 			},
 			info.Transport,
 			nil
+	}
+
+	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
 	// Otherwise, return the requested scheme and port, and the proxy transport

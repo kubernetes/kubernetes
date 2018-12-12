@@ -97,6 +97,15 @@ func TimestampFromProto(ts *Timestamp) (time.Time, error) {
 	return t, validateTimestamp(ts)
 }
 
+// TimestampNow returns a google.protobuf.Timestamp for the current time.
+func TimestampNow() *Timestamp {
+	ts, err := TimestampProto(time.Now())
+	if err != nil {
+		panic("ptypes: time.Now() out of Timestamp range")
+	}
+	return ts
+}
+
 // TimestampProto converts the time.Time to a google.protobuf.Timestamp proto.
 // It returns an error if the resulting Timestamp is invalid.
 func TimestampProto(t time.Time) (*Timestamp, error) {

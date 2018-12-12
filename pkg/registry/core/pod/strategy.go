@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // podStrategy implements behavior for Pods
@@ -290,6 +291,10 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 		}
 	}
 
+	if err := proxyutil.IsProxyableIP(pod.Status.PodIP); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
+	}
+
 	loc := &url.URL{
 		Scheme: scheme,
 	}
@@ -352,7 +357,7 @@ func LogLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
 	}
-	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -511,7 +516,7 @@ func streamLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -546,7 +551,7 @@ func PortForwardLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}

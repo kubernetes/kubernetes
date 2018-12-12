@@ -19,24 +19,24 @@ package vsphere
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -478,7 +478,7 @@ func getVirtualDiskPage83Data(ctx context.Context, dc *object.Datacenter, diskPa
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc)
 
 	if err != nil {
-		glog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
+		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err
 	}
 	diskUUID = formatVirtualDiskUUID(diskUUID)
@@ -747,7 +747,6 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 // and it's associated NodeInfo object is returned.
 func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	nodesInfo := GetReadySchedulableNodeInfos()
-	rand.Seed(time.Now().Unix())
 	Expect(nodesInfo).NotTo(BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
 }

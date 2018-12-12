@@ -37,12 +37,12 @@ func (c *Client) BackupDb(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return utils.GetErrorFromResponse(r)
 	}
 
 	// Read data from response
-	defer r.Body.Close()
 	_, err = io.Copy(w, r.Body)
 
 	return err

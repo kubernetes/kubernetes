@@ -124,9 +124,9 @@ func TestRealServer(t *testing.T) {
 		Protocol: string("TCP"),
 	}
 	rss := []*utilipvs.RealServer{
-		{net.ParseIP("172.16.2.1"), 8080, 1},
-		{net.ParseIP("172.16.2.2"), 8080, 2},
-		{net.ParseIP("172.16.2.3"), 8080, 3},
+		{Address: net.ParseIP("172.16.2.1"), Port: 8080, Weight: 1},
+		{Address: net.ParseIP("172.16.2.2"), Port: 8080, Weight: 2},
+		{Address: net.ParseIP("172.16.2.3"), Port: 8080, Weight: 3},
 	}
 	err := fake.AddVirtualServer(vs)
 	if err != nil {

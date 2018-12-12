@@ -42,7 +42,7 @@ message AllowedHostPath {
   // pathPrefix is the path prefix that the host volume must match.
   // It does not support `*`.
   // Trailing slashes are trimmed when validating the path prefix with a host path.
-  // 
+  //
   // Examples:
   // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
   // `/foo` would not allow `/food` or `/etc/foo`
@@ -58,9 +58,11 @@ message AllowedHostPath {
 // created by POSTing to .../pods/<pod name>/evictions.
 message Eviction {
   // ObjectMeta describes the pod that is being evicted.
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DeleteOptions may be provided
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.DeleteOptions deleteOptions = 2;
 }
 
@@ -97,17 +99,21 @@ message IDRange {
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the PodDisruptionBudget.
+  // +optional
   optional PodDisruptionBudgetSpec spec = 2;
 
   // Most recently observed status of the PodDisruptionBudget.
+  // +optional
   optional PodDisruptionBudgetStatus status = 3;
 }
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 message PodDisruptionBudgetList {
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated PodDisruptionBudget items = 2;
@@ -119,16 +125,19 @@ message PodDisruptionBudgetSpec {
   // "selector" will still be available after the eviction, i.e. even in the
   // absence of the evicted pod.  So for example you can prevent all voluntary
   // evictions by specifying "100%".
+  // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString minAvailable = 1;
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // An eviction is allowed if at most "maxUnavailable" pods selected by
   // "selector" are unavailable after the eviction, i.e. even in absence of
   // the evicted pod. For example, one can prevent all voluntary evictions
   // by specifying 0. This is a mutually exclusive setting with "minAvailable".
+  // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 3;
 }
 
@@ -242,6 +251,12 @@ message PodSecurityPolicySpec {
   // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
   optional RunAsUserStrategyOptions runAsUser = 11;
 
+  // RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  // If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+  // RunAsGroup feature gate to be enabled.
+  // +optional
+  optional RunAsGroupStrategyOptions runAsGroup = 22;
+
   // supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
   optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
 
@@ -281,7 +296,7 @@ message PodSecurityPolicySpec {
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
   // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
@@ -291,7 +306,7 @@ message PodSecurityPolicySpec {
   // forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
@@ -303,6 +318,17 @@ message PodSecurityPolicySpec {
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
   repeated string allowedProcMountTypes = 21;
+}
+
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+message RunAsGroupStrategyOptions {
+  // rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  optional string rule = 1;
+
+  // ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+  // then supply a single range with the same start and end. Required for MustRunAs.
+  // +optional
+  repeated IDRange ranges = 2;
 }
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.

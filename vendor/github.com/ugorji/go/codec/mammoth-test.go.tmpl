@@ -1,0 +1,33 @@
+// Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
+
+// ************************************************************
+// DO NOT EDIT. 
+// THIS FILE IS AUTO-GENERATED from mammoth-test.go.tmpl
+// ************************************************************
+
+package codec
+
+// TestMammoth has all the different paths optimized in fast-path
+// It has all the primitives, slices and maps.
+// 
+// For each of those types, it has a pointer and a non-pointer field.
+
+type TestMammoth struct {
+
+{{range .Values }}{{if .Primitive }}{{/*
+*/}}{{ .MethodNamePfx "F" true }} {{ .Primitive }}
+{{ .MethodNamePfx "Fptr" true }} *{{ .Primitive }}
+{{end}}{{end}}
+
+{{range .Values }}{{if not .Primitive }}{{if not .MapKey }}{{/*
+*/}}{{ .MethodNamePfx "F" false }} []{{ .Elem }}
+{{ .MethodNamePfx "Fptr" false }} *[]{{ .Elem }}
+{{end}}{{end}}{{end}}
+
+{{range .Values }}{{if not .Primitive }}{{if .MapKey }}{{/*
+*/}}{{ .MethodNamePfx "F" false }} map[{{ .MapKey }}]{{ .Elem }}
+{{ .MethodNamePfx "Fptr" false }} *map[{{ .MapKey }}]{{ .Elem }}
+{{end}}{{end}}{{end}}
+
+}

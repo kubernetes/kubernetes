@@ -374,3 +374,39 @@ func TestLoadConfigFailures(t *testing.T) {
 		}
 	}
 }
+
+// TestProcessHostnameOverrideFlag tests processing hostname-override arg
+func TestProcessHostnameOverrideFlag(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		hostnameOverrideFlag string
+		expectedHostname     string
+	}{
+		{
+			name:                 "Hostname from config file",
+			hostnameOverrideFlag: "",
+			expectedHostname:     "foo",
+		},
+		{
+			name:                 "Hostname from flag",
+			hostnameOverrideFlag: "  bar ",
+			expectedHostname:     "bar",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewOptions()
+			options.config = &kubeproxyconfig.KubeProxyConfiguration{
+				HostnameOverride: "foo",
+			}
+
+			options.hostnameOverride = tc.hostnameOverrideFlag
+
+			err := options.processHostnameOverrideFlag()
+			assert.NoError(t, err, "unexpected error %v", err)
+			if tc.expectedHostname != options.config.HostnameOverride {
+				t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
+			}
+		})
+	}
+}

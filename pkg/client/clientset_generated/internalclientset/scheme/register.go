@@ -25,6 +25,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	apps "k8s.io/kubernetes/pkg/apis/apps/install"
+	auditregistration "k8s.io/kubernetes/pkg/apis/auditregistration/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization/install"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -56,6 +57,7 @@ func Install(scheme *runtime.Scheme) {
 	admissionregistration.Install(scheme)
 	core.Install(scheme)
 	apps.Install(scheme)
+	auditregistration.Install(scheme)
 	authentication.Install(scheme)
 	authorization.Install(scheme)
 	autoscaling.Install(scheme)

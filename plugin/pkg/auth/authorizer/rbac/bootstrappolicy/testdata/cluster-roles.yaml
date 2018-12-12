@@ -271,6 +271,7 @@ items:
   - apiGroups:
     - apps
     resources:
+    - controllerrevisions
     - daemonsets
     - deployments
     - deployments/scale
@@ -640,6 +641,7 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
     - endpoints
     - namespaces
     - secrets
@@ -880,7 +882,6 @@ items:
     resources:
     - nodes
     verbs:
-    - delete
     - patch
     - update
   - apiGroups:

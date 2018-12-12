@@ -2,7 +2,7 @@
 
 ## **Summary**
 This document provides a summary of the tests included in the Kubernetes conformance test suite.
-Each test lists a set of formal requirements that a platform that meets conformance requirements  must adhere to.
+Each test lists a set of formal requirements that a platform that meets conformance requirements must adhere to.
 
 The tests are a subset of the "e2e" tests that make up the Kubernetes testing infrastructure.
 Each test is identified by the presence of the `[Conformance]` keyword in the ginkgo descriptive function calls.

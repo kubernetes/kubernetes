@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ExecMounter is a mounter that uses provided Exec interface to mount and
@@ -44,10 +44,10 @@ var _ Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := isBind(options)
 
 	if bind {
-		err := m.doExecMount(source, target, fstype, []string{"bind"})
+		err := m.doExecMount(source, target, fstype, bindOpts)
 		if err != nil {
 			return err
 		}
@@ -59,10 +59,10 @@ func (m *execMounter) Mount(source string, target string, fstype string, options
 
 // doExecMount calls exec(mount <what> <where>) using given exec interface.
 func (m *execMounter) doExecMount(source, target, fstype string, options []string) error {
-	glog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
+	klog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
 	mountArgs := makeMountArgs(source, target, fstype, options)
 	output, err := m.exec.Run("mount", mountArgs...)
-	glog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
+	klog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
 	if err != nil {
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, "mount", source, target, fstype, options, string(output))
@@ -75,9 +75,9 @@ func (m *execMounter) doExecMount(source, target, fstype string, options []strin
 func (m *execMounter) Unmount(target string) error {
 	outputBytes, err := m.exec.Run("umount", target)
 	if err == nil {
-		glog.V(5).Infof("Exec unmounted %s: %s", target, string(outputBytes))
+		klog.V(5).Infof("Exec unmounted %s: %s", target, string(outputBytes))
 	} else {
-		glog.V(5).Infof("Failed to exec unmount %s: err: %q, umount output: %s", target, err, string(outputBytes))
+		klog.V(5).Infof("Failed to exec unmount %s: err: %q, umount output: %s", target, err, string(outputBytes))
 	}
 
 	return err

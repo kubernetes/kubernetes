@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -175,7 +175,7 @@ func TestStatus(t *testing.T) {
 			statusCode:   http.StatusForbidden,
 			reqPath:      "/apis",
 			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis"`,
+			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
 			name:         "401",
@@ -304,7 +304,7 @@ func TestObjectSizeResponses(t *testing.T) {
 	const DeploymentTwoMegabyteSize = 1000000
 
 	expectedMsgFor1MB := `etcdserver: request is too large`
-	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = grpc: trying to send message larger than max`
+	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
 	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
 
 	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)    // >1 MB file

@@ -23,12 +23,12 @@ import (
 	"net"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	clientset "k8s.io/client-go/kubernetes"
+	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -36,16 +36,15 @@ import (
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
-	kubectrlmgrschemev1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
+	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -190,7 +189,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.Authorization.RemoteKubeConfigFileOptional = true
 	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
-	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
+	// Set the PairName but leave certificate directory blank to generate in-memory by default
+	s.SecureServing.ServerCert.CertDirectory = ""
 	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
 	s.SecureServing.BindPort = ports.KubeControllerManagerPort
 
@@ -206,19 +206,11 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 
 // NewDefaultComponentConfig returns kube-controller manager configuration object.
 func NewDefaultComponentConfig(insecurePort int32) (kubectrlmgrconfig.KubeControllerManagerConfiguration, error) {
-	scheme := runtime.NewScheme()
-	if err := kubectrlmgrschemev1alpha1.AddToScheme(scheme); err != nil {
-		return kubectrlmgrconfig.KubeControllerManagerConfiguration{}, err
-	}
-	if err := kubectrlmgrconfig.AddToScheme(scheme); err != nil {
-		return kubectrlmgrconfig.KubeControllerManagerConfiguration{}, err
-	}
-
 	versioned := kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration{}
-	scheme.Default(&versioned)
+	kubectrlmgrconfigscheme.Scheme.Default(&versioned)
 
 	internal := kubectrlmgrconfig.KubeControllerManagerConfiguration{}
-	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
+	if err := kubectrlmgrconfigscheme.Scheme.Convert(&versioned, &internal, nil); err != nil {
 		return internal, err
 	}
 	internal.Generic.Port = insecurePort
@@ -260,10 +252,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	var dummy string
-	fs.MarkDeprecated("insecure-experimental-approve-all-kubelet-csrs-for-group", "This flag does nothing.")
-	fs.StringVar(&dummy, "insecure-experimental-approve-all-kubelet-csrs-for-group", "", "This flag does nothing.")
-	utilfeature.DefaultFeatureGate.AddFlag(fss.FlagSet("generic"))
+	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
 }
@@ -440,8 +429,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 
 func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	// TODO: remove dependency on the legacyscheme
-	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
+	return eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: userAgent})
 }

@@ -21,7 +21,7 @@ package util
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"path"
 	"strconv"
 	"strings"
@@ -29,7 +29,7 @@ import (
 
 // FindMultipathDeviceForDevice given a device name like /dev/sdx, find the devicemapper parent
 func (handler *deviceHandler) FindMultipathDeviceForDevice(device string) string {
-	io := handler.get_io
+	io := handler.getIo
 	disk, err := findDeviceForPath(device, io)
 	if err != nil {
 		return ""
@@ -68,7 +68,7 @@ func findDeviceForPath(path string, io IoUtil) (string, error) {
 // which are managed by the devicemapper dm-1.
 func (handler *deviceHandler) FindSlaveDevicesOnMultipath(dm string) []string {
 	var devices []string
-	io := handler.get_io
+	io := handler.getIo
 	// Split path /dev/dm-1 into "", "dev", "dm-1"
 	parts := strings.Split(dm, "/")
 	if len(parts) != 3 || !strings.HasPrefix(parts[1], "dev") {
@@ -92,7 +92,7 @@ func (handler *deviceHandler) FindSlaveDevicesOnMultipath(dm string) []string {
 // }
 func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (map[string]int, error) {
 	portalHostMap := make(map[string]int)
-	io := handler.get_io
+	io := handler.getIo
 
 	// Iterate over all the iSCSI hosts in sysfs
 	sysPath := "/sys/class/iscsi_host"
@@ -109,7 +109,7 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 		}
 		hostNumber, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 		if err != nil {
-			glog.Errorf("Could not get number from iSCSI host: %s", hostName)
+			klog.Errorf("Could not get number from iSCSI host: %s", hostName)
 			continue
 		}
 
@@ -205,7 +205,7 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 // corresponding to that LUN.
 func (handler *deviceHandler) FindDevicesForISCSILun(targetIqn string, lun int) ([]string, error) {
 	devices := make([]string, 0)
-	io := handler.get_io
+	io := handler.getIo
 
 	// Iterate over all the iSCSI hosts in sysfs
 	sysPath := "/sys/class/iscsi_host"
@@ -222,7 +222,7 @@ func (handler *deviceHandler) FindDevicesForISCSILun(targetIqn string, lun int) 
 		}
 		hostNumber, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 		if err != nil {
-			glog.Errorf("Could not get number from iSCSI host: %s", hostName)
+			klog.Errorf("Could not get number from iSCSI host: %s", hostName)
 			continue
 		}
 

@@ -31,12 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
@@ -52,7 +53,7 @@ func waitForNominatedNodeNameWithTimeout(cs clientset.Interface, pod *v1.Pod, ti
 		}
 		return false, err
 	}); err != nil {
-		return fmt.Errorf("Pod %v annotation did not get set: %v", pod.Name, err)
+		return fmt.Errorf("Pod %v/%v annotation did not get set: %v", pod.Namespace, pod.Name, err)
 	}
 	return nil
 }
@@ -64,7 +65,7 @@ func waitForNominatedNodeName(cs clientset.Interface, pod *v1.Pod) error {
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {
 	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Initialize scheduler.
 	context := initTest(t, "preemption")
 	defer cleanupTest(t, context)
@@ -268,7 +269,7 @@ func TestPreemption(t *testing.T) {
 		for i, p := range pods {
 			if _, found := test.preemptedPodIndexes[i]; found {
 				if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
-					t.Errorf("Test [%v]: Pod %v is not getting evicted.", test.description, p.Name)
+					t.Errorf("Test [%v]: Pod %v/%v is not getting evicted.", test.description, p.Namespace, p.Name)
 				}
 			} else {
 				if p.DeletionTimestamp != nil {
@@ -292,7 +293,7 @@ func TestPreemption(t *testing.T) {
 // TestDisablePreemption tests disable pod preemption of scheduler works as expected.
 func TestDisablePreemption(t *testing.T) {
 	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Initialize scheduler, and disable preemption.
 	context := initTestDisablePreemption(t, "disable-preemption")
 	defer cleanupTest(t, context)
@@ -394,7 +395,7 @@ func mkPriorityPodWithGrace(tc *TestContext, name string, priority int32, grace 
 // after preemption and while the higher priority pods is not scheduled yet.
 func TestPreemptionStarvation(t *testing.T) {
 	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Initialize scheduler.
 	context := initTest(t, "preemption")
 	defer cleanupTest(t, context)
@@ -450,7 +451,7 @@ func TestPreemptionStarvation(t *testing.T) {
 		// make sure that runningPods are all scheduled.
 		for _, p := range runningPods {
 			if err := waitForPodToSchedule(cs, p); err != nil {
-				t.Fatalf("Pod %v didn't get scheduled: %v", p.Name, err)
+				t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
 			}
 		}
 		// Create pending pods.
@@ -464,7 +465,7 @@ func TestPreemptionStarvation(t *testing.T) {
 		for _, p := range pendingPods {
 			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout,
 				podUnschedulable(cs, p.Namespace, p.Name)); err != nil {
-				t.Errorf("Pod %v didn't get marked unschedulable: %v", p.Name, err)
+				t.Errorf("Pod %v/%v didn't get marked unschedulable: %v", p.Namespace, p.Name, err)
 			}
 		}
 		// Create the preemptor.
@@ -474,14 +475,14 @@ func TestPreemptionStarvation(t *testing.T) {
 		}
 		// Check that the preemptor pod gets the annotation for nominated node name.
 		if err := waitForNominatedNodeName(cs, preemptor); err != nil {
-			t.Errorf("Test [%v]: NominatedNodeName annotation was not set for pod %v: %v", test.description, preemptor.Name, err)
+			t.Errorf("Test [%v]: NominatedNodeName annotation was not set for pod %v/%v: %v", test.description, preemptor.Namespace, preemptor.Name, err)
 		}
 		// Make sure that preemptor is scheduled after preemptions.
 		if err := waitForPodToScheduleWithTimeout(cs, preemptor, 60*time.Second); err != nil {
 			t.Errorf("Preemptor pod %v didn't get scheduled: %v", preemptor.Name, err)
 		}
 		// Cleanup
-		glog.Info("Cleaning up all pods...")
+		klog.Info("Cleaning up all pods...")
 		allPods := pendingPods
 		allPods = append(allPods, runningPods...)
 		allPods = append(allPods, preemptor)
@@ -501,7 +502,7 @@ func TestPreemptionStarvation(t *testing.T) {
 //    node name of the medium priority pod is cleared.
 func TestNominatedNodeCleanUp(t *testing.T) {
 	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Initialize scheduler.
 	context := initTest(t, "preemption")
 	defer cleanupTest(t, context)
@@ -532,7 +533,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	// make sure that the pods are all scheduled.
 	for _, p := range lowPriPods {
 		if err := waitForPodToSchedule(cs, p); err != nil {
-			t.Fatalf("Pod %v didn't get scheduled: %v", p.Name, err)
+			t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
 		}
 	}
 	// Step 2. Create a medium priority pod.
@@ -551,7 +552,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	}
 	// Step 3. Check that nominated node name of the medium priority pod is set.
 	if err := waitForNominatedNodeName(cs, medPriPod); err != nil {
-		t.Errorf("NominatedNodeName annotation was not set for pod %v: %v", medPriPod.Name, err)
+		t.Errorf("NominatedNodeName annotation was not set for pod %v/%v: %v", medPriPod.Namespace, medPriPod.Name, err)
 	}
 	// Step 4. Create a high priority pod.
 	podConf = initPausePod(cs, &pausePodConfig{
@@ -569,7 +570,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	}
 	// Step 5. Check that nominated node name of the high priority pod is set.
 	if err := waitForNominatedNodeName(cs, highPriPod); err != nil {
-		t.Errorf("NominatedNodeName annotation was not set for pod %v: %v", medPriPod.Name, err)
+		t.Errorf("NominatedNodeName annotation was not set for pod %v/%v: %v", medPriPod.Namespace, medPriPod.Name, err)
 	}
 	// And the nominated node name of the medium priority pod is cleared.
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -615,7 +616,7 @@ func addPodConditionReady(pod *v1.Pod) {
 // TestPDBInPreemption tests PodDisruptionBudget support in preemption.
 func TestPDBInPreemption(t *testing.T) {
 	// Enable PodPriority feature gate.
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Initialize scheduler.
 	context := initTest(t, "preemption-pdb")
 	defer cleanupTest(t, context)
@@ -842,8 +843,8 @@ func TestPDBInPreemption(t *testing.T) {
 				t.Fatalf("Failed to create PDB: %v", err)
 			}
 		}
-		// Wait for PDBs to show up in the scheduler's cache and become stable.
-		if err := waitCachedPDBsStable(context, test.pdbs, test.pdbPodNum); err != nil {
+		// Wait for PDBs to become stable.
+		if err := waitForPDBsStable(context, test.pdbs, test.pdbPodNum); err != nil {
 			t.Fatalf("Not all pdbs are stable in the cache: %v", err)
 		}
 
@@ -856,18 +857,18 @@ func TestPDBInPreemption(t *testing.T) {
 		for i, p := range pods {
 			if _, found := test.preemptedPodIndexes[i]; found {
 				if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
-					t.Errorf("Test [%v]: Pod %v is not getting evicted.", test.description, p.Name)
+					t.Errorf("Test [%v]: Pod %v/%v is not getting evicted.", test.description, p.Namespace, p.Name)
 				}
 			} else {
 				if p.DeletionTimestamp != nil {
-					t.Errorf("Test [%v]: Didn't expect pod %v to get preempted.", test.description, p.Name)
+					t.Errorf("Test [%v]: Didn't expect pod %v/%v to get preempted.", test.description, p.Namespace, p.Name)
 				}
 			}
 		}
 		// Also check that the preemptor pod gets the annotation for nominated node name.
 		if len(test.preemptedPodIndexes) > 0 {
 			if err := waitForNominatedNodeName(cs, preemptor); err != nil {
-				t.Errorf("Test [%v]: NominatedNodeName annotation was not set for pod %v: %v", test.description, preemptor.Name, err)
+				t.Errorf("Test [%v]: NominatedNodeName annotation was not set for pod %v/%v: %v", test.description, preemptor.Namespace, preemptor.Name, err)
 			}
 		}
 

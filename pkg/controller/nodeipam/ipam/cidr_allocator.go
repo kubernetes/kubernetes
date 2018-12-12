@@ -21,7 +21,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 type nodeAndCIDR struct {
@@ -121,7 +121,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 			LabelSelector: labels.Everything().String(),
 		})
 		if err != nil {
-			glog.Errorf("Failed to list all nodes: %v", err)
+			klog.Errorf("Failed to list all nodes: %v", err)
 			return false, nil
 		}
 		return true, nil

@@ -17,12 +17,12 @@ limitations under the License.
 package azure
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 // VMSet defines functions all vmsets (including scale set and availability
@@ -65,6 +65,6 @@ type VMSet interface {
 	// GetDataDisks gets a list of data disks attached to the node.
 	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
 
-	// GetProvisioningStateByNodeName gets the provisioning state by node name.
-	GetProvisioningStateByNodeName(name string) (string, error)
+	// GetPowerStatusByNodeName returns the power state of the specified node.
+	GetPowerStatusByNodeName(name string) (string, error)
 }

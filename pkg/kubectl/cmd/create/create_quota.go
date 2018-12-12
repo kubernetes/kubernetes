@@ -20,10 +20,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -38,6 +39,7 @@ var (
 		kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`))
 )
 
+// QuotaOpts holds the command-line options for 'create quota' sub command
 type QuotaOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -49,7 +51,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use: "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
+		Use:                   "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"resourcequota"},
 		Short:                 i18n.T("Create a quota with the specified name."),
@@ -65,22 +67,23 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.ResourceQuotaV1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.ResourceQuotaV1GeneratorName)
 	cmd.Flags().String("hard", "", i18n.T("A comma-delimited set of resource=quantity pairs that define a hard limit."))
 	cmd.Flags().String("scopes", "", i18n.T("A comma-delimited set of quota scopes that must all match each object tracked by the quota."))
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	var generator kubectl.StructuredGenerator
+	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.ResourceQuotaV1GeneratorName:
-		generator = &kubectl.ResourceQuotaGeneratorV1{
+	case generateversioned.ResourceQuotaV1GeneratorName:
+		generator = &generateversioned.ResourceQuotaGeneratorV1{
 			Name:   name,
 			Hard:   cmdutil.GetFlagString(cmd, "hard"),
 			Scopes: cmdutil.GetFlagString(cmd, "scopes"),
@@ -92,7 +95,7 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateQuota implements the behavior to run the create quota command
+// Run calls the CreateSubcommandOptions.Run in QuotaOpts instance
 func (o *QuotaOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

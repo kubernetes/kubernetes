@@ -11,8 +11,6 @@ go_library(
         "repair.go",
         "util.go",
         "wal.go",
-        "wal_unix.go",
-        "wal_windows.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/wal",
     importpath = "github.com/coreos/etcd/wal",

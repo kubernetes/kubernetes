@@ -36,20 +36,20 @@ type extensionAttributes struct {
 
 // Extension tag to openapi extension attributes
 var tagToExtension = map[string]extensionAttributes{
-	"patchMergeKey": extensionAttributes{
+	"patchMergeKey": {
 		xName: "x-kubernetes-patch-merge-key",
 		kind:  types.Slice,
 	},
-	"patchStrategy": extensionAttributes{
+	"patchStrategy": {
 		xName:         "x-kubernetes-patch-strategy",
 		kind:          types.Slice,
 		allowedValues: sets.NewString("merge", "retainKeys"),
 	},
-	"listMapKey": extensionAttributes{
+	"listMapKey": {
 		xName: "x-kubernetes-list-map-keys",
 		kind:  types.Slice,
 	},
-	"listType": extensionAttributes{
+	"listType": {
 		xName:         "x-kubernetes-list-type",
 		kind:          types.Slice,
 		allowedValues: sets.NewString("atomic", "set", "map"),

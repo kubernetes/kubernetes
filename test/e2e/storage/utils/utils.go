@@ -24,7 +24,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -38,6 +41,11 @@ const (
 	KStart           KubeletOpt = "start"
 	KStop            KubeletOpt = "stop"
 	KRestart         KubeletOpt = "restart"
+)
+
+const (
+	// ClusterRole name for e2e test Priveledged Pod Security Policy User
+	podSecurityPolicyPrivilegedClusterRoleName = "e2e-test-privileged-psp"
 )
 
 // PodExec wraps RunKubectl to execute a bash cmd in target pod
@@ -212,13 +220,13 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 	}
 
+	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
+	defer func() {
+		KubeletCommand(KStart, c, clientPod)
+	}()
 	By("Stopping the kubelet.")
 	KubeletCommand(KStop, c, clientPod)
-	defer func() {
-		if err != nil {
-			KubeletCommand(KStart, c, clientPod)
-		}
-	}()
+
 	By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, metav1.NewDeleteOptions(0))
@@ -330,7 +338,7 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v2.1.0-k8s1.11",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v2.2.0-k8s1.12",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
@@ -385,4 +393,93 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
+}
+
+func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
+	namespace string,
+	teardown bool,
+	saNames []string) {
+	bindingString := "Binding"
+	if teardown {
+		bindingString = "Unbinding"
+	}
+	roleBindingClient := client.RbacV1().RoleBindings(namespace)
+	for _, saName := range saNames {
+		By(fmt.Sprintf("%v priviledged Pod Security Policy to the service account %s", bindingString, saName))
+		binding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "psp-" + saName,
+				Namespace: namespace,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      saName,
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				Name:     podSecurityPolicyPrivilegedClusterRoleName,
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		}
+
+		roleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
+			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			return apierrs.IsNotFound(err), nil
+		})
+		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
+
+		if teardown {
+			continue
+		}
+
+		_, err = roleBindingClient.Create(binding)
+		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
+
+	}
+}
+
+func CheckVolumeModeOfPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+	if volMode == v1.PersistentVolumeBlock {
+		// Check if block exists
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("test -b %s", path))
+
+		// Double check that it's not directory
+		VerifyExecInPodFail(pod, fmt.Sprintf("test -d %s", path), 1)
+	} else {
+		// Check if directory exists
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("test -d %s", path))
+
+		// Double check that it's not block
+		VerifyExecInPodFail(pod, fmt.Sprintf("test -b %s", path), 1)
+	}
+}
+
+func CheckReadWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+	if volMode == v1.PersistentVolumeBlock {
+		// random -> file1
+		VerifyExecInPodSucceed(pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
+		// file1 -> dev (write to dev)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
+		// dev -> file2 (read from dev)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
+		// file1 == file2 (check contents)
+		VerifyExecInPodSucceed(pod, "diff /tmp/file1 /tmp/file2")
+		// Clean up temp files
+		VerifyExecInPodSucceed(pod, "rm -f /tmp/file1 /tmp/file2")
+
+		// Check that writing file to block volume fails
+		VerifyExecInPodFail(pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
+	} else {
+		// text -> file1 (write to file)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
+		// grep file1 (read from file and check contents)
+		VerifyExecInPodSucceed(pod, fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path))
+
+		// Check that writing to directory as block volume fails
+		VerifyExecInPodFail(pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
+	}
 }

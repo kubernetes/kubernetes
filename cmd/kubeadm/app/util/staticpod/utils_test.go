@@ -22,13 +22,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -56,26 +55,8 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "default apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
-				},
-			},
-			component: kubeadmconstants.KubeAPIServer,
-			port:      1,
-			path:      "foo",
-			scheme:    v1.URISchemeHTTP,
-			expected:  "127.0.0.1",
-		},
-		{
-			name: "default apiserver advertise address with http",
-			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
-					AdvertiseAddress: "1.2.3.4",
-				},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						features.SelfHosting: true,
-					},
 				},
 			},
 			component: kubeadmconstants.KubeAPIServer,
@@ -87,7 +68,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "default apiserver advertise address with https",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
 				},
 			},
@@ -100,7 +81,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "valid ipv4 apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 			},
@@ -113,7 +94,7 @@ func TestComponentProbe(t *testing.T) {
 		{
 			name: "valid ipv6 apiserver advertise address with http",
 			cfg: &kubeadmapi.InitConfiguration{
-				APIEndpoint: kubeadmapi.APIEndpoint{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "2001:db8::1",
 				},
 			},
@@ -127,7 +108,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv4 controller-manager probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
+					ControllerManager: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "1.2.3.4"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -140,7 +123,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv6 controller-manager probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
+					ControllerManager: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "2001:db8::1"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -153,7 +138,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv4 scheduler probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
+					Scheduler: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "1.2.3.4"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -166,7 +153,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv6 scheduler probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
+					Scheduler: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "2001:db8::1"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -480,13 +469,19 @@ func TestVolumeMapToSlice(t *testing.T) {
 		"foo": {
 			Name: "foo",
 		},
+		"bar": {
+			Name: "bar",
+		},
 	}
 	volumeSlice := VolumeMapToSlice(testVolumes)
-	if len(volumeSlice) != 1 {
+	if len(volumeSlice) != 2 {
 		t.Errorf("Expected slice length of 1, got %d", len(volumeSlice))
 	}
-	if volumeSlice[0].Name != "foo" {
-		t.Errorf("Expected volume name \"foo\", got %s", volumeSlice[0].Name)
+	if volumeSlice[0].Name != "bar" {
+		t.Errorf("Expected first volume name \"bar\", got %s", volumeSlice[0].Name)
+	}
+	if volumeSlice[1].Name != "foo" {
+		t.Errorf("Expected second volume name \"foo\", got %s", volumeSlice[1].Name)
 	}
 }
 
@@ -495,13 +490,19 @@ func TestVolumeMountMapToSlice(t *testing.T) {
 		"foo": {
 			Name: "foo",
 		},
+		"bar": {
+			Name: "bar",
+		},
 	}
 	volumeMountSlice := VolumeMountMapToSlice(testVolumeMounts)
-	if len(volumeMountSlice) != 1 {
+	if len(volumeMountSlice) != 2 {
 		t.Errorf("Expected slice length of 1, got %d", len(volumeMountSlice))
 	}
-	if volumeMountSlice[0].Name != "foo" {
-		t.Errorf("Expected volume mount name \"foo\", got %s", volumeMountSlice[0].Name)
+	if volumeMountSlice[0].Name != "bar" {
+		t.Errorf("Expected first volume mount name \"bar\", got %s", volumeMountSlice[0].Name)
+	}
+	if volumeMountSlice[1].Name != "foo" {
+		t.Errorf("Expected second volume name \"foo\", got %s", volumeMountSlice[1].Name)
 	}
 }
 
@@ -613,6 +614,76 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 		if (actualErr != nil) != rt.expectErr {
 			t.Errorf(
 				"ReadStaticPodFromDisk failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
+				rt.expectErr,
+				(actualErr != nil),
+				actualErr,
+			)
+		}
+	}
+}
+
+func TestManifestFilesAreEqual(t *testing.T) {
+	var tests = []struct {
+		description    string
+		podYamls       []string
+		expectedResult bool
+		expectErr      bool
+	}{
+		{
+			description:    "manifests are equal",
+			podYamls:       []string{validPod, validPod},
+			expectedResult: true,
+			expectErr:      false,
+		},
+		{
+			description:    "manifests are not equal",
+			podYamls:       []string{validPod, validPod + "\n"},
+			expectedResult: false,
+			expectErr:      false,
+		},
+		{
+			description:    "first manifest doesn't exist",
+			podYamls:       []string{validPod, ""},
+			expectedResult: false,
+			expectErr:      true,
+		},
+		{
+			description:    "second manifest doesn't exist",
+			podYamls:       []string{"", validPod},
+			expectedResult: false,
+			expectErr:      true,
+		},
+	}
+
+	for _, rt := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		// write 2 manifests
+		for i := 0; i < 2; i++ {
+			if rt.podYamls[i] != "" {
+				manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
+				err := ioutil.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)
+				if err != nil {
+					t.Fatalf("Failed to write manifest file\n%s\n\tfatal error: %v", rt.description, err)
+				}
+			}
+		}
+
+		// compare them
+		result, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
+		if result != rt.expectedResult {
+			t.Errorf(
+				"ManifestFilesAreEqual failed\n%s\nexpected result: %t\nactual result: %t",
+				rt.description,
+				rt.expectedResult,
+				result,
+			)
+		}
+		if (actualErr != nil) != rt.expectErr {
+			t.Errorf(
+				"ManifestFilesAreEqual failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
 				rt.description,
 				rt.expectErr,
 				(actualErr != nil),

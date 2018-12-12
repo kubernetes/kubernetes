@@ -18,6 +18,7 @@ package cert
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -64,7 +65,7 @@ func NewPrivateKey() (*rsa.PrivateKey, error) {
 }
 
 // NewSelfSignedCACert creates a CA certificate
-func NewSelfSignedCACert(cfg Config, key *rsa.PrivateKey) (*x509.Certificate, error) {
+func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, error) {
 	now := time.Now()
 	tmpl := x509.Certificate{
 		SerialNumber: new(big.Int).SetInt64(0),
@@ -76,7 +77,7 @@ func NewSelfSignedCACert(cfg Config, key *rsa.PrivateKey) (*x509.Certificate, er
 		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
-		IsCA: true,
+		IsCA:                  true,
 	}
 
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &tmpl, &tmpl, key.Public(), key)
@@ -87,7 +88,7 @@ func NewSelfSignedCACert(cfg Config, key *rsa.PrivateKey) (*x509.Certificate, er
 }
 
 // NewSignedCert creates a signed certificate using the given CA certificate and key
-func NewSignedCert(cfg Config, key *rsa.PrivateKey, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, error) {
+func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
 	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err
@@ -187,7 +188,7 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
-		IsCA: true,
+		IsCA:                  true,
 	}
 
 	caDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &caTemplate, &caTemplate, &caKey.PublicKey, caKey)
@@ -257,34 +258,6 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
-}
-
-// FormatBytesCert receives byte array certificate and formats in human-readable format
-func FormatBytesCert(cert []byte) (string, error) {
-	block, _ := pem.Decode(cert)
-	c, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse certificate [%v]", err)
-	}
-	return FormatCert(c), nil
-}
-
-// FormatCert receives certificate and formats in human-readable format
-func FormatCert(c *x509.Certificate) string {
-	var ips []string
-	for _, ip := range c.IPAddresses {
-		ips = append(ips, ip.String())
-	}
-	altNames := append(ips, c.DNSNames...)
-	res := fmt.Sprintf(
-		"Issuer: CN=%s | Subject: CN=%s | CA: %t\n",
-		c.Issuer.CommonName, c.Subject.CommonName, c.IsCA,
-	)
-	res += fmt.Sprintf("Not before: %s Not After: %s", c.NotBefore, c.NotAfter)
-	if len(altNames) > 0 {
-		res += fmt.Sprintf("\nAlternate Names: %v", altNames)
-	}
-	return res
 }
 
 func ipsToStrings(ips []net.IP) []string {

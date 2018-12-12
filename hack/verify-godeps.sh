@@ -51,7 +51,6 @@ function cleanup {
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
-  export GODEP=""
 }
 trap cleanup EXIT
 
@@ -85,7 +84,7 @@ ret=0
 
 pushd "${KUBE_ROOT}" > /dev/null 2>&1
   # Test for diffs
-  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
+  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
     echo "Your Godeps.json is different:" >&2
     echo "${_out}" >&2
     echo "Godeps Verify failed." >&2

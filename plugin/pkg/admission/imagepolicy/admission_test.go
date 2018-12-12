@@ -930,9 +930,9 @@ func TestAnnotationFiltering(t *testing.T) {
 			annotations: map[string]string{
 				"my.image-policy.k8s.io/test":     "test",
 				"other.image-policy.k8s.io/test2": "annotation",
-				"test":    "test",
-				"another": "another",
-				"":        "",
+				"test":                            "test",
+				"another":                         "another",
+				"":                                "",
 			},
 			outAnnotations: map[string]string{
 				"my.image-policy.k8s.io/test":     "test",

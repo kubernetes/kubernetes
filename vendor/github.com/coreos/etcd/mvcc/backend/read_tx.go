@@ -40,9 +40,10 @@ type readTx struct {
 	mu  sync.RWMutex
 	buf txReadBuffer
 
-	// txmu protects accesses to the Tx on Range requests
-	txmu sync.Mutex
-	tx   *bolt.Tx
+	// txmu protects accesses to buckets and tx on Range requests.
+	txmu    sync.RWMutex
+	tx      *bolt.Tx
+	buckets map[string]*bolt.Bucket
 }
 
 func (rt *readTx) Lock()   { rt.mu.RLock() }
@@ -63,30 +64,57 @@ func (rt *readTx) UnsafeRange(bucketName, key, endKey []byte, limit int64) ([][]
 	if int64(len(keys)) == limit {
 		return keys, vals
 	}
+
+	// find/cache bucket
+	bn := string(bucketName)
+	rt.txmu.RLock()
+	bucket, ok := rt.buckets[bn]
+	rt.txmu.RUnlock()
+	if !ok {
+		rt.txmu.Lock()
+		bucket = rt.tx.Bucket(bucketName)
+		rt.buckets[bn] = bucket
+		rt.txmu.Unlock()
+	}
+
+	// ignore missing bucket since may have been created in this batch
+	if bucket == nil {
+		return keys, vals
+	}
 	rt.txmu.Lock()
-	// ignore error since bucket may have been created in this batch
-	k2, v2, _ := unsafeRange(rt.tx, bucketName, key, endKey, limit-int64(len(keys)))
+	c := bucket.Cursor()
 	rt.txmu.Unlock()
+
+	k2, v2 := unsafeRange(c, key, endKey, limit-int64(len(keys)))
 	return append(k2, keys...), append(v2, vals...)
 }
 
 func (rt *readTx) UnsafeForEach(bucketName []byte, visitor func(k, v []byte) error) error {
 	dups := make(map[string]struct{})
-	f1 := func(k, v []byte) error {
+	getDups := func(k, v []byte) error {
 		dups[string(k)] = struct{}{}
-		return visitor(k, v)
+		return nil
 	}
-	f2 := func(k, v []byte) error {
+	visitNoDup := func(k, v []byte) error {
 		if _, ok := dups[string(k)]; ok {
 			return nil
 		}
 		return visitor(k, v)
 	}
-	if err := rt.buf.ForEach(bucketName, f1); err != nil {
+	if err := rt.buf.ForEach(bucketName, getDups); err != nil {
 		return err
 	}
 	rt.txmu.Lock()
-	err := unsafeForEach(rt.tx, bucketName, f2)
+	err := unsafeForEach(rt.tx, bucketName, visitNoDup)
 	rt.txmu.Unlock()
-	return err
+	if err != nil {
+		return err
+	}
+	return rt.buf.ForEach(bucketName, visitor)
+}
+
+func (rt *readTx) reset() {
+	rt.buf.reset()
+	rt.buckets = make(map[string]*bolt.Bucket)
+	rt.tx = nil
 }

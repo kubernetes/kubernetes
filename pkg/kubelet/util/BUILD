@@ -8,16 +8,34 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+    srcs = [
+        "util_unix_test.go",
+        "util_windows_test.go",
     ],
+    embed = [":go_default_library"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+            "//vendor/github.com/stretchr/testify/require:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
+        "boottime_util_darwin.go",
+        "boottime_util_linux.go",
         "doc.go",
         "util.go",
         "util_unix.go",
@@ -29,16 +47,19 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin": [
-            "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/Microsoft/go-winio:go_default_library",
         ],
         "//conditions:default": [],
     }),

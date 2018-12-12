@@ -25,7 +25,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/utils"
 )
 
@@ -49,25 +49,25 @@ func main() {
 
 	if *build {
 		if err := bazelBuild(); err != nil {
-			glog.Exitf("couldn't build with bazel: %v", err)
+			klog.Exitf("couldn't build with bazel: %v", err)
 		}
 	}
 
 	ginkgo, err := getBazelGinkgo()
 	if err != nil {
-		glog.Fatalf("Failed to get ginkgo binary: %v", err)
+		klog.Fatalf("Failed to get ginkgo binary: %v", err)
 	}
 
 	test, err := getBazelTestBin()
 	if err != nil {
-		glog.Fatalf("Failed to get test file: %v", err)
+		klog.Fatalf("Failed to get test file: %v", err)
 	}
 
 	args := append(strings.Split(*ginkgoFlags, " "), test, "--")
 	args = append(args, strings.Split(*testFlags, " ")...)
 
 	if execCommand(ginkgo, args...); err != nil {
-		glog.Exitf("Test failed: %v", err)
+		klog.Exitf("Test failed: %v", err)
 	}
 
 }

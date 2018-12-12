@@ -20,7 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -42,5 +44,24 @@ func TestRollbackerFor(t *testing.T) {
 		if reflect.TypeOf(result) != expectedType {
 			t.Fatalf("unexpected output type (%v was expected but got %v)", expectedType, reflect.TypeOf(result))
 		}
+	}
+}
+
+func TestGetDeploymentPatch(t *testing.T) {
+	patchType, patchBytes, err := getDeploymentPatch(&corev1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Image: "foo"}}}}, map[string]string{"a": "true"})
+	if err != nil {
+		t.Error(err)
+	}
+	if patchType != types.JSONPatchType {
+		t.Errorf("expected strategic merge patch, got %v", patchType)
+	}
+	expectedPatch := `[` +
+		`{"op":"replace","path":"/spec/template","value":{"metadata":{"creationTimestamp":null},"spec":{"containers":[{"name":"","image":"foo","resources":{}}]}}},` +
+		`{"op":"replace","path":"/metadata/annotations","value":{"a":"true"}}` +
+		`]`
+	if string(patchBytes) != expectedPatch {
+		t.Errorf("expected:\n%s\ngot\n%s", expectedPatch, string(patchBytes))
 	}
 }

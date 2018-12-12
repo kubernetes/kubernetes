@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 
@@ -55,13 +55,13 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 	task, err := vdm.CreateVirtualDisk(ctx, diskManager.diskPath, datastore.Datacenter.Datacenter, vmDiskSpec)
 	if err != nil {
 		vclib.RecordvSphereMetric(vclib.APICreateVolume, requestTime, err)
-		glog.Errorf("Failed to create virtual disk: %s. err: %+v", diskManager.diskPath, err)
+		klog.Errorf("Failed to create virtual disk: %s. err: %+v", diskManager.diskPath, err)
 		return "", err
 	}
 	taskInfo, err := task.WaitForResult(ctx, nil)
 	vclib.RecordvSphereMetric(vclib.APICreateVolume, requestTime, err)
 	if err != nil {
-		glog.Errorf("Failed to complete virtual disk creation: %s. err: %+v", diskManager.diskPath, err)
+		klog.Errorf("Failed to complete virtual disk creation: %s. err: %+v", diskManager.diskPath, err)
 		return "", err
 	}
 	canonicalDiskPath = taskInfo.Result.(string)
@@ -77,14 +77,14 @@ func (diskManager virtualDiskManager) Delete(ctx context.Context, datacenter *vc
 	// Delete virtual disk
 	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, diskPath, datacenter.Datacenter)
 	if err != nil {
-		glog.Errorf("Failed to delete virtual disk. err: %v", err)
+		klog.Errorf("Failed to delete virtual disk. err: %v", err)
 		vclib.RecordvSphereMetric(vclib.APIDeleteVolume, requestTime, err)
 		return err
 	}
 	err = task.Wait(ctx)
 	vclib.RecordvSphereMetric(vclib.APIDeleteVolume, requestTime, err)
 	if err != nil {
-		glog.Errorf("Failed to delete virtual disk. err: %v", err)
+		klog.Errorf("Failed to delete virtual disk. err: %v", err)
 		return err
 	}
 	return nil

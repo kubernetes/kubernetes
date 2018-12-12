@@ -44,6 +44,10 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	if cc.BindTimeoutSeconds == nil {
 		allErrs = append(allErrs, field.Required(field.NewPath("bindTimeoutSeconds"), ""))
 	}
+	if cc.PercentageOfNodesToScore < 0 || cc.PercentageOfNodesToScore > 100 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
+			cc.PercentageOfNodesToScore, "not in valid range 0-100"))
+	}
 	return allErrs
 }
 

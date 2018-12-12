@@ -297,7 +297,7 @@ func TestIsValidLabelValue(t *testing.T) {
 		"end-with-num-1",
 		"1234",                  // only num
 		strings.Repeat("a", 63), // to the limit
-		"", // empty value
+		"",                      // empty value
 	}
 	for i := range successCases {
 		if errs := IsValidLabelValue(successCases[i]); len(errs) != 0 {

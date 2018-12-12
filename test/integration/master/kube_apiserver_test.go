@@ -19,6 +19,7 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -98,8 +99,8 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 	result := kubeclient.RESTClient().Get().AbsPath("/swagger.json").Do()
 	status := 0
 	result.StatusCode(&status)
-	if status != 200 {
-		t.Fatalf("GET /swagger.json failed: expected status=%d, got=%d", 200, status)
+	if status != http.StatusOK {
+		t.Fatalf("GET /swagger.json failed: expected status=%d, got=%d", http.StatusOK, status)
 	}
 
 	raw, err := result.Raw()

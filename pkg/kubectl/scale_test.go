@@ -264,7 +264,7 @@ func TestStatefulSetScale(t *testing.T) {
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
-	err := scaler.Scale("default", name, count, &preconditions, nil, nil, schema.GroupResource{Group: "apps", Resource: "statefullset"})
+	err := scaler.Scale("default", name, count, &preconditions, nil, nil, schema.GroupResource{Group: "apps", Resource: "statefulset"})
 	if err != nil {
 		t.Fatal(err)
 	}

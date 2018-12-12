@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -122,7 +122,7 @@ func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool
 
 func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
-		glog.Warningf("Terminating all watchers from cacher %v", objectType)
+		klog.Warningf("Terminating all watchers from cacher %v", objectType)
 	}
 	i.allWatchers.terminateAll()
 	for index, watchers := range i.valueWatchers {
@@ -269,7 +269,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// Also note that startCaching is called in a loop, so there's no need
 	// to have another loop here.
 	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
-		glog.Errorf("unexpected ListAndWatch error: %v", err)
+		klog.Errorf("unexpected ListAndWatch error: %v", err)
 	}
 }
 
@@ -404,10 +404,15 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 // GetToList implements storage.Interface.
 func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
+	hasContinuation := pagingEnabled && len(pred.Continue) > 0
+	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	if resourceVersion == "" || hasContinuation || hasLimit {
 		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility). If a continuation or limit is
+		// storage (for backward compatibility). If a continuation is
 		// requested, serve it from the underlying storage as well.
+		// Limits are only sent to storage when resourceVersion is non-zero
+		// since the watch cache isn't able to perform continuations, and
+		// limits are ignored when resource version is zero
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
@@ -547,7 +552,7 @@ func (c *Cacher) GuaranteedUpdate(
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
-		glog.Errorf("GetByKey returned error: %v", err)
+		klog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
 		currObj := elem.(*storeElement).Object.DeepCopyObject()
 		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
@@ -590,7 +595,7 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 func (c *Cacher) processEvent(event *watchCacheEvent) {
 	if curLen := int64(len(c.incoming)); c.incomingHWM.Update(curLen) {
 		// Monitor if this gets backed up, and how much.
-		glog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
+		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
 	c.incoming <- *event
 }
@@ -679,7 +684,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 			// false is currently passed only if we are forcing watcher to close due
 			// to its unresponsiveness and blocking other watchers.
 			// TODO: Get this information in cleaner way.
-			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
+			klog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
@@ -942,7 +947,7 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 		if len(initEvents) > 0 {
 			objType = reflect.TypeOf(initEvents[0].Object).String()
 		}
-		glog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
+		klog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
 	}
 
 	defer close(c.result)

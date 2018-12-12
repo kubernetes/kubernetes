@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	appstyped "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -47,9 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -111,7 +112,7 @@ func setupScheduler(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    true,
+		EnableEquivalenceClassCache:    false,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       100,
 	})
@@ -485,21 +486,12 @@ func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string
 
 func forEachFeatureGate(t *testing.T, tf func(t *testing.T)) {
 	for _, fg := range featureGates() {
-		func() {
-			enabled := utilfeature.DefaultFeatureGate.Enabled(fg)
-			defer func() {
-				if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled)); err != nil {
-					t.Fatalf("Failed to set FeatureGate %v to %t", fg, enabled)
-				}
-			}()
-
-			for _, f := range []bool{true, false} {
-				if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f)); err != nil {
-					t.Fatalf("Failed to set FeatureGate %v to %t", fg, f)
-				}
+		for _, f := range []bool{true, false} {
+			func() {
+				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
-			}
-		}()
+			}()
+		}
 	}
 }
 
@@ -630,7 +622,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"node-1"},
 									},
@@ -704,23 +696,10 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	})
 }
 
-func setFeatureGate(t *testing.T, feature utilfeature.Feature, enabled bool) {
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", feature, enabled)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t: %v", feature, enabled, err)
-	}
-}
-
 // When ScheduleDaemonSetPods is disabled, DaemonSets should not launch onto nodes with insufficient capacity.
 // Look for TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled, we don't need this test anymore.
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
-	// Rollback feature gate.
-	defer func() {
-		if enabled {
-			setFeatureGate(t, features.ScheduleDaemonSetPods, true)
-		}
-	}()
-	setFeatureGate(t, features.ScheduleDaemonSetPods, false)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
@@ -761,17 +740,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 // feature is enabled, the DaemonSet should create Pods for all the nodes regardless of available resource
 // on the nodes, and kube-scheduler should not schedule Pods onto the nodes with insufficient resource.
 func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) {
-	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
-	defer func() {
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
-			features.ScheduleDaemonSetPods, enabled)); err != nil {
-			t.Fatalf("Failed to set FeatureGate %v to %t", features.ScheduleDaemonSetPods, enabled)
-		}
-	}()
-
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.ScheduleDaemonSetPods, true)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t", features.ScheduleDaemonSetPods, true)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, true)()
 
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
@@ -1012,16 +981,7 @@ func TestTaintedNode(t *testing.T) {
 // TestUnschedulableNodeDaemonDoesLaunchPod tests that the DaemonSet Pods can still be scheduled
 // to the Unschedulable nodes when TaintNodesByCondition are enabled.
 func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
-	enabledTaint := utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition)
-	defer func() {
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
-			features.TaintNodesByCondition, enabledTaint)); err != nil {
-			t.Fatalf("Failed to set FeatureGate %v to %t", features.TaintNodesByCondition, enabledTaint)
-		}
-	}()
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.TaintNodesByCondition, true)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t", features.TaintNodesByCondition, true)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	forEachFeatureGate(t, func(t *testing.T) {
 		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
@@ -1059,7 +1019,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 			node.Spec.Unschedulable = true
 			node.Spec.Taints = []v1.Taint{
 				{
-					Key:    algorithm.TaintNodeUnschedulable,
+					Key:    schedulerapi.TaintNodeUnschedulable,
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			}
@@ -1077,7 +1037,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 			}
 			nodeNU.Spec.Taints = []v1.Taint{
 				{
-					Key:    algorithm.TaintNodeNetworkUnavailable,
+					Key:    schedulerapi.TaintNodeNetworkUnavailable,
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			}

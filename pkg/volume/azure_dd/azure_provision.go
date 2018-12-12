@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -127,6 +128,9 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		availabilityZone         string
 		availabilityZones        sets.String
 		selectedAvailabilityZone string
+
+		diskIopsReadWrite string
+		diskMbpsReadWrite string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -165,6 +169,10 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			}
 		case "zoned":
 			strZoned = v
+		case "diskiopsreadwrite":
+			diskIopsReadWrite = v
+		case "diskmbpsreadwrite":
+			diskMbpsReadWrite = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -241,6 +249,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			SizeGB:             requestGiB,
 			Tags:               tags,
 			AvailabilityZone:   selectedAvailabilityZone,
+			DiskIOPSReadWrite:  diskIopsReadWrite,
+			DiskMBpsReadWrite:  diskMbpsReadWrite,
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {
@@ -257,7 +267,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 				return nil, err
 			}
 		} else {
-			diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGiB)
+			diskURI, err = diskController.CreateBlobDisk(name, storage.SkuName(storageAccountType), requestGiB)
 			if err != nil {
 				return nil, err
 			}

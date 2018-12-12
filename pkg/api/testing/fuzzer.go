@@ -21,6 +21,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -28,15 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	appsfuzzer "k8s.io/kubernetes/pkg/apis/apps/fuzzer"
+	auditregistrationfuzzer "k8s.io/kubernetes/pkg/apis/auditregistration/fuzzer"
 	autoscalingfuzzer "k8s.io/kubernetes/pkg/apis/autoscaling/fuzzer"
 	batchfuzzer "k8s.io/kubernetes/pkg/apis/batch/fuzzer"
 	certificatesfuzzer "k8s.io/kubernetes/pkg/apis/certificates/fuzzer"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
@@ -64,14 +65,14 @@ func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(r *runtime.RawExtension, c fuzz.Continue) {
 			// Pick an arbitrary type and fuzz it
-			types := []runtime.Object{&api.Pod{}, &extensions.Deployment{}, &api.Service{}}
+			types := []runtime.Object{&api.Pod{}, &apps.Deployment{}, &api.Service{}}
 			obj := types[c.Rand.Intn(len(types))]
 			c.Fuzz(obj)
 
 			var codec runtime.Codec
 			switch obj.(type) {
-			case *extensions.Deployment:
-				codec = apitesting.TestCodec(codecs, extensionsv1beta1.SchemeGroupVersion)
+			case *apps.Deployment:
+				codec = apitesting.TestCodec(codecs, appsv1.SchemeGroupVersion)
 			default:
 				codec = apitesting.TestCodec(codecs, v1.SchemeGroupVersion)
 			}
@@ -88,6 +89,7 @@ func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
+// FuzzerFuncs is a list of fuzzer functions
 var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	genericfuzzer.Funcs,
 	overrideGenericFuncs,
@@ -100,6 +102,7 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	policyfuzzer.Funcs,
 	certificatesfuzzer.Funcs,
 	admissionregistrationfuzzer.Funcs,
+	auditregistrationfuzzer.Funcs,
 	storagefuzzer.Funcs,
 	networkingfuzzer.Funcs,
 )

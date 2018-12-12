@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit"
 )
 
+// ValidatePolicy validates the audit policy
 func ValidatePolicy(policy *audit.Policy) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateOmitStages(policy.OmitStages, field.NewPath("omitStages"))...)

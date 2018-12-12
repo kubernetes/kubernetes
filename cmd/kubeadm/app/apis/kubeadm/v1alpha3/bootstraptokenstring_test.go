@@ -18,9 +18,10 @@ package v1alpha3
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestMarshalJSON(t *testing.T) {
@@ -99,13 +100,13 @@ func roundtrip(input string, bts *BootstrapTokenString) error {
 	// If string input was specified, roundtrip like this: string -> (unmarshal) -> object -> (marshal) -> string
 	if len(input) > 0 {
 		if err := json.Unmarshal([]byte(input), newbts); err != nil {
-			return fmt.Errorf("expected no unmarshal error, got error: %v", err)
+			return errors.Wrap(err, "expected no unmarshal error, got error")
 		}
 		if b, err = json.Marshal(newbts); err != nil {
-			return fmt.Errorf("expected no marshal error, got error: %v", err)
+			return errors.Wrap(err, "expected no marshal error, got error")
 		}
 		if input != string(b) {
-			return fmt.Errorf(
+			return errors.Errorf(
 				"expected token: %s\n\t  actual: %s",
 				input,
 				string(b),
@@ -113,13 +114,13 @@ func roundtrip(input string, bts *BootstrapTokenString) error {
 		}
 	} else { // Otherwise, roundtrip like this: object -> (marshal) -> string -> (unmarshal) -> object
 		if b, err = json.Marshal(bts); err != nil {
-			return fmt.Errorf("expected no marshal error, got error: %v", err)
+			return errors.Wrap(err, "expected no marshal error, got error")
 		}
 		if err := json.Unmarshal(b, newbts); err != nil {
-			return fmt.Errorf("expected no unmarshal error, got error: %v", err)
+			return errors.Wrap(err, "expected no unmarshal error, got error")
 		}
 		if !reflect.DeepEqual(bts, newbts) {
-			return fmt.Errorf(
+			return errors.Errorf(
 				"expected object: %v\n\t  actual: %v",
 				bts,
 				newbts,

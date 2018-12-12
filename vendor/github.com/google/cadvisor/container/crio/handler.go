@@ -176,7 +176,7 @@ func newCrioContainerHandler(
 	}
 	// TODO for env vars we wanted to show from container.Config.Env from whitelist
 	//for _, exposedEnv := range metadataEnvs {
-	//glog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
+	//klog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
 	//}
 
 	return handler, nil

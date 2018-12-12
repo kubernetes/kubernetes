@@ -14,12 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package framework contains provider-independent helper code for
+// building and running E2E tests with Ginkgo. The actual Ginkgo test
+// suites gets assembled by combining this framework, the optional
+// provider support code and specific tests via a separate .go file
+// like Kubernetes' test/e2e.go.
 package framework
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -36,17 +42,14 @@ import (
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/tools/clientcmd"
 	csi "k8s.io/csi-api/pkg/client/clientset/versioned"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -65,6 +68,11 @@ const (
 // Eventual goal is to merge this with integration test framework.
 type Framework struct {
 	BaseName string
+
+	// Set together with creating the ClientSet and the namespace.
+	// Guaranteed to be unique in the cluster even when running the same
+	// test multiple times in parallel.
+	UniqueName string
 
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
@@ -107,8 +115,6 @@ type Framework struct {
 	// Place where various additional data is stored during test run to be printed to ReportDir,
 	// or stdout if ReportDir is not set once test ends.
 	TestSummaries []TestDataSummary
-
-	kubemarkControllerCloseChannel chan struct{}
 
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
 	clusterAutoscalerMetricsBeforeTest metrics.MetricsCollection
@@ -210,25 +216,7 @@ func (f *Framework) BeforeEach() {
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 
-		if ProviderIs("kubemark") && TestContext.KubemarkExternalKubeConfig != "" && TestContext.CloudConfig.KubemarkController == nil {
-			externalConfig, err := clientcmd.BuildConfigFromFlags("", TestContext.KubemarkExternalKubeConfig)
-			externalConfig.QPS = f.Options.ClientQPS
-			externalConfig.Burst = f.Options.ClientBurst
-			Expect(err).NotTo(HaveOccurred())
-			externalClient, err := clientset.NewForConfig(externalConfig)
-			Expect(err).NotTo(HaveOccurred())
-			f.KubemarkExternalClusterClientSet = externalClient
-			f.kubemarkControllerCloseChannel = make(chan struct{})
-			externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
-			kubemarkInformerFactory := informers.NewSharedInformerFactory(f.ClientSet, 0)
-			kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
-			go kubemarkNodeInformer.Informer().Run(f.kubemarkControllerCloseChannel)
-			TestContext.CloudConfig.KubemarkController, err = kubemark.NewKubemarkController(f.KubemarkExternalClusterClientSet, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
-			Expect(err).NotTo(HaveOccurred())
-			externalInformerFactory.Start(f.kubemarkControllerCloseChannel)
-			Expect(TestContext.CloudConfig.KubemarkController.WaitForCacheSync(f.kubemarkControllerCloseChannel)).To(BeTrue())
-			go TestContext.CloudConfig.KubemarkController.Run(f.kubemarkControllerCloseChannel)
-		}
+		TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
 	}
 
 	if !f.SkipNamespaceCreation {
@@ -247,13 +235,27 @@ func (f *Framework) BeforeEach() {
 		} else {
 			Logf("Skipping waiting for service account")
 		}
+		f.UniqueName = f.Namespace.GetName()
+	} else {
+		// not guaranteed to be unique, but very likely
+		f.UniqueName = fmt.Sprintf("%s-%08x", f.BaseName, rand.Int31())
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
 		var err error
+		var nodeMode NodesSet
+		switch TestContext.GatherKubeSystemResourceUsageData {
+		case "master":
+			nodeMode = MasterNodes
+		case "masteranddns":
+			nodeMode = MasterAndDNSNodes
+		default:
+			nodeMode = AllNodes
+		}
+
 		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
 			InKubemark:                  ProviderIs("kubemark"),
-			MasterOnly:                  TestContext.GatherKubeSystemResourceUsageData == "master",
+			Nodes:                       nodeMode,
 			ResourceDataGatheringPeriod: 60 * time.Second,
 			ProbeDuration:               15 * time.Second,
 			PrintVerboseLogs:            false,
@@ -346,7 +348,7 @@ func (f *Framework) AfterEach() {
 
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
-		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
+		// Pass both unversioned client and versioned clientset, till we have removed all uses of the unversioned client.
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
@@ -383,9 +385,7 @@ func (f *Framework) AfterEach() {
 		}
 	}
 
-	if TestContext.CloudConfig.KubemarkController != nil {
-		close(f.kubemarkControllerCloseChannel)
-	}
+	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
 
 	// Report any flakes that were observed in the e2e test and reset.
 	if f.flakeReport != nil && f.flakeReport.GetFlakeCount() > 0 {

@@ -70,7 +70,7 @@ type ClusterConfiguration struct {
 	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
 	// the BindPort is used.
 	// Possible usages are:
-	// e.g. In an cluster with more than one control plane instances, this field should be
+	// e.g. In a cluster with more than one control plane instances, this field should be
 	// assigned the address of the external load balancer in front of the
 	// control plane instances.
 	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
@@ -162,7 +162,7 @@ type NodeRegistrationOptions struct {
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
-	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 }
 

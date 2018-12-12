@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
-var TestMinVersion = version.MustParseSemantic("v1.11.0-alpha.1")
+var TestMinVersion = version.MustParseSemantic("v1.12.0-alpha.1")
 
 func TestKnownFeatures(t *testing.T) {
 	var someFeatures = FeatureList{
@@ -144,12 +144,12 @@ func TestValidateVersion(t *testing.T) {
 		},
 		{ //min version but correct value given
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.11.0",
+			requestedVersion:  "v1.12.0",
 			expectedError:     false,
 		},
 		{ //min version and incorrect value given
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.10.2",
+			requestedVersion:  "v1.11.2",
 			expectedError:     true,
 		},
 	}
@@ -162,39 +162,6 @@ func TestValidateVersion(t *testing.T) {
 		} else if test.expectedError && err == nil {
 			t.Error("ValidateVersion didn't failed when expected")
 			continue
-		}
-	}
-}
-
-func TestResolveFeatureGateDependencies(t *testing.T) {
-
-	var tests = []struct {
-		inputFeatures    map[string]bool
-		expectedFeatures map[string]bool
-	}{
-		{ // no flags
-			inputFeatures:    map[string]bool{},
-			expectedFeatures: map[string]bool{},
-		},
-		{ // others flags
-			inputFeatures:    map[string]bool{CoreDNS: false},
-			expectedFeatures: map[string]bool{CoreDNS: false},
-		},
-		{ // just StoreCertsInSecrets flags
-			inputFeatures:    map[string]bool{StoreCertsInSecrets: true},
-			expectedFeatures: map[string]bool{StoreCertsInSecrets: true, SelfHosting: true},
-		},
-		{ // just HighAvailability flags
-			inputFeatures:    map[string]bool{HighAvailability: true},
-			expectedFeatures: map[string]bool{HighAvailability: true, StoreCertsInSecrets: true, SelfHosting: true},
-		},
-	}
-
-	for _, test := range tests {
-		ResolveFeatureGateDependencies(test.inputFeatures)
-		if !reflect.DeepEqual(test.inputFeatures, test.expectedFeatures) {
-			t.Errorf("ResolveFeatureGateDependencies failed, expected: %v, got: %v", test.inputFeatures, test.expectedFeatures)
-
 		}
 	}
 }

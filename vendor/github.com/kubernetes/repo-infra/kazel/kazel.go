@@ -31,7 +31,8 @@ import (
 	"strings"
 
 	bzl "github.com/bazelbuild/buildtools/build"
-	"github.com/golang/glog"
+
+	"k8s.io/klog"
 )
 
 const (
@@ -51,36 +52,36 @@ func main() {
 	flag.Parse()
 	flag.Set("alsologtostderr", "true")
 	if *root == "" {
-		glog.Fatalf("-root argument is required")
+		klog.Fatalf("-root argument is required")
 	}
 	if *validate {
 		*dryRun = true
 	}
 	v, err := newVendorer(*root, *cfgPath, *dryRun)
 	if err != nil {
-		glog.Fatalf("unable to build vendorer: %v", err)
+		klog.Fatalf("unable to build vendorer: %v", err)
 	}
 	if err = os.Chdir(v.root); err != nil {
-		glog.Fatalf("cannot chdir into root %q: %v", v.root, err)
+		klog.Fatalf("cannot chdir into root %q: %v", v.root, err)
 	}
 
 	if v.cfg.ManageGoRules {
 		if err = v.walkVendor(); err != nil {
-			glog.Fatalf("err walking vendor: %v", err)
+			klog.Fatalf("err walking vendor: %v", err)
 		}
 		if err = v.walkRepo(); err != nil {
-			glog.Fatalf("err walking repo: %v", err)
+			klog.Fatalf("err walking repo: %v", err)
 		}
 	}
 	if err = v.walkGenerated(); err != nil {
-		glog.Fatalf("err walking generated: %v", err)
+		klog.Fatalf("err walking generated: %v", err)
 	}
 	if _, err = v.walkSource("."); err != nil {
-		glog.Fatalf("err walking source: %v", err)
+		klog.Fatalf("err walking source: %v", err)
 	}
 	written := 0
 	if written, err = v.reconcileAllRules(); err != nil {
-		glog.Fatalf("err reconciling rules: %v", err)
+		klog.Fatalf("err reconciling rules: %v", err)
 	}
 	if *validate && written > 0 {
 		fmt.Fprintf(os.Stderr, "\n%d BUILD files not up-to-date.\n", written)
@@ -90,14 +91,15 @@ func main() {
 
 // Vendorer collects context, configuration, and cache while walking the tree.
 type Vendorer struct {
-	ctx          *build.Context
-	icache       map[icacheKey]icacheVal
-	skippedPaths []*regexp.Regexp
-	dryRun       bool
-	root         string
-	cfg          *Cfg
-	newRules     map[string][]*bzl.Rule // package path -> list of rules to add or update
-	managedAttrs []string
+	ctx                 *build.Context
+	icache              map[icacheKey]icacheVal
+	skippedPaths        []*regexp.Regexp
+	skippedOpenAPIPaths []*regexp.Regexp
+	dryRun              bool
+	root                string
+	cfg                 *Cfg
+	newRules            map[string][]*bzl.Rule // package path -> list of rules to add or update
+	managedAttrs        []string
 }
 
 func newVendorer(root, cfgPath string, dryRun bool) (*Vendorer, error) {
@@ -123,19 +125,23 @@ func newVendorer(root, cfgPath string, dryRun bool) (*Vendorer, error) {
 		managedAttrs: []string{"srcs", "deps", "library"},
 	}
 
-	for _, sp := range cfg.SkippedPaths {
-		r, err := regexp.Compile(sp)
-		if err != nil {
-			return nil, err
-		}
-		v.skippedPaths = append(v.skippedPaths, r)
+	builtIn, err := compileSkippedPaths([]string{"^\\.git", "^bazel-*"})
+	if err != nil {
+		return nil, err
 	}
-	for _, builtinSkip := range []string{
-		"^\\.git",
-		"^bazel-*",
-	} {
-		v.skippedPaths = append(v.skippedPaths, regexp.MustCompile(builtinSkip))
+
+	sp, err := compileSkippedPaths(cfg.SkippedPaths)
+	if err != nil {
+		return nil, err
 	}
+	sp = append(builtIn, sp...)
+	v.skippedPaths = sp
+
+	sop, err := compileSkippedPaths(cfg.SkippedOpenAPIGenPaths)
+	if err != nil {
+		return nil, err
+	}
+	v.skippedOpenAPIPaths = append(sop, sp...)
 
 	return &v, nil
 
@@ -541,7 +547,7 @@ func asExpr(e interface{}) bzl.Expr {
 		}
 		return &bzl.ListExpr{List: list}
 	default:
-		glog.Fatalf("Uh oh")
+		klog.Fatalf("Uh oh")
 		return nil
 	}
 }
@@ -781,4 +787,17 @@ func context() *build.Context {
 
 func walk(root string, walkFn filepath.WalkFunc) error {
 	return nil
+}
+
+func compileSkippedPaths(skippedPaths []string) ([]*regexp.Regexp, error) {
+	regexPaths := []*regexp.Regexp{}
+
+	for _, sp := range skippedPaths {
+		r, err := regexp.Compile(sp)
+		if err != nil {
+			return nil, err
+		}
+		regexPaths = append(regexPaths, r)
+	}
+	return regexPaths, nil
 }

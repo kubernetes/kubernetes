@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -85,9 +86,9 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 
 func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string) (*v1.Pod, *v1.PersistentVolumeClaim, *v1.PersistentVolume) {
 	var err error
-	test := storageClassTest{
-		name:      "default",
-		claimSize: "2Gi",
+	test := testsuites.StorageClassTest{
+		Name:      "default",
+		ClaimSize: "2Gi",
 	}
 	pvc := newClaim(test, ns, "default")
 	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)

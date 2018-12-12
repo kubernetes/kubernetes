@@ -21,10 +21,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -235,7 +235,7 @@ func (b *nfsMounter) SetUp(fsGroup *int64) error {
 
 func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsNotMountPoint(dir)
-	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
+	klog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -255,22 +255,22 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
 			}
 		}

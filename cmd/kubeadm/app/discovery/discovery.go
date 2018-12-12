@@ -17,11 +17,13 @@ limitations under the License.
 package discovery
 
 import (
-	"fmt"
 	"net/url"
+
+	"github.com/pkg/errors"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
@@ -31,41 +33,42 @@ import (
 // TokenUser defines token user
 const TokenUser = "tls-bootstrap-token-user"
 
-// For returns a KubeConfig object that can be used for doing the TLS Bootstrap with the right credentials
+// For returns a kubeconfig object that can be used for doing the TLS Bootstrap with the right credentials
 // Also, before returning anything, it makes sure it can trust the API Server
 func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// TODO: Print summary info about the CA certificate, along with the checksum signature
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
 	config, err := DiscoverValidatedKubeConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't validate the identity of the API Server: %v", err)
+		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
 	}
 
-	if len(cfg.TLSBootstrapToken) == 0 {
+	if len(cfg.Discovery.TLSBootstrapToken) == 0 {
 		return config, nil
 	}
 	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 	return kubeconfigutil.CreateWithToken(
 		clusterinfo.Server,
-		cfg.ClusterName,
+		kubeadmapiv1beta1.DefaultClusterName,
 		TokenUser,
 		clusterinfo.CertificateAuthorityData,
-		cfg.TLSBootstrapToken,
+		cfg.Discovery.TLSBootstrapToken,
 	), nil
 }
 
 // DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust
 func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	switch {
-	case len(cfg.DiscoveryFile) != 0:
-		if isHTTPSURL(cfg.DiscoveryFile) {
-			return https.RetrieveValidatedConfigInfo(cfg.DiscoveryFile, cfg.ClusterName)
+	case cfg.Discovery.File != nil:
+		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
+		if isHTTPSURL(kubeConfigPath) {
+			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta1.DefaultClusterName)
 		}
-		return file.RetrieveValidatedConfigInfo(cfg.DiscoveryFile, cfg.ClusterName)
-	case len(cfg.DiscoveryToken) != 0:
+		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta1.DefaultClusterName)
+	case cfg.Discovery.BootstrapToken != nil:
 		return token.RetrieveValidatedConfigInfo(cfg)
 	default:
-		return nil, fmt.Errorf("couldn't find a valid discovery configuration")
+		return nil, errors.New("couldn't find a valid discovery configuration")
 	}
 }
 

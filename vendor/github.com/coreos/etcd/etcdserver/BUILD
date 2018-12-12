@@ -10,6 +10,7 @@ go_library(
         "cluster_util.go",
         "config.go",
         "consistent_index.go",
+        "corrupt.go",
         "doc.go",
         "errors.go",
         "metrics.go",
@@ -28,10 +29,12 @@ go_library(
     deps = [
         "//vendor/github.com/coreos/etcd/alarm:go_default_library",
         "//vendor/github.com/coreos/etcd/auth:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/compactor:go_default_library",
         "//vendor/github.com/coreos/etcd/discovery:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v2http/httptypes:go_default_library",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/membership:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/stats:go_default_library",
@@ -63,7 +66,6 @@ go_library(
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

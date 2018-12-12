@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -130,8 +130,8 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer gc.attemptToOrphan.ShutDown()
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
-	glog.Infof("Starting garbage collector controller")
-	defer glog.Infof("Shutting down garbage collector controller")
+	klog.Infof("Starting garbage collector controller")
+	defer klog.Infof("Shutting down garbage collector controller")
 
 	go gc.dependencyGraphBuilder.Run(stopCh)
 
@@ -139,7 +139,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 		return
 	}
 
-	glog.Infof("Garbage collector: all resource monitors have synced. Proceeding to collect garbage")
+	klog.Infof("Garbage collector: all resource monitors have synced. Proceeding to collect garbage")
 
 	// gc workers
 	for i := 0; i < workers; i++ {
@@ -172,13 +172,13 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 
 		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
-			glog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
+			klog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
 			return
 		}
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
-			glog.V(5).Infof("no resource updates from discovery, skipping garbage collector sync")
+			klog.V(5).Infof("no resource updates from discovery, skipping garbage collector sync")
 			return
 		}
 
@@ -196,18 +196,18 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			if attempt > 1 {
 				newResources = GetDeletableResources(discoveryClient)
 				if len(newResources) == 0 {
-					glog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+					klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
 					return false, nil
 				}
 			}
 
-			glog.V(2).Infof("syncing garbage collector with updated resources from discovery (attempt %d): %s", attempt, printDiff(oldResources, newResources))
+			klog.V(2).Infof("syncing garbage collector with updated resources from discovery (attempt %d): %s", attempt, printDiff(oldResources, newResources))
 
 			// Resetting the REST mapper will also invalidate the underlying discovery
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			gc.restMapper.Reset()
-			glog.V(4).Infof("reset restmapper")
+			klog.V(4).Infof("reset restmapper")
 
 			// Perform the monitor resync and wait for controllers to report cache sync.
 			//
@@ -222,7 +222,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
 				return false, nil
 			}
-			glog.V(4).Infof("resynced monitors")
+			klog.V(4).Infof("resynced monitors")
 
 			// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
 			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
@@ -242,7 +242,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
 		// occurred.
 		oldResources = newResources
-		glog.V(2).Infof("synced garbage collector")
+		klog.V(2).Infof("synced garbage collector")
 	}, period, stopCh)
 }
 
@@ -308,7 +308,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
 			// For now, record the error and retry.
-			glog.V(5).Infof("error syncing item %s: %v", n, err)
+			klog.V(5).Infof("error syncing item %s: %v", n, err)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
@@ -318,7 +318,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		// requeue if item hasn't been observed via an informer event yet.
 		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
 		// see https://issue.k8s.io/56121
-		glog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
+		klog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
 		gc.attemptToDelete.AddRateLimited(item)
 	}
 	return true
@@ -330,7 +330,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
 	dangling bool, owner *unstructured.Unstructured, err error) {
 	if gc.absentOwnerCache.Has(reference.UID) {
-		glog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	}
 	// TODO: we need to verify the reference resource is supported by the
@@ -351,14 +351,14 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
-		glog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		klog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	case err != nil:
 		return false, nil, err
 	}
 
 	if owner.GetUID() != reference.UID {
-		glog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		klog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		gc.absentOwnerCache.Add(reference.UID)
 		return true, nil, nil
 	}
@@ -405,10 +405,10 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 }
 
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
-	glog.V(2).Infof("processing item %s", item.identity)
+	klog.V(2).Infof("processing item %s", item.identity)
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
-		glog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
+		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
 		return nil
 	}
 	// TODO: It's only necessary to talk to the API server if this is a
@@ -420,7 +420,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// the GraphBuilder can add "virtual" node for an owner that doesn't
 		// exist yet, so we need to enqueue a virtual Delete event to remove
 		// the virtual node from GraphBuilder.uidToNode.
-		glog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
+		klog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 		// since we're manually inserting a delete event to remove this node,
 		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
@@ -431,7 +431,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	}
 
 	if latest.GetUID() != item.identity.UID {
-		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		klog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 		// since we're manually inserting a delete event to remove this node,
 		// we don't need to keep tracking it as a virtual node and requeueing in attemptToDelete
@@ -448,7 +448,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	// compute if we should delete the item
 	ownerReferences := latest.GetOwnerReferences()
 	if len(ownerReferences) == 0 {
-		glog.V(2).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
+		klog.V(2).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
 		return nil
 	}
 
@@ -456,15 +456,15 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	if err != nil {
 		return err
 	}
-	glog.V(5).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaitingForDependentsDeletion: %#v\n", item.identity, solid, dangling, waitingForDependentsDeletion)
+	klog.V(5).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaitingForDependentsDeletion: %#v\n", item.identity, solid, dangling, waitingForDependentsDeletion)
 
 	switch {
 	case len(solid) != 0:
-		glog.V(2).Infof("object %#v has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
+		klog.V(2).Infof("object %#v has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
 		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
 			return nil
 		}
-		glog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
+		klog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
 		// waitingForDependentsDeletion needs to be deleted from the
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
@@ -483,7 +483,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				// problem.
 				// there are multiple workers run attemptToDeleteItem in
 				// parallel, the circle detection can fail in a race condition.
-				glog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
+				klog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
 				patch, err := item.unblockOwnerReferencesStrategicMergePatch()
 				if err != nil {
 					return err
@@ -494,7 +494,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				break
 			}
 		}
-		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
+		klog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
 		// the deletion event will be observed by the graphBuilder, so the item
 		// will be processed again in processDeletingDependentsItem. If it
 		// doesn't have dependents, the function will remove the
@@ -518,7 +518,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 			// otherwise, default to background.
 			policy = metav1.DeletePropagationBackground
 		}
-		glog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		klog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
 		return gc.deleteObject(item.identity, &policy)
 	}
 }
@@ -527,12 +527,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 	blockingDependents := item.blockingDependents()
 	if len(blockingDependents) == 0 {
-		glog.V(2).Infof("remove DeleteDependents finalizer for item %s", item.identity)
+		klog.V(2).Infof("remove DeleteDependents finalizer for item %s", item.identity)
 		return gc.removeFinalizer(item, metav1.FinalizerDeleteDependents)
 	}
 	for _, dep := range blockingDependents {
 		if !dep.isDeletingDependents() {
-			glog.V(2).Infof("adding %s to attemptToDelete, because its owner %s is deletingDependents", dep.identity, item.identity)
+			klog.V(2).Infof("adding %s to attemptToDelete, because its owner %s is deletingDependents", dep.identity, item.identity)
 			gc.attemptToDelete.Add(dep)
 		}
 	}
@@ -570,7 +570,7 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 	if len(errorsSlice) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
-	glog.V(5).Infof("successfully updated all dependents of owner %s", owner)
+	klog.V(5).Infof("successfully updated all dependents of owner %s", owner)
 	return nil
 }
 
@@ -644,9 +644,9 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
 		if discovery.IsGroupDiscoveryFailedError(err) {
-			glog.Warningf("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+			klog.Warningf("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
 		} else {
-			glog.Warningf("failed to discover preferred resources: %v", err)
+			klog.Warningf("failed to discover preferred resources: %v", err)
 		}
 	}
 	if preferredResources == nil {
@@ -660,7 +660,7 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	for _, rl := range deletableResources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {
-			glog.Warningf("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			klog.Warningf("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
 			continue
 		}
 		for i := range rl.APIResources {

@@ -22,7 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.extensions.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -45,7 +44,7 @@ message AllowedHostPath {
   // pathPrefix is the path prefix that the host volume must match.
   // It does not support `*`.
   // Trailing slashes are trimmed when validating the path prefix with a host path.
-  // 
+  //
   // Examples:
   // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
   // `/foo` would not allow `/food` or `/etc/foo`
@@ -54,31 +53,6 @@ message AllowedHostPath {
   // when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
   // +optional
   optional bool readOnly = 2;
-}
-
-message CustomMetricCurrentStatus {
-  // Custom Metric name.
-  optional string name = 1;
-
-  // Custom Metric value (average).
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
-}
-
-message CustomMetricCurrentStatusList {
-  repeated CustomMetricCurrentStatus items = 1;
-}
-
-// Alpha-level support for Custom Metrics in HPA (as annotations).
-message CustomMetricTarget {
-  // Custom Metric name.
-  optional string name = 1;
-
-  // Custom Metric value (average).
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
-}
-
-message CustomMetricTargetList {
-  repeated CustomMetricTarget items = 1;
 }
 
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
@@ -335,6 +309,8 @@ message DeploymentSpec {
 
   // The number of old ReplicaSets to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
+  // This is set to the max value of int32 (i.e. 2147483647) by default, which
+  // means "retaining all old RelicaSets".
   // +optional
   optional int32 revisionHistoryLimit = 6;
 
@@ -688,7 +664,7 @@ message NetworkPolicyList {
 message NetworkPolicyPeer {
   // This is a label selector which selects Pods. This field follows standard label
   // selector semantics; if present but empty, it selects all pods.
-  // 
+  //
   // If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
@@ -697,7 +673,7 @@ message NetworkPolicyPeer {
 
   // Selects Namespaces using cluster-scoped labels. This field follows standard label
   // selector semantics; if present but empty, it selects all namespaces.
-  // 
+  //
   // If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
@@ -847,6 +823,12 @@ message PodSecurityPolicySpec {
   // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
   optional RunAsUserStrategyOptions runAsUser = 11;
 
+  // RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  // If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+  // RunAsGroup feature gate to be enabled.
+  // +optional
+  optional RunAsGroupStrategyOptions runAsGroup = 22;
+
   // supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
   optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
 
@@ -886,7 +868,7 @@ message PodSecurityPolicySpec {
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
   // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
@@ -896,7 +878,7 @@ message PodSecurityPolicySpec {
   // forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
@@ -1084,6 +1066,18 @@ message RollingUpdateDeployment {
   // at any time during the update is atmost 130% of desired pods.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
+}
+
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+// Deprecated: use RunAsGroupStrategyOptions from policy API Group instead.
+message RunAsGroupStrategyOptions {
+  // rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  optional string rule = 1;
+
+  // ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+  // then supply a single range with the same start and end. Required for MustRunAs.
+  // +optional
+  repeated IDRange ranges = 2;
 }
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.

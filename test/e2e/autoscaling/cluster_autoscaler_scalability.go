@@ -33,9 +33,9 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
 const (
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 			}
 			break
 		}
-		glog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
+		klog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
 	})
 
 	It("should scale up at all [Feature:ClusterAutoscalerScalability1]", func() {
@@ -170,7 +170,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		replicas1 := additionalNodes1 * replicasPerNode
 		replicas2 := additionalNodes2 * replicasPerNode
 
-		glog.Infof("cores per node: %v", coresPerNode)
+		klog.Infof("cores per node: %v", coresPerNode)
 
 		// saturate cluster
 		initialReplicas := nodeCount
@@ -178,7 +178,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		defer reservationCleanup()
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
-		glog.Infof("Reserved successfully")
+		klog.Infof("Reserved successfully")
 
 		// configure pending pods & expected scale up #1
 		rcConfig := reserveMemoryRCConfig(f, "extra-pod-1", replicas1, additionalNodes1*perNodeReservation, largeScaleUpTimeout)
@@ -191,7 +191,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		testCleanup1 := simpleScaleUpTestWithTolerance(f, config, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup1()
 
-		glog.Infof("Scaled up once")
+		klog.Infof("Scaled up once")
 
 		// configure pending pods & expected scale up #2
 		rcConfig2 := reserveMemoryRCConfig(f, "extra-pod-2", replicas2, additionalNodes2*perNodeReservation, largeScaleUpTimeout)
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		testCleanup2 := simpleScaleUpTestWithTolerance(f, config2, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup2()
 
-		glog.Infof("Scaled up twice")
+		klog.Infof("Scaled up twice")
 	})
 
 	It("should scale down empty nodes [Feature:ClusterAutoscalerScalability3]", func() {
@@ -327,7 +327,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 
 		By("Checking if the number of nodes is as expected")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		glog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
+		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
 		Expect(len(nodes.Items)).Should(Equal(totalNodes))
 	})
 
@@ -390,7 +390,7 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	} else {
 		framework.ExpectNoError(framework.WaitForReadyNodes(f.ClientSet, config.expectedResult.nodes, scaleUpTimeout))
 	}
-	glog.Infof("cluster is increased")
+	klog.Infof("cluster is increased")
 	if tolerateMissingPodCount > 0 {
 		framework.ExpectNoError(waitForCaPodsReadyInNamespace(f, f.ClientSet, tolerateMissingPodCount))
 	} else {
@@ -527,5 +527,5 @@ func distributeLoad(f *framework.Framework, namespace string, id string, podDist
 
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
-	glog.Infof("%s took %s", name, elapsed)
+	klog.Infof("%s took %s", name, elapsed)
 }
