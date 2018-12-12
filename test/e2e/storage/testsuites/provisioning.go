@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -242,6 +243,50 @@ func testProvisioning(input *provisioningTestInput) {
 			By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
 			RunInPodWithVolume(input.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: input.nodeName})
+		}
+		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+	})
+
+	It("should allow concurrent writes on the same node", func() {
+		if !input.dInfo.Capabilities[CapMultiPODs] {
+			framework.Skipf("Driver %q does not support multiple concurrent pods - skipping", input.dInfo.Name)
+		}
+		input.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+			// We start two pods concurrently on the same node,
+			// using the same PVC. Both wait for other to create a
+			// file before returning. The pods are forced onto the
+			// same node via pod affinity.
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+			firstPodName := "pvc-tester-first"
+			secondPodName := "pvc-tester-second"
+			run := func(podName, command string) {
+				defer GinkgoRecover()
+				defer wg.Done()
+				node := NodeSelection{
+					Name: input.nodeName,
+				}
+				if podName == secondPodName {
+					node.Affinity = &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										// Set by RunInPodWithVolume.
+										"app": firstPodName,
+									},
+								},
+									TopologyKey: "kubernetes.io/hostname",
+								},
+							},
+						},
+					}
+				}
+				RunInPodWithVolume(input.cs, claim.Namespace, claim.Name, podName, command, node)
+			}
+			go run(firstPodName, "touch /mnt/test/first && while ! [ -f /mnt/test/second ]; do sleep 1; done")
+			go run(secondPodName, "touch /mnt/test/second && while ! [ -f /mnt/test/first ]; do sleep 1; done")
+			wg.Wait()
 		}
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
@@ -561,6 +606,9 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName + "-",
+			Labels: map[string]string{
+				"app": podName,
+			},
 		},
 		Spec: v1.PodSpec{
 			NodeName:     node.Name,
