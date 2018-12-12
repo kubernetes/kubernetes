@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // CacheComparer is an implementation of the Scheduler's cache comparer.
@@ -68,7 +68,7 @@ func (c *CacheComparer) Compare() error {
 }
 
 // CompareNodes compares actual nodes with cached nodes.
-func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
+func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*schedulernodeinfo.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, node := range nodes {
 		actual = append(actual, node.Name)
@@ -83,7 +83,7 @@ func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*sch
 }
 
 // ComparePods compares actual pods with cached pods.
-func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
+func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*schedulernodeinfo.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, pod := range pods {
 		actual = append(actual, string(pod.UID))
