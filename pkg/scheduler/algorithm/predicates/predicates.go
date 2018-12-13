@@ -1563,7 +1563,7 @@ func CheckNodePIDPressurePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata
 	return true, nil, nil
 }
 
-// CheckNodeConditionPredicate checks if a pod can be scheduled on a node reporting out of disk,
+// CheckNodeConditionPredicate checks if a pod can be scheduled on a node reporting
 // network unavailable and not ready condition. Only node conditions are accounted in this predicate.
 func CheckNodeConditionPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	reasons := []algorithm.PredicateFailureReason{}
@@ -1576,12 +1576,9 @@ func CheckNodeConditionPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, 
 	for _, cond := range node.Status.Conditions {
 		// We consider the node for scheduling only when its:
 		// - NodeReady condition status is ConditionTrue,
-		// - NodeOutOfDisk condition status is ConditionFalse,
 		// - NodeNetworkUnavailable condition status is ConditionFalse.
 		if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
 			reasons = append(reasons, ErrNodeNotReady)
-		} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
-			reasons = append(reasons, ErrNodeOutOfDisk)
 		} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
 			reasons = append(reasons, ErrNodeNetworkUnavailable)
 		}

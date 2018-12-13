@@ -1212,7 +1212,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "Mix of failed predicates works fine",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeOutOfDisk, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeUnderDiskPressure, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName, algorithmpredicates.ErrDiskConflict},
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 				"machine4": []algorithm.PredicateFailureReason{},
@@ -1225,9 +1225,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderPIDPressure},
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
-				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeOutOfDisk},
 			},
-			expected: map[string]bool{},
+			expected: map[string]bool{"machine4": true},
 		},
 		{
 			name: "Node condition errors and ErrNodeUnknownCondition should be considered unresolvable",

@@ -128,7 +128,7 @@ const (
 	// beta: v1.12
 	//
 	// Taint nodes based on their condition status for 'NetworkUnavailable',
-	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
+	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
 	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 
 	// owner: @jsafrane

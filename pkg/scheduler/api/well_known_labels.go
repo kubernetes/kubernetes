@@ -45,11 +45,6 @@ const (
 	// and removed when node becomes scheduable.
 	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
 
-	// TaintNodeOutOfDisk will be added when node becomes out of disk
-	// and feature-gate for TaintNodesByCondition flag is enabled,
-	// and removed when node has enough disk.
-	TaintNodeOutOfDisk = "node.kubernetes.io/out-of-disk"
-
 	// TaintNodeMemoryPressure will be added when node has memory pressure
 	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when node has enough memory.

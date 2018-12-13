@@ -4521,47 +4521,17 @@ func TestNodeConditionPredicate(t *testing.T) {
 			schedulable: false,
 		},
 		{
-			name:        "node3 ignored - node out of disk",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node4 considered",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			schedulable: true,
-		},
-		{
-			name:        "node5 ignored - node out of disk",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node6 considered",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			schedulable: true,
-		},
-		{
-			name:        "node7 ignored - node out of disk, node not Ready",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node8 ignored - node not Ready",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node9 ignored - node unschedulable",
+			name:        "node3 ignored - node unschedulable",
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
 			schedulable: false,
 		},
 		{
-			name:        "node10 considered",
+			name:        "node4 considered",
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
 			schedulable: true,
 		},
 		{
-			name:        "node11 considered",
+			name:        "node5 considered",
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
 			schedulable: true,
 		},
