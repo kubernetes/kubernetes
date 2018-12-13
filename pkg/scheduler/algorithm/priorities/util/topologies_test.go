@@ -220,7 +220,7 @@ func TestNodesHaveSameTopologyKey(t *testing.T) {
 			topologyKey: "",
 		},
 		{
-			name: "nodeA lable nil vs. nodeB{'a':''} by key('a')",
+			name: "nodeA label nil vs. nodeB{'a':''} by key('a')",
 			nodeA: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{},
 			},
