@@ -197,6 +197,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	// Prepare the event broadcaster.
 	if cc.Broadcaster != nil && cc.EventClient != nil {
+		cc.Broadcaster.StartLogging(klog.V(6).Infof)
 		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
 	}
 
