@@ -103,7 +103,7 @@ type Config struct {
 	// successfully binding a pod
 	Ecache     *equivalence.Cache
 	NodeLister algorithm.NodeLister
-	Algorithm  algorithm.ScheduleAlgorithm
+	Algorithm  core.ScheduleAlgorithm
 	GetBinder  func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind

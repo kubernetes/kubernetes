@@ -211,7 +211,7 @@ func TestScheduler(t *testing.T) {
 		name             string
 		injectBindError  error
 		sendPod          *v1.Pod
-		algo             algorithm.ScheduleAlgorithm
+		algo             core.ScheduleAlgorithm
 		expectErrorPod   *v1.Pod
 		expectForgetPod  *v1.Pod
 		expectAssumedPod *v1.Pod
