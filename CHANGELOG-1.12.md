@@ -380,7 +380,7 @@ filename | sha512 hash
 
 ## Known Issues
 
-- Feature [#566](https://github.com/kubernetes/kubernetes/issues/566) enabling CoreDNS as the default for kube-up deployments was dropped from the release due to a scalability memory resource consumption issue observed. If a cluster operator is considering using CoreDNS on a cluster greater than 2000 nodes, it may be necessary to give more consideration to CoreDNS pod memory resource limits and experimentally measure that memory usage versus cluster resource availability.
+- Feature [#566](https://github.com/kubernetes/enhancements/issues/566) enabling CoreDNS as the default for kube-up deployments was dropped from the release due to a scalability memory resource consumption issue observed. If a cluster operator is considering using CoreDNS on a cluster greater than 2000 nodes, it may be necessary to give more consideration to CoreDNS pod memory resource limits and experimentally measure that memory usage versus cluster resource availability.
 - kube-controller-manager currently needs a writable `--cert-dir` (default is `/var/run/kubernetes`) for generating self-signed certificates, when no `--tls-cert-file` or `--tls-private-key-file` are provided.
 - The `system:kube-controller-manager` ClusterRole lacks permission to `get` the `configmap` extension-apiserver-authentication. kube-controller-manager errors if run with a service account bound to the clusterrole.
 - Runtime handler and Windows npipe protocol are not supported yet in crictl v1.11.x. Those features will be supported in crictl [v1.12.0](https://github.com/kubernetes-sigs/cri-tools/releases/tag/v1.12.0), together with Kubernetes v1.12.1.
@@ -518,13 +518,13 @@ SIG Scheduling development efforts have been primarily focused on improving perf
 
 ### SIG-storage
 
-SIG Storage promoted the [Kubernetes volume topology feature](https://github.com/kubernetes/features/issues/490) to beta. This enables Kubernetes to understand and act intelligently on volume accessibility information (such as the “zone” a cloud volume is provisioned in, the “rack” that a SAN array is accessible from, and so on).
+SIG Storage promoted the [Kubernetes volume topology feature](https://github.com/kubernetes/enhancements/issues/490) to beta. This enables Kubernetes to understand and act intelligently on volume accessibility information (such as the “zone” a cloud volume is provisioned in, the “rack” that a SAN array is accessible from, and so on).
 
-The [dynamic maximum volume count](https://github.com/kubernetes/features/issues/554) feature was also moved to beta. This enables a volume plugin to specify the maximum number of a given volume type per node as a function of the node characteristics (for example, a larger limit for larger nodes, a smaller limit for smaller nodes).
+The [dynamic maximum volume count](https://github.com/kubernetes/enhancements/issues/554) feature was also moved to beta. This enables a volume plugin to specify the maximum number of a given volume type per node as a function of the node characteristics (for example, a larger limit for larger nodes, a smaller limit for smaller nodes).
 
-SIG Storage also worked on a number of [Container Storage Interface (CSI) features](https://github.com/kubernetes/features/issues/178) this quarter in anticipation of moving support for CSI from beta to GA in the next Kubernetes release. This includes graduating the dependent “mount namespace propagation” feature to GA, moving the Kubelet plugin registration mechanism to beta, adding alpha support for a new CSI driver registry as well as for topology, and adding a number of alpha features to support the use of CSI for “local ephemeral volumes” (that is, volumes that exist for the lifecycle of a pod and contain some injected information, like a token or secret).
+SIG Storage also worked on a number of [Container Storage Interface (CSI) features](https://github.com/kubernetes/enhancements/issues/178) this quarter in anticipation of moving support for CSI from beta to GA in the next Kubernetes release. This includes graduating the dependent “mount namespace propagation” feature to GA, moving the Kubelet plugin registration mechanism to beta, adding alpha support for a new CSI driver registry as well as for topology, and adding a number of alpha features to support the use of CSI for “local ephemeral volumes” (that is, volumes that exist for the lifecycle of a pod and contain some injected information, like a token or secret).
 
-With Kubernetes v1.12, SIG Storage also introduced alpha support for [volume snapshotting](https://github.com/kubernetes/features/issues/177). This feature introduces the ability to create/delete volume snapshots and create new volumes from a snapshot using the Kubernetes API.
+With Kubernetes v1.12, SIG Storage also introduced alpha support for [volume snapshotting](https://github.com/kubernetes/enhancements/issues/177). This feature introduces the ability to create/delete volume snapshots and create new volumes from a snapshot using the Kubernetes API.
 
 ### SIG-vmware
 
@@ -1588,7 +1588,7 @@ filename | sha256 hash
 * The `system-node-critical` and `system-cluster-critical` priority classes are now limited to the `kube-system` namespace by the `PodPriority` admission plugin. ([#65593](https://github.com/kubernetes/kubernetes/pull/65593), [@bsalamat](https://github.com/bsalamat))
 * kubernetes-worker juju charm: Added support for setting the --enable-ssl-chain-completion option on the ingress proxy.  "action required": if your installation relies on supplying incomplete certificate chains and using OCSP to fill them in, you must set "ingress-ssl-chain-completion" to "true" in your juju configuration. ([#63845](https://github.com/kubernetes/kubernetes/pull/63845), [@paulgear](https://github.com/paulgear))
 * In anticipation of CSI 1.0 in the next release, Kubernetes 1.12 calls the CSI `NodeGetInfo` RPC instead of `NodeGetId` RPC. Ensure your CSI Driver implements `NodeGetInfo(...)` before upgrading to 1.12. [@saad-ali](https://github.com/kubernetes/kubernetes/issues/68688)
-* Kubernetes 1.12 also enables [Kubelet device plugin registration](https://github.com/kubernetes/features/issues/595) feature by default. Before upgrading to 1.12, ensure the `driver-registrar` CSI sidecar container for your CSI driver is configured to handle plugin registration (set the `--kubelet-registration-path` parameter on `driver-registrar` to expose a new unix domain socket to handle Kubelet Plugin Registration).
+* Kubernetes 1.12 also enables [Kubelet device plugin registration](https://github.com/kubernetes/enhancements/issues/595) feature by default. Before upgrading to 1.12, ensure the `driver-registrar` CSI sidecar container for your CSI driver is configured to handle plugin registration (set the `--kubelet-registration-path` parameter on `driver-registrar` to expose a new unix domain socket to handle Kubelet Plugin Registration).
 
 ### Other notable changes
 
