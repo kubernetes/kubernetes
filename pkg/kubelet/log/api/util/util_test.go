@@ -1,7 +1,6 @@
 package util
 
 import (
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"reflect"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/log/api"
 	"k8s.io/kubernetes/pkg/kubelet/log/api/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/log/api/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 var testcases = []struct {
@@ -378,7 +378,8 @@ func TestIsPodLogPolicyExists(t *testing.T) {
 func TestGetPodLogPolicy(t *testing.T) {
 	for _, tc := range testcases {
 		actual, _ := GetPodLogPolicy(tc.pod)
-		if !reflect.DeepEqual(actual, tc.logPolicy) {
+		// because of conversion from map to slice, use custom deep equal here.
+		if !podLogPolicyDeepEqual(actual, tc.logPolicy) {
 			t.Errorf("test GetPodLogPolicy error, expected: %v, actual: %v, pod: %q", tc.logPolicy, actual, format.Pod(tc.pod))
 		}
 	}
@@ -391,4 +392,31 @@ func TestGetPodLogConfigMapNames(t *testing.T) {
 			t.Errorf("test GetPodLogConfigMapNames error, expected: %v, actual: %v, pod: %q", tc.configMapNames, actual, format.Pod(tc.pod))
 		}
 	}
+}
+
+func podLogPolicyDeepEqual(x *api.PodLogPolicy, y *api.PodLogPolicy) bool {
+	if x == nil || y == nil {
+		return x == y
+	}
+	if x.PluginName != y.PluginName {
+		return false
+	}
+	if x.SafeDeletionEnabled != y.SafeDeletionEnabled {
+		return false
+	}
+	if len(x.ContainerLogPolicies) != len(y.ContainerLogPolicies) {
+		return false
+	}
+
+	// slice compare
+	xm := make(map[api.ContainerLogPolicy]int)
+	ym := make(map[api.ContainerLogPolicy]int)
+	for _, clp := range x.ContainerLogPolicies {
+		xm[clp]++
+	}
+	for _, clp := range y.ContainerLogPolicies {
+		ym[clp]++
+	}
+
+	return reflect.DeepEqual(xm, ym)
 }
