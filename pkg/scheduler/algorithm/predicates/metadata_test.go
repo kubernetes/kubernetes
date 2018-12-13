@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -70,8 +71,8 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	for !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	if !reflect.DeepEqual(meta1.topologyPairsPotentialAffinityPods, meta2.topologyPairsPotentialAffinityPods) {
-		return fmt.Errorf("topologyPairsPotentialAffinityPods are not equal")
+	if !reflect.DeepEqual(meta1.podAffinityQuery, meta2.podAffinityQuery) {
+		return fmt.Errorf("podAffinityQuery are not equal")
 	}
 	if !reflect.DeepEqual(meta1.topologyPairsPotentialAntiAffinityPods, meta2.topologyPairsPotentialAntiAffinityPods) {
 		return fmt.Errorf("topologyPairsPotentialAntiAffinityPods are not equal")
@@ -363,7 +364,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 				}
 				_, precompute := NewServiceAffinityPredicate(lister, schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
-				pmf := PredicateMetadataFactory{lister}
+				pmf := PredicateMetadataFactory{lister, BuildTopologyInfo(nodeInfoMap)}
 				meta := pmf.GetMetadata(test.pendingPod, nodeInfoMap)
 				return meta.(*predicateMetadata), nodeInfoMap
 			}
@@ -443,36 +444,16 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				},
 			},
 		},
-		topologyPairsPotentialAffinityPods: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "nodeA"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeA"},
-					}: struct{}{},
-				},
-				{key: "name", value: "nodeC"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-						Spec: v1.PodSpec{
-							NodeName: "nodeC",
-						},
-					}: struct{}{},
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeC"},
-					}: struct{}{},
-				},
+		podAffinityQuery: affinityQuery{
+			{
+				schedulernodeinfo.TopologyPair{Key: "name", Value: "nodeA"}: sets.NewString("/p1"),
 			},
-			podToTopologyPairs: map[string]topologyPairSet{
-				"p1_": {
-					topologyPair{key: "name", value: "nodeA"}: struct{}{},
-				},
-				"p2_": {
-					topologyPair{key: "name", value: "nodeC"}: struct{}{},
-				},
-				"p6_": {
-					topologyPair{key: "name", value: "nodeC"}: struct{}{},
-				},
+			{
+				schedulernodeinfo.TopologyPair{Key: "name", Value: "nodeC"}: sets.NewString("/p2"),
+				schedulernodeinfo.TopologyPair{Key: "name", Value: "nodeC"}: sets.NewString("/p6"),
 			},
 		},
+		podAffinityFits: sets.String{},
 		topologyPairsPotentialAntiAffinityPods: &topologyPairsMaps{
 			topologyPairToPods: map[topologyPair]podSet{
 				{key: "name", value: "nodeN"}: {
@@ -548,17 +529,19 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 	newPod := func(labels ...string) *v1.Pod {
 		labelMap := make(map[string]string)
+		var podName string
 		for _, l := range labels {
 			labelMap[l] = ""
+			podName += l
 		}
 		return &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "normal", Labels: labelMap},
+			ObjectMeta: metav1.ObjectMeta{Name: podName, Labels: labelMap},
 			Spec:       v1.PodSpec{NodeName: "nodeA"},
 		}
 	}
-	normalPodA := newPod("aaa")
-	normalPodB := newPod("bbb")
-	normalPodAB := newPod("aaa", "bbb")
+	podFoo := newPod("foo")
+	podBar := newPod("bar")
+	podFooBar := newPod("foo", "bar")
 	nodeA := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"hostname": "nodeA"}}}
 
 	tests := []struct {
@@ -566,7 +549,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		existingPods             []*v1.Pod
 		nodes                    []*v1.Node
 		pod                      *v1.Pod
-		wantAffinityPodsMaps     *topologyPairsMaps
+		wantPodAffinityQuery     affinityQuery
 		wantAntiAffinityPodsMaps *topologyPairsMaps
 		wantErr                  bool
 	}{
@@ -574,141 +557,152 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			name:  "nil test",
 			nodes: []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "aaa-normal"},
+				ObjectMeta: metav1.ObjectMeta{Name: "normal"},
 			},
-			wantAffinityPodsMaps:     newTopologyPairsMaps(),
+			wantPodAffinityQuery:     affinityQuery(nil),
 			wantAntiAffinityPodsMaps: newTopologyPairsMaps(),
 		},
 		{
 			name:         "incoming pod without affinity/anti-affinity causes a no-op",
-			existingPods: []*v1.Pod{normalPodA},
+			existingPods: []*v1.Pod{podFoo},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "aaa-normal"},
+				ObjectMeta: metav1.ObjectMeta{Name: "normal"},
 			},
-			wantAffinityPodsMaps:     newTopologyPairsMaps(),
+			wantPodAffinityQuery:     affinityQuery(nil),
 			wantAntiAffinityPodsMaps: newTopologyPairsMaps(),
 		},
 		{
 			name:         "no pod has label that violates incoming pod's affinity and anti-affinity",
-			existingPods: []*v1.Pod{normalPodB},
+			existingPods: []*v1.Pod{podBar},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "aaa-anti"},
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo"),
 						},
 						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo"),
 						},
 					},
 				},
 			},
-			wantAffinityPodsMaps:     newTopologyPairsMaps(),
+			wantPodAffinityQuery:     newAffinityQuery(1),
 			wantAntiAffinityPodsMaps: newTopologyPairsMaps(),
 		},
 		{
 			name:         "existing pod matches incoming pod's affinity and anti-affinity - single term case",
-			existingPods: []*v1.Pod{normalPodA},
+			existingPods: []*v1.Pod{podFoo},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "affi-antiaffi"},
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo"),
 						},
 						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo"),
 						},
 					},
 				},
 			},
-			wantAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodA: struct{}{}},
-				},
-				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
-					},
-				},
+			wantPodAffinityQuery: affinityQuery{
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo")},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodA: struct{}{}},
+					{key: "hostname", value: "nodeA"}: {podFoo: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
+					"foo_": {
 						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
 					},
 				},
 			},
 		},
 		{
-			name:         "existing pod matches incoming pod's affinity and anti-affinity - mutiple terms case",
-			existingPods: []*v1.Pod{normalPodAB},
+			name:         "existing pod matches incoming pod's affinity and anti-affinity - multiple terms case",
+			existingPods: []*v1.Pod{podFooBar},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "affi-antiaffi"},
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "bbb"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "bar"),
 						},
 						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo"),
 						},
 					},
 				},
 			},
-			wantAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodAB: struct{}{}},
-				},
-				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
-					},
-				},
+			wantPodAffinityQuery: affinityQuery{
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodAB: struct{}{}},
+					{key: "hostname", value: "nodeA"}: {podFooBar: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
+					"foobar_": {
 						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
 					},
 				},
 			},
+		},
+		{
+			name:         "existing pod partially matches incoming pod's affinity",
+			existingPods: []*v1.Pod{podFoo, podFooBar, podBar},
+			nodes:        []*v1.Node{nodeA},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("baz", "foo", "bar"),
+						},
+					},
+				},
+			},
+			wantPodAffinityQuery: affinityQuery{
+				make(map[schedulernodeinfo.TopologyPair]sets.String),
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo", "/foobar")},
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar", "/bar")},
+			},
+			wantAntiAffinityPodsMaps: newTopologyPairsMaps(),
 		},
 		{
 			name:         "existing pod not match incoming pod's affinity but matches anti-affinity",
-			existingPods: []*v1.Pod{normalPodA},
+			existingPods: []*v1.Pod{podFoo},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "affi-antiaffi"},
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "bbb"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "bar"),
 						},
 						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "bbb"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "bar"),
 						},
 					},
 				},
 			},
-			wantAffinityPodsMaps: newTopologyPairsMaps(),
+			wantPodAffinityQuery: affinityQuery{
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo")},
+				make(map[schedulernodeinfo.TopologyPair]sets.String),
+			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodA: struct{}{}},
+					{key: "hostname", value: "nodeA"}: {podFoo: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
+					"foo_": {
 						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
 					},
 				},
@@ -716,28 +710,31 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		},
 		{
 			name:         "incoming pod's anti-affinity has more than one term - existing pod violates partial term - case 1",
-			existingPods: []*v1.Pod{normalPodAB},
+			existingPods: []*v1.Pod{podFooBar},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "anaffi-antiaffiti"},
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "ccc"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "baz"),
 						},
 						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "ccc"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "baz"),
 						},
 					},
 				},
 			},
-			wantAffinityPodsMaps: newTopologyPairsMaps(),
+			wantPodAffinityQuery: affinityQuery{
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
+				make(map[schedulernodeinfo.TopologyPair]sets.String),
+			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodAB: struct{}{}},
+					{key: "hostname", value: "nodeA"}: {podFooBar: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
+					"foobar_": {
 						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
 					},
 				},
@@ -745,28 +742,31 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		},
 		{
 			name:         "incoming pod's anti-affinity has more than one term - existing pod violates partial term - case 2",
-			existingPods: []*v1.Pod{normalPodB},
+			existingPods: []*v1.Pod{podBar},
 			nodes:        []*v1.Node{nodeA},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "affi-antiaffi"},
+				ObjectMeta: metav1.ObjectMeta{Name: "incoming-pod"},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "bbb"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "bar"),
 						},
 						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("aaa", "bbb"),
+							RequiredDuringSchedulingIgnoredDuringExecution: newPodAffinityTerms("foo", "bar"),
 						},
 					},
 				},
 			},
-			wantAffinityPodsMaps: newTopologyPairsMaps(),
+			wantPodAffinityQuery: affinityQuery{
+				make(map[schedulernodeinfo.TopologyPair]sets.String),
+				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/bar")},
+			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodB: struct{}{}},
+					{key: "hostname", value: "nodeA"}: {podBar: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
-					"normal_": {
+					"bar_": {
 						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
 					},
 				},
@@ -777,13 +777,13 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
 
-			gotAffinityPodsMaps, gotAntiAffinityPodsMaps, err := getTPMapMatchingIncomingAffinityAntiAffinity(tt.pod, nodeInfoMap)
+			gotPodAffinityQuery, gotAntiAffinityPodsMaps, err := getTPMapMatchingIncomingAffinityAntiAffinity(tt.pod, nodeInfoMap)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(gotAffinityPodsMaps, tt.wantAffinityPodsMaps) {
-				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMaps = %#v, want %#v", gotAffinityPodsMaps, tt.wantAffinityPodsMaps)
+			if !reflect.DeepEqual(gotPodAffinityQuery, tt.wantPodAffinityQuery) {
+				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotPodAffinityQuery = %#v, want %#v", gotPodAffinityQuery, tt.wantPodAffinityQuery)
 			}
 			if !reflect.DeepEqual(gotAntiAffinityPodsMaps, tt.wantAntiAffinityPodsMaps) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAntiAffinityPodsMaps = %#v, want %#v", gotAntiAffinityPodsMaps, tt.wantAntiAffinityPodsMaps)

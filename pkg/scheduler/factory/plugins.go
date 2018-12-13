@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"k8s.io/klog"
@@ -43,6 +44,7 @@ type PluginFactoryArgs struct {
 	NodeLister                     algorithm.NodeLister
 	PDBLister                      algorithm.PDBLister
 	NodeInfo                       predicates.NodeInfo
+	TopologyInfo                   schedulernodeinfo.TopologyInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
 	StorageClassInfo               predicates.StorageClassInfo

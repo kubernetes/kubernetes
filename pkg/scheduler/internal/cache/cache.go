@@ -75,6 +75,8 @@ type schedulerCache struct {
 	nodeTree *NodeTree
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
+	// A map from node label to node names
+	toplogyInfo schedulernodeinfo.TopologyInfo
 }
 
 type podState struct {
@@ -111,6 +113,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
 		imageStates: make(map[string]*imageState),
+		toplogyInfo: make(map[schedulernodeinfo.TopologyPair]sets.String),
 	}
 }
 
@@ -522,6 +525,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 
 	cache.nodeTree.AddNode(node)
 	cache.addNodeImageStates(node, n.info)
+	cache.toplogyInfo.AddNode(node)
 	return n.info.SetNode(node)
 }
 
@@ -540,6 +544,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 
 	cache.nodeTree.UpdateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
+	cache.toplogyInfo.UpdateNode(oldNode, newNode)
 	return n.info.SetNode(newNode)
 }
 
@@ -566,6 +571,7 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 
 	cache.nodeTree.RemoveNode(node)
 	cache.removeNodeImageStates(node)
+	cache.toplogyInfo.RemoveNode(node)
 	return nil
 }
 
@@ -664,4 +670,8 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 
 func (cache *schedulerCache) NodeTree() *NodeTree {
 	return cache.nodeTree
+}
+
+func (cache *schedulerCache) TopologyInfo() schedulernodeinfo.TopologyInfo {
+	return cache.toplogyInfo
 }

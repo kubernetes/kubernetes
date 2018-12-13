@@ -23,6 +23,8 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
+var _ internalcache.Cache = &Cache{}
+
 // Cache is used for testing
 type Cache struct {
 	AssumeFunc       func(*v1.Pod)
@@ -94,3 +96,6 @@ func (c *Cache) Snapshot() *internalcache.Snapshot {
 
 // NodeTree is a fake method for testing.
 func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
+
+// TopologyInfo is a fake method for testing.
+func (c *Cache) TopologyInfo() schedulernodeinfo.TopologyInfo { return nil }

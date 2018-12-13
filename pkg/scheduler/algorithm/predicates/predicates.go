@@ -1375,26 +1375,28 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	return nil, nil
 }
 
-//  nodeMatchesAllTopologyTerms checks whether "nodeInfo" matches
-//  topology of all the "terms" for the given "pod".
-func (c *PodAffinityChecker) nodeMatchesAllTopologyTerms(pod *v1.Pod, topologyPairs *topologyPairsMaps, nodeInfo *schedulernodeinfo.NodeInfo, terms []v1.PodAffinityTerm) bool {
+// TODO(Huang-Wei): remove this method as it's not used any more
+// nodeMatchesAllTopologyTerms checks whether "nodeInfo" matches
+// topology of all the "terms".
+func (c *PodAffinityChecker) nodeMatchesAllTopologyTerms(q affinityQuery, nodeInfo *schedulernodeinfo.NodeInfo, terms []v1.PodAffinityTerm) bool {
 	node := nodeInfo.Node()
-	for _, term := range terms {
-		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-			pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-			if _, ok := topologyPairs.topologyPairToPods[pair]; !ok {
-				return false
-			}
-		} else {
+	for idx, term := range terms {
+		topologyValue, ok := node.Labels[term.TopologyKey]
+		if !ok {
+			return false
+		}
+
+		pair := schedulernodeinfo.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
+		if _, ok := q[idx][pair]; !ok {
 			return false
 		}
 	}
 	return true
 }
 
-//  nodeMatchesAnyTopologyTerm checks whether "nodeInfo" matches
-//  topology of any "term" for the given "pod".
-func (c *PodAffinityChecker) nodeMatchesAnyTopologyTerm(pod *v1.Pod, topologyPairs *topologyPairsMaps, nodeInfo *schedulernodeinfo.NodeInfo, terms []v1.PodAffinityTerm) bool {
+// nodeMatchesAnyTopologyTerm checks whether "nodeInfo" matches
+// topology of any "term".
+func (c *PodAffinityChecker) nodeMatchesAnyTopologyTerm(topologyPairs *topologyPairsMaps, nodeInfo *schedulernodeinfo.NodeInfo, terms []v1.PodAffinityTerm) bool {
 	node := nodeInfo.Node()
 	for _, term := range terms {
 		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
@@ -1417,26 +1419,27 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	}
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		// Check all affinity terms.
-		topologyPairsPotentialAffinityPods := predicateMeta.topologyPairsPotentialAffinityPods
-		if affinityTerms := GetPodAffinityTerms(affinity.PodAffinity); len(affinityTerms) > 0 {
-			matchExists := c.nodeMatchesAllTopologyTerms(pod, topologyPairsPotentialAffinityPods, nodeInfo, affinityTerms)
-			if !matchExists {
-				// This pod may the first pod in a series that have affinity to themselves. In order
-				// to not leave such pods in pending state forever, we check that if no other pod
-				// in the cluster matches the namespace and selector of this pod and the pod matches
-				// its own terms, then we allow the pod to pass the affinity check.
-				if !(len(topologyPairsPotentialAffinityPods.topologyPairToPods) == 0 && targetPodMatchesAffinityOfPod(pod, pod)) {
-					klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
-						podName(pod), node.Name)
-					return ErrPodAffinityRulesNotMatch, nil
-				}
+		if len(GetPodAffinityTerms(affinity.PodAffinity)) > 0 {
+			podAffinityFits := predicateMeta.getPodAffinityFits()
+			podAffinityPass := false
+			// if no node fits for its pod affinity terms, give it last chance
+			// to see if it matches itself
+			if len(podAffinityFits) == 0 {
+				podAffinityPass = podMatchesItsOwnAffinityOnNode(pod, node)
+			} else {
+				podAffinityPass = podAffinityFits.Has(node.Name)
+			}
+			if !podAffinityPass {
+				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
+					podName(pod), node.Name)
+				return ErrPodAffinityRulesNotMatch, nil
 			}
 		}
 
 		// Check all anti-affinity terms.
 		topologyPairsPotentialAntiAffinityPods := predicateMeta.topologyPairsPotentialAntiAffinityPods
 		if antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
-			matchExists := c.nodeMatchesAnyTopologyTerm(pod, topologyPairsPotentialAntiAffinityPods, nodeInfo, antiAffinityTerms)
+			matchExists := c.nodeMatchesAnyTopologyTerm(topologyPairsPotentialAntiAffinityPods, nodeInfo, antiAffinityTerms)
 			if matchExists {
 				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinity",
 					podName(pod), node.Name)
@@ -1492,7 +1495,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 				return ErrPodAffinityRulesNotMatch, nil
 			}
 			// Check if pod matches its own affinity properties (namespace and label selector).
-			if !targetPodMatchesAffinityOfPod(pod, pod) {
+			if !podMatchesItsOwnAffinityOnNode(pod, node) {
 				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
 					podName(pod), node.Name)
 				return ErrPodAffinityRulesNotMatch, nil
@@ -1700,4 +1703,22 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, no
 	// All volumes bound or matching PVs found for all unbound PVCs
 	klog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
+}
+
+// BuildTopologyInfo buids a TopologyInfo based on a nodeInfoMap
+func BuildTopologyInfo(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) schedulernodeinfo.TopologyInfo {
+	if nodeInfoMap == nil {
+		return nil
+	}
+	topologyInfo := make(schedulernodeinfo.TopologyInfo)
+	for nodeName, nodeInfo := range nodeInfoMap {
+		for k, v := range nodeInfo.Node().Labels {
+			pair := schedulernodeinfo.TopologyPair{Key: k, Value: v}
+			if topologyInfo[pair] == nil {
+				topologyInfo[pair] = sets.String{}
+			}
+			topologyInfo[pair][nodeName] = sets.Empty{}
+		}
+	}
+	return topologyInfo
 }

@@ -25,7 +25,7 @@ func init() {
 	// Register functions that extract metadata used by predicates computations.
 	factory.RegisterPredicateMetadataProducerFactory(
 		func(args factory.PluginFactoryArgs) predicates.PredicateMetadataProducer {
-			return predicates.NewPredicateMetadataFactory(args.PodLister)
+			return predicates.NewPredicateMetadataFactory(args.PodLister, args.TopologyInfo)
 		})
 
 	// IMPORTANT NOTES for predicate developers:

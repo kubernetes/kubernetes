@@ -18,10 +18,13 @@ package predicates
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // ExampleUtils is a https://blog.golang.org/examples styled unit test.
@@ -67,4 +70,153 @@ func ExampleFindLabelsInSet() {
 	// will_see_this
 	// label1=value1,label2=value2,label3=will_see_this
 	// pod1,pod2,
+}
+
+func TestIntersect(t *testing.T) {
+	tests := []struct {
+		name    string
+		strsets []sets.String
+		want    sets.String
+	}{
+		{
+			name:    "single nil",
+			strsets: []sets.String{},
+			want:    sets.String{},
+		},
+		{
+			name:    "multiple nils",
+			strsets: []sets.String{{}, {}, {}, {}},
+			want:    sets.String{},
+		},
+		{
+			name: "no intersaction found",
+			strsets: []sets.String{
+				{
+					"nodeB": struct{}{},
+					"nodeC": struct{}{},
+				},
+				{
+					"nodeC": struct{}{},
+					"nodeA": struct{}{},
+				},
+				{
+					"nodeA": struct{}{},
+					"nodeB": struct{}{},
+					"nodeD": struct{}{},
+				},
+			},
+			want: sets.String{},
+		},
+		{
+			name: "intersaction found",
+			strsets: []sets.String{
+				{
+					"nodeB": struct{}{},
+					"nodeC": struct{}{},
+				},
+				{
+					"nodeC": struct{}{},
+					"nodeA": struct{}{},
+					"nodeB": struct{}{},
+				},
+				{
+					"nodeA": struct{}{},
+					"nodeB": struct{}{},
+					"nodeD": struct{}{},
+				},
+				{
+					"nodeE": struct{}{},
+					"nodeB": struct{}{},
+				},
+			},
+			want: sets.String{
+				"nodeB": struct{}{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Intersect(tt.strsets); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Intersect() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnion(t *testing.T) {
+	tests := []struct {
+		name    string
+		strsets []sets.String
+		want    sets.String
+	}{
+		{
+			name:    "single nil",
+			strsets: []sets.String{},
+			want:    sets.String{},
+		},
+		{
+			name:    "multiple nils",
+			strsets: []sets.String{{}, {}, {}, {}},
+			want:    sets.String{},
+		},
+		{
+			name: "union case 1",
+			strsets: []sets.String{
+				{
+					"nodeB": struct{}{},
+					"nodeC": struct{}{},
+				},
+				{
+					"nodeC": struct{}{},
+					"nodeA": struct{}{},
+				},
+				{
+					"nodeA": struct{}{},
+					"nodeB": struct{}{},
+					"nodeD": struct{}{},
+				},
+			},
+			want: sets.String{
+				"nodeA": struct{}{},
+				"nodeB": struct{}{},
+				"nodeC": struct{}{},
+				"nodeD": struct{}{},
+			},
+		},
+		{
+			name: "union case 2",
+			strsets: []sets.String{
+				{
+					"nodeB": struct{}{},
+				},
+				{
+					"nodeC": struct{}{},
+					"nodeA": struct{}{},
+				},
+				{
+					"nodeA": struct{}{},
+					"nodeB": struct{}{},
+					"nodeD": struct{}{},
+				},
+				{
+					"nodeE": struct{}{},
+					"nodeB": struct{}{},
+				},
+			},
+			want: sets.String{
+				"nodeA": struct{}{},
+				"nodeB": struct{}{},
+				"nodeC": struct{}{},
+				"nodeD": struct{}{},
+				"nodeE": struct{}{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Union(tt.strsets); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Union() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

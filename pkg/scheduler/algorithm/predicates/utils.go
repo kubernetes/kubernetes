@@ -19,6 +19,7 @@ package predicates
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -76,4 +77,40 @@ func portsConflict(existingPorts schedulernodeinfo.HostPortInfo, wantPorts []*v1
 	}
 
 	return false
+}
+
+// Intersect returns a new set which includes the items in ALL "strsets"
+// For example:
+// input: [{a1, a2}, {a2, a3}, {a2, a4}]
+// output: {a2}
+func Intersect(strsets []sets.String) sets.String {
+	length := len(strsets)
+	if length == 0 {
+		return sets.String{}
+	}
+	if length == 1 {
+		return strsets[0]
+	}
+	if length == 2 {
+		return strsets[0].Intersection(strsets[1])
+	}
+	return Intersect(strsets[:length/2]).Intersection(Intersect(strsets[length/2:]))
+}
+
+// Union returns a new set which includes all non-duplicate items in "strsets"
+// For example:
+// input: [{a1, a2}, {a2, a3}, {a4}]
+// output: {a1, a2, a3, a4}
+func Union(strsets []sets.String) sets.String {
+	length := len(strsets)
+	if length == 0 {
+		return sets.String{}
+	}
+	if length == 1 {
+		return strsets[0]
+	}
+	if length == 2 {
+		return strsets[0].Union(strsets[1])
+	}
+	return Union(strsets[:length/2]).Union(Union(strsets[length/2:]))
 }
