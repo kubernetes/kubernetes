@@ -59,6 +59,9 @@ type latencyAdapter struct {
 }
 
 func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
+	if l.m == nil {
+		metrics.Register(&latencyAdapter{requestLatency}, &resultAdapter{requestResult})
+	}
 	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
