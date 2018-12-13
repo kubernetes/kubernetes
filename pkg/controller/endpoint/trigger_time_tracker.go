@@ -48,31 +48,32 @@ Please note that the EndpointsController satisfied all this assumptions in a ver
 // Refer to scalability tests results to make it clear how probable is that.
 */
 type triggerTimeTracker struct {
-	// All maps below are indexed by the Endpoints object name.
+	// All maps below are indexed by the Endpoints object namespaced name.
 
-	// Map storing the min trigger change time that was saved when the endpoints object was last
-	// changed. This map will be updated only in the updateAndReset method.
+	// lastSyncMinTriggerTime is a map storing the min trigger change time that was saved when the
+	// endpoints object was last changed. This map will be updated only in the updateAndReset method.
 	lastSyncMinTriggerTime map[string]time.Time
 
-	// Similar map as the lastMinTriggerTime but stores the last *max* trigger change time.
+	// lastSyncMaxTriggerTime is a map similar to the lastMinTriggerTime but stores the last *max*
+	// trigger change time.
 	lastSyncMaxTriggerTime map[string]time.Time
 
-	// Map storing min trigger change time observed since the last updated of the endpoints object.
-	// In contrast to lastSavedMinTriggerTime and lastSavedMaxTriggerTime this map will be updated
-	// in the observe method, i.e. every time a trigger change is observed
+	// minTriggerTime  is a map storing min trigger change time observed since the last updated of the
+	// endpoints object. In contrast to lastSavedMinTriggerTime and lastSavedMaxTriggerTime this map
+	// will be updated in the observe method, i.e. every time a trigger change is observed
 	// (e.g. Pod added / updated / removed) and reset in the updateAndReset method.
 	minTriggerTime map[string]time.Time
 
-	// Map from the endpoints object name to the bool value that reflects whether the client is
-	// currently listing the objects via the list function.
+	// isListingObjects is a map from the endpoints object namespaced name to the bool value that
+	// reflects whether the client is currently listing the objects via the list function.
 	isListingObjects map[string]bool
 
-	// Map storing all trigger times that were observed during the time the objects were listed in the
-	// "list" function. We need this multi-map to make sure that we haven't missed any event due
-	// a unfortunate race condition.
+	// dirtyTriggerTimes is a map storing all trigger times that were observed during the time the
+	// objects were listed in the "list" function. We need this multi-map to make sure that we haven't
+	// missed any event due a unfortunate race condition.
 	dirtyTriggerTimes map[string][]time.Time
 
-	// Mutex guarding this util.
+	// mutex guarding this util.
 	mutex sync.Mutex
 }
 
@@ -97,8 +98,7 @@ func (this *triggerTimeTracker) observe(key string, triggerTime time.Time) {
 		return
 	}
 
-	if triggerTime.Before(this.lastSyncMaxTriggerTime[key]) ||
-			triggerTime == this.lastSyncMaxTriggerTime[key] {
+	if !triggerTime.After(this.lastSyncMaxTriggerTime[key]) {
 		// Trigger was already processed
 		if triggerTime.Before(this.lastSyncMinTriggerTime[key]) {
 			// Oops, we exported a wrong time in the last processing. Increment the error counter.
@@ -140,6 +140,12 @@ func (this *triggerTimeTracker) stopListingAndReset(
 	this.mutex.Lock()
 	defer this.mutex.Unlock()
 
+	// Clear dirty times and isListing state.
+	defer func() {
+		this.isListingObjects[key] = false
+		this.dirtyTriggerTimes[key] = nil
+	}()
+
 	var endpointsLastChangeTriggerTime time.Time
 
 	if _, ok := this.minTriggerTime[key]; !ok {
@@ -161,9 +167,7 @@ func (this *triggerTimeTracker) stopListingAndReset(
 
 		if minTriggerTime == nil {
 			// Nothing was observed, nothing in the dirty set, nothing fresh enough in listing times.
-			// Reset state and return nil, there is nothing to export this time.
-			this.isListingObjects[key] = false
-			this.dirtyTriggerTimes[key] = nil
+			// Return nil, there is nothing to export this time.
 			return nil
 		}
 
@@ -178,9 +182,6 @@ func (this *triggerTimeTracker) stopListingAndReset(
 	if p := minGreaterThan(this.dirtyTriggerTimes[key], maxTimeFromListing); p != nil {
 		this.minTriggerTime[key] = *p
 	}
-	// Clear dirty times.
-	this.isListingObjects[key] = false
-	this.dirtyTriggerTimes[key] = nil
 
 	// Updated the lastSync min and max.
 	this.lastSyncMinTriggerTime[key] = endpointsLastChangeTriggerTime

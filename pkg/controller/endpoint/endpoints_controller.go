@@ -310,7 +310,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 		e.queue.Add(key)
 	}
 
-	oldTriggerTime, triggerTime  := getPodLastTransitionTime(newPod), getPodLastTransitionTime(newPod)
+	oldTriggerTime, triggerTime  := getPodLastTransitionTime(oldPod), getPodLastTransitionTime(newPod)
 	if triggerTime != nil && (oldTriggerTime == nil || triggerTime.After(*oldTriggerTime)) {
 		for key := range services {
 			e.triggerTimeTracker.observe(key, *triggerTime)
@@ -620,29 +620,25 @@ func shouldPodBeInEndpoints(pod *v1.Pod) bool {
 	}
 }
 
-// Computes the last-transition-time for the given pod, defined as max lastTransitionTime over
-// all pod-conditions.
+// Computes the last-transition-time, for the given pod, that resulted or will result in the
+// Endpoints object change.
+// TODO(mmat): This method currently ignores DeletionTimestamp changes, fix that.
+// TODO(mmat): This method currently ignores label changes, fix that.
 func getPodLastTransitionTime(pod *v1.Pod) (*time.Time) {
-	var lastTransitionTime time.Time
-	for _, condition := range pod.Status.Conditions {
-		val := condition.LastTransitionTime.Time
-		if lastTransitionTime.Before(val) {
-			lastTransitionTime = val
-		}
+	podReadyCondition := podutil.GetPodReadyCondition(pod.Status)
+	if podReadyCondition != nil && !podReadyCondition.LastTransitionTime.IsZero() {
+		return &podReadyCondition.LastTransitionTime.Time
 	}
-	if lastTransitionTime.IsZero() {
-		return nil
-	}
-	return &lastTransitionTime
+	return nil
 }
 
 func getPodTriggerTimes(pods []*v1.Pod) []time.Time {
-  times := make([]time.Time, 0, len(pods))
-  for _, pod := range pods {
-  	podLastTransitionTime := getPodLastTransitionTime(pod)
-  	if podLastTransitionTime != nil {
+	times := make([]time.Time, 0, len(pods))
+	for _, pod := range pods {
+		podLastTransitionTime := getPodLastTransitionTime(pod)
+		if podLastTransitionTime != nil {
 			times = append(times, *podLastTransitionTime)
 		}
 	}
-  return times;
+	return times;
 }
