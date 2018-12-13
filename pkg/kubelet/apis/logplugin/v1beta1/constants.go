@@ -18,7 +18,7 @@ package logplugin
 
 const (
 	// Current version of the API supported by kubelet
-	Version = "v1beta1"
+	Version       = "v1beta1"
 	LogPluginPath = "/var/lib/kubelet/log-plugins/"
 	// KubeletSocket is the path of the Kubelet registry socket
 	KubeletSocket = LogPluginPath + "kubelet.sock"
