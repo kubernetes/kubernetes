@@ -17,11 +17,10 @@ limitations under the License.
 package app
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	goruntime "runtime"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -37,9 +36,9 @@ type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh 
 
 // Serve creates a base handler chain for a controller manager. It runs the
 // the chain with the given serveFunc.
-func Serve(c *CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
+func Serve(c *CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}, checks ...healthz.HealthzChecker) error {
 	mux := mux.NewPathRecorderMux("controller-manager")
-	healthz.InstallHandler(mux)
+	healthz.InstallHandler(mux, checks...)
 	if c.ComponentConfig.EnableProfiling {
 		routes.Profiling{}.Install(mux)
 		if c.ComponentConfig.EnableContentionProfiling {
