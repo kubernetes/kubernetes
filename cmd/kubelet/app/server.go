@@ -507,13 +507,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		standaloneMode = false
 	}
 
-	if kubeDeps == nil {
-		kubeDeps, err = UnsecuredDependencies(s)
-		if err != nil {
-			return err
-		}
-	}
-
 	if kubeDeps.Cloud == nil {
 		if !cloudprovider.IsExternal(s.CloudProvider) {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
