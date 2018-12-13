@@ -37,6 +37,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/scheduler/api/compatibility:all-srcs",
         "//pkg/scheduler/api/latest:all-srcs",
         "//pkg/scheduler/api/v1:all-srcs",
         "//pkg/scheduler/api/validation:all-srcs",
