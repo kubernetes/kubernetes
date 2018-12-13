@@ -444,14 +444,25 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	var matchErr error
 	addrs := []string{}
 	for ix := range nodes.Items {
 		node := &nodes.Items[ix]
 		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
 		if err != nil {
+			if _, ok := err.(*nodeutil.NoMatchError); ok {
+				matchErr = err
+				continue
+			}
 			return nil, err
 		}
 		addrs = append(addrs, addr)
+	}
+	if len(addrs) == 0 && matchErr != nil {
+		// We only return an error if we have items.
+		// Currently we return empty list/no error if Items is empty.
+		// We do this for backward compatibility reasons.
+		return nil, matchErr
 	}
 	return addrs, nil
 }
