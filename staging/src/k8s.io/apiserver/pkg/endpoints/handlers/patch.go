@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/apply"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -46,6 +47,9 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	"k8s.io/klog"
+	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"sigs.k8s.io/structured-merge-diff/merge"
 )
 
 // PatchResource returns a function that will handle a resource patch.
@@ -265,10 +269,11 @@ type patcher struct {
 	trace *utiltrace.Trace
 
 	// Set at invocation-time (by applyPatch) and immutable thereafter
-	namespace         string
-	updatedObjectInfo rest.UpdatedObjectInfo
-	mechanism         patchMechanism
-	forceAllowCreate  bool
+	namespace          string
+	updatedObjectInfo  rest.UpdatedObjectInfo
+	mechanism          patchMechanism
+	applyManagedFields rest.TransformFunc
+	forceAllowCreate   bool
 }
 
 type patchMechanism interface {
@@ -403,6 +408,7 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 	if patchErr != nil {
 		return nil, patchErr
 	}
+
 	objToUpdateHasUID, err := hasUID(objToUpdate)
 	if err != nil {
 		return nil, err
@@ -414,6 +420,7 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 		}
 		return nil, errors.NewConflict(p.resource.GroupResource(), p.name, fmt.Errorf("uid mismatch: the provided object specified uid %s, and no existing object was found", accessor.GetUID()))
 	}
+
 	if err := checkName(objToUpdate, p.name, p.namespace, p.namer); err != nil {
 		return nil, err
 	}
@@ -446,28 +453,110 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 	return patchedObject, nil
 }
 
+func noOpTransform(_ context.Context, newObj runtime.Object, _ runtime.Object) (runtime.Object, error) {
+	return newObj, nil
+}
+
+type convertor func(runtime.Object) (runtime.Object, error)
+
+func newConvertor(objectConvertor runtime.ObjectConvertor, versioner runtime.GroupVersioner) convertor {
+	return func(obj runtime.Object) (runtime.Object, error) {
+		return objectConvertor.ConvertToVersion(obj, versioner)
+	}
+}
+
+// TODO(kwiesmueller): typeConverter & convertor naming needs "fixing"
+func makeManagedFieldsUpdater(typeConverter apply.TypeConverter, convert convertor, updater merge.Updater, manager string) rest.TransformFunc {
+	return func(_ context.Context, newObj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+		newObjVersioned, err := convert(newObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
+		}
+		oldObjVersioned, err := convert(oldObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert old object to proper version: %v", err)
+		}
+
+		managed, err := apply.DecodeObjectManagedFields(newObj)
+		if err != nil {
+			return nil, err
+		}
+
+		newObjTyped, err := typeConverter.ObjectToTyped(newObjVersioned)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create typed new object: %v", err)
+		}
+		oldObjTyped, err := typeConverter.ObjectToTyped(oldObjVersioned)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create typed old object: %v", err)
+		}
+
+		managed, err = updater.Update(oldObjTyped, newObjTyped, managed, manager)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
+		}
+
+		if err := apply.EncodeObjectManagedFields(newObj, managed); err != nil {
+			return nil, err
+		}
+
+		return newObj, nil
+	}
+}
+
 // patchResource divides PatchResource for easier unit testing
 func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, bool, error) {
+	var (
+		converter apply.TypeConverter
+		updater   merge.Updater
+	)
+
+	modelCheck := func(models openapiproto.Models, manager string) (rest.TransformFunc, error) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			if scope.OpenAPIModels != nil {
+				var err error
+				converter, err = apply.NewTypeConverter(scope.OpenAPIModels)
+				if err != nil {
+					return noOpTransform, err
+				}
+
+				updater = merge.Updater{
+					Converter: apply.NewVersionConverter(converter, p.unsafeConvertor),
+				}
+				return makeManagedFieldsUpdater(converter, newConvertor(p.unsafeConvertor, p.kind.GroupVersion()), updater, manager), nil
+			}
+			return noOpTransform, fmt.Errorf("No OpenAPI for: %v", scope.Kind)
+		}
+		return noOpTransform, fmt.Errorf("server side apply feature gate disabled")
+	}
+
+	p.applyManagedFields = noOpTransform
 	p.namespace = request.NamespaceValue(ctx)
 	switch p.patchType {
 	case types.JSONPatchType, types.MergePatchType:
 		p.mechanism = &jsonPatcher{patcher: p}
+		p.applyManagedFields, _ = modelCheck(scope.OpenAPIModels, "jsonpatch")
 	case types.StrategicMergePatchType:
 		schemaReferenceObj, err := p.unsafeConvertor.ConvertToVersion(p.restPatcher.New(), p.kind.GroupVersion())
 		if err != nil {
 			return nil, false, err
 		}
 		p.mechanism = &smpPatcher{patcher: p, schemaReferenceObj: schemaReferenceObj}
-	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
+		p.applyManagedFields, _ = modelCheck(scope.OpenAPIModels, "smpatch")
+		// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
-		p.mechanism = &applyPatcher{patcher: p, models: scope.OpenAPIModels}
+		if _, err := modelCheck(scope.OpenAPIModels, ""); err != nil {
+			klog.Warningf("%v", err)
+			return nil, false, err
+		}
+		p.mechanism = &applyPatcher{patcher: p, converter: converter, updater: updater}
 		p.forceAllowCreate = true
 	default:
 		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyManagedFields, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options, err := patchToUpdateOptions(p.options)

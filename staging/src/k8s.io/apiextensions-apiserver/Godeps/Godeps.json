@@ -1127,18 +1127,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apimachinery/pkg/apply",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/apimachinery/pkg/apply/parse",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/apimachinery/pkg/apply/strategy",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/apimachinery/pkg/conversion",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1496,6 +1484,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/endpoints/handlers",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/endpoints/handlers/apply",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -2287,6 +2279,10 @@
 			"Rev": "0317810137be915b9cf888946c6e115c1bfac693"
 		},
 		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/schemaconv",
+			"Rev": "0317810137be915b9cf888946c6e115c1bfac693"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
 			"Rev": "0317810137be915b9cf888946c6e115c1bfac693"
 		},
@@ -2585,6 +2581,26 @@
 		{
 			"ImportPath": "k8s.io/client-go/util/workqueue",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
+			"Rev": "01332b709372d8d83b4d7653b30a1961680a47d5"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
