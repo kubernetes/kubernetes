@@ -131,26 +131,47 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	cases := []struct {
 		name string
 		op   watch.EventType
+		ns   string
 	}{
 		{
 			"foo",
 			watch.Added,
+			"test_namespace",
 		},
 		{
 			"bar",
 			watch.Added,
+			"test_namespace",
+		},
+		{
+			"baz",
+			watch.Added,
+			"",
 		},
 		{
 			"bar",
 			watch.Modified,
+			"test_namespace",
+		},
+		{
+			"baz",
+			watch.Modified,
+			"",
 		},
 		{
 			"foo",
 			watch.Deleted,
+			"test_namespace",
 		},
 		{
 			"bar",
 			watch.Deleted,
+			"test_namespace",
+		},
+		{
+			"baz",
+			watch.Deleted,
+			"",
 		},
 	}
 
@@ -169,6 +190,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	wg.Add(len(watchNamespaces))
 	for idx, watchNamespace := range watchNamespaces {
 		i := idx
+		watchNamespace := watchNamespace
 		w, err := o.Watch(testResource, watchNamespace)
 		if err != nil {
 			t.Fatalf("test resource watch failed in %s: %v", watchNamespace, err)
@@ -176,14 +198,17 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 		go func() {
 			assert.NoError(t, err, "watch invocation failed")
 			for _, c := range cases {
-				fmt.Printf("%#v %#v\n", c, i)
-				event := <-w.ResultChan()
-				accessor, err := meta.Accessor(event.Object)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
+				if watchNamespace == "" || c.ns == watchNamespace {
+					fmt.Printf("%#v %#v\n", c, i)
+					event := <-w.ResultChan()
+					accessor, err := meta.Accessor(event.Object)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+					assert.Equal(t, c.op, event.Type, "watch event mismatched")
+					assert.Equal(t, c.name, accessor.GetName(), "watched object mismatch")
+					assert.Equal(t, c.ns, accessor.GetNamespace(), "watched object mismatch")
 				}
-				assert.Equal(t, c.op, event.Type, "watch event mismatched")
-				assert.Equal(t, c.name, accessor.GetName(), "watched object mismatch")
 			}
 			wg.Done()
 		}()
@@ -191,13 +216,13 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	for _, c := range cases {
 		switch c.op {
 		case watch.Added:
-			obj := getArbitraryResource(testResource, c.name, "test_namespace")
-			o.Create(testResource, obj, "test_namespace")
+			obj := getArbitraryResource(testResource, c.name, c.ns)
+			o.Create(testResource, obj, c.ns)
 		case watch.Modified:
-			obj := getArbitraryResource(testResource, c.name, "test_namespace")
-			o.Update(testResource, obj, "test_namespace")
+			obj := getArbitraryResource(testResource, c.name, c.ns)
+			o.Update(testResource, obj, c.ns)
 		case watch.Deleted:
-			o.Delete(testResource, "test_namespace", c.name)
+			o.Delete(testResource, c.ns, c.name)
 		}
 	}
 	wg.Wait()
