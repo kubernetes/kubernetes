@@ -47,9 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/klog"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/merge"
 )
 
 // PatchResource returns a function that will handle a resource patch.
@@ -269,11 +266,10 @@ type patcher struct {
 	trace *utiltrace.Trace
 
 	// Set at invocation-time (by applyPatch) and immutable thereafter
-	namespace          string
-	updatedObjectInfo  rest.UpdatedObjectInfo
-	mechanism          patchMechanism
-	applyManagedFields rest.TransformFunc
-	forceAllowCreate   bool
+	namespace         string
+	updatedObjectInfo rest.UpdatedObjectInfo
+	mechanism         patchMechanism
+	forceAllowCreate  bool
 }
 
 type patchMechanism interface {
@@ -283,6 +279,8 @@ type patchMechanism interface {
 
 type jsonPatcher struct {
 	*patcher
+
+	fieldManager *apply.FieldManager
 }
 
 func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -304,6 +302,9 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 		return nil, err
 	}
 
+	if p.fieldManager != nil {
+		return p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher")
+	}
 	return objToUpdate, nil
 }
 
@@ -338,6 +339,7 @@ type smpPatcher struct {
 
 	// Schema
 	schemaReferenceObj runtime.Object
+	fieldManager       *apply.FieldManager
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -355,11 +357,43 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 		return nil, err
 	}
 	// Convert the object back to the hub version
-	return p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, p.hubGroupVersion)
+	newObj, err := p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, p.hubGroupVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.fieldManager != nil {
+		return p.fieldManager.Update(currentObject, newObj, "jsonPatcher")
+	}
+	return newObj, nil
 }
 
 func (p *smpPatcher) createNewObject() (runtime.Object, error) {
 	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
+}
+
+type applyPatcher struct {
+	patch        []byte
+	options      *metav1.PatchOptions
+	creater      runtime.ObjectCreater
+	kind         schema.GroupVersionKind
+	fieldManager *apply.FieldManager
+}
+
+func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
+	force := false
+	if p.options.Force != nil {
+		force = *p.options.Force
+	}
+	return p.fieldManager.Apply(obj, p.patch, force)
+}
+
+func (p *applyPatcher) createNewObject() (runtime.Object, error) {
+	obj, err := p.creater.New(p.kind)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new object: %v", obj)
+	}
+	return p.applyPatchToCurrentObject(obj)
 }
 
 // strategicPatchObject applies a strategic merge patch of <patchBytes> to
@@ -453,110 +487,41 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 	return patchedObject, nil
 }
 
-func noOpTransform(_ context.Context, newObj runtime.Object, _ runtime.Object) (runtime.Object, error) {
-	return newObj, nil
-}
-
-type convertor func(runtime.Object) (runtime.Object, error)
-
-func newConvertor(objectConvertor runtime.ObjectConvertor, versioner runtime.GroupVersioner) convertor {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		return objectConvertor.ConvertToVersion(obj, versioner)
-	}
-}
-
-// TODO(kwiesmueller): typeConverter & convertor naming needs "fixing"
-func makeManagedFieldsUpdater(typeConverter apply.TypeConverter, convert convertor, updater merge.Updater, manager string) rest.TransformFunc {
-	return func(_ context.Context, newObj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
-		newObjVersioned, err := convert(newObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
-		}
-		oldObjVersioned, err := convert(oldObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert old object to proper version: %v", err)
-		}
-
-		managed, err := apply.DecodeObjectManagedFields(newObj)
-		if err != nil {
-			return nil, err
-		}
-
-		newObjTyped, err := typeConverter.ObjectToTyped(newObjVersioned)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create typed new object: %v", err)
-		}
-		oldObjTyped, err := typeConverter.ObjectToTyped(oldObjVersioned)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create typed old object: %v", err)
-		}
-
-		managed, err = updater.Update(oldObjTyped, newObjTyped, managed, manager)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
-		}
-
-		if err := apply.EncodeObjectManagedFields(newObj, managed); err != nil {
-			return nil, err
-		}
-
-		return newObj, nil
-	}
-}
-
 // patchResource divides PatchResource for easier unit testing
 func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, bool, error) {
-	var (
-		converter apply.TypeConverter
-		updater   merge.Updater
-	)
-
-	modelCheck := func(models openapiproto.Models, manager string) (rest.TransformFunc, error) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			if scope.OpenAPIModels != nil {
-				var err error
-				converter, err = apply.NewTypeConverter(scope.OpenAPIModels)
-				if err != nil {
-					return noOpTransform, err
-				}
-
-				updater = merge.Updater{
-					Converter: apply.NewVersionConverter(converter, p.unsafeConvertor),
-				}
-				return makeManagedFieldsUpdater(converter, newConvertor(p.unsafeConvertor, p.kind.GroupVersion()), updater, manager), nil
-			}
-			return noOpTransform, fmt.Errorf("No OpenAPI for: %v", scope.Kind)
-		}
-		return noOpTransform, fmt.Errorf("server side apply feature gate disabled")
-	}
-
-	p.applyManagedFields = noOpTransform
 	p.namespace = request.NamespaceValue(ctx)
 	switch p.patchType {
 	case types.JSONPatchType, types.MergePatchType:
-		p.mechanism = &jsonPatcher{patcher: p}
-		p.applyManagedFields, _ = modelCheck(scope.OpenAPIModels, "jsonpatch")
+		p.mechanism = &jsonPatcher{
+			patcher:      p,
+			fieldManager: scope.FieldManager,
+		}
 	case types.StrategicMergePatchType:
 		schemaReferenceObj, err := p.unsafeConvertor.ConvertToVersion(p.restPatcher.New(), p.kind.GroupVersion())
 		if err != nil {
 			return nil, false, err
 		}
-		p.mechanism = &smpPatcher{patcher: p, schemaReferenceObj: schemaReferenceObj}
-		p.applyManagedFields, _ = modelCheck(scope.OpenAPIModels, "smpatch")
-		// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
-	case types.ApplyPatchType:
-		if _, err := modelCheck(scope.OpenAPIModels, ""); err != nil {
-			klog.Warningf("%v", err)
-			return nil, false, err
+		p.mechanism = &smpPatcher{
+			patcher:            p,
+			schemaReferenceObj: schemaReferenceObj,
+			fieldManager:       scope.FieldManager,
 		}
-		p.mechanism = &applyPatcher{patcher: p, converter: converter, updater: updater}
+	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
+	case types.ApplyPatchType:
+		p.mechanism = &applyPatcher{
+			fieldManager: scope.FieldManager,
+			patch:        p.patchBytes,
+			options:      p.options,
+			creater:      p.creater,
+			kind:         p.kind,
+		}
 		p.forceAllowCreate = true
 	default:
 		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyManagedFields, p.applyAdmission)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options, err := patchToUpdateOptions(p.options)

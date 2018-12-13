@@ -25,8 +25,6 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"k8s.io/klog"
-
 	apps "k8s.io/api/apps/v1beta1"
 	auditreg "k8s.io/api/auditregistration/v1alpha1"
 	autoscaling "k8s.io/api/autoscaling/v1"
@@ -53,6 +51,8 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -107,6 +107,24 @@ func (h *MasterHolder) SetMaster(m *master.Master) {
 	close(h.Initialized)
 }
 
+func DefaultOpenAPIConfig() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	openAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	openAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	openAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+
+	return openAPIConfig
+}
+
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
 func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	var m *master.Master
@@ -129,21 +147,9 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
+		masterConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
+		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	}
-	masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
-	masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
-		InfoProps: spec.InfoProps{
-			Title:   "Kubernetes",
-			Version: "unversioned",
-		},
-	}
-	masterConfig.GenericConfig.OpenAPIConfig.DefaultResponse = &spec.Response{
-		ResponseProps: spec.ResponseProps{
-			Description: "Default Response.",
-		},
-	}
-	masterConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
-	masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	// set the loopback client config
 	if masterConfig.GenericConfig.LoopbackClientConfig == nil {
