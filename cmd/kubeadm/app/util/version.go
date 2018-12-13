@@ -79,9 +79,11 @@ func KubernetesReleaseVersion(version string) (string, error) {
 
 	// kubeReleaseLabelRegex matches labels such as: latest, latest-1, latest-1.10
 	if kubeReleaseLabelRegex.MatchString(versionLabel) {
-		var clientVersion string
 		// Try to obtain a client version.
-		clientVersion, _ = kubeadmVersion(pkgversion.Get().String())
+		clientVersion, err := kubeadmVersion(pkgversion.Get().String())
+		if err != nil {
+			return "", err
+		}
 		// Fetch version from the internet.
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetchFromURL(url, getReleaseVersionTimeout)
