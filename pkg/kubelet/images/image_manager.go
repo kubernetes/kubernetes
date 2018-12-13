@@ -75,7 +75,7 @@ func shouldPullImage(container *v1.Container, imagePresent bool) bool {
 	return false
 }
 
-// records an event using ref, event msg.  log to glog using prefix, msg, logFn
+// records an event using ref, event msg.  log to klog using prefix, msg, logFn
 func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, msg string, logFn func(args ...interface{})) {
 	if ref != nil {
 		m.recorder.Event(ref, eventtype, event, msg)

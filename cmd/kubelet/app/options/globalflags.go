@@ -34,7 +34,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 )
 
-// AddGlobalFlags explicitly registers flags that libraries (glog, verflag, etc.) register
+// AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
 // against the global flagsets from "flag" and "github.com/spf13/pflag".
 // We do this in order to prevent unwanted flags from leaking into the Kubelet's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet) {

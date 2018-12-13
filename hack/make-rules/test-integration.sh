@@ -35,7 +35,7 @@ KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 600s}
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
-# Default glog module settings.
+# Default klog module settings.
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-"garbagecollector*=6,graph_builder*=6"}
 
 kube::test::find_integration_test_dirs() {

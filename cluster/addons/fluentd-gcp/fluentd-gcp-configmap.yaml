@@ -155,7 +155,7 @@ data:
 
     # Multi-line parsing is required for all the kube logs because very large log
     # statements, such as those that include entire object bodies, get split into
-    # multiple lines by glog.
+    # multiple lines by klog.
 
     # Example:
     # I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]

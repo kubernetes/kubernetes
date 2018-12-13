@@ -53,7 +53,7 @@ is one of
 
 and X represents the QPS configured for the kubernetes API client, and Y is the number of nodes to create.
 
-The -d flags set the -v level for glog to 6, enabling nearly all of the debug logs in the code.
+The -d flags set the -v level for klog to 6, enabling nearly all of the debug logs in the code.
 
 So to run the test for CloudAllocator with 10 nodes, one can run
 

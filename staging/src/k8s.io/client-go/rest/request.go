@@ -385,10 +385,10 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
-		glogBody("Request Body", data)
+		klogBody("Request Body", data)
 		r.body = bytes.NewReader(data)
 	case []byte:
-		glogBody("Request Body", t)
+		klogBody("Request Body", t)
 		r.body = bytes.NewReader(t)
 	case io.Reader:
 		r.body = t
@@ -402,7 +402,7 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
-		glogBody("Request Body", data)
+		klogBody("Request Body", data)
 		r.body = bytes.NewReader(data)
 		r.SetHeader("Content-Type", r.content.ContentType)
 	default:
@@ -822,7 +822,7 @@ func (r *Request) DoRaw() ([]byte, error) {
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
-		glogBody("Response Body", result.body)
+		klogBody("Response Body", result.body)
 		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
 			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
 		}
@@ -863,7 +863,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		}
 	}
 
-	glogBody("Response Body", body)
+	klogBody("Response Body", body)
 
 	// verify the content type is accurate
 	contentType := resp.Header.Get("Content-Type")
@@ -915,7 +915,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	}
 }
 
-// truncateBody decides if the body should be truncated, based on the glog Verbosity.
+// truncateBody decides if the body should be truncated, based on the klog Verbosity.
 func truncateBody(body string) string {
 	max := 0
 	switch {
@@ -934,10 +934,10 @@ func truncateBody(body string) string {
 	return body[:max] + fmt.Sprintf(" [truncated %d chars]", len(body)-max)
 }
 
-// glogBody logs a body output that could be either JSON or protobuf. It explicitly guards against
+// klogBody logs a body output that could be either JSON or protobuf. It explicitly guards against
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
-func glogBody(prefix string, body []byte) {
+func klogBody(prefix string, body []byte) {
 	if klog.V(8) {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a

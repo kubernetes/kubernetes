@@ -56,7 +56,7 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // test binary.  Returns when all e2e services are ready or an error.
 //
 // We want to statically link e2e services into the test binary, but we don't
-// want their glog output to pollute the test result. So we run the binary in
+// want their klog output to pollute the test result. So we run the binary in
 // run-services-mode to start e2e services in another process.
 // The function starts 2 processes:
 // * internal e2e services: services which statically linked in the test binary - apiserver, etcd and

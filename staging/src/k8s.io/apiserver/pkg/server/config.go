@@ -566,7 +566,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			goruntime.SetBlockProfileRate(1)
 		}
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
-		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
+		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.KlogSetter))
 	}
 	if c.EnableMetrics {
 		if c.EnableProfiling {

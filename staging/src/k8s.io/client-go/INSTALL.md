@@ -36,7 +36,7 @@ This downloads a version of `k8s.io/client-go` prior to v1.12.0,
 which includes most of its dependencies in its `k8s.io/client-go/vendor` path
 (except for `k8s.io/apimachinery` and `glog`).
 
-We excluded `k8s.io/apimachinery` and `glog` from `k8s.io/client-go/vendor` to
+We excluded `k8s.io/apimachinery` and `klog` from `k8s.io/client-go/vendor` to
 prevent `go get` users from hitting issues like
 [#19](https://github.com/kubernetes/client-go/issues/19) and
 [#83](https://github.com/kubernetes/client-go/issues/83). If your project shares
@@ -53,7 +53,7 @@ HEAD from all dependencies may not even compile with client-go!
 Reasons why you might need to use a dependency management system:
 * You use a dependency that client-go also uses, and don't want two copies of
   the dependency compiled into your application. For some dependencies with
-  singletons or global inits (e.g. `glog`) this wouldn't even compile...
+  singletons or global inits (e.g. `klog`) this wouldn't even compile...
 * You want to lock in a particular version (so you don't have to change your
   code every time we change a public interface).
 * You want your install to be reproducible. For example, for your CI system or
