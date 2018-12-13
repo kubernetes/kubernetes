@@ -29,6 +29,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	pkgversion "k8s.io/kubernetes/pkg/version"
 )
 
@@ -186,7 +187,15 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 func kubeadmVersion(info string) (string, error) {
 	v, err := versionutil.ParseSemantic(info)
 	if err != nil {
-		return "", pkgerrors.Wrap(err, "kubeadm version error")
+		// In case we run `go test` in git tree the version comes from
+		// unmodified pkg/version/base.go. Then we'd better fall back
+		// to a predefined but meaningful constant.
+		if strings.HasPrefix(info, "v0.0.0-master") {
+			klog.Warningf("Can't use in-tree client version. Fall back to minimum control plane version")
+			v = constants.MinimumControlPlaneVersion
+		} else {
+			return "", pkgerrors.Wrap(err, "kubeadm version error")
+		}
 	}
 	// There is no utility in versionutil to get the version without the metadata,
 	// so this needs some manual formatting.
