@@ -152,7 +152,7 @@ func TestJSONPatch(t *testing.T) {
 			patchType:  types.JSONPatchType,
 			patchBytes: []byte(test.patch),
 		}
-		jp := jsonPatcher{p}
+		jp := jsonPatcher{patcher: p}
 		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
 		pod := &examplev1.Pod{}
 		pod.Name = "podA"
