@@ -14,28 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply
+package internal_test
 
 import (
 	"fmt"
-	"path/filepath"
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
-	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
-
-var fakeSchema = prototesting.Fake{
-	Path: filepath.Join(
-		"..", "..", "..", "..", "..", "..", "..", "..",
-		"api", "openapi-spec", "swagger.json"),
-}
 
 // TestVersionConverter tests the version converter
 func TestVersionConverter(t *testing.T) {
@@ -47,7 +40,7 @@ func TestVersionConverter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
-	tc, err := NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
@@ -55,7 +48,7 @@ func TestVersionConverter(t *testing.T) {
 		gvkForVersion("v1beta1"): objForGroupVersion("apps/v1beta1"),
 		gvkForVersion("v1"):      objForGroupVersion("apps/v1"),
 	}
-	vc := NewVersionConverter(tc, oc)
+	vc := internal.NewVersionConverter(tc, oc)
 
 	input, err := tc.ObjectToTyped(objForGroupVersion("apps/v1beta1"))
 	if err != nil {

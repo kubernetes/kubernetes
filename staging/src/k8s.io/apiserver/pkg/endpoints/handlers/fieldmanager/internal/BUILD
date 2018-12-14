@@ -3,16 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "decode.go",
-        "encode.go",
-        "fieldmanager.go",
         "gvkparser.go",
         "managedfields.go",
         "typeconverter.go",
         "versionconverter.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/apply",
-    importpath = "k8s.io/apiserver/pkg/endpoints/handlers/apply",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal",
+    importpath = "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -33,8 +30,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "decode_test.go",
-        "roundtrip_test.go",
+        "managedfields_test.go",
         "typeconverter_test.go",
         "versionconverter_test.go",
     ],
