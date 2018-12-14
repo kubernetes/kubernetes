@@ -18,16 +18,12 @@ package internal
 
 import (
 	"fmt"
-	"reflect"
-	"sort"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/value"
 )
 
 // DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.

@@ -123,11 +123,11 @@ func TestRoundTripManagedFields(t *testing.T) {
 			if err := yaml.Unmarshal([]byte(test), &unmarshaled); err != nil {
 				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
 			}
-			decoded, err := DecodeManagedFields(unmarshaled)
+			decoded, err := decodeManagedFields(unmarshaled)
 			if err != nil {
 				t.Fatalf("did not expect decoding error but got: %v", err)
 			}
-			encoded, err := EncodeManagedFields(decoded)
+			encoded, err := encodeManagedFields(decoded)
 			if err != nil {
 				t.Fatalf("did not expect encoding error but got: %v", err)
 			}
