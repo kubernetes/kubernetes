@@ -538,6 +538,12 @@ const (
 	//
 	// Enable all logic related to the PodDisruptionBudget API object in policy
 	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
+
+	// owner: @m1093782566
+	// alpha: v1.17
+	//
+	// Enables topology aware service routing
+	ServiceTopology featuregate.Feature = "ServiceTopology"
 )
 
 func init() {
@@ -623,6 +629,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
+	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
