@@ -312,7 +312,7 @@ func TestSetListToMatchingType(t *testing.T) {
 func TestSetExtractListRoundTrip(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...)
+	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10)
 	for i := 0; i < 5; i++ {
 		start := &testapigroup.CarpList{}
 		fuzzer.Fuzz(&start.Items)

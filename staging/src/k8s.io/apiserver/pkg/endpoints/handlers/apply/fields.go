@@ -1,20 +1,36 @@
 /*
 Copyright 2018 The Kubernetes Authors.
- Licensed under the Apache License, Version 2.0 (the "License");
+
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-     http://www.apache.org/licenses/LICENSE-2.0
- Unless required by applicable law or agreed to in writing, software
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
- package apply
- import "sigs.k8s.io/structured-merge-diff/fieldpath"
- type Fields map[string]Fields
- func fieldsSet(f Fields, path fieldpath.Path, set fieldpath.Set) error {
-	for k := range f {
+
+package apply
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
+)
+
+func newFields() metav1.Fields {
+	return metav1.Fields{Map: map[string]metav1.Fields{}}
+}
+
+func fieldsSet(f metav1.Fields, path fieldpath.Path, set *fieldpath.Set) error {
+	if len(f.Map) == 0 {
+		set.Insert(path)
+	}
+	for k := range f.Map {
 		if k == "." {
 			set.Insert(path)
 			continue
@@ -24,7 +40,7 @@ limitations under the License.
 			return err
 		}
 		path = append(path, pe)
-		err = fieldsSet(f[k], path, set)
+		err = fieldsSet(f.Map[k], path, set)
 		if err != nil {
 			return err
 		}
@@ -32,22 +48,28 @@ limitations under the License.
 	}
 	return nil
 }
- func FieldsToSet(f Fields) (fieldpath.Set, error) {
+
+// FieldsToSet creates a set paths from an input trie of fields
+func FieldsToSet(f metav1.Fields) (fieldpath.Set, error) {
 	set := fieldpath.Set{}
-	return set, fieldsSet(f, fieldpath.Path{}, set)
+	return set, fieldsSet(f, fieldpath.Path{}, &set)
 }
- func removeUselessDots(f Fields) {
-	if _, ok := f["."]; ok && len(f) == 1 {
-		del(f["."])
-		return
+
+func removeUselessDots(f metav1.Fields) metav1.Fields {
+	if _, ok := f.Map["."]; ok && len(f.Map) == 1 {
+		delete(f.Map, ".")
+		return f
 	}
-	for _, tf := range f {
-		removeUselessDots(tf)
+	for k, tf := range f.Map {
+		f.Map[k] = removeUselessDots(tf)
 	}
+	return f
 }
- func SetToFields(s fieldpath.Set) (Fields, error) {
+
+// SetToFields creates a trie of fields from an input set of paths
+func SetToFields(s fieldpath.Set) (metav1.Fields, error) {
 	var err error
-	f := Fields{}
+	f := newFields()
 	s.Iterate(func(path fieldpath.Path) {
 		if err != nil {
 			return
@@ -56,15 +78,18 @@ limitations under the License.
 		for _, pe := range path {
 			var str string
 			str, err = PathElementString(pe)
-			if _, ok := tf[str]; ok {
-				tf = tf[str]
+			if err != nil {
+				break
+			}
+			if _, ok := tf.Map[str]; ok {
+				tf = tf.Map[str]
 			} else {
-				tf[str] = Fields{}
-				tf = tf[str]
+				tf.Map[str] = newFields()
+				tf = tf.Map[str]
 			}
 		}
-		tf["."] = Fields{}
+		tf.Map["."] = newFields()
 	})
- 	removeUselessDots(f)
+	f = removeUselessDots(f)
 	return f, err
 }

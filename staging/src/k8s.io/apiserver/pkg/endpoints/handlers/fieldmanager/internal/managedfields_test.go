@@ -18,291 +18,126 @@ package internal
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 // TestRoundTripManagedFields will roundtrip ManagedFields from the format used by
 // sigs.k8s.io/structured-merge-diff to the wire format (api format) and back
 func TestRoundTripManagedFields(t *testing.T) {
-	tests := []struct {
-		yaml      []byte
-		errString string
-	}{
-		{
-			yaml: []byte(`foo:
+	tests := []string{
+		`foo:
   apiVersion: v1
   fields:
-    children:
-    - pathElement:
-        index: 5
-      set:
-        members:
-        - fieldName: i
-    - pathElement:
-        value:
-          floatValue: 3.1415
-      set:
-        members:
-        - fieldName: pi
-    - pathElement:
-        value:
-          intValue: 3
-      set:
-        members:
-        - fieldName: alsoPi
-    - pathElement:
-        value:
-          booleanValue: false
-      set:
-        members:
-        - fieldName: notTrue`),
-		}, {
-			yaml: []byte(`foo:
+    i:5:
+      f:i: {}
+    v:3:
+      f:alsoPi: {}
+    v:3.1415:
+      f:pi: {}
+    v:false:
+      f:notTrue: {}
+`,
+		`foo:
   apiVersion: v1
   fields:
-    children:
-    - pathElement:
-        fieldName: spec
-      set:
-        children:
-        - pathElement:
-            fieldName: containers
-          set:
-            children:
-            - pathElement:
-                key:
-                - name: name
-                  value:
-                    stringValue: c
-                    'null': false
-              set:
-                members:
-                - fieldName: image
-                - fieldName: name`),
-		}, {
-			yaml: []byte(`foo:
+    f:spec:
+      f:containers:
+        k:{"name":"c"}:
+          f:image: {}
+          f:name: {}
+`,
+		`foo:
   apiVersion: v1
   fields:
-    members:
-    - fieldName: apiVersion
-    - fieldName: kind
-    children:
-    - pathElement:
-        fieldName: metadata
-      set:
-        members:
-        - fieldName: name
-        children:
-        - pathElement:
-            fieldName: labels
-          set:
-            members:
-            - fieldName: app
-    - pathElement:
-        fieldName: spec
-      set:
-        members:
-        - fieldName: replicas
-        children:
-        - pathElement:
-            fieldName: selector
-          set:
-            children:
-            - pathElement:
-                fieldName: matchLabels
-              set:
-                members:
-                - fieldName: app
-        - pathElement:
-            fieldName: template
-          set:
-            children:
-            - pathElement:
-                fieldName: metadata
-              set:
-                children:
-                - pathElement:
-                    fieldName: labels
-                  set:
-                    members:
-                    - fieldName: app
-            - pathElement:
-                fieldName: spec
-              set:
-                children:
-                - pathElement:
-                    fieldName: containers
-                  set:
-                    children:
-                    - pathElement:
-                        key:
-                        - name: name
-                          value:
-                            stringValue: nginx
-                            'null': false
-                      set:
-                        members:
-                        - fieldName: image
-                        - fieldName: name
-                        children:
-                        - pathElement:
-                            fieldName: ports
-                          set:
-                            children:
-                            - pathElement:
-                                index: 0
-                              set:
-                                members:
-                                - fieldName: containerPort`),
-		}, {
-			yaml: []byte(`foo:
+    f:apiVersion: {}
+    f:kind: {}
+    f:metadata:
+      f:labels:
+        f:app: {}
+      f:name: {}
+    f:spec:
+      f:replicas: {}
+      f:selector:
+        f:matchLabels:
+          f:app: {}
+      f:template:
+        f:medatada:
+          f:labels:
+            f:app: {}
+        f:spec:
+          f:containers:
+            k:{"name":"nginx"}:
+              .: {}
+              f:image: {}
+              f:name: {}
+              f:ports:
+                i:0:
+                  f:containerPort: {}
+`,
+		`foo:
   apiVersion: v1
   fields:
-    members:
-    - fieldName: allowVolumeExpansion
-    - fieldName: apiVersion
-    - fieldName: kind
-    - fieldName: provisioner
-    children:
-    - pathElement:
-        fieldName: metadata
-      set:
-        members:
-        - fieldName: name
-    - pathElement:
-        fieldName: parameters
-      set:
-        members:
-        - fieldName: resturl
-        - fieldName: restuser
-        - fieldName: secretName
-        - fieldName: secretNamespace`),
-		}, {
-			yaml: []byte(`foo:
+    f:allowVolumeExpansion: {}
+    f:apiVersion: {}
+    f:kind: {}
+    f:metadata:
+      f:name: {}
+      f:parameters:
+        f:resturl: {}
+        f:restuser: {}
+        f:secretName: {}
+        f:secretNamespace: {}
+    f:provisioner: {}
+`,
+		`foo:
   apiVersion: v1
   fields:
-    members:
-    - fieldName: apiVersion
-    - fieldName: kind
-    children:
-    - pathElement:
-        fieldName: metadata
-      set:
-        members:
-        - fieldName: name
-    - pathElement:
-        fieldName: spec
-      set:
-        members:
-        - fieldName: group
-        - fieldName: scope
-        children:
-        - pathElement:
-            fieldName: names
-          set:
-            members:
-            - fieldName: kind
-            - fieldName: plural
-            - fieldName: singular
-            children:
-            - pathElement:
-                fieldName: shortNames
-              set:
-                members:
-                - index: 0
-        - pathElement:
-            fieldName: versions
-          set:
-            children:
-            - pathElement:
-                key:
-                - name: name
-                  value:
-                    stringValue: v1
-                    'null': false
-              set:
-                members:
-                - fieldName: name
-                - fieldName: served
-                - fieldName: storage`),
-		},
+    f:apiVersion: {}
+    f:kind: {}
+    f:metadata:
+      f:name: {}
+    f:spec:
+      f:group: {}
+      f:names:
+        f:kind: {}
+        f:plural: {}
+        f:shortNames:
+          i:0: {}
+        f:singular: {}
+      f:scope: {}
+      f:versions:
+        k:{"name":"v1"}:
+          f:name: {}
+          f:served: {}
+          f:storage: {}
+`,
 	}
 
-	for i, tc := range tests {
-		var original map[string]metav1.VersionedFieldSet
-		if err := yaml.Unmarshal(tc.yaml, &original); err != nil {
-			t.Errorf("[%v]did not expect yaml unmarshalling error but got: %v", i, err)
-			continue
-		}
-
-		decoded, err := decodeManagedFields(original)
-		if err == nil && len(tc.errString) > 0 {
-			t.Errorf("[%v]expected error but got none.", i)
-			continue
-		}
-		if err != nil && len(tc.errString) == 0 {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-			continue
-		}
-		if err != nil && len(tc.errString) > 0 && !strings.Contains(err.Error(), tc.errString) {
-			t.Errorf("[%v]expected error with %q but got: %v", i, tc.errString, err)
-			continue
-		}
-		encoded, err := encodeManagedFields(decoded)
-		if err != nil {
-			t.Errorf("[%v]did not expect round trip error but got: %v", i, err)
-			continue
-		}
-		if !reflect.DeepEqual(encoded, original) {
-			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, original, encoded)
-		}
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			var unmarshaled map[string]metav1.VersionedFieldSet
+			if err := yaml.Unmarshal([]byte(test), &unmarshaled); err != nil {
+				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+			}
+			decoded, err := DecodeManagedFields(unmarshaled)
+			if err != nil {
+				t.Fatalf("did not expect decoding error but got: %v", err)
+			}
+			encoded, err := EncodeManagedFields(decoded)
+			if err != nil {
+				t.Fatalf("did not expect encoding error but got: %v", err)
+			}
+			marshaled, err := yaml.Marshal(&encoded)
+			if err != nil {
+				t.Fatalf("did not expect yaml marshalling error but got: %v", err)
+			}
+			if !reflect.DeepEqual(string(marshaled), test) {
+				t.Fatalf("expected:\n%v\nbut got:\n%v", test, string(marshaled))
+			}
+		})
 	}
-}
-
-// TestValidateOneOf tests that validateOneOf returns true if <= 1
-// non-nil fields are passed to it are and false otherwise
-func TestValidateOneOf(t *testing.T) {
-	var nilValue *string
-	nonNilValue := strPtr("test")
-
-	tests := []struct {
-		fields   []interface{}
-		expected bool
-	}{
-		{
-			fields:   []interface{}{},
-			expected: true,
-		}, {
-			fields:   []interface{}{nilValue},
-			expected: true,
-		}, {
-			fields:   []interface{}{nonNilValue},
-			expected: true,
-		}, {
-			fields:   []interface{}{nilValue, nonNilValue, nilValue},
-			expected: true,
-		}, {
-			fields:   []interface{}{nonNilValue, nonNilValue},
-			expected: false,
-		}, {
-			fields:   []interface{}{nilValue, nonNilValue, nonNilValue, nilValue},
-			expected: false,
-		},
-	}
-
-	for i, tc := range tests {
-		actual := validateOneOf(tc.fields...)
-		if actual != tc.expected {
-			t.Errorf("[%v]expected validateOneOf(%v) to return:\n\t%+v\nbut got:\n\t%+v", i, tc.fields, tc.expected, actual)
-		}
-	}
-}
-
-func strPtr(s string) *string {
-	return &s
 }

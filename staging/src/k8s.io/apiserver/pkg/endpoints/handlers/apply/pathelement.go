@@ -28,14 +28,23 @@ import (
 )
 
 const (
+	// Field indicates that the content of this path element is a field's name
 	Field = "f"
-	Value = "v"
-	Index = "i"
-	Key   = "k"
 
+	// Value indicates that the content of this path element is a field's value
+	Value = "v"
+
+	// Index indicates that the content of this path element is an index in an array
+	Index = "i"
+
+	// Key indicates that the content of this path element is a key value map
+	Key = "k"
+
+	// Separator separates the type of a path element from the contents
 	Separator = ":"
 )
 
+// NewPathElement parses a serialized path element
 func NewPathElement(s string) (fieldpath.PathElement, error) {
 	split := strings.SplitN(s, Separator, 2)
 	if len(split) < 2 {
@@ -63,15 +72,18 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 			Index: &i,
 		}, nil
 	case Key:
-		kv := map[string]string{}
+		kv := map[string]json.RawMessage{}
 		err := json.Unmarshal([]byte(split[1]), &kv)
 		if err != nil {
 			return fieldpath.PathElement{}, err
 		}
 		fields := []value.Field{}
 		for k, v := range kv {
-			fmt.Println(v)
-			val, err := value.FromJSON([]byte(v))
+			b, err := json.Marshal(v)
+			if err != nil {
+				return fieldpath.PathElement{}, err
+			}
+			val, err := value.FromJSON(b)
 			if err != nil {
 				return fieldpath.PathElement{}, err
 			}
@@ -90,18 +102,24 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 	}
 }
 
+// PathElementString serializes a path element
 func PathElementString(pe fieldpath.PathElement) (string, error) {
 	switch {
 	case pe.FieldName != nil:
 		return Field + Separator + *pe.FieldName, nil
 	case len(pe.Key) > 0:
-		kv := map[string]string{}
+		kv := map[string]json.RawMessage{}
 		for _, k := range pe.Key {
 			b, err := k.Value.ToJSON()
 			if err != nil {
 				return "", err
 			}
-			kv[k.Name] = string(b)
+			m := json.RawMessage{}
+			err = json.Unmarshal(b, &m)
+			if err != nil {
+				return "", err
+			}
+			kv[k.Name] = m
 		}
 		b, err := json.Marshal(kv)
 		if err != nil {

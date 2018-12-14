@@ -349,7 +349,7 @@ type MyAPIObject2 struct {
 func getObjectMetaAndOwnerReferences() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metav1.OwnerReference) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	fuzz.New().NilChance(.5).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).Fuzz(&myAPIObject2)
+	fuzz.New().NilChance(.5).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10).Fuzz(&myAPIObject2)
 	references := myAPIObject2.ObjectMeta.OwnerReferences
 	// This is necessary for the test to pass because the getter will return a
 	// non-nil slice.
