@@ -1052,6 +1052,25 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 	return fmt.Errorf("PersistentVolumeClaims %v not all in phase %s within %v", pvcNames, phase, timeout)
 }
 
+// findAvailableNamespaceName random namespace name starting with baseName.
+func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
+	var name string
+	err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
+		name = fmt.Sprintf("%v-%v", baseName, randomSuffix())
+		_, err := c.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+		if err == nil {
+			// Already taken
+			return false, nil
+		}
+		if apierrs.IsNotFound(err) {
+			return true, nil
+		}
+		Logf("Unexpected error while getting namespace: %v", err)
+		return false, nil
+	})
+	return name, err
+}
+
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error) {
@@ -1060,11 +1079,19 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	}
 	labels["e2e-run"] = string(RunId)
 
+	// We don't use ObjectMeta.GenerateName feature, as in case of API call
+	// failure we don't know whether the namespace was created and what is its
+	// name.
+	name, err := findAvailableNamespaceName(baseName, c)
+	if err != nil {
+		return nil, err
+	}
+
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
-			Namespace:    "",
-			Labels:       labels,
+			Name:      name,
+			Namespace: "",
+			Labels:    labels,
 		},
 		Status: v1.NamespaceStatus{},
 	}
