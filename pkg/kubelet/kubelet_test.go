@@ -264,7 +264,8 @@ func newTestKubeletWithImageList(
 		kubelet.resourceAnalyzer,
 		kubelet.podManager,
 		kubelet.runtimeCache,
-		fakeRuntime)
+		fakeRuntime,
+		kubelet.statusManager)
 	fakeImageGCPolicy := images.ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
