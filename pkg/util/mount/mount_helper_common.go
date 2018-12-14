@@ -19,9 +19,13 @@ package mount
 import (
 	"fmt"
 	"os"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
+
+const PathExistTimeout = 1 * time.Second
 
 // CleanupMountPoint unmounts the given path and
 // deletes the remaining directory if successful.
@@ -32,6 +36,28 @@ func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
 	// the path in the kubelet container, not on the host.
 	pathExists, pathErr := PathExists(mountPath)
+	if !pathExists {
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		return nil
+	}
+	corruptedMnt := IsCorruptedMnt(pathErr)
+	if pathErr != nil && !corruptedMnt {
+		return fmt.Errorf("Error checking path: %v", pathErr)
+	}
+	return doCleanupMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
+}
+
+// CleanupNfsMountPoint is an unmount routine that unmounts the given path awared
+// of the possibility of hang caused by lost connection with nfs server.
+func CleanupNfsMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
+	pathExists, pathErr := PathExistsWithTimeout(mountPath, PathExistTimeout)
+	if pathErr == wait.ErrWaitTimeout {
+		klog.Warningf("Timeout checking %q, unmounting", mountPath)
+		if err := mounter.Unmount(mountPath); err != nil {
+			return err
+		}
+	}
+
 	if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
@@ -99,5 +125,26 @@ func PathExists(path string) (bool, error) {
 		return true, err
 	} else {
 		return false, err
+	}
+}
+
+// PathExistsWithTimeout is similar to PathExists, but it would return
+// ErrWaitTimeout if PathExists didn't return in given 'duration'
+func PathExistsWithTimeout(path string, d time.Duration) (bool, error) {
+	var (
+		exists bool
+		err    error
+	)
+	c := make(chan struct{}, 1)
+	go func() {
+		exists, err = PathExists(path)
+		c <- struct{}{}
+	}()
+
+	select {
+	case <-c:
+		return exists, err
+	case <-time.After(d):
+		return false, wait.ErrWaitTimeout
 	}
 }

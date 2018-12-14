@@ -127,7 +127,7 @@ func (n *Mounter) makeNsenterArgs(source, target, fstype string, options []strin
 
 // Unmount runs umount(8) in the host's mount namespace.
 func (n *Mounter) Unmount(target string) error {
-	args := []string{target}
+	args := []string{"--force", target}
 	// No need to execute systemd-run here, it's enough that unmount is executed
 	// in the host's mount namespace. It will finish appropriate fuse daemon(s)
 	// running in any scope.

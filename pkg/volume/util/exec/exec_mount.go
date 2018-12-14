@@ -77,7 +77,7 @@ func (m *execMounter) doExecMount(source, target, fstype string, options []strin
 
 // Unmount runs umount(8) using given exec interface.
 func (m *execMounter) Unmount(target string) error {
-	outputBytes, err := m.exec.Run("umount", target)
+	outputBytes, err := m.exec.Run("umount", "--force", target)
 	if err == nil {
 		klog.V(5).Infof("Exec unmounted %s: %s", target, string(outputBytes))
 	} else {
