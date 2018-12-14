@@ -25,13 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 )
 
 func createInternalLoadBalancer(gce *Cloud, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {

@@ -49,8 +49,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"

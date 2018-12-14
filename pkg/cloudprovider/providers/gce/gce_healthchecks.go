@@ -23,11 +23,11 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"k8s.io/api/core/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
 
