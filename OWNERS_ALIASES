@@ -312,6 +312,8 @@ aliases:
     - feiskyer
     - mikedanese
   api-approvers:
+    - jennybuckley
+    - apelisse
     - erictune
     - lavalamp
     - smarterclayton
