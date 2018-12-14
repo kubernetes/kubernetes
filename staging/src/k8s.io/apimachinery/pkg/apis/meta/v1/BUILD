@@ -9,10 +9,6 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        # "controller_ref_test.go",
-        # "conversion_test.go",
-        # "duration_test.go",
-        # "group_version_test.go",
         "controller_ref_test.go",
         "conversion_test.go",
         "duration_test.go",
