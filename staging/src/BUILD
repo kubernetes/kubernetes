@@ -207,6 +207,7 @@ filegroup(
         "//staging/src/k8s.io/code-generator/pkg/namer:all-srcs",
         "//staging/src/k8s.io/code-generator/pkg/util:all-srcs",
         "//staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:all-srcs",
+        "//staging/src/k8s.io/component-base/cli/flags:all-srcs",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:all-srcs",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:all-srcs",
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions:all-srcs",
