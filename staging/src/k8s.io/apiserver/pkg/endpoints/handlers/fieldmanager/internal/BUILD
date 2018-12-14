@@ -32,6 +32,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "fields_test.go",
         "managedfields_test.go",
         "pathelement_test.go",
         "typeconverter_test.go",
@@ -48,6 +49,7 @@ go_test(
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
