@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply
+package fieldmanager
 
 import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/merge"
 )
@@ -30,7 +31,7 @@ const applyManager = "apply"
 // FieldManager updates the managed fields and merge applied
 // configurations.
 type FieldManager struct {
-	typeConverter   TypeConverter
+	typeConverter   internal.TypeConverter
 	objectConverter runtime.ObjectConvertor
 	objectDefaulter runtime.ObjectDefaulter
 	groupVersion    schema.GroupVersion
@@ -40,7 +41,7 @@ type FieldManager struct {
 // NewFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
 func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion) (*FieldManager, error) {
-	typeConverter, err := NewTypeConverter(models)
+	typeConverter, err := internal.NewTypeConverter(models)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
 		updater: merge.Updater{
-			Converter: NewVersionConverter(typeConverter, objectConverter),
+			Converter: internal.NewVersionConverter(typeConverter, objectConverter),
 		},
 	}, nil
 }
@@ -68,7 +69,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
 	}
 
-	managed, err := DecodeObjectManagedFields(newObj)
+	managed, err := internal.DecodeObjectManagedFields(newObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
@@ -87,7 +88,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
 
-	if err := EncodeObjectManagedFields(newObj, managed); err != nil {
+	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
 	}
 
@@ -104,7 +105,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
 	}
 
-	managed, err := DecodeObjectManagedFields(liveObj)
+	managed, err := internal.DecodeObjectManagedFields(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
@@ -128,7 +129,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 		return nil, fmt.Errorf("failed to convert new typed object to object: %v", err)
 	}
 
-	if err := EncodeObjectManagedFields(newObj, managed); err != nil {
+	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
 	}
 

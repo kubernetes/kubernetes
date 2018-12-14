@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply
+package internal
 
 import (
 	"reflect"
@@ -240,7 +240,7 @@ func TestRoundTripManagedFields(t *testing.T) {
 			continue
 		}
 
-		decoded, err := DecodeManagedFields(original)
+		decoded, err := decodeManagedFields(original)
 		if err == nil && len(tc.errString) > 0 {
 			t.Errorf("[%v]expected error but got none.", i)
 			continue
@@ -253,7 +253,7 @@ func TestRoundTripManagedFields(t *testing.T) {
 			t.Errorf("[%v]expected error with %q but got: %v", i, tc.errString, err)
 			continue
 		}
-		encoded, err := EncodeManagedFields(decoded)
+		encoded, err := encodeManagedFields(decoded)
 		if err != nil {
 			t.Errorf("[%v]did not expect round trip error but got: %v", i, err)
 			continue
@@ -262,4 +262,47 @@ func TestRoundTripManagedFields(t *testing.T) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, original, encoded)
 		}
 	}
+}
+
+// TestValidateOneOf tests that validateOneOf returns true if <= 1
+// non-nil fields are passed to it are and false otherwise
+func TestValidateOneOf(t *testing.T) {
+	var nilValue *string
+	nonNilValue := strPtr("test")
+
+	tests := []struct {
+		fields   []interface{}
+		expected bool
+	}{
+		{
+			fields:   []interface{}{},
+			expected: true,
+		}, {
+			fields:   []interface{}{nilValue},
+			expected: true,
+		}, {
+			fields:   []interface{}{nonNilValue},
+			expected: true,
+		}, {
+			fields:   []interface{}{nilValue, nonNilValue, nilValue},
+			expected: true,
+		}, {
+			fields:   []interface{}{nonNilValue, nonNilValue},
+			expected: false,
+		}, {
+			fields:   []interface{}{nilValue, nonNilValue, nonNilValue, nilValue},
+			expected: false,
+		},
+	}
+
+	for i, tc := range tests {
+		actual := validateOneOf(tc.fields...)
+		if actual != tc.expected {
+			t.Errorf("[%v]expected validateOneOf(%v) to return:\n\t%+v\nbut got:\n\t%+v", i, tc.fields, tc.expected, actual)
+		}
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
 }

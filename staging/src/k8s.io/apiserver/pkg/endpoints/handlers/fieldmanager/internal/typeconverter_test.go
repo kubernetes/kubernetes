@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apply_test
+package internal_test
 
 import (
 	"path/filepath"
@@ -23,14 +23,14 @@ import (
 
 	"github.com/ghodss/yaml"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apiserver/pkg/endpoints/handlers/apply"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
 
 var fakeSchema = prototesting.Fake{
 	Path: filepath.Join(
-		"..", "..", "..", "..", "..", "..", "..", "..",
+		"..", "..", "..", "..", "..", "..", "..", "..", "..",
 		"api", "openapi-spec", "swagger.json"),
 }
 
@@ -44,7 +44,7 @@ func TestTypeConverter(t *testing.T) {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := apply.NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}

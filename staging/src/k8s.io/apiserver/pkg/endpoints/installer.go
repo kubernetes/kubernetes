@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/apply"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
@@ -516,7 +516,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		fm, err := apply.NewFieldManager(
+		fm, err := fieldmanager.NewFieldManager(
 			a.group.OpenAPIModels,
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,
