@@ -74,7 +74,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/apply:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
@@ -88,6 +87,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -103,7 +103,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/apply:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:all-srcs",
     ],

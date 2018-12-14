@@ -39,7 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/handlers/apply"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -280,7 +280,7 @@ type patchMechanism interface {
 type jsonPatcher struct {
 	*patcher
 
-	fieldManager *apply.FieldManager
+	fieldManager *fieldmanager.FieldManager
 }
 
 func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -339,7 +339,7 @@ type smpPatcher struct {
 
 	// Schema
 	schemaReferenceObj runtime.Object
-	fieldManager       *apply.FieldManager
+	fieldManager       *fieldmanager.FieldManager
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -377,7 +377,7 @@ type applyPatcher struct {
 	options      *metav1.PatchOptions
 	creater      runtime.ObjectCreater
 	kind         schema.GroupVersionKind
-	fieldManager *apply.FieldManager
+	fieldManager *fieldmanager.FieldManager
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
