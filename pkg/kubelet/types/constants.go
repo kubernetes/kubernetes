@@ -26,7 +26,7 @@ const (
 
 	// User visible keys for managing node allocatable enforcement on the node.
 	NodeAllocatableEnforcementKey = "pods"
-	SystemReservedEnforcementKey  = "system-reserved"
-	KubeReservedEnforcementKey    = "kube-reserved"
+	SystemReservedEnforcementKey  = "SystemReserved"
+	KubeReservedEnforcementKey    = "KubeReserved"
 	NodeAllocatableNoneKey        = "none"
 )

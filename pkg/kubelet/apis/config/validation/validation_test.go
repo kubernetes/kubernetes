@@ -28,7 +28,7 @@ import (
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               true,
-		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+		EnforceNodeAllocatable:      []string{"pods", "SystemReserved", "KubeReserved"},
 		SystemCgroups:               "",
 		CgroupRoot:                  "",
 		EventBurst:                  10,
@@ -58,7 +58,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 
 	errorCase := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               false,
-		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
+		EnforceNodeAllocatable:      []string{"pods", "SystemReserved", "KubeReserved", "illegal-key"},
 		SystemCgroups:               "/",
 		CgroupRoot:                  "",
 		EventBurst:                  -10,

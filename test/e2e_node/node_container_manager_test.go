@@ -98,8 +98,8 @@ func getAllocatableLimits(cpu, memory string, capacity v1.ResourceList) (*resour
 }
 
 const (
-	kubeReservedCgroup   = "kube-reserved"
-	systemReservedCgroup = "system-reserved"
+	kubeReservedCgroup   = "KubeReserved"
+	systemReservedCgroup = "SystemReserved"
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {

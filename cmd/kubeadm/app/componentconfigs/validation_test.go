@@ -286,7 +286,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					Kubelet: &kubeletconfig.KubeletConfiguration{
 						CgroupsPerQOS:               true,
-						EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+						EnforceNodeAllocatable:      []string{"pods", "SystemReserved", "KubeReserved"},
 						SystemCgroups:               "",
 						CgroupRoot:                  "",
 						EventBurst:                  10,
