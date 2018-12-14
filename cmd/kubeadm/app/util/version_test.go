@@ -421,10 +421,10 @@ func TestValidateStableVersion(t *testing.T) {
 			output:        "v1.11.0",
 		},
 		{
-			name:          "valid: client version is empty; use remote version",
+			name:          "invalid: client version is empty",
 			remoteVersion: "v1.12.1",
 			clientVersion: "",
-			output:        "v1.12.1",
+			expectedError: true,
 		},
 		{
 			name:          "invalid: error parsing the remote version",
