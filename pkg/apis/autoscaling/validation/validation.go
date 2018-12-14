@@ -79,6 +79,13 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
 		}
 	}
+	if len(ref.APIVersion) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("APIVersion"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.APIVersion) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("APIVersion"), ref.APIVersion, msg))
+		}
+	}
 
 	return allErrs
 }
@@ -189,6 +196,13 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
 	}
+	if len(src.Metric.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("metricName"), "must specify a metric name"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(src.Metric.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("metricName"), src.Metric.Name, msg))
+		}
+	}
 
 	return allErrs
 }
@@ -226,6 +240,13 @@ func validatePodsSource(src *autoscaling.PodsMetricSource, fldPath *field.Path) 
 
 	if src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must specify a positive target averageValue"))
+	}
+	if len(src.Metric.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("metricName"), "must specify a metric name"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(src.Metric.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("metricName"), src.Metric.Name, msg))
+		}
 	}
 
 	return allErrs
