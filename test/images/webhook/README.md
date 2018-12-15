@@ -8,6 +8,15 @@ TODO: add the reference when the document for admission webhook v1beta1 API is d
 
 ## Build the code
 
+The binary can be built using the following command :
+
 ```bash
-make build
+make bin
+```
+
+The images can be built using the Makefile in the parent directory (`test/images`) :
+
+```bash
+cd ..
+make all WHAT=webhook
 ```

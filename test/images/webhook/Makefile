@@ -14,6 +14,7 @@
 
 SRCS=webhook
 ARCH ?= amd64
+GOARM ?= 7
 TARGET ?= $(CURDIR)
 GOLANG_VERSION ?= latest
 SRC_DIR = $(notdir $(shell pwd))
