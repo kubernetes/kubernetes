@@ -90,7 +90,7 @@ func (s *Updater) update(oldObject, newObject typed.TypedValue, managers fieldpa
 // that you intend to persist (after applying the patch if this is for a
 // PATCH call), and liveObject must be the original object (empty if
 // this is a CREATE call).
-func (s *Updater) Update(liveObject, newObject typed.TypedValue, managers fieldpath.ManagedFields, manager string) (fieldpath.ManagedFields, error) {
+func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (fieldpath.ManagedFields, error) {
 	var err error
 	managers, err = s.update(liveObject, newObject, managers, manager, true)
 	if err != nil {
@@ -106,14 +106,14 @@ func (s *Updater) Update(liveObject, newObject typed.TypedValue, managers fieldp
 		}
 	}
 	managers[manager].Set = managers[manager].Set.Union(compare.Modified).Union(compare.Added).Difference(compare.Removed)
-	managers[manager].APIVersion = fieldpath.APIVersion("v1") // TODO: We don't support multiple versions yet.
+	managers[manager].APIVersion = version
 	return managers, nil
 }
 
 // Apply should be called when Apply is run, given the current object as
 // well as the configuration that is applied. This will merge the object
 // and return it.
-func (s *Updater) Apply(liveObject, configObject typed.TypedValue, managers fieldpath.ManagedFields, manager string, force bool) (typed.TypedValue, fieldpath.ManagedFields, error) {
+func (s *Updater) Apply(liveObject, configObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (typed.TypedValue, fieldpath.ManagedFields, error) {
 	newObject, err := liveObject.Merge(configObject)
 	if err != nil {
 		return typed.TypedValue{}, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
@@ -131,7 +131,7 @@ func (s *Updater) Apply(liveObject, configObject typed.TypedValue, managers fiel
 	}
 	managers[manager] = &fieldpath.VersionedSet{
 		Set:        set,
-		APIVersion: fieldpath.APIVersion("v1"), // TODO: We don't support multiple versions yet.
+		APIVersion: version,
 	}
 	return newObject, managers, nil
 }

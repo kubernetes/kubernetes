@@ -52,6 +52,7 @@ func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server
 		resourceConfig.EnableVersions(groupVersions...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})

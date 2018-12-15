@@ -128,6 +128,19 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			}
 		}
 
+		if scope.FieldManager != nil {
+			liveObj, err := scope.Creater.New(scope.Kind)
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+			obj, err = scope.FieldManager.Update(liveObj, obj, "create")
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
+
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.Create(

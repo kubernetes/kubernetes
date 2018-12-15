@@ -67,6 +67,7 @@ type ApplyOptions struct {
 	DeleteOptions *delete.DeleteOptions
 
 	ServerSideApply            bool
+	ForceConflicts             bool
 	Selector                   string
 	DryRun                     bool
 	ServerDryRun               bool
@@ -180,7 +181,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	cmdutil.AddServerSideApplyFlag(cmd)
+	cmdutil.AddServerSideApplyFlags(cmd)
 
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
@@ -192,7 +193,16 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.ForceConflicts && !o.ServerSideApply {
+		return fmt.Errorf("--force-conflicts only works with --server-side")
+	}
+
+	if o.DryRun && o.ServerSideApply {
+		return fmt.Errorf("--dry-run doesn't work with --server-side")
+	}
 
 	if o.DryRun && o.ServerDryRun {
 		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
@@ -371,7 +381,9 @@ func (o *ApplyOptions) Run() error {
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
-			options := metav1.PatchOptions{}
+			options := metav1.PatchOptions{
+				Force: &o.ForceConflicts,
+			}
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}
 			}

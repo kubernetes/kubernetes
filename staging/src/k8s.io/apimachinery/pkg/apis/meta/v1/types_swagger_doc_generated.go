@@ -118,59 +118,12 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
 }
 
-var map_FieldNameValuePair = map[string]string{
-	"":      "FieldNameValuePair is an individual key-value pair.",
-	"name":  "Name is the field's name.",
-	"value": "Value is the field's value.",
+var map_Fields = map[string]string{
+	"": "Fields stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
 }
 
-func (FieldNameValuePair) SwaggerDoc() map[string]string {
-	return map_FieldNameValuePair
-}
-
-var map_FieldPathElement = map[string]string{
-	"":          "FieldPathElement describes how to select a child field given a containing object.",
-	"fieldName": "Exactly one of the following fields should be non-nil. FieldName selects a single field from a map (reminder: this is also how structs are represented). The containing object must be a map.",
-	"key":       "Key selects the list element which has fields matching those given. The containing object must be an associative list with map typed elements.",
-	"value":     "Value selects the list element with the given value. The containing object must be an associative list with a primitive typed element (i.e., a set).",
-	"index":     "Index selects a list element by its index number. The containing object must be an atomic list.",
-}
-
-func (FieldPathElement) SwaggerDoc() map[string]string {
-	return map_FieldPathElement
-}
-
-var map_FieldSet = map[string]string{
-	"":         "FieldSet stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
-	"members":  "Members lists fields that are part of the set.",
-	"children": "Children lists child fields which themselves have children that are members of the set. Appearance in this list does not imply membership, although it does imply some descendant field is a member. Note: this is a tree, not an arbitrary graph.",
-}
-
-func (FieldSet) SwaggerDoc() map[string]string {
-	return map_FieldSet
-}
-
-var map_FieldSetNode = map[string]string{
-	"":            "FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing nested set membership.",
-	"pathElement": "PathElement identifies which field this node expresses child membership for.",
-	"set":         "Set identifies which child fields of this node are part of the FieldSet.",
-}
-
-func (FieldSetNode) SwaggerDoc() map[string]string {
-	return map_FieldSetNode
-}
-
-var map_FieldValue = map[string]string{
-	"":             "FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.",
-	"floatValue":   "Exactly one of the following fields should be set. FloatValue is a primitive float value. it is serialized as a string",
-	"intValue":     "IntValue is a primitive int value.",
-	"stringValue":  "StringValue is a primitive string value.",
-	"booleanValue": "BooleanValue is a primitive boolean value.",
-	"null":         "Null represents an explicit `\"foo\" = null`",
-}
-
-func (FieldValue) SwaggerDoc() map[string]string {
-	return map_FieldValue
+func (Fields) SwaggerDoc() map[string]string {
+	return map_Fields
 }
 
 var map_GetOptions = map[string]string{
@@ -413,14 +366,14 @@ func (UpdateOptions) SwaggerDoc() map[string]string {
 	return map_UpdateOptions
 }
 
-var map_VersionedFieldSet = map[string]string{
-	"":           "VersionedFieldSet is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
+var map_VersionedFields = map[string]string{
+	"":           "VersionedFields is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
 	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
 	"fields":     "Fields identifies a set of fields.",
 }
 
-func (VersionedFieldSet) SwaggerDoc() map[string]string {
-	return map_VersionedFieldSet
+func (VersionedFields) SwaggerDoc() map[string]string {
+	return map_VersionedFields
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
