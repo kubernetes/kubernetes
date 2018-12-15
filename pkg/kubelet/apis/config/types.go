@@ -218,7 +218,7 @@ type KubeletConfiguration struct {
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
-	// PodPidsLimit is the maximum number of pids in any pod.
+	// The maximum number of processes per pod.  If -1, the kubelet defaults to the node allocatable pid capacity.
 	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.

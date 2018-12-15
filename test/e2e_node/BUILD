@@ -97,6 +97,7 @@ go_test(
         "mirror_pod_test.go",
         "node_container_manager_test.go",
         "node_perf_test.go",
+        "pids_test.go",
         "pods_container_manager_test.go",
         "resource_usage_test.go",
         "restart_test.go",
