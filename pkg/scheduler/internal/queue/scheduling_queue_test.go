@@ -96,9 +96,15 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 
 func TestPriorityQueue_Add(t *testing.T) {
 	q := NewPriorityQueue(nil)
-	q.Add(&medPriorityPod)
-	q.Add(&unschedulablePod)
-	q.Add(&highPriorityPod)
+	if err := q.Add(&medPriorityPod); err != nil {
+		t.Errorf("add failed: %v", err)
+	}
+	if err := q.Add(&unschedulablePod); err != nil {
+		t.Errorf("add failed: %v", err)
+	}
+	if err := q.Add(&highPriorityPod); err != nil {
+		t.Errorf("add failed: %v", err)
+	}
 	expectedNominatedPods := map[string][]*v1.Pod{
 		"node1": {&medPriorityPod, &unschedulablePod},
 	}
@@ -228,7 +234,9 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	q := NewPriorityQueue(nil)
 	q.Update(&highPriorityPod, &highPriNominatedPod)
 	q.Add(&unschedulablePod)
-	q.Delete(&highPriNominatedPod)
+	if err := q.Delete(&highPriNominatedPod); err != nil {
+		t.Errorf("delete failed: %v", err)
+	}
 	if _, exists, _ := q.activeQ.Get(&unschedulablePod); !exists {
 		t.Errorf("Expected %v to be in activeQ.", unschedulablePod.Name)
 	}
@@ -238,7 +246,9 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	if len(q.nominatedPods) != 1 {
 		t.Errorf("Expected nomindatePods to have only 'unschedulablePod': %v", q.nominatedPods)
 	}
-	q.Delete(&unschedulablePod)
+	if err := q.Delete(&unschedulablePod); err != nil {
+		t.Errorf("delete failed: %v", err)
+	}
 	if len(q.nominatedPods) != 0 {
 		t.Errorf("Expected nomindatePods to be empty: %v", q.nominatedPods)
 	}
