@@ -60,6 +60,17 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 // use-case), and simply updates the managed fields in the output
 // object.
 func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
+	managed, err := internal.DecodeObjectManagedFields(newObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(newObj); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from new obj: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(liveObj); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
+	}
+
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
@@ -67,11 +78,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
-	}
-
-	managed, err := internal.DecodeObjectManagedFields(newObj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
@@ -98,16 +104,19 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 // Apply is used when server-side apply is called, as it merges the
 // object and update the managed fields.
 func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (runtime.Object, error) {
+	managed, err := internal.DecodeObjectManagedFields(liveObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(liveObj); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
+	}
+
 	// We can assume that patchObj is already on the proper version:
 	// it shouldn't have to be converted so that it's not defaulted.
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
-	}
-
-	managed, err := internal.DecodeObjectManagedFields(liveObj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
 
 	patchObjTyped, err := f.typeConverter.YAMLToTyped(patch)

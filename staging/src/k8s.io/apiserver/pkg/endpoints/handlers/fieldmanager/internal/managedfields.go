@@ -22,9 +22,20 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
+
+// RemoveObjectManagedFields removes the ManagedFields from the object
+// before we merge so that it doesn't appear in the ManagedFields
+// recursively.
+func RemoveObjectManagedFields(obj runtime.Object) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("couldn't get accessor: %v", err)
+	}
+	accessor.SetManagedFields(nil)
+	return nil
+}
 
 // DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.
 func DecodeObjectManagedFields(from runtime.Object) (fieldpath.ManagedFields, error) {
