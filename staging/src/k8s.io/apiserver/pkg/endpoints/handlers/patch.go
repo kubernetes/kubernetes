@@ -47,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	"k8s.io/klog"
 )
 
 // PatchResource returns a function that will handle a resource patch.
@@ -303,7 +304,10 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		return p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher")
+		objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher")
+		if err != nil {
+			klog.Warningf("FieldManager: Failed to update object managed fields: %v", err)
+		}
 	}
 	return objToUpdate, nil
 }
@@ -363,7 +367,10 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		return p.fieldManager.Update(currentObject, newObj, "jsonPatcher")
+		newObj, err = p.fieldManager.Update(currentObject, newObj, "smPatcher")
+		if err != nil {
+			klog.Warningf("FieldManager: Failed to update object managed fields: %v", err)
+		}
 	}
 	return newObj, nil
 }
