@@ -312,6 +312,7 @@ aliases:
     - feiskyer
     - mikedanese
   api-approvers:
+    # TODO remove jennybuckly and apelisse from this before merging with master
     - jennybuckley
     - apelisse
     - erictune
