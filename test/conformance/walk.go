@@ -29,17 +29,18 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 var (
 	baseURL                                           = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
 	confDoc                                           = flag.Bool("conformance", false, "write a conformance document")
+	version                                           = flag.String("version", "v1.9", "version of this conformance document")
 	totalConfTests, totalLegacyTests, missingComments int
 )
 
@@ -323,10 +324,16 @@ func main() {
 
 	if *confDoc {
 		// Note: this assumes that you're running from the root of the kube src repo
-		header, err := ioutil.ReadFile("test/conformance/cf_header.md")
-		if err == nil {
-			fmt.Printf("%s\n\n", header)
+		templ, err := template.ParseFiles("test/conformance/cf_header.md")
+		if err != nil {
+			fmt.Printf("Error reading the Header file information: %s\n\n", err)
 		}
+		data := struct {
+			Version string
+		}{
+			Version: *version,
+		}
+		templ.Execute(os.Stdout, data)
 	}
 
 	totalConfTests = 0
