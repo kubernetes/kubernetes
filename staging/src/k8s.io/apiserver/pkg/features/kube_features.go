@@ -112,5 +112,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
-	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
+	ServerSideApply:         {Default: true, PreRelease: utilfeature.Alpha},
 }
