@@ -50,8 +50,8 @@ kubernetesVersion: ` + k8sVersionString + `
 	"ClusterStatus_v1beta1": []byte(`
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterStatus
-apiEndpoints: 
-  ` + nodeName + `: 
+apiEndpoints:
+  ` + nodeName + `:
     advertiseAddress: 1.2.3.4
     bindPort: 1234
 `),
@@ -71,8 +71,8 @@ kubernetesVersion: ` + k8sVersionString + `
 	"ClusterStatus_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
 kind: ClusterStatus
-apiEndpoints: 
-  ` + nodeName + `: 
+apiEndpoints:
+  ` + nodeName + `:
     advertiseAddress: 1.2.3.4
     bindPort: 1234
 `),
@@ -569,12 +569,12 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	var tests = []struct {
-		name            string
-		fileContents    []byte
-		node            *v1.Node
-		configMaps      []fakeConfigMap
-		newControlPlane bool
-		expectedError   bool
+		name          string
+		fileContents  []byte
+		node          *v1.Node
+		configMaps    []fakeConfigMap
+		upgrading     bool
+		expectedError bool
 	}{
 		{
 			name:          "invalid - No kubeadm-config ConfigMap",
@@ -591,7 +591,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name: "valid v1beta1 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
+			name: "valid v1beta1 - upgrading == true", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
 			configMaps: []fakeConfigMap{
 				{
 					name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
@@ -627,7 +627,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			},
 		},
 		{
-			name: "valid v1beta1 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
+			name: "valid v1beta1 - upgrading == false", // InitConfiguration composed with data from different places, without node specific information
 			configMaps: []fakeConfigMap{
 				{
 					name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
@@ -648,10 +648,10 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			newControlPlane: true,
+			upgrading: false,
 		},
 		{
-			name: "valid v1alpha3 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
+			name: "valid v1alpha3 - upgrading == true", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
 			configMaps: []fakeConfigMap{
 				{
 					name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
@@ -687,7 +687,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			},
 		},
 		{
-			name: "valid v1alpha3 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
+			name: "valid v1alpha3 - upgrading == false", // InitConfiguration composed with data from different places, without node specific information
 			configMaps: []fakeConfigMap{
 				{
 					name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
@@ -708,7 +708,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			newControlPlane: true,
+			upgrading: false,
 		},
 	}
 
@@ -741,7 +741,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 				}
 			}
 
-			cfg, err := getInitConfigurationFromCluster(tmpdir, client, rt.newControlPlane)
+			cfg, err := getInitConfigurationFromCluster(tmpdir, client, rt.upgrading)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getInitConfigurationFromCluster: %v", err)
 				return
@@ -757,7 +757,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			if cfg.ClusterConfiguration.KubernetesVersion != k8sVersionString {
 				t.Errorf("invalid ClusterConfiguration.KubernetesVersion")
 			}
-			if !rt.newControlPlane && (cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234) {
+			if rt.upgrading && (cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234) {
 				t.Errorf("invalid cfg.LocalAPIEndpoint")
 			}
 			if cfg.ComponentConfigs.Kubelet == nil {

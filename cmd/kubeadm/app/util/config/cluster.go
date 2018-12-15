@@ -39,9 +39,9 @@ import (
 )
 
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
-func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, upgrading bool) (*kubeadmapi.InitConfiguration, error) {
 	// Load the configuration from a file or the cluster
-	initcfg, err := loadConfiguration(client, w, logPrefix, cfgPath, newControlPlane)
+	initcfg, err := loadConfiguration(client, w, logPrefix, cfgPath, upgrading)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPr
 }
 
 // loadConfiguration loads the configuration byte slice from either a file or the cluster ConfigMap
-func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, upgrading bool) (*kubeadmapi.InitConfiguration, error) {
 	// The config file has the highest priority
 	if cfgPath != "" {
 		fmt.Fprintf(w, "[%s] Reading configuration options from a file: %s\n", logPrefix, cfgPath)
@@ -63,7 +63,7 @@ func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPa
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
 	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
-	return getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
+	return getInitConfigurationFromCluster(constants.KubernetesDir, client, upgrading)
 }
 
 func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
@@ -86,7 +86,7 @@ func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 	return initcfg, nil
 }
 
-func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, upgrading bool) (*kubeadmapi.InitConfiguration, error) {
 	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
 	// Also, the config map really should be KubeadmConfigConfigMap...
 	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
@@ -111,9 +111,8 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		return nil, errors.Wrap(err, "failed to get component configs")
 	}
 
-	// if this isn't a new controlplane instance (e.g. in case of kubeadm upgrades)
-	// get nodes specific information as well
-	if !newControlPlane {
+	// in case of kubeadm upgrades get nodes specific information as well
+	if upgrading {
 		// gets the nodeRegistration for the current from the node object
 		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")

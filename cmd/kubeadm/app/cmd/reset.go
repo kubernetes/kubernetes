@@ -189,7 +189,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 	msg := `
 The reset process does not reset or clean up iptables rules or IPVS tables.
 If you wish to reset iptables, you must do so manually.
-For example: 
+For example:
 iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
 
 If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
@@ -206,7 +206,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 	var dataDir string
 
 	if client != nil {
-		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+		cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", true)
 		if err == nil && cfg.Etcd.Local != nil {
 			return cfg.Etcd.Local.DataDir, nil
 		}
