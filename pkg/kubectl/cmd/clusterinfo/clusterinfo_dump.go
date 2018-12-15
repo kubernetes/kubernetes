@@ -133,20 +133,14 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 
 	o.PrintObj = printer.PrintObj
 
-	config, err := f.ToRESTConfig()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
-	o.CoreClient, err = corev1client.NewForConfig(config)
-	if err != nil {
-		return err
-	}
+	o.CoreClient = clientset.CoreV1()
 
-	o.AppsClient, err = appsv1client.NewForConfig(config)
-	if err != nil {
-		return err
-	}
+	o.AppsClient = clientset.AppsV1()
 
 	o.Timeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
@@ -184,7 +178,8 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			namespaces = append(namespaces, namespaceList.Items[ix].Name)
 		}
 	} else {
-		if len(o.Namespaces) == 0 {
+		namespaces = o.Namespaces
+		if len(namespaces) == 0 {
 			namespaces = []string{
 				metav1.NamespaceSystem,
 				o.Namespace,
