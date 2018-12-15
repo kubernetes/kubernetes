@@ -400,8 +400,9 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
-func AddServerSideApplyFlag(cmd *cobra.Command) {
+func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
+	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
@@ -478,6 +479,10 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 
 func GetServerSideApplyFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "server-side")
+}
+
+func GetForceConflictsFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "force-conflicts")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
