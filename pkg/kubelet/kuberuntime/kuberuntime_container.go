@@ -584,7 +584,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		klog.V(3).Infof("Container %q exited normally", containerID.String())
 	}
 
-	message := fmt.Sprintf("Killing container with id %s", containerID.String())
+	message := fmt.Sprintf("Killing container %s", containerID.String())
 	if reason != "" {
 		message = fmt.Sprint(message, ":", reason)
 	}

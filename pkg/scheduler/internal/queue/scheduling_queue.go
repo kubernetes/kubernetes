@@ -276,31 +276,34 @@ func (p *PriorityQueue) run() {
 // already exist in the map. Adding an existing pod is not going to update the pod.
 func (p *PriorityQueue) addNominatedPodIfNeeded(pod *v1.Pod) {
 	nnn := NominatedNodeName(pod)
-	if len(nnn) > 0 {
-		for _, np := range p.nominatedPods[nnn] {
-			if np.UID == pod.UID {
-				klog.V(4).Infof("Pod %v/%v already exists in the nominated map!", pod.Namespace, pod.Name)
-				return
-			}
-		}
-		p.nominatedPods[nnn] = append(p.nominatedPods[nnn], pod)
+	if len(nnn) <= 0 {
+		return
 	}
+	for _, np := range p.nominatedPods[nnn] {
+		if np.UID == pod.UID {
+			klog.V(4).Infof("Pod %v/%v already exists in the nominated map!", pod.Namespace, pod.Name)
+			return
+		}
+	}
+	p.nominatedPods[nnn] = append(p.nominatedPods[nnn], pod)
 }
 
 // deleteNominatedPodIfExists deletes a pod from the nominatedPods.
 // NOTE: this function assumes lock has been acquired in caller.
 func (p *PriorityQueue) deleteNominatedPodIfExists(pod *v1.Pod) {
 	nnn := NominatedNodeName(pod)
-	if len(nnn) > 0 {
-		for i, np := range p.nominatedPods[nnn] {
-			if np.UID == pod.UID {
-				p.nominatedPods[nnn] = append(p.nominatedPods[nnn][:i], p.nominatedPods[nnn][i+1:]...)
-				if len(p.nominatedPods[nnn]) == 0 {
-					delete(p.nominatedPods, nnn)
-				}
-				break
-			}
+	if len(nnn) <= 0 {
+		return
+	}
+	for i, np := range p.nominatedPods[nnn] {
+		if np.UID != pod.UID {
+			continue
 		}
+		p.nominatedPods[nnn] = append(p.nominatedPods[nnn][:i], p.nominatedPods[nnn][i+1:]...)
+		if len(p.nominatedPods[nnn]) == 0 {
+			delete(p.nominatedPods, nnn)
+		}
+		break
 	}
 }
 
@@ -317,23 +320,23 @@ func (p *PriorityQueue) updateNominatedPod(oldPod, newPod *v1.Pod) {
 func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	err := p.activeQ.Add(pod)
-	if err != nil {
+	if err := p.activeQ.Add(pod); err != nil {
 		klog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
-	} else {
-		if p.unschedulableQ.get(pod) != nil {
-			klog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
-			p.deleteNominatedPodIfExists(pod)
-			p.unschedulableQ.delete(pod)
-		}
-		// Delete pod from backoffQ if it is backing off
-		if err = p.podBackoffQ.Delete(pod); err == nil {
-			klog.Errorf("Error: pod %v/%v is already in the podBackoff queue.", pod.Namespace, pod.Name)
-		}
-		p.addNominatedPodIfNeeded(pod)
-		p.cond.Broadcast()
+		return err
 	}
-	return err
+	if p.unschedulableQ.get(pod) != nil {
+		klog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
+		p.deleteNominatedPodIfExists(pod)
+		p.unschedulableQ.delete(pod)
+	}
+	// Delete pod from backoffQ if it is backing off
+	if err := p.podBackoffQ.Delete(pod); err == nil {
+		klog.Errorf("Error: pod %v/%v is already in the podBackoff queue.", pod.Namespace, pod.Name)
+	}
+	p.addNominatedPodIfNeeded(pod)
+	p.cond.Broadcast()
+
+	return nil
 }
 
 // AddIfNotPresent adds a pod to the active queue if it is not present in any of

@@ -2845,8 +2845,10 @@ function main() {
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     compute-master-manifest-variables
-    start-etcd-servers
-    start-etcd-empty-dir-cleanup-pod
+    if [[ -z "${ETCD_SERVERS:-}" ]]; then
+      start-etcd-servers
+      start-etcd-empty-dir-cleanup-pod
+    fi
     start-kube-apiserver
     start-kube-controller-manager
     start-kube-scheduler

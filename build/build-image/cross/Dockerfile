@@ -15,7 +15,7 @@
 # This file creates a standard build environment for building cross
 # platform go binary for the architecture kubernetes cares about.
 
-FROM golang:1.11.2
+FROM golang:1.11.3
 
 ENV GOARM 7
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
@@ -44,7 +44,7 @@ RUN apt-get update \
 # Use dynamic cgo linking for architectures other than amd64 for the server platforms
 # To install crossbuild essential for other architectures add the following repository.
 RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
+  && apt-key adv --no-tty --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
   && apt-get update \
   && apt-get install -y build-essential \
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \

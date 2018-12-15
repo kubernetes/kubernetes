@@ -1083,17 +1083,17 @@ filename | sha256 hash
 
 ### Node
 
-Many of the changes within SIG-Node revolve around control. With the beta release of the `kubelet.config.k8s.io` API group, a significant subset of Kubelet configuration can now be [configured via a versioned config file](https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/). Kubernetes v1.10 adds alpha support for the ability to [configure whether containers in a pod should share a single process namespace](https://github.com/kubernetes/features/issues/495), and the CRI has been upgraded to v1alpha2, which adds [support for Windows Container Configuration](https://github.com/kubernetes/features/issues/547). Kubernetes v1.10 also ships with the beta release of the [CRI validation test suite](https://github.com/kubernetes/features/issues/292). 
+Many of the changes within SIG-Node revolve around control. With the beta release of the `kubelet.config.k8s.io` API group, a significant subset of Kubelet configuration can now be [configured via a versioned config file](https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/). Kubernetes v1.10 adds alpha support for the ability to [configure whether containers in a pod should share a single process namespace](https://github.com/kubernetes/enhancements/issues/495), and the CRI has been upgraded to v1alpha2, which adds [support for Windows Container Configuration](https://github.com/kubernetes/enhancements/issues/547). Kubernetes v1.10 also ships with the beta release of the [CRI validation test suite](https://github.com/kubernetes/enhancements/issues/292). 
 
 The Resource Management Working Group graduated three features to beta in the 1.10 release.  First, [CPU Manager](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/), which allows users to request exclusive CPU cores.  This helps performance in a variety of use-cases, including network latency sensitive applications, as well as applications that benefit from CPU cache residency.  Next, [Huge Pages](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/), which allows pods to consume either 2Mi or 1Gi Huge Pages.  This benefits applications that consume large amounts of memory.  Use of Huge Pages is a common tuning recommendation for databases and JVMs.  Finally, the [Device Plugin](https://kubernetes.io/docs/concepts/cluster-administration/device-plugins/) feature, which provides a framework for vendors to advertise their resources to the Kubelet without changing Kubernetes core code.  Targeted devices include GPUs, High-performance NICs, FPGAs, InfiniBand, and other similar computing resources that may require vendor specific initialization and setup.
 
 ### Storage
 
-This release brings additional power to both local storage and Persistent Volumes. [Mount namespace propagation](https://github.com/kubernetes/features/issues/432) allows a container to mount a volume as rslave so that host mounts can be seen inside the container, or as rshared so that mounts made inside a container can be seen by the host. (Note that this is [not supported on Windows](https://github.com/kubernetes/kubernetes/pull/60275).) [Local Ephemeral Storage Capacity Isolation](https://github.com/kubernetes/features/issues/361) makes it possible to set requests and limits on ephemeral local storage resources. In addition, you can now create [Local Persistent Storage](https://github.com/kubernetes/features/issues/121), which enables PersistentVolumes to be created with locally attached disks, and not just network volumes.
+This release brings additional power to both local storage and Persistent Volumes. [Mount namespace propagation](https://github.com/kubernetes/enhancements/issues/432) allows a container to mount a volume as rslave so that host mounts can be seen inside the container, or as rshared so that mounts made inside a container can be seen by the host. (Note that this is [not supported on Windows](https://github.com/kubernetes/kubernetes/pull/60275).) [Local Ephemeral Storage Capacity Isolation](https://github.com/kubernetes/enhancements/issues/361) makes it possible to set requests and limits on ephemeral local storage resources. In addition, you can now create [Local Persistent Storage](https://github.com/kubernetes/enhancements/issues/121), which enables PersistentVolumes to be created with locally attached disks, and not just network volumes.
 
-On the Persistent Volumes side, this release [Prevents deletion of Persistent Volume Claims that are used by a pod](https://github.com/kubernetes/features/issues/498) and [Persistent Volumes that are bound to a Persistent Volume Claim](https://github.com/kubernetes/features/issues/499), making it impossible to delete storage that is in use by a pod. 
+On the Persistent Volumes side, this release [Prevents deletion of Persistent Volume Claims that are used by a pod](https://github.com/kubernetes/enhancements/issues/498) and [Persistent Volumes that are bound to a Persistent Volume Claim](https://github.com/kubernetes/enhancements/issues/499), making it impossible to delete storage that is in use by a pod. 
 
-This release also includes [Topology Aware Volume Scheduling](https://github.com/kubernetes/features/issues/490) for local persistent volumes, the stable release of [Detailed storage metrics of internal state](https://github.com/kubernetes/features/issues/496), and beta support for [Out-of-tree CSI Volume Plugins](https://github.com/kubernetes/features/issues/178).
+This release also includes [Topology Aware Volume Scheduling](https://github.com/kubernetes/enhancements/issues/490) for local persistent volumes, the stable release of [Detailed storage metrics of internal state](https://github.com/kubernetes/enhancements/issues/496), and beta support for [Out-of-tree CSI Volume Plugins](https://github.com/kubernetes/enhancements/issues/178).
 
 ### Windows
 
@@ -1105,23 +1105,23 @@ SIG-OpenStack updated the OpenStack provider to use newer APIs, consolidated com
 
 ### API-machinery
 
-[API Aggregation](https://github.com/kubernetes/features/issues/263) has been upgraded to "stable" in Kubernetes 1.10, so you can use it in production. Webhooks have seen numerous improvements, including alpha [Support for self-hosting authorizer webhooks](https://github.com/kubernetes/features/issues/516).
+[API Aggregation](https://github.com/kubernetes/enhancements/issues/263) has been upgraded to "stable" in Kubernetes 1.10, so you can use it in production. Webhooks have seen numerous improvements, including alpha [Support for self-hosting authorizer webhooks](https://github.com/kubernetes/enhancements/issues/516).
 
 ### Auth
 
-This release lays the groundwork for new authentication methods, including the alpha release of [External client-go credential providers](https://github.com/kubernetes/features/issues/541)  and the [TokenRequest API](https://github.com/kubernetes/features/issues/542). In addition, [Pod Security Policy](https://github.com/kubernetes/features/issues/5) now lets administrators decide what contexts pods can run in, and gives administrators the ability to [limit node access to the API](https://github.com/kubernetes/features/issues/279).
+This release lays the groundwork for new authentication methods, including the alpha release of [External client-go credential providers](https://github.com/kubernetes/enhancements/issues/541)  and the [TokenRequest API](https://github.com/kubernetes/enhancements/issues/542). In addition, [Pod Security Policy](https://github.com/kubernetes/enhancements/issues/5) now lets administrators decide what contexts pods can run in, and gives administrators the ability to [limit node access to the API](https://github.com/kubernetes/enhancements/issues/279).
 
 ### Azure
 
-Kubernetes 1.10 includes alpha [Azure support for cluster-autoscaler](https://github.com/kubernetes/features/issues/514), as well as [support for Azure Virtual Machine Scale Sets](https://github.com/kubernetes/features/issues/513).
+Kubernetes 1.10 includes alpha [Azure support for cluster-autoscaler](https://github.com/kubernetes/enhancements/issues/514), as well as [support for Azure Virtual Machine Scale Sets](https://github.com/kubernetes/enhancements/issues/513).
 
 ### CLI
 
-This release includes a change to [kubectl get and describe to work better with extensions](https://github.com/kubernetes/features/issues/515), as the server, rather than the client, returns this information for a smoother user experience.
+This release includes a change to [kubectl get and describe to work better with extensions](https://github.com/kubernetes/enhancements/issues/515), as the server, rather than the client, returns this information for a smoother user experience.
 
 ### Network
 
-In terms of networking, Kubernetes 1.10 is about control. Users now have beta support for the ability to [configure a pod's resolv.conf](https://github.com/kubernetes/features/issues/504), rather than relying on the cluster DNS, as well as [configuring the NodePort IP address](https://github.com/kubernetes/features/issues/539). You can also  [switch the default DNS plugin to CoreDNS](https://github.com/kubernetes/features/issues/427) (beta). 
+In terms of networking, Kubernetes 1.10 is about control. Users now have beta support for the ability to [configure a pod's resolv.conf](https://github.com/kubernetes/enhancements/issues/504), rather than relying on the cluster DNS, as well as [configuring the NodePort IP address](https://github.com/kubernetes/enhancements/issues/539). You can also  [switch the default DNS plugin to CoreDNS](https://github.com/kubernetes/enhancements/issues/427) (beta). 
 
 ## Before Upgrading
 
@@ -1267,7 +1267,7 @@ If no featureGates was specified in `kubeadm-config`, just change `featureGates:
 
 * VolumeScheduling and LocalPersistentVolume features are beta and enabled by default.  The PersistentVolume NodeAffinity alpha annotation is deprecated and will be removed in a future release. ([#59391](https://github.com/kubernetes/kubernetes/pull/59391), [@msau42](https://github.com/msau42))
 
-* The alpha Accelerators feature gate is deprecated and will be removed in v1.11. Please use device plugins ([https://github.com/kubernetes/features/issues/368](https://github.com/kubernetes/features/issues/368)) instead. They can be enabled using the DevicePlugins feature gate. ([#57384](https://github.com/kubernetes/kubernetes/pull/57384), [@mindprince](https://github.com/mindprince))
+* The alpha Accelerators feature gate is deprecated and will be removed in v1.11. Please use device plugins ([https://github.com/kubernetes/enhancements/issues/368](https://github.com/kubernetes/enhancements/issues/368)) instead. They can be enabled using the DevicePlugins feature gate. ([#57384](https://github.com/kubernetes/kubernetes/pull/57384), [@mindprince](https://github.com/mindprince))
 
 * The ability to use kubectl scale jobs is deprecated. All other scale operations remain in place, but the ability to scale jobs will be removed in a future release.  ([#60139](https://github.com/kubernetes/kubernetes/pull/60139), [@soltysh](https://github.com/soltysh))
 

@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -339,7 +339,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeNodeList(test.nodes))
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeNodeList(test.nodes))
 			selectorSpread := SelectorSpread{
 				serviceLister:     schedulertesting.FakeServiceLister(test.services),
 				controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
@@ -575,7 +575,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(labeledNodes))
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(labeledNodes))
 			selectorSpread := SelectorSpread{
 				serviceLister:     schedulertesting.FakeServiceLister(test.services),
 				controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
@@ -767,7 +767,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(test.nodes))
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(test.nodes))
 			zoneSpread := ServiceAntiAffinity{podLister: schedulertesting.FakePodLister(test.pods), serviceLister: schedulertesting.FakeServiceLister(test.services), label: "zone"}
 
 			metaDataProducer := NewPriorityMetadataFactory(

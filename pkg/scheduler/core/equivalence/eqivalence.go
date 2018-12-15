@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -283,7 +283,7 @@ func (n *NodeCache) RunPredicate(
 	predicateID int,
 	pod *v1.Pod,
 	meta algorithm.PredicateMetadata,
-	nodeInfo *schedulercache.NodeInfo,
+	nodeInfo *schedulernodeinfo.NodeInfo,
 	equivClass *Class,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
@@ -310,7 +310,7 @@ func (n *NodeCache) updateResult(
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
 	equivalenceHash uint64,
-	nodeInfo *schedulercache.NodeInfo,
+	nodeInfo *schedulernodeinfo.NodeInfo,
 ) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.

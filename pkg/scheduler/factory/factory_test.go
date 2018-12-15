@@ -38,9 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -230,19 +230,19 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	}
 }
 
-func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
@@ -557,7 +557,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	return nil, nil
 }
@@ -569,7 +569,7 @@ func (f *fakeExtender) SupportsPreemption() bool {
 func (f *fakeExtender) Filter(
 	pod *v1.Pod,
 	nodes []*v1.Node,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
 	return nil, nil, nil
 }
