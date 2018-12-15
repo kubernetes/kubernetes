@@ -89,8 +89,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
-	// TODO: We don't support multiple versions yet.
-	apiVersion := fieldpath.APIVersion("v1")
+	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
@@ -129,8 +128,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
-	// TODO: We don't support multiple versions yet.
-	apiVersion := fieldpath.APIVersion("v1")
+	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, applyManager, force)
 	if err != nil {
 		return nil, err
