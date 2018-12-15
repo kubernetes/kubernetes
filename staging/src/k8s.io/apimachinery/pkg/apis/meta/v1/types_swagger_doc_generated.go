@@ -366,14 +366,14 @@ func (UpdateOptions) SwaggerDoc() map[string]string {
 	return map_UpdateOptions
 }
 
-var map_VersionedFieldSet = map[string]string{
-	"":           "VersionedFieldSet is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
+var map_VersionedFields = map[string]string{
+	"":           "VersionedFields is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
 	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
 	"fields":     "Fields identifies a set of fields.",
 }
 
-func (VersionedFieldSet) SwaggerDoc() map[string]string {
-	return map_VersionedFieldSet
+func (VersionedFields) SwaggerDoc() map[string]string {
+	return map_VersionedFields
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

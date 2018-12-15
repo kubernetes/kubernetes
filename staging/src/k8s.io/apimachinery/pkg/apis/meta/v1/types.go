@@ -259,7 +259,7 @@ type ObjectMeta struct {
 	// "ci-cd". The set of fields is always in the version that the
 	// workflow used when modifying the object.
 	// +optional
-	ManagedFields map[string]VersionedFieldSet `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
+	ManagedFields map[string]VersionedFields `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
 
 // Initializers tracks the progress of initialization.
@@ -1037,9 +1037,9 @@ const (
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
 
-// VersionedFieldSet is a pair of a FieldSet and the group version of the resource
+// VersionedFields is a pair of a FieldSet and the group version of the resource
 // that the fieldset applies to.
-type VersionedFieldSet struct {
+type VersionedFields struct {
 	// APIVersion defines the version of this resource that this field set
 	// applies to. The format is "group/version" just like the top-level
 	// APIVersion field. It is necessary to track the version of a field

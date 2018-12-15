@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
 )
 
@@ -88,8 +89,9 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
-
-	managed, err = f.updater.Update(liveObjTyped, newObjTyped, managed, manager)
+	// TODO: We don't support multiple versions yet.
+	apiVersion := fieldpath.APIVersion("v1")
+	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
@@ -127,8 +129,9 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
-
-	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, managed, applyManager, force)
+	// TODO: We don't support multiple versions yet.
+	apiVersion := fieldpath.APIVersion("v1")
+	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, applyManager, force)
 	if err != nil {
 		return nil, err
 	}

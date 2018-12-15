@@ -119,7 +119,7 @@ func TestRoundTripManagedFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
-			var unmarshaled map[string]metav1.VersionedFieldSet
+			var unmarshaled map[string]metav1.VersionedFields
 			if err := yaml.Unmarshal([]byte(test), &unmarshaled); err != nil {
 				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
 			}

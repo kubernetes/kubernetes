@@ -3,9 +3,6 @@ options:
   no_parent_owners: true
 approvers:
 - api-approvers
-# Only meant for FEATURE BRANCH
-- apelisse
-- jennybuckley
 reviewers:
 - api-reviewers
 labels:

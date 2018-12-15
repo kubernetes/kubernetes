@@ -73,7 +73,7 @@ func EncodeObjectManagedFields(obj runtime.Object, fields fieldpath.ManagedField
 
 // decodeManagedFields converts ManagedFields from the wire format (api format)
 // to the format used by sigs.k8s.io/structured-merge-diff
-func decodeManagedFields(encodedManagedFields map[string]metav1.VersionedFieldSet) (managedFields fieldpath.ManagedFields, err error) {
+func decodeManagedFields(encodedManagedFields map[string]metav1.VersionedFields) (managedFields fieldpath.ManagedFields, err error) {
 	managedFields = make(map[string]*fieldpath.VersionedSet, len(encodedManagedFields))
 	for manager, encodedVersionedSet := range encodedManagedFields {
 		managedFields[manager], err = decodeVersionedSet(&encodedVersionedSet)
@@ -84,7 +84,7 @@ func decodeManagedFields(encodedManagedFields map[string]metav1.VersionedFieldSe
 	return managedFields, nil
 }
 
-func decodeVersionedSet(encodedVersionedSet *metav1.VersionedFieldSet) (versionedSet *fieldpath.VersionedSet, err error) {
+func decodeVersionedSet(encodedVersionedSet *metav1.VersionedFields) (versionedSet *fieldpath.VersionedSet, err error) {
 	versionedSet = &fieldpath.VersionedSet{}
 	versionedSet.APIVersion = fieldpath.APIVersion(encodedVersionedSet.APIVersion)
 	set, err := FieldsToSet(encodedVersionedSet.Fields)
@@ -97,8 +97,8 @@ func decodeVersionedSet(encodedVersionedSet *metav1.VersionedFieldSet) (versione
 
 // encodeManagedFields converts ManagedFields from the the format used by
 // sigs.k8s.io/structured-merge-diff to the the wire format (api format)
-func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedFields map[string]metav1.VersionedFieldSet, err error) {
-	encodedManagedFields = make(map[string]metav1.VersionedFieldSet, len(managedFields))
+func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedFields map[string]metav1.VersionedFields, err error) {
+	encodedManagedFields = make(map[string]metav1.VersionedFields, len(managedFields))
 	for manager, versionedSet := range managedFields {
 		v, err := encodeVersionedSet(versionedSet)
 		if err != nil {
@@ -109,8 +109,8 @@ func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedF
 	return encodedManagedFields, nil
 }
 
-func encodeVersionedSet(versionedSet *fieldpath.VersionedSet) (encodedVersionedSet *metav1.VersionedFieldSet, err error) {
-	encodedVersionedSet = &metav1.VersionedFieldSet{}
+func encodeVersionedSet(versionedSet *fieldpath.VersionedSet) (encodedVersionedSet *metav1.VersionedFields, err error) {
+	encodedVersionedSet = &metav1.VersionedFields{}
 	encodedVersionedSet.APIVersion = string(versionedSet.APIVersion)
 	encodedVersionedSet.Fields, err = SetToFields(*versionedSet.Set)
 	if err != nil {

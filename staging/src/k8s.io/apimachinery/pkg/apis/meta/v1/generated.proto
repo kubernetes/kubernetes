@@ -633,7 +633,7 @@ message ObjectMeta {
   // "ci-cd". The set of fields is always in the version that the
   // workflow used when modifying the object.
   // +optional
-  map<string, VersionedFieldSet> managedFields = 17;
+  map<string, VersionedFields> managedFields = 17;
 }
 
 // OwnerReference contains enough information to let you identify an owning
@@ -897,9 +897,9 @@ message Verbs {
   repeated string items = 1;
 }
 
-// VersionedFieldSet is a pair of a FieldSet and the group version of the resource
+// VersionedFields is a pair of a FieldSet and the group version of the resource
 // that the fieldset applies to.
-message VersionedFieldSet {
+message VersionedFields {
   // APIVersion defines the version of this resource that this field set
   // applies to. The format is "group/version" just like the top-level
   // APIVersion field. It is necessary to track the version of a field
