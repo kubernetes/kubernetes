@@ -14,27 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiextensions
+package helpers
 
 import (
 	"reflect"
 	"testing"
 	"time"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCRDHasFinalizer(t *testing.T) {
 	tests := []struct {
 		name             string
-		crd              *CustomResourceDefinition
+		crd              *apiextensions.CustomResourceDefinition
 		finalizerToCheck string
 
 		expected bool
 	}{
 		{
 			name: "missing",
-			crd: &CustomResourceDefinition{
+			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it"}},
 			},
 			finalizerToCheck: "it",
@@ -42,7 +43,7 @@ func TestCRDHasFinalizer(t *testing.T) {
 		},
 		{
 			name: "present",
-			crd: &CustomResourceDefinition{
+			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it", "it"}},
 			},
 			finalizerToCheck: "it",
@@ -60,14 +61,14 @@ func TestCRDHasFinalizer(t *testing.T) {
 func TestCRDRemoveFinalizer(t *testing.T) {
 	tests := []struct {
 		name             string
-		crd              *CustomResourceDefinition
+		crd              *apiextensions.CustomResourceDefinition
 		finalizerToCheck string
 
 		expected []string
 	}{
 		{
 			name: "missing",
-			crd: &CustomResourceDefinition{
+			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it"}},
 			},
 			finalizerToCheck: "it",
@@ -75,7 +76,7 @@ func TestCRDRemoveFinalizer(t *testing.T) {
 		},
 		{
 			name: "present",
-			crd: &CustomResourceDefinition{
+			crd: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it", "it"}},
 			},
 			finalizerToCheck: "it",
@@ -93,32 +94,32 @@ func TestCRDRemoveFinalizer(t *testing.T) {
 func TestSetCRDCondition(t *testing.T) {
 	tests := []struct {
 		name                 string
-		crdCondition         []CustomResourceDefinitionCondition
-		newCondition         CustomResourceDefinitionCondition
-		expectedcrdCondition []CustomResourceDefinitionCondition
+		crdCondition         []apiextensions.CustomResourceDefinitionCondition
+		newCondition         apiextensions.CustomResourceDefinitionCondition
+		expectedcrdCondition []apiextensions.CustomResourceDefinitionCondition
 	}{
 		{
 			name: "test setCRDcondition when one condition",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			newCondition: CustomResourceDefinitionCondition{
-				Type:               Established,
-				Status:             ConditionFalse,
+			newCondition: apiextensions.CustomResourceDefinitionCondition{
+				Type:               apiextensions.Established,
+				Status:             apiextensions.ConditionFalse,
 				Reason:             "NotAccepted",
 				Message:            "Not accepted",
 				LastTransitionTime: metav1.Date(2018, 1, 2, 0, 0, 0, 0, time.UTC),
 			},
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
+			expectedcrdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionFalse,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionFalse,
 					Reason:             "NotAccepted",
 					Message:            "Not accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 2, 0, 0, 0, 0, time.UTC),
@@ -127,40 +128,40 @@ func TestSetCRDCondition(t *testing.T) {
 		},
 		{
 			name: "test setCRDcondition when two condition",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			newCondition: CustomResourceDefinitionCondition{
-				Type:               NamesAccepted,
-				Status:             ConditionFalse,
+			newCondition: apiextensions.CustomResourceDefinitionCondition{
+				Type:               apiextensions.NamesAccepted,
+				Status:             apiextensions.ConditionFalse,
 				Reason:             "Conflicts",
 				Message:            "conflicts found",
 				LastTransitionTime: metav1.Date(2018, 1, 2, 0, 0, 0, 0, time.UTC),
 			},
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
+			expectedcrdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionFalse,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionFalse,
 					Reason:             "Conflicts",
 					Message:            "conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 2, 0, 0, 0, 0, time.UTC),
@@ -169,35 +170,35 @@ func TestSetCRDCondition(t *testing.T) {
 		},
 		{
 			name: "test setCRDcondition when condition needs to be appended",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			newCondition: CustomResourceDefinitionCondition{
-				Type:               Terminating,
-				Status:             ConditionFalse,
-				Reason:             "NeverEstablished",
-				Message:            "resource was never established",
+			newCondition: apiextensions.CustomResourceDefinitionCondition{
+				Type:               apiextensions.Terminating,
+				Status:             apiextensions.ConditionFalse,
+				Reason:             "Neverapiextensions.Established",
+				Message:            "resource was never apiextensions.Established",
 				LastTransitionTime: metav1.Date(2018, 2, 1, 0, 0, 0, 0, time.UTC),
 			},
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
+			expectedcrdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               Terminating,
-					Status:             ConditionFalse,
-					Reason:             "NeverEstablished",
-					Message:            "resource was never established",
+					Type:               apiextensions.Terminating,
+					Status:             apiextensions.ConditionFalse,
+					Reason:             "Neverapiextensions.Established",
+					Message:            "resource was never apiextensions.Established",
 					LastTransitionTime: metav1.Date(2018, 2, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
@@ -220,33 +221,33 @@ func TestSetCRDCondition(t *testing.T) {
 func TestRemoveCRDCondition(t *testing.T) {
 	tests := []struct {
 		name                 string
-		crdCondition         []CustomResourceDefinitionCondition
-		conditionType        CustomResourceDefinitionConditionType
-		expectedcrdCondition []CustomResourceDefinitionCondition
+		crdCondition         []apiextensions.CustomResourceDefinitionCondition
+		conditionType        apiextensions.CustomResourceDefinitionConditionType
+		expectedcrdCondition []apiextensions.CustomResourceDefinitionCondition
 	}{
 		{
 			name: "test remove CRDCondition when the conditionType meets",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			conditionType: NamesAccepted,
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
+			conditionType: apiextensions.NamesAccepted,
+			expectedcrdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2011, 1, 2, 0, 0, 0, 0, time.UTC),
@@ -255,34 +256,34 @@ func TestRemoveCRDCondition(t *testing.T) {
 		},
 		{
 			name: "test remove CRDCondition when the conditionType not meets",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			conditionType: Terminating,
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
+			conditionType: apiextensions.Terminating,
+			expectedcrdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -307,75 +308,75 @@ func TestRemoveCRDCondition(t *testing.T) {
 func TestIsCRDConditionPresentAndEqual(t *testing.T) {
 	tests := []struct {
 		name          string
-		crdCondition  []CustomResourceDefinitionCondition
-		conditionType CustomResourceDefinitionConditionType
-		status        ConditionStatus
+		crdCondition  []apiextensions.CustomResourceDefinitionCondition
+		conditionType apiextensions.CustomResourceDefinitionConditionType
+		status        apiextensions.ConditionStatus
 		expectresult  bool
 	}{
 		{
 			name: "test CRDCondition is not Present",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			conditionType: Terminating,
-			status:        ConditionTrue,
+			conditionType: apiextensions.Terminating,
+			status:        apiextensions.ConditionTrue,
 			expectresult:  false,
 		},
 		{
 			name: "test CRDCondition is Present but not Equal",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			conditionType: Established,
-			status:        ConditionFalse,
+			conditionType: apiextensions.Established,
+			status:        apiextensions.ConditionFalse,
 			expectresult:  false,
 		},
 		{
 			name: "test CRDCondition is Present and Equal",
-			crdCondition: []CustomResourceDefinitionCondition{
+			crdCondition: []apiextensions.CustomResourceDefinitionCondition{
 				{
-					Type:               Established,
-					Status:             ConditionTrue,
+					Type:               apiextensions.Established,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "Accepted",
 					Message:            "the initial names have been accepted",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
+					Type:               apiextensions.NamesAccepted,
+					Status:             apiextensions.ConditionTrue,
 					Reason:             "NoConflicts",
 					Message:            "no conflicts found",
 					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 			},
-			conditionType: NamesAccepted,
-			status:        ConditionTrue,
+			conditionType: apiextensions.NamesAccepted,
+			status:        apiextensions.ConditionTrue,
 			expectresult:  true,
 		},
 	}
@@ -388,32 +389,32 @@ func TestIsCRDConditionPresentAndEqual(t *testing.T) {
 	}
 }
 
-func generateCRDwithCondition(conditions []CustomResourceDefinitionCondition) *CustomResourceDefinition {
+func generateCRDwithCondition(conditions []apiextensions.CustomResourceDefinitionCondition) *apiextensions.CustomResourceDefinition {
 	testCRDObjectMeta := metav1.ObjectMeta{
 		Name:            "plural.group.com",
 		ResourceVersion: "12",
 	}
-	testCRDSpec := CustomResourceDefinitionSpec{
+	testCRDSpec := apiextensions.CustomResourceDefinitionSpec{
 		Group:   "group.com",
 		Version: "version",
-		Scope:   ResourceScope("Cluster"),
-		Names: CustomResourceDefinitionNames{
+		Scope:   apiextensions.ResourceScope("Cluster"),
+		Names: apiextensions.CustomResourceDefinitionNames{
 			Plural:   "plural",
 			Singular: "singular",
 			Kind:     "kind",
 			ListKind: "listkind",
 		},
 	}
-	testCRDAcceptedNames := CustomResourceDefinitionNames{
+	testCRDAcceptedNames := apiextensions.CustomResourceDefinitionNames{
 		Plural:   "plural",
 		Singular: "singular",
 		Kind:     "kind",
 		ListKind: "listkind",
 	}
-	return &CustomResourceDefinition{
+	return &apiextensions.CustomResourceDefinition{
 		ObjectMeta: testCRDObjectMeta,
 		Spec:       testCRDSpec,
-		Status: CustomResourceDefinitionStatus{
+		Status: apiextensions.CustomResourceDefinitionStatus{
 			AcceptedNames: testCRDAcceptedNames,
 			Conditions:    conditions,
 		},

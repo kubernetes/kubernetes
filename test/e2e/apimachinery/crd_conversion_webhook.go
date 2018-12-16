@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration"
+	"k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -346,7 +346,7 @@ func testCRListConversion(f *framework.Framework, testCrd *framework.TestCrd) {
 	Expect(err).To(BeNil())
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
-	crd, err = integration.UpdateCustomResourceDefinitionWithRetry(testCrd.ApiExtensionClient, crd.Name, func(c *v1beta1.CustomResourceDefinition) {
+	crd, err = helpers.UpdateCustomResourceDefinitionWithRetry(testCrd.ApiExtensionClient, crd.Name, func(c *v1beta1.CustomResourceDefinition) {
 		c.Spec.Versions = alternativeApiVersions
 	})
 	Expect(err).To(BeNil())
