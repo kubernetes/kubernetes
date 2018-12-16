@@ -37,6 +37,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
@@ -289,7 +290,7 @@ func TestScaleSubresource(t *testing.T) {
 			// Start with a new CRD, so that the object doesn't have resourceVersion
 			noxuDefinition := noxuDefinition.DeepCopy()
 
-			subresources, err := getSubresourcesForVersion(noxuDefinition, v.Name)
+			subresources, err := helpers.GetSubresourcesForVersion(noxuDefinition, v.Name)
 			if err != nil {
 				t.Fatal(err)
 			}

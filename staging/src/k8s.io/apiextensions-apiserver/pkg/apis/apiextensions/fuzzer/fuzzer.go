@@ -23,6 +23,7 @@ import (
 	"github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
@@ -72,7 +73,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			if len(obj.Status.StoredVersions) == 0 {
 				for _, v := range obj.Spec.Versions {
-					if v.Storage && !apiextensions.IsStoredVersion(obj, v.Name) {
+					if v.Storage && !helpers.IsStoredVersion(obj, v.Name) {
 						obj.Status.StoredVersions = append(obj.Status.StoredVersions, v.Name)
 					}
 				}

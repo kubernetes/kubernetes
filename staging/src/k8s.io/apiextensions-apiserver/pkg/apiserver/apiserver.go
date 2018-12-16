@@ -36,16 +36,12 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
-	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	externalclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	externalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/status"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
-
-	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 )
 
 var (
@@ -105,7 +101,7 @@ type CustomResourceDefinitions struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	// provided for easier embedding
-	Informers internalinformers.SharedInformerFactory
+	Informers externalinformers.SharedInformerFactory
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -151,13 +147,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	crdClient, err := internalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	crdClient, err := externalclientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		// it's really bad that this is leaking here, but until we can fix the test (which I'm pretty sure isn't even testing what it wants to test),
 		// we need to be able to move forward
 		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
-	s.Informers = internalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
+	s.Informers = externalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 
 	delegateHandler := delegationTarget.UnprotectedHandler()
 	if delegateHandler == nil {
@@ -172,11 +168,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		discovery: map[string]*discovery.APIGroupHandler{},
 		delegate:  delegateHandler,
 	}
-	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
+	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().V1beta1().CustomResourceDefinitions(), crdClient.Apiextensions())
 	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
-		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		s.Informers.Apiextensions().V1beta1().CustomResourceDefinitions(),
 		delegateHandler,
 		c.ExtraConfig.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
@@ -191,11 +187,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
 
-	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
-	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
+	crdController := NewDiscoveryController(s.Informers.Apiextensions().V1beta1().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
+	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().V1beta1().CustomResourceDefinitions(), crdClient.Apiextensions())
 	finalizingController := finalizer.NewCRDFinalizer(
-		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
-		crdClient.Apiextensions(),
+		s.Informers.Apiextensions().V1beta1().CustomResourceDefinitions(),
+		crdClient.ApiextensionsV1beta1(),
 		crdHandler,
 	)
 

@@ -36,6 +36,7 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
@@ -176,7 +177,7 @@ func TestTableGet(t *testing.T) {
 		}
 		t.Logf("%v table list: %#v", gvk, tbl)
 
-		columns, err := getColumnsForVersion(crd, v.Name)
+		columns, err := helpers.GetColumnsForVersion(crd, v.Name)
 		if err != nil {
 			t.Fatal(err)
 		}

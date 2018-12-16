@@ -22,8 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -334,10 +335,10 @@ func TestSync(t *testing.T) {
 		if e, a := tc.expectedNames, actualNames; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v expected %v, got %#v", tc.name, e, a)
 		}
-		if e, a := tc.expectedNameConflictCondition, actualNameConflictCondition; !apiextensions.IsCRDConditionEquivalent(&e, &a) {
+		if e, a := tc.expectedNameConflictCondition, actualNameConflictCondition; !helpers.IsCRDConditionEquivalent(&e, &a) {
 			t.Errorf("%v expected %v, got %v", tc.name, e, a)
 		}
-		if e, a := tc.expectedEstablishedCondition, establishedCondition; !apiextensions.IsCRDConditionEquivalent(&e, &a) {
+		if e, a := tc.expectedEstablishedCondition, establishedCondition; !helpers.IsCRDConditionEquivalent(&e, &a) {
 			t.Errorf("%v expected %v, got %v", tc.name, e, a)
 		}
 	}

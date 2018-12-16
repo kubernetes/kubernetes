@@ -24,6 +24,10 @@ import (
 	"k8s.io/klog"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,10 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 )
 
 type DiscoveryController struct {
@@ -86,7 +86,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	foundVersion := false
 	foundGroup := false
 	for _, crd := range crds {
-		if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+		if !helpers.IsCRDConditionTrue(crd, apiextensions.Established) {
 			continue
 		}
 
@@ -122,7 +122,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 		verbs := metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"})
 		// if we're terminating we don't allow some verbs
-		if apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating) {
+		if helpers.IsCRDConditionTrue(crd, apiextensions.Terminating) {
 			verbs = metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "watch"})
 		}
 
@@ -136,7 +136,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			Categories:   crd.Status.AcceptedNames.Categories,
 		})
 
-		subresources, err := getSubresourcesForVersion(crd, version.Version)
+		subresources, err := helpers.GetSubresourcesForVersion(crd, version.Version)
 		if err != nil {
 			return err
 		}

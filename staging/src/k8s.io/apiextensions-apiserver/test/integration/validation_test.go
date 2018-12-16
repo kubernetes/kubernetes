@@ -31,6 +31,7 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
@@ -421,7 +422,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 		for _, v := range noxuDefinition.Spec.Versions {
 			// Re-define the CRD to make sure we start with a clean CRD
 			noxuDefinition := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)[i]
-			validationSchema, err := getSchemaForVersion(noxuDefinition, v.Name)
+			validationSchema, err := helpers.GetSchemaForVersion(noxuDefinition, v.Name)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -445,8 +446,8 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			}
 
 			// update the CRD to a less stricter schema
-			_, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, "noxus.mygroup.example.com", func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
-				validationSchema, err := getSchemaForVersion(crd, v.Name)
+			_, err = helpers.UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, "noxus.mygroup.example.com", func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+				validationSchema, err := helpers.GetSchemaForVersion(crd, v.Name)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -493,7 +494,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 		for _, v := range noxuDefinition.Spec.Versions {
 			// Re-define the CRD to make sure we start with a clean CRD
 			noxuDefinition := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)[i]
-			validationSchema, err := getSchemaForVersion(noxuDefinition, v.Name)
+			validationSchema, err := helpers.GetSchemaForVersion(noxuDefinition, v.Name)
 			if err != nil {
 				t.Fatal(err)
 			}

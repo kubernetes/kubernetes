@@ -56,15 +56,18 @@ import (
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers"
+	helpersv1beta1 "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -102,8 +105,8 @@ type crdHandler struct {
 type crdInfo struct {
 	// spec and acceptedNames are used to compare against if a change is made on a CRD. We only update
 	// the storage if one of these changes.
-	spec          *apiextensions.CustomResourceDefinitionSpec
-	acceptedNames *apiextensions.CustomResourceDefinitionNames
+	spec          *apiextensionsv1beta1.CustomResourceDefinitionSpec
+	acceptedNames *apiextensionsv1beta1.CustomResourceDefinitionNames
 
 	// Storage per version
 	storages map[string]customresource.CustomResourceStorage
@@ -198,7 +201,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !apiextensions.HasServedCRDVersion(crd, requestInfo.APIVersion) {
+	if !helpersv1beta1.HasServedCRDVersion(crd, requestInfo.APIVersion) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -206,13 +209,13 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// but it becomes "unserved" because another names update leads to a conflict
 	// and EstablishingController wasn't fast enough to put the CRD into the Established condition.
 	// We accept this as the problem is small and self-healing.
-	if !apiextensions.IsCRDConditionTrue(crd, apiextensions.NamesAccepted) &&
-		!apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if !helpersv1beta1.IsCRDConditionTrue(crd, apiextensionsv1beta1.NamesAccepted) &&
+		!helpersv1beta1.IsCRDConditionTrue(crd, apiextensionsv1beta1.Established) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
-	terminating := apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating)
+	terminating := helpersv1beta1.IsCRDConditionTrue(crd, apiextensionsv1beta1.Terminating)
 
 	crdInfo, err := r.getOrCreateServingInfoFor(crd)
 	if err != nil {
@@ -230,7 +233,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var handler http.HandlerFunc
-	subresources, err := getSubresourcesForVersion(crd, requestInfo.APIVersion)
+	subresources, err := helpersv1beta1.GetSubresourcesForVersion(crd, requestInfo.APIVersion)
 	if err != nil {
 		utilruntime.HandleError(err)
 		http.Error(w, "the server could not properly serve the CR subresources", http.StatusInternalServerError)
@@ -325,8 +328,8 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 }
 
 func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) {
-	oldCRD := oldObj.(*apiextensions.CustomResourceDefinition)
-	newCRD := newObj.(*apiextensions.CustomResourceDefinition)
+	oldCRD := oldObj.(*apiextensionsv1beta1.CustomResourceDefinition)
+	newCRD := newObj.(*apiextensionsv1beta1.CustomResourceDefinition)
 
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
@@ -335,8 +338,8 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	// For HA clusters, we want to prevent race conditions when changing status to Established,
 	// so we want to be sure that CRD is Installing at least for 5 seconds before Establishing it.
 	// TODO: find a real HA safe checkpointing mechanism instead of an arbitrary wait.
-	if !apiextensions.IsCRDConditionTrue(newCRD, apiextensions.Established) &&
-		apiextensions.IsCRDConditionTrue(newCRD, apiextensions.NamesAccepted) {
+	if !helpersv1beta1.IsCRDConditionTrue(newCRD, apiextensionsv1beta1.Established) &&
+		helpersv1beta1.IsCRDConditionTrue(newCRD, apiextensionsv1beta1.NamesAccepted) {
 		if r.masterCount > 1 {
 			r.establishingController.QueueCRD(newCRD.Name, 5*time.Second)
 		} else {
@@ -407,7 +410,7 @@ func (r *crdHandler) removeDeadStorage() {
 
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
-func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
+func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1beta1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
 	info, err := r.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		return nil, err
@@ -415,9 +418,7 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
-
-func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
+func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensionsv1beta1.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
@@ -431,7 +432,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		return ret, nil
 	}
 
-	storageVersion, err := apiextensions.GetCRDStorageVersion(crd)
+	storageVersion, err := helpersv1beta1.GetCRDStorageVersion(crd)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +463,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
-		validationSchema, err := getSchemaForVersion(crd, v.Name)
+		internalCRD := &apiextensions.CustomResourceDefinition{}
+		if err := apiextensionsv1beta1.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crd, internalCRD, nil); err != nil {
+			return nil, err
+		}
+		validationSchema, err := helpers.GetSchemaForVersion(internalCRD, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR schema")
@@ -474,7 +479,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		var statusSpec *apiextensions.CustomResourceSubresourceStatus
 		var statusValidator *validate.SchemaValidator
-		subresources, err := getSubresourcesForVersion(crd, v.Name)
+		subresources, err := helpers.GetSubresourcesForVersion(internalCRD, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
@@ -498,7 +503,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			scaleSpec = subresources.Scale
 		}
 
-		columns, err := getColumnsForVersion(crd, v.Name)
+		columns, err := helpers.GetColumnsForVersion(internalCRD, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR columns")
@@ -514,7 +519,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind},
 			customresource.NewStrategy(
 				typer,
-				crd.Spec.Scope == apiextensions.NamespaceScoped,
+				crd.Spec.Scope == apiextensionsv1beta1.NamespaceScoped,
 				kind,
 				validator,
 				statusValidator,
@@ -533,13 +538,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		selfLinkPrefix := ""
 		switch crd.Spec.Scope {
-		case apiextensions.ClusterScoped:
+		case apiextensionsv1beta1.ClusterScoped:
 			selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, v.Name) + "/" + crd.Status.AcceptedNames.Plural + "/"
-		case apiextensions.NamespaceScoped:
+		case apiextensionsv1beta1.NamespaceScoped:
 			selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, v.Name, "namespaces") + "/"
 		}
 
-		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
+		clusterScoped := crd.Spec.Scope == apiextensionsv1beta1.ClusterScoped
 
 		requestScopes[v.Name] = handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{

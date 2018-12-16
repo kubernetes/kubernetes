@@ -34,10 +34,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	helpers "k8s.io/apiextensions-apiserver/pkg/helpers/v1beta1"
 )
 
 // This controller is reserving names. To avoid conflicts, be sure to run only one instance of the worker at a time.
@@ -202,7 +203,7 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 		Reason:  "NotAccepted",
 		Message: "not all names are accepted",
 	}
-	if old := apiextensions.FindCRDCondition(in, apiextensions.Established); old != nil {
+	if old := helpers.FindCRDCondition(in, apiextensions.Established); old != nil {
 		establishedCondition = *old
 	}
 	if establishedCondition.Status != apiextensions.ConditionTrue && namesAcceptedCondition.Status == apiextensions.ConditionTrue {
@@ -251,14 +252,14 @@ func (c *NamingConditionController) sync(key string) error {
 
 	// nothing to do if accepted names and NamesAccepted condition didn't change
 	if reflect.DeepEqual(inCustomResourceDefinition.Status.AcceptedNames, acceptedNames) &&
-		apiextensions.IsCRDConditionEquivalent(&namingCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NamesAccepted)) {
+		helpers.IsCRDConditionEquivalent(&namingCondition, helpers.FindCRDCondition(inCustomResourceDefinition, apiextensions.NamesAccepted)) {
 		return nil
 	}
 
 	crd := inCustomResourceDefinition.DeepCopy()
 	crd.Status.AcceptedNames = acceptedNames
-	apiextensions.SetCRDCondition(crd, namingCondition)
-	apiextensions.SetCRDCondition(crd, establishedCondition)
+	helpers.SetCRDCondition(crd, namingCondition)
+	helpers.SetCRDCondition(crd, establishedCondition)
 
 	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
 	if err != nil {

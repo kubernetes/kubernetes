@@ -29,8 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 
-	internal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 type webhookConverterFactory struct {
@@ -38,7 +37,7 @@ type webhookConverterFactory struct {
 }
 
 func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*webhookConverterFactory, error) {
-	clientManager, err := webhook.NewClientManager(v1beta1.SchemeGroupVersion, v1beta1.AddToScheme)
+	clientManager, err := webhook.NewClientManager(apiextensions.SchemeGroupVersion, apiextensions.AddToScheme)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +61,7 @@ type webhookConverter struct {
 	nopConverter  nopConverter
 }
 
-func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.ClientConfig {
+func webhookClientConfigForCRD(crd *apiextensions.CustomResourceDefinition) *webhook.ClientConfig {
 	apiConfig := crd.Spec.Conversion.WebhookClientConfig
 	ret := webhook.ClientConfig{
 		Name:     fmt.Sprintf("conversion_webhook_for_%s", crd.Name),
@@ -85,7 +84,7 @@ func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.
 
 var _ runtime.ObjectConvertor = &webhookConverter{}
 
-func (f *webhookConverterFactory) NewWebhookConverter(validVersions map[schema.GroupVersion]bool, crd *internal.CustomResourceDefinition) (*webhookConverter, error) {
+func (f *webhookConverterFactory) NewWebhookConverter(validVersions map[schema.GroupVersion]bool, crd *apiextensions.CustomResourceDefinition) (*webhookConverter, error) {
 	restClient, err := f.clientManager.HookClient(*webhookClientConfigForCRD(crd))
 	if err != nil {
 		return nil, err
@@ -136,7 +135,7 @@ func (c *webhookConverter) Convert(in, out, context interface{}) error {
 	return nil
 }
 
-func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.ConversionReview {
+func createConversionReview(obj runtime.Object, apiVersion string) *apiextensions.ConversionReview {
 	listObj, isList := obj.(*unstructured.UnstructuredList)
 	var objects []runtime.RawExtension
 	if isList {
@@ -151,13 +150,13 @@ func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.Conv
 			objects = []runtime.RawExtension{{Object: obj}}
 		}
 	}
-	return &v1beta1.ConversionReview{
-		Request: &v1beta1.ConversionRequest{
+	return &apiextensions.ConversionReview{
+		Request: &apiextensions.ConversionRequest{
 			Objects:           objects,
 			DesiredAPIVersion: apiVersion,
 			UID:               uuid.NewUUID(),
 		},
-		Response: &v1beta1.ConversionResponse{},
+		Response: &apiextensions.ConversionResponse{},
 	}
 }
 
@@ -225,7 +224,7 @@ func (c *webhookConverter) ConvertToVersion(in runtime.Object, target runtime.Gr
 		out.SetAPIVersion(toGV.String())
 		return out, nil
 	}
-	response := &v1beta1.ConversionReview{}
+	response := &apiextensions.ConversionReview{}
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 	r := c.restClient.Post().Context(ctx).Body(request).Do()

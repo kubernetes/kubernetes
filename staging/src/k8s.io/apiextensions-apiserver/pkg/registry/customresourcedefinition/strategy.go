@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/helpers"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -83,7 +84,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	for _, v := range crd.Spec.Versions {
 		if v.Storage {
-			if !apiextensions.IsStoredVersion(crd, v.Name) {
+			if !helpers.IsStoredVersion(crd, v.Name) {
 				crd.Status.StoredVersions = append(crd.Status.StoredVersions, v.Name)
 			}
 			break
@@ -151,7 +152,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 	for _, v := range newCRD.Spec.Versions {
 		if v.Storage {
-			if !apiextensions.IsStoredVersion(newCRD, v.Name) {
+			if !helpers.IsStoredVersion(newCRD, v.Name) {
 				newCRD.Status.StoredVersions = append(newCRD.Status.StoredVersions, v.Name)
 			}
 			break
