@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
 func role(rules []rbacv1.PolicyRule, labels map[string]string, annotations map[string]string) *rbacv1.ClusterRole {
@@ -272,7 +272,7 @@ func TestComputeReconciledRoleRules(t *testing.T) {
 			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v", k, tc.expectedReconciliationNeeded, reconciliationNeeded)
 			continue
 		}
-		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
+		if reconciliationNeeded && !apiequality.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
 			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedReconciledRole, result.Role)
 		}
 	}
@@ -391,7 +391,7 @@ func TestComputeReconciledRoleAggregationRules(t *testing.T) {
 			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v", k, tc.expectedReconciliationNeeded, reconciliationNeeded)
 			continue
 		}
-		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
+		if reconciliationNeeded && !apiequality.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
 			t.Errorf("%s: %v", k, diff.ObjectDiff(tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole))
 		}
 	}
