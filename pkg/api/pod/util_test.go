@@ -307,7 +307,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// now test dropping the fields - should not be dropped
-	DropDisabledAlphaFields(&testPod.Spec)
+	DropDisabledFields(&testPod.Spec)
 
 	// check to make sure VolumeDevices is still present
 	// if featureset is set to true
@@ -322,14 +322,14 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 
 	// now test dropping the fields
-	DropDisabledAlphaFields(&testPod.Spec)
+	DropDisabledFields(&testPod.Spec)
 
 	// check to make sure VolumeDevices is nil
 	// if featureset is set to false
 	if testPod.Spec.Containers[0].VolumeDevices != nil {
-		t.Error("DropDisabledAlphaFields for Containers failed")
+		t.Error("DropDisabledFields for Containers failed")
 	}
 	if testPod.Spec.InitContainers[0].VolumeDevices != nil {
-		t.Error("DropDisabledAlphaFields for InitContainers failed")
+		t.Error("DropDisabledFields for InitContainers failed")
 	}
 }

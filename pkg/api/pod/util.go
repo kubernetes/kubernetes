@@ -232,9 +232,9 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	return !isEqual
 }
 
-// DropDisabledAlphaFields removes disabled fields from the pod spec.
+// DropDisabledFields removes disabled fields from the pod spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
-func DropDisabledAlphaFields(podSpec *api.PodSpec) {
+func DropDisabledFields(podSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		podSpec.Priority = nil
 		podSpec.PriorityClassName = ""

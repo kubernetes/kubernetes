@@ -81,7 +81,7 @@ func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	controller.Generation = 1
 
 	if controller.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&controller.Spec.Template.Spec)
+		pod.DropDisabledFields(&controller.Spec.Template.Spec)
 	}
 }
 
@@ -93,10 +93,10 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	newController.Status = oldController.Status
 
 	if oldController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&oldController.Spec.Template.Spec)
+		pod.DropDisabledFields(&oldController.Spec.Template.Spec)
 	}
 	if newController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&newController.Spec.Template.Spec)
+		pod.DropDisabledFields(&newController.Spec.Template.Spec)
 	}
 
 	// Any changes to the spec increment the generation number, any changes to the
