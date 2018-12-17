@@ -2342,7 +2342,6 @@ function create-nodes() {
 
   local instances_left=${nodes}
 
-  #TODO: parallelize this loop to speed up the process
   for ((i=1; i<=${NUM_MIGS}; i++)); do
     local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
     if [[ $i == ${NUM_MIGS} ]]; then
@@ -2365,8 +2364,9 @@ function create-nodes() {
         "${group_name}" \
         --zone "${ZONE}" \
         --project "${PROJECT}" \
-        --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true;
+        --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true &
   done
+  wait
 }
 
 # Assumes:

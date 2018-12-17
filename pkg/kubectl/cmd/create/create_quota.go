@@ -39,6 +39,7 @@ var (
 		kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`))
 )
 
+// QuotaOpts holds the command-line options for 'create quota' sub command
 type QuotaOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -72,6 +73,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -93,7 +95,7 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateQuota implements the behavior to run the create quota command
+// Run calls the CreateSubcommandOptions.Run in QuotaOpts instance
 func (o *QuotaOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

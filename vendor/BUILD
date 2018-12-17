@@ -389,7 +389,6 @@ filegroup(
         "//vendor/golang.org/x/crypto/poly1305:all-srcs",
         "//vendor/golang.org/x/crypto/salsa20/salsa:all-srcs",
         "//vendor/golang.org/x/crypto/ssh:all-srcs",
-        "//vendor/golang.org/x/exp/inotify:all-srcs",
         "//vendor/golang.org/x/net/context:all-srcs",
         "//vendor/golang.org/x/net/html:all-srcs",
         "//vendor/golang.org/x/net/http2:all-srcs",

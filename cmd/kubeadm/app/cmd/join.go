@@ -307,7 +307,16 @@ func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ig
 	if err != nil {
 		return nil, err
 	}
-	if defaultcfg.ControlPlane != nil {
+
+	// override node name and CRI socket from the command line options
+	if defaultcfg.NodeRegistration.Name != "" {
+		internalCfg.NodeRegistration.Name = defaultcfg.NodeRegistration.Name
+	}
+	if defaultcfg.NodeRegistration.CRISocket != kubeadmapiv1beta1.DefaultCRISocket {
+		internalCfg.NodeRegistration.CRISocket = defaultcfg.NodeRegistration.CRISocket
+	}
+
+	if internalCfg.ControlPlane != nil {
 		if err := configutil.VerifyAPIServerBindAddress(internalCfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 			return nil, err
 		}

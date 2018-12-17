@@ -51,6 +51,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -148,7 +149,7 @@ func initTestScheduler(
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, false, true, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, nil, false, true, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -158,6 +159,7 @@ func initTestSchedulerWithOptions(
 	context *TestContext,
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
+	pluginSet plugins.PluginSet,
 	disablePreemption bool,
 	disableEquivalenceCache bool,
 	resyncPeriod time.Duration,
@@ -203,6 +205,11 @@ func initTestSchedulerWithOptions(
 	if setPodInformer {
 		go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
 		controller.WaitForCacheSync("scheduler", context.schedulerConfig.StopEverything, podInformer.Informer().HasSynced)
+	}
+
+	// Set pluginSet if provided. DefaultPluginSet is used if this is not specified.
+	if pluginSet != nil {
+		context.schedulerConfig.PluginSet = pluginSet
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -257,7 +264,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), true, nil, true, true, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil, nil, true, true, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
@@ -602,6 +609,25 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 		return cond != nil && cond.Status == v1.ConditionFalse &&
 			cond.Reason == v1.PodReasonUnschedulable, nil
+	}
+}
+
+// podSchedulingError returns a condition function that returns true if the given pod
+// gets unschedulable status for reasons other than "Unschedulable". The scheduler
+// records such reasons in case of error.
+func podSchedulingError(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil && cond.Status == v1.ConditionFalse &&
+			cond.Reason != v1.PodReasonUnschedulable, nil
 	}
 }
 

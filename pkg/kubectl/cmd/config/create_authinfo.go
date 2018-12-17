@@ -56,7 +56,7 @@ const (
 )
 
 var (
-	create_authinfo_long = fmt.Sprintf(templates.LongDesc(`
+	createAuthInfoLong = fmt.Sprintf(templates.LongDesc(`
 		Sets a user entry in kubeconfig
 
 		Specifying a name that already exists will merge new fields on top of existing values.
@@ -72,7 +72,7 @@ var (
 
 		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
-	create_authinfo_example = templates.Examples(`
+	createAuthInfoExample = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"
 		# entry, without touching other values:
 		kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
@@ -93,6 +93,7 @@ var (
 		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-secret-`)
 )
 
+// NewCmdConfigSetAuthInfo returns an Command option instance for 'config set-credentials' sub command
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createAuthInfoOptions{configAccess: configAccess}
 	return newCmdConfigSetAuthInfo(out, options)
@@ -103,8 +104,8 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 		Use:                   fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, flagAuthProvider, flagAuthProviderArg),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Sets a user entry in kubeconfig"),
-		Long:                  create_authinfo_long,
-		Example:               create_authinfo_example,
+		Long:                  createAuthInfoLong,
+		Example:               createAuthInfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := options.complete(cmd, out)
 			if err != nil {
@@ -247,13 +248,13 @@ func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) erro
 
 	authProviderArgs, err := cmd.Flags().GetStringSlice(flagAuthProviderArg)
 	if err != nil {
-		return fmt.Errorf("Error: %s\n", err)
+		return fmt.Errorf("Error: %s", err)
 	}
 
 	if len(authProviderArgs) > 0 {
 		newPairs, removePairs, err := cmdutil.ParsePairs(authProviderArgs, flagAuthProviderArg, true)
 		if err != nil {
-			return fmt.Errorf("Error: %s\n", err)
+			return fmt.Errorf("Error: %s", err)
 		}
 		o.authProviderArgs = newPairs
 		o.authProviderArgsToRemove = removePairs

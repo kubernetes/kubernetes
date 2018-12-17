@@ -108,6 +108,7 @@ aliases:
     - mbohlool
     - pweil-
     - tallclair
+    - krmayankk
 
   sig-auth-serviceaccounts-approvers:
     - deads2k
@@ -119,6 +120,7 @@ aliases:
     - enj
     - liggitt
     - mikedanese
+    - WanLinghao
 
   sig-storage-reviewers:
     - saad-ali

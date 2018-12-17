@@ -34,22 +34,22 @@ import (
 // pip = this pod's ip
 // nip = this node's ip
 
-type MasqTester struct {
+type masqTester struct {
 	Port string
 }
 
-func NewMasqTester() *MasqTester {
-	return &MasqTester{
+func newMasqTester() *masqTester {
+	return &masqTester{
 		Port: "8080",
 	}
 }
 
-func (m *MasqTester) AddFlags(fs *pflag.FlagSet) {
+func (m *masqTester) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat and /whoami endpoints on.")
 }
 
 func main() {
-	m := NewMasqTester()
+	m := newMasqTester()
 	m.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
@@ -62,7 +62,7 @@ func main() {
 	}
 }
 
-func (m *MasqTester) Run() error {
+func (m *masqTester) Run() error {
 	// pip is the current pod's IP and nip is the current node's IP
 	// pull the pip and nip out of the env
 	pip, ok := os.LookupEnv("POD_IP")
@@ -145,9 +145,8 @@ func check(ip string, pip string, nip string) error {
 	if rip != pip {
 		if rip == nip {
 			return fmt.Errorf("Returned ip %q != my Pod ip %q, == my Node ip %q - SNAT", rip, pip, nip)
-		} else {
-			return fmt.Errorf("Returned ip %q != my Pod ip %q or my Node ip %q - SNAT to unexpected ip (possible SNAT through unexpected interface on the way into another node)", rip, pip, nip)
 		}
+		return fmt.Errorf("Returned ip %q != my Pod ip %q or my Node ip %q - SNAT to unexpected ip (possible SNAT through unexpected interface on the way into another node)", rip, pip, nip)
 	}
 	return nil
 }

@@ -36,13 +36,14 @@ var (
 		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
 )
 
+// ClusterRoleBindingOpts is returned by NewCmdCreateClusterRoleBinding
 type ClusterRoleBindingOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
 
-// ClusterRoleBinding is a command to ease creating ClusterRoleBindings.
+// NewCmdCreateClusterRoleBinding returns an initialized command instance of ClusterRoleBinding
 func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &ClusterRoleBindingOpts{
+	o := &ClusterRoleBindingOpts{
 		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
@@ -53,12 +54,12 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 		Long:                  clusterRoleBindingLong,
 		Example:               clusterRoleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
@@ -71,6 +72,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ClusterRoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -94,7 +96,7 @@ func (o *ClusterRoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command,
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateClusterRoleBinding is the implementation of the create clusterrolebinding command.
+// Run calls the CreateSubcommandOptions.Run in ClusterRoleBindingOpts instance
 func (o *ClusterRoleBindingOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

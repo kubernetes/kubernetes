@@ -150,9 +150,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create server: %v", err)
 	}
 
+	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
 		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
-			t.Errorf("apiextensions-apiserver failed run: %v", err)
+			errCh <- err
 		}
 	}(stopCh)
 
@@ -163,6 +164,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
 		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
 		status := 0
 		result.StatusCode(&status)

@@ -70,6 +70,11 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
 
 		gv := scope.Kind.GroupVersion()
 		s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
@@ -77,6 +82,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			scope.err(err, w, req)
 			return
 		}
+
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
 
 		body, err := readBody(req)
@@ -144,17 +150,6 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		}
 		trace.Step("Object stored in database")
 
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Self-link added")
-
 		// If the object is partially initialized, always indicate it via StatusAccepted
 		code := http.StatusCreated
 		if accessor, err := meta.Accessor(result); err == nil {
@@ -168,7 +163,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		}
 
 		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, code, result)
+		transformResponseObject(ctx, scope, req, w, code, outputMediaType, result)
 	}
 }
 

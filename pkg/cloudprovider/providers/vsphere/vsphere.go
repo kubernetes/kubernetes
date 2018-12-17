@@ -76,6 +76,10 @@ var (
 	ErrPasswordMissing = errors.New(MissingPasswordErrMsg)
 )
 
+var _ cloudprovider.Interface = (*VSphere)(nil)
+var _ cloudprovider.Instances = (*VSphere)(nil)
+var _ cloudprovider.Zones = (*VSphere)(nil)
+
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
 	cfg      *VSphereConfig

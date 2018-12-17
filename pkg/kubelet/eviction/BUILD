@@ -11,7 +11,6 @@ go_test(
     srcs = [
         "eviction_manager_test.go",
         "helpers_test.go",
-        "main_test.go",
         "memory_threshold_notifier_test.go",
         "mock_threshold_notifier_test.go",
     ],

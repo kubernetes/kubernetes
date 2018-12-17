@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "horizontal.go",
-        "rate_limitters.go",
+        "rate_limiters.go",
         "replica_calculator.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler",

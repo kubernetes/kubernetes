@@ -1161,19 +1161,20 @@ func TestVolumeModeCheck(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		recover := utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)
-		expectedMismatch, err := checkVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
-		if err != nil {
-			t.Errorf("Unexpected failure for checkVolumeModeMismatches: %v", err)
-		}
-		// expected to match but either got an error or no returned pvmatch
-		if expectedMismatch && !scenario.isExpectedMismatch {
-			t.Errorf("Unexpected failure for scenario, expected not to mismatch on modes but did: %s", name)
-		}
-		if !expectedMismatch && scenario.isExpectedMismatch {
-			t.Errorf("Unexpected failure for scenario, did not mismatch on mode when expected to mismatch: %s", name)
-		}
-		recover()
+		t.Run(name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
+			expectedMismatch, err := checkVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
+			if err != nil {
+				t.Errorf("Unexpected failure for checkVolumeModeMismatches: %v", err)
+			}
+			// expected to match but either got an error or no returned pvmatch
+			if expectedMismatch && !scenario.isExpectedMismatch {
+				t.Errorf("Unexpected failure for scenario, expected not to mismatch on modes but did: %s", name)
+			}
+			if !expectedMismatch && scenario.isExpectedMismatch {
+				t.Errorf("Unexpected failure for scenario, did not mismatch on mode when expected to mismatch: %s", name)
+			}
+		})
 	}
 }
 
@@ -1252,23 +1253,24 @@ func TestFilteringVolumeModes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		recover := utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)
-		pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
-		// expected to match but either got an error or no returned pvmatch
-		if pvmatch == nil && scenario.isExpectedMatch {
-			t.Errorf("Unexpected failure for scenario, no matching volume: %s", name)
-		}
-		if err != nil && scenario.isExpectedMatch {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
-		}
-		// expected to not match but either got an error or a returned pvmatch
-		if pvmatch != nil && !scenario.isExpectedMatch {
-			t.Errorf("Unexpected failure for scenario, expected no matching volume: %s", name)
-		}
-		if err != nil && !scenario.isExpectedMatch {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
-		}
-		recover()
+		t.Run(name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
+			pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
+			// expected to match but either got an error or no returned pvmatch
+			if pvmatch == nil && scenario.isExpectedMatch {
+				t.Errorf("Unexpected failure for scenario, no matching volume: %s", name)
+			}
+			if err != nil && scenario.isExpectedMatch {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
+			}
+			// expected to not match but either got an error or a returned pvmatch
+			if pvmatch != nil && !scenario.isExpectedMatch {
+				t.Errorf("Unexpected failure for scenario, expected no matching volume: %s", name)
+			}
+			if err != nil && !scenario.isExpectedMatch {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
+			}
+		})
 	}
 }
 

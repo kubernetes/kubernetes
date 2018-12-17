@@ -25,13 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // ResourceAllocationPriority contains information to calculate resource allocation priority.
 type ResourceAllocationPriority struct {
 	Name   string
-	scorer func(requested, allocable *schedulercache.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
+	scorer func(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
 }
 
 // PriorityMap priorities nodes according to the resource allocations on the node.
@@ -39,14 +39,14 @@ type ResourceAllocationPriority struct {
 func (r *ResourceAllocationPriority) PriorityMap(
 	pod *v1.Pod,
 	meta interface{},
-	nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 	allocatable := nodeInfo.AllocatableResource()
 
-	var requested schedulercache.Resource
+	var requested schedulernodeinfo.Resource
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		requested = *priorityMeta.nonZeroRequest
 	} else {
@@ -91,8 +91,8 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	}, nil
 }
 
-func getNonZeroRequests(pod *v1.Pod) *schedulercache.Resource {
-	result := &schedulercache.Resource{}
+func getNonZeroRequests(pod *v1.Pod) *schedulernodeinfo.Resource {
+	result := &schedulernodeinfo.Resource{}
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)

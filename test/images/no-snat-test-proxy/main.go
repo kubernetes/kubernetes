@@ -30,22 +30,22 @@ import (
 
 // This Pod's /checknosnat takes `target` and `ips` arguments, and queries {target}/checknosnat?ips={ips}
 
-type MasqTestProxy struct {
+type masqTestProxy struct {
 	Port string
 }
 
-func NewMasqTestProxy() *MasqTestProxy {
-	return &MasqTestProxy{
+func newMasqTestProxy() *masqTestProxy {
+	return &masqTestProxy{
 		Port: "31235",
 	}
 }
 
-func (m *MasqTestProxy) AddFlags(fs *pflag.FlagSet) {
+func (m *masqTestProxy) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat endpoint on.")
 }
 
 func main() {
-	m := NewMasqTestProxy()
+	m := newMasqTestProxy()
 	m.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
@@ -58,7 +58,7 @@ func main() {
 	}
 }
 
-func (m *MasqTestProxy) Run() error {
+func (m *masqTestProxy) Run() error {
 	// register handler
 	http.HandleFunc("/checknosnat", checknosnat)
 

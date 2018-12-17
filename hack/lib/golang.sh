@@ -354,7 +354,15 @@ kube::golang::create_gopath_tree() {
     ln -snf "${KUBE_ROOT}" "${go_pkg_dir}"
   fi
 
-  cat >"${KUBE_GOPATH}/BUILD" <<EOF
+  # Using bazel with a recursive target (e.g. bazel test ...) will abort due to
+  # the symlink loop created in this function, so create this special file which
+  # tells bazel not to follow the symlink.
+  touch "${go_pkg_basedir}/DONT_FOLLOW_SYMLINKS_WHEN_TRAVERSING_THIS_DIRECTORY_VIA_A_RECURSIVE_TARGET_PATTERN"
+  # Additionally, the //:package-srcs glob recursively includes all
+  # subdirectories, and similarly fails due to the symlink loop. By creating a
+  # BUILD.bazel file, we effectively create a dummy package, which stops the
+  # glob from descending further into the tree and hitting the loop.
+  cat >"${KUBE_GOPATH}/BUILD.bazel" <<EOF
 # This dummy BUILD file prevents Bazel from trying to descend through the
 # infinite loop created by the symlink at
 # ${go_pkg_dir}

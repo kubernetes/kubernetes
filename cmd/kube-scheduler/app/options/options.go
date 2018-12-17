@@ -104,6 +104,7 @@ func NewOptions() (*Options, error) {
 		},
 	}
 
+	o.Authentication.TolerateInClusterLookupFailure = true
 	o.Authentication.RemoteKubeConfigFileOptional = true
 	o.Authorization.RemoteKubeConfigFileOptional = true
 	o.Authorization.AlwaysAllowPaths = []string{"/healthz"}
@@ -152,7 +153,7 @@ func (o *Options) Flags() (nfs apiserverflag.NamedFlagSets) {
 	o.Deprecated.AddFlags(nfs.FlagSet("deprecated"), &o.ComponentConfig)
 
 	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
-	utilfeature.DefaultFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
+	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
 
 	return nfs
 }

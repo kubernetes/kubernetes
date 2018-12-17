@@ -86,9 +86,11 @@ func TestSetControllerConversion(t *testing.T) {
 
 	rs := &apps.ReplicaSet{}
 	rc := &api.ReplicationController{}
+	extGroup := schema.GroupVersion{Group: "apps", Version: "v1"}
+	extCodec := legacyscheme.Codecs.LegacyCodec(extGroup)
 
-	extGroup := testapi.Apps
-	defaultGroup := testapi.Default
+	defaultGroup := schema.GroupVersion{Group: "", Version: "v1"}
+	defaultCodec := legacyscheme.Codecs.LegacyCodec(defaultGroup)
 
 	fuzzInternalObject(t, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal}, rs, rand.Int63())
 
@@ -102,7 +104,7 @@ func TestSetControllerConversion(t *testing.T) {
 	}
 
 	t.Logf("rs._internal.apps -> rs.v1.apps")
-	data, err := runtime.Encode(extGroup.Codec(), rs)
+	data, err := runtime.Encode(extCodec, rs)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -110,9 +112,9 @@ func TestSetControllerConversion(t *testing.T) {
 	decoder := legacyscheme.Codecs.DecoderToVersion(
 		legacyscheme.Codecs.UniversalDeserializer(),
 		runtime.NewMultiGroupVersioner(
-			*defaultGroup.GroupVersion(),
-			schema.GroupKind{Group: defaultGroup.GroupVersion().Group},
-			schema.GroupKind{Group: extGroup.GroupVersion().Group},
+			defaultGroup,
+			schema.GroupKind{Group: defaultGroup.Group},
+			schema.GroupKind{Group: extGroup.Group},
 		),
 	)
 
@@ -122,7 +124,7 @@ func TestSetControllerConversion(t *testing.T) {
 	}
 
 	t.Logf("rc._internal -> rc.v1")
-	data, err = runtime.Encode(defaultGroup.Codec(), rc)
+	data, err = runtime.Encode(defaultCodec, rc)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}

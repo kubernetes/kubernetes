@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	convert_long = templates.LongDesc(i18n.T(`
+	convertLong = templates.LongDesc(i18n.T(`
 		Convert config files between different API versions. Both YAML
 		and JSON formats are accepted.
 
@@ -48,7 +48,7 @@ var (
 		The default output will be printed to stdout in YAML format. One can use -o option
 		to change to output destination.`))
 
-	convert_example = templates.Examples(i18n.T(`
+	convertExample = templates.Examples(i18n.T(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
 		kubectl convert -f pod.yaml
 
@@ -93,8 +93,8 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Use:                   "convert -f FILENAME",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Convert config files between different API versions"),
-		Long:                  convert_long,
-		Example:               convert_example,
+		Long:                  convertLong,
+		Example:               convertExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.RunConvert())

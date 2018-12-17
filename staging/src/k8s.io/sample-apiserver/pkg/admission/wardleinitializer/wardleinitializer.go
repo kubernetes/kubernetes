@@ -18,7 +18,7 @@ package wardleinitializer
 
 import (
 	"k8s.io/apiserver/pkg/admission"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/externalversions"
 )
 
 type pluginInitializer struct {

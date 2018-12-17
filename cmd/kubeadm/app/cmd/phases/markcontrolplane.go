@@ -50,6 +50,7 @@ func NewMarkControlPlanePhase() workflow.Phase {
 		Example: markControlPlaneExample,
 		InheritFlags: []string{
 			options.NodeName,
+			options.CfgPath,
 		},
 		Run: runMarkControlPlane,
 	}

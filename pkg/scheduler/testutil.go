@@ -27,6 +27,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -88,4 +89,27 @@ func (fc *FakeConfigurator) CreateFromConfig(policy schedulerapi.Policy) (*facto
 // CreateFromKeys returns FakeConfigurator.Config
 func (fc *FakeConfigurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*factory.Config, error) {
 	return fc.Config, nil
+}
+
+// EmptyPluginSet is the default plugin restirar used by the default scheduler.
+type EmptyPluginSet struct{}
+
+var _ = plugins.PluginSet(EmptyPluginSet{})
+
+// ReservePlugins returns a slice of default reserve plugins.
+func (r EmptyPluginSet) ReservePlugins() []plugins.ReservePlugin {
+	return []plugins.ReservePlugin{}
+}
+
+// PrebindPlugins returns a slice of default prebind plugins.
+func (r EmptyPluginSet) PrebindPlugins() []plugins.PrebindPlugin {
+	return []plugins.PrebindPlugin{}
+}
+
+// Data returns a pointer to PluginData.
+func (r EmptyPluginSet) Data() *plugins.PluginData {
+	return &plugins.PluginData{
+		Ctx:            nil,
+		SchedulerCache: nil,
+	}
 }

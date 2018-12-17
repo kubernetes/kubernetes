@@ -183,7 +183,7 @@ Etcd:
     ServerCertSANs: null
 FeatureGates: null
 ImageRepository: k8s.gcr.io
-KubernetesVersion: v1.11.2
+KubernetesVersion: v1.12.2
 LocalAPIEndpoint:
   AdvertiseAddress: 192.168.2.2
   BindPort: 6443

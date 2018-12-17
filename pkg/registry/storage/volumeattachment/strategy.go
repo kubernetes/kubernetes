@@ -20,6 +20,7 @@ import (
 	"context"
 
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -134,14 +135,5 @@ func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 	oldVolumeAttachment := old.(*storage.VolumeAttachment)
 
 	newVolumeAttachment.Spec = oldVolumeAttachment.Spec
-
-	oldMeta := oldVolumeAttachment.ObjectMeta
-	newMeta := &newVolumeAttachment.ObjectMeta
-	newMeta.SetDeletionTimestamp(oldMeta.GetDeletionTimestamp())
-	newMeta.SetGeneration(oldMeta.GetGeneration())
-	newMeta.SetSelfLink(oldMeta.GetSelfLink())
-	newMeta.SetLabels(oldMeta.GetLabels())
-	newMeta.SetAnnotations(oldMeta.GetAnnotations())
-	newMeta.SetFinalizers(oldMeta.GetFinalizers())
-	newMeta.SetOwnerReferences(oldMeta.GetOwnerReferences())
+	metav1.ResetObjectMetaForStatus(&newVolumeAttachment.ObjectMeta, &oldVolumeAttachment.ObjectMeta)
 }

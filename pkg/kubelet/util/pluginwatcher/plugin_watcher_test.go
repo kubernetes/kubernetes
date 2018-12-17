@@ -32,7 +32,8 @@ import (
 )
 
 var (
-	socketDir string
+	socketDir           string
+	deprecatedSocketDir string
 
 	supportedVersions = []string{"v1beta1", "v1beta2"}
 )
@@ -50,19 +51,27 @@ func init() {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}
 
+	d2, err := ioutil.TempDir("", "deprecated_plugin_test")
+	if err != nil {
+		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
+	}
+
 	socketDir = d
+	deprecatedSocketDir = d2
 }
 
 func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(socketDir))
+	require.NoError(t, os.RemoveAll(deprecatedSocketDir))
 	os.MkdirAll(socketDir, 0755)
+	os.MkdirAll(deprecatedSocketDir, 0755)
 }
 
 func TestPluginRegistration(t *testing.T) {
 	defer cleanup(t)
 
-	hdlr := NewExampleHandler(supportedVersions)
-	w := newWatcherWithHandler(t, hdlr)
+	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
+	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
 	defer func() { require.NoError(t, w.Stop()) }()
 
 	for i := 0; i < 10; i++ {
@@ -84,13 +93,40 @@ func TestPluginRegistration(t *testing.T) {
 	}
 }
 
+func TestPluginRegistrationDeprecated(t *testing.T) {
+	defer cleanup(t)
+
+	hdlr := NewExampleHandler(supportedVersions, true /* permitDeprecatedDir */)
+	w := newWatcherWithHandler(t, hdlr, true /* testDeprecatedDir */)
+	defer func() { require.NoError(t, w.Stop()) }()
+
+	// Test plugins in deprecated dir
+	for i := 0; i < 10; i++ {
+		endpoint := fmt.Sprintf("%s/dep-plugin-%d.sock", deprecatedSocketDir, i)
+		pluginName := fmt.Sprintf("dep-example-plugin-%d", i)
+
+		hdlr.AddPluginName(pluginName)
+
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, endpoint, supportedVersions...)
+		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+
+		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+		require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
+
+		require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+
+		require.NoError(t, p.Stop())
+		require.True(t, waitForEvent(t, exampleEventDeRegister, hdlr.EventChan(p.pluginName)))
+	}
+}
+
 func TestPluginReRegistration(t *testing.T) {
 	defer cleanup(t)
 
 	pluginName := fmt.Sprintf("example-plugin")
-	hdlr := NewExampleHandler(supportedVersions)
+	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
 
-	w := newWatcherWithHandler(t, hdlr)
+	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
 	defer func() { require.NoError(t, w.Stop()) }()
 
 	plugins := make([]*examplePlugin, 10)
@@ -122,7 +158,7 @@ func TestPluginReRegistration(t *testing.T) {
 func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	defer cleanup(t)
 
-	hdlr := NewExampleHandler(supportedVersions)
+	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
 	plugins := make([]*examplePlugin, 10)
 
 	for i := 0; i < len(plugins); i++ {
@@ -137,7 +173,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 		plugins[i] = p
 	}
 
-	w := newWatcherWithHandler(t, hdlr)
+	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
 	defer func() { require.NoError(t, w.Stop()) }()
 
 	var wg sync.WaitGroup
@@ -173,10 +209,10 @@ func TestPluginRegistrationFailureWithUnsupportedVersion(t *testing.T) {
 	pluginName := fmt.Sprintf("example-plugin")
 	socketPath := socketDir + "/plugin.sock"
 
-	hdlr := NewExampleHandler(supportedVersions)
+	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
 	hdlr.AddPluginName(pluginName)
 
-	w := newWatcherWithHandler(t, hdlr)
+	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
 	defer func() { require.NoError(t, w.Stop()) }()
 
 	// Advertise v1beta3 but don't serve anything else than the plugin service
@@ -199,10 +235,10 @@ func TestPlugiRegistrationFailureWithUnsupportedVersionAtKubeletStart(t *testing
 	require.NoError(t, p.Serve())
 	defer func() { require.NoError(t, p.Stop()) }()
 
-	hdlr := NewExampleHandler(supportedVersions)
+	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
 	hdlr.AddPluginName(pluginName)
 
-	w := newWatcherWithHandler(t, hdlr)
+	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
 	defer func() { require.NoError(t, w.Stop()) }()
 
 	require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
@@ -230,11 +266,215 @@ func waitForEvent(t *testing.T, expected examplePluginEvent, eventChan chan exam
 	return false
 }
 
-func newWatcherWithHandler(t *testing.T, hdlr PluginHandler) *Watcher {
-	w := NewWatcher(socketDir)
+func newWatcherWithHandler(t *testing.T, hdlr PluginHandler, testDeprecatedDir bool) *Watcher {
+	depSocketDir := ""
+	if testDeprecatedDir {
+		depSocketDir = deprecatedSocketDir
+	}
+	w := NewWatcher(socketDir, depSocketDir)
 
 	w.AddHandler(registerapi.DevicePlugin, hdlr)
 	require.NoError(t, w.Start())
 
 	return w
+}
+
+func TestFoundInDeprecatedDir(t *testing.T) {
+	testCases := []struct {
+		sockDir                    string
+		deprecatedSockDir          string
+		socketPath                 string
+		expectFoundInDeprecatedDir bool
+	}{
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins_registry/mydriver.foo/csi.sock",
+			expectFoundInDeprecatedDir: false,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins/mydriver.foo/csi.sock",
+			expectFoundInDeprecatedDir: true,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins_registry",
+			expectFoundInDeprecatedDir: false,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins",
+			expectFoundInDeprecatedDir: true,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins/kubernetes.io",
+			expectFoundInDeprecatedDir: true,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins/my.driver.com",
+			expectFoundInDeprecatedDir: true,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins_registry",
+			expectFoundInDeprecatedDir: false,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins_registry/kubernetes.io",
+			expectFoundInDeprecatedDir: false,
+		},
+		{
+			sockDir:                    "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir:          "/var/lib/kubelet/plugins",
+			socketPath:                 "/var/lib/kubelet/plugins_registry/my.driver.com",
+			expectFoundInDeprecatedDir: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir)
+
+		actualFoundInDeprecatedDir := watcher.foundInDeprecatedDir(tc.socketPath)
+
+		// Assert
+		if tc.expectFoundInDeprecatedDir != actualFoundInDeprecatedDir {
+			t.Fatalf("expecting actualFoundInDeprecatedDir=%v, but got %v for testcase: %#v", tc.expectFoundInDeprecatedDir, actualFoundInDeprecatedDir, tc)
+		}
+	}
+}
+
+func TestContainsBlacklistedDir(t *testing.T) {
+	testCases := []struct {
+		sockDir           string
+		deprecatedSockDir string
+		path              string
+		expected          bool
+	}{
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins_registry/mydriver.foo/csi.sock",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/mydriver.foo/csi.sock",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins_registry",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io",
+			expected:          true,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io/csi.sock",
+			expected:          true,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io/my.plugin/csi.sock",
+			expected:          true,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io/",
+			expected:          true,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/my.driver.com",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins_registry",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins_registry/kubernetes.io",
+			expected:          false, // New (non-deprecated dir) has no blacklist
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins_registry/my.driver.com",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/my-kubernetes.io-plugin",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/my-kubernetes.io-plugin/csi.sock",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io-plugin",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io-plugin/csi.sock",
+			expected:          false,
+		},
+		{
+			sockDir:           "/var/lib/kubelet/plugins_registry",
+			deprecatedSockDir: "/var/lib/kubelet/plugins",
+			path:              "/var/lib/kubelet/plugins/kubernetes.io-plugin/",
+			expected:          false,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir)
+
+		actual := watcher.containsBlacklistedDir(tc.path)
+
+		// Assert
+		if tc.expected != actual {
+			t.Fatalf("expecting %v but got %v for testcase: %#v", tc.expected, actual, tc)
+		}
+	}
 }
