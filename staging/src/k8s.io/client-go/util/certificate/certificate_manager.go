@@ -48,11 +48,10 @@ var certificateWaitBackoff = wait.Backoff{Duration: 30 * time.Second, Steps: 4, 
 // manager. In the background it communicates with the API server to get new
 // certificates for certificates about to expire.
 type Manager interface {
-	// CertificateSigningRequestClient sets the client interface that is used for
-	// signing new certificates generated as part of rotation.
-	SetCertificateSigningRequestClient(certificatesclient.CertificateSigningRequestInterface) error
 	// Start the API server status sync loop.
 	Start()
+	// Stop the cert manager loop.
+	Stop()
 	// Current returns the currently selected certificate from the
 	// certificate manager, as well as the associated certificate and key data
 	// in PEM format.
@@ -67,11 +66,11 @@ type Manager interface {
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
-	// CertificateSigningRequestClient will be used for signing new certificate
-	// requests generated when a key rotation occurs. It must be set either at
-	// initialization or by using CertificateSigningRequestClient before
-	// Manager.Start() is called.
-	CertificateSigningRequestClient certificatesclient.CertificateSigningRequestInterface
+	// ClientFn will be used to create a client for
+	// signing new certificate requests generated when a key rotation occurs.
+	// It must be set at initialization. The function will never be invoked
+	// in parallel. It is passed the current client certificate if one exists.
+	ClientFn CSRClientFunc
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
 	// part of rotation. It follows the same rules as the template parameter of
@@ -141,21 +140,34 @@ type Gauge interface {
 // NoCertKeyError indicates there is no cert/key currently available.
 type NoCertKeyError string
 
+// CSRClientFunc returns a new client for requesting CSRs. It passes the
+// current certificate if one is available and valid.
+type CSRClientFunc func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error)
+
 func (e *NoCertKeyError) Error() string { return string(*e) }
 
 type manager struct {
-	certSigningRequestClient certificatesclient.CertificateSigningRequestInterface
-	getTemplate              func() *x509.CertificateRequest
-	lastRequestLock          sync.Mutex
-	lastRequest              *x509.CertificateRequest
-	dynamicTemplate          bool
-	usages                   []certificates.KeyUsage
-	certStore                Store
-	certAccessLock           sync.RWMutex
-	cert                     *tls.Certificate
-	forceRotation            bool
-	certificateExpiration    Gauge
-	serverHealth             bool
+	getTemplate     func() *x509.CertificateRequest
+	lastRequestLock sync.Mutex
+	lastRequest     *x509.CertificateRequest
+	dynamicTemplate bool
+	usages          []certificates.KeyUsage
+	forceRotation   bool
+
+	certStore Store
+
+	certificateExpiration Gauge
+
+	// the following variables must only be accessed under certAccessLock
+	certAccessLock sync.RWMutex
+	cert           *tls.Certificate
+	serverHealth   bool
+
+	// the clientFn must only be accessed under the clientAccessLock
+	clientAccessLock sync.Mutex
+	clientFn         CSRClientFunc
+	stopCh           chan struct{}
+	stopped          bool
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -176,14 +188,15 @@ func NewManager(config *Config) (Manager, error) {
 	}
 
 	m := manager{
-		certSigningRequestClient: config.CertificateSigningRequestClient,
-		getTemplate:              getTemplate,
-		dynamicTemplate:          config.GetTemplate != nil,
-		usages:                   config.Usages,
-		certStore:                config.CertificateStore,
-		cert:                     cert,
-		forceRotation:            forceRotation,
-		certificateExpiration:    config.CertificateExpiration,
+		stopCh:                make(chan struct{}),
+		clientFn:              config.ClientFn,
+		getTemplate:           getTemplate,
+		dynamicTemplate:       config.GetTemplate != nil,
+		usages:                config.Usages,
+		certStore:             config.CertificateStore,
+		cert:                  cert,
+		forceRotation:         forceRotation,
+		certificateExpiration: config.CertificateExpiration,
 	}
 
 	return &m, nil
@@ -192,10 +205,14 @@ func NewManager(config *Config) (Manager, error) {
 // Current returns the currently selected certificate from the certificate
 // manager. This can be nil if the manager was initialized without a
 // certificate and has not yet received one from the
-// CertificateSigningRequestClient.
+// CertificateSigningRequestClient, or if the current cert has expired.
 func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
+	if m.cert != nil && m.cert.Leaf != nil && time.Now().After(m.cert.Leaf.NotAfter) {
+		klog.V(2).Infof("Current certificate is expired.")
+		return nil
+	}
 	return m.cert
 }
 
@@ -207,18 +224,15 @@ func (m *manager) ServerHealthy() bool {
 	return m.serverHealth
 }
 
-// SetCertificateSigningRequestClient sets the client interface that is used
-// for signing new certificates generated as part of rotation. It must be
-// called before Start() and can not be used to change the
-// CertificateSigningRequestClient that has already been set. This method is to
-// support the one specific scenario where the CertificateSigningRequestClient
-// uses the CertificateManager.
-func (m *manager) SetCertificateSigningRequestClient(certSigningRequestClient certificatesclient.CertificateSigningRequestInterface) error {
-	if m.certSigningRequestClient == nil {
-		m.certSigningRequestClient = certSigningRequestClient
-		return nil
+// Stop terminates the manager.
+func (m *manager) Stop() {
+	m.clientAccessLock.Lock()
+	defer m.clientAccessLock.Unlock()
+	if m.stopped {
+		return
 	}
-	return fmt.Errorf("property CertificateSigningRequestClient is already set")
+	close(m.stopCh)
+	m.stopped = true
 }
 
 // Start will start the background work of rotating the certificates.
@@ -226,7 +240,7 @@ func (m *manager) Start() {
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
 	// client.
-	if m.certSigningRequestClient == nil {
+	if m.clientFn == nil {
 		klog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
 	}
@@ -234,7 +248,7 @@ func (m *manager) Start() {
 	klog.V(2).Infof("Certificate rotation is enabled.")
 
 	templateChanged := make(chan struct{})
-	go wait.Forever(func() {
+	go wait.Until(func() {
 		deadline := m.nextRotationDeadline()
 		if sleepInterval := deadline.Sub(time.Now()); sleepInterval > 0 {
 			klog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
@@ -269,17 +283,17 @@ func (m *manager) Start() {
 			utilruntime.HandleError(fmt.Errorf("Reached backoff limit, still unable to rotate certs: %v", err))
 			wait.PollInfinite(32*time.Second, m.rotateCerts)
 		}
-	}, time.Second)
+	}, time.Second, m.stopCh)
 
 	if m.dynamicTemplate {
-		go wait.Forever(func() {
+		go wait.Until(func() {
 			// check if the current template matches what we last requested
 			if !m.certSatisfiesTemplate() && !reflect.DeepEqual(m.getLastRequest(), m.getTemplate()) {
 				// if the template is different, queue up an interrupt of the rotation deadline loop.
 				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
 				templateChanged <- struct{}{}
 			}
-		}, time.Second)
+		}, time.Second, m.stopCh)
 	}
 }
 
@@ -327,11 +341,26 @@ func getCurrentCertificateOrBootstrap(
 	return &bootstrapCert, true, nil
 }
 
+func (m *manager) getClient() (certificatesclient.CertificateSigningRequestInterface, error) {
+	current := m.Current()
+	m.clientAccessLock.Lock()
+	defer m.clientAccessLock.Unlock()
+	return m.clientFn(current)
+}
+
+// RotateCerts is exposed for testing only and is not a part of the public interface.
+// Returns true if it changed the cert, false otherwise. Error is only returned in
+// exceptional cases.
+func (m *manager) RotateCerts() (bool, error) {
+	return m.rotateCerts()
+}
+
 // rotateCerts attempts to request a client cert from the server, wait a reasonable
 // period of time for it to be signed, and then update the cert on disk. If it cannot
 // retrieve a cert, it will return false. It will only return error in exceptional cases.
 // This method also keeps track of "server health" by interpreting the responses it gets
 // from the server on the various calls it makes.
+// TODO: return errors, have callers handle and log them correctly
 func (m *manager) rotateCerts() (bool, error) {
 	klog.V(2).Infof("Rotating certificates")
 
@@ -341,9 +370,16 @@ func (m *manager) rotateCerts() (bool, error) {
 		return false, nil
 	}
 
+	// request the client each time
+	client, err := m.getClient()
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to load a client to request certificates: %v", err))
+		return false, nil
+	}
+
 	// Call the Certificate Signing Request API to get a certificate for the
 	// new private key.
-	req, err := csr.RequestCertificate(m.certSigningRequestClient, csrPEM, "", m.usages, privateKey)
+	req, err := csr.RequestCertificate(client, csrPEM, "", m.usages, privateKey)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Failed while requesting a signed certificate from the master: %v", err))
 		return false, m.updateServerError(err)
@@ -359,7 +395,7 @@ func (m *manager) rotateCerts() (bool, error) {
 	var crtPEM []byte
 	watchDuration := time.Minute
 	if err := wait.ExponentialBackoff(certificateWaitBackoff, func() (bool, error) {
-		data, err := csr.WaitForCertificate(m.certSigningRequestClient, req, watchDuration)
+		data, err := csr.WaitForCertificate(client, req, watchDuration)
 		switch {
 		case err == nil:
 			crtPEM = data

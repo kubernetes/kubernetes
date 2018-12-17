@@ -75,6 +75,7 @@ func NewUploadConfigPhase() workflow.Phase {
 				Name:           "all",
 				Short:          "Uploads all configuration to a config map",
 				RunAllSiblings: true,
+				InheritFlags:   getUploadConfigPhaseFlags(),
 			},
 			{
 				Name:         "kubeadm",

@@ -47,10 +47,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "desired_state_of_world_populator_test.go",
-        "main_test.go",
-    ],
+    srcs = ["desired_state_of_world_populator_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",

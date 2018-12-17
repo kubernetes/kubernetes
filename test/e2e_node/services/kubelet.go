@@ -108,7 +108,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	klog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	utilfeature.DefaultFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
+	utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()

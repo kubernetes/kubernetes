@@ -85,9 +85,9 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--something-that-allows-empty-string=",
 				"--allow-privileged=true",
 				"--insecure-bind-address=127.0.0.1",
+				"--something-that-allows-empty-string=",
 			},
 		},
 	}

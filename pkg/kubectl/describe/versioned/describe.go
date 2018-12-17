@@ -881,8 +881,8 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 				"    ConfigMapOptional:\t%v\n",
 				source.ConfigMap.Name, source.ConfigMap.Optional)
 		} else if source.ServiceAccountToken != nil {
-			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
-				source.ServiceAccountToken.ExpirationSeconds)
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
+				*source.ServiceAccountToken.ExpirationSeconds)
 		}
 	}
 }
@@ -1647,12 +1647,12 @@ func describeContainerVolumes(container corev1.Container, w PrefixWriter) {
 	sort.Sort(SortableVolumeMounts(container.VolumeMounts))
 	for _, mount := range container.VolumeMounts {
 		flags := []string{}
-		switch {
-		case mount.ReadOnly:
+		if mount.ReadOnly {
 			flags = append(flags, "ro")
-		case !mount.ReadOnly:
+		} else {
 			flags = append(flags, "rw")
-		case len(mount.SubPath) > 0:
+		}
+		if len(mount.SubPath) > 0 {
 			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
 		}
 		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
@@ -2073,6 +2073,16 @@ func describeCronJob(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (s
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", cronJob.Spec.SuccessfulJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t<unset>\n")
+		}
+		if cronJob.Spec.FailedJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t%d\n", *cronJob.Spec.FailedJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t<unset>\n")
+		}
 		if cronJob.Spec.StartingDeadlineSeconds != nil {
 			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
 		} else {

@@ -35,10 +35,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "main_test.go",
-        "reconciler_test.go",
-    ],
+    srcs = ["reconciler_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",

@@ -55,6 +55,10 @@ const (
 // overrideIP = true in cloud config file. Default value is false.
 var overrideIP bool = false
 
+var _ cloudprovider.Interface = (*PCCloud)(nil)
+var _ cloudprovider.Instances = (*PCCloud)(nil)
+var _ cloudprovider.Zones = (*PCCloud)(nil)
+
 // Photon is an implementation of the cloud provider interface for Photon Controller.
 type PCCloud struct {
 	cfg *PCConfig

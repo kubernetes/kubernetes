@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/inotify"
+	"github.com/sigma/go-inotify"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"

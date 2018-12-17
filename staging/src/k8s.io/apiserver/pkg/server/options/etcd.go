@@ -134,9 +134,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
-		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
-		"The individual override format: resource[.group]#size, where resource is lowercase plural (no version), "+
-		"group is optional, and size is a number. It takes effect when watch-cache is enabled. "+
+		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
+		"The individual setting format: resource[.group]#size, where resource is lowercase plural (no version), "+
+		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
+		"and size is a number. It takes effect when watch-cache is enabled. "+
 		"Some resources (replicationcontrollers, endpoints, nodes, pods, services, apiservices.apiregistration.k8s.io) "+
 		"have system defaults set by heuristics, others default to default-watch-cache-size")
 
@@ -163,6 +164,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"SSL Certificate Authority file used to secure etcd communication.")
 
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
+		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
+	fs.MarkDeprecated("experimental-encryption-provider-config", "use --encryption-provider-config.")
+
+	fs.StringVar(&s.EncryptionProviderConfigFilepath, "encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
 
 	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,

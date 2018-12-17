@@ -27,7 +27,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -2111,6 +2111,8 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
+		podNodePairs, err := framework.PodNodePairs(cs, ns)
+		framework.Logf("[pod,node] pairs: %+v; err: %v", podNodePairs, err)
 		framework.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.DefaultLoadBalancerName(svc)
 		framework.Logf("cleaning load balancer resource for %s", lb)

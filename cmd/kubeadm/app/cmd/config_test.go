@@ -43,7 +43,7 @@ const (
 	defaultNumberOfImages = 8
 	// dummyKubernetesVersion is just used for unit testing, in order to not make
 	// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
-	dummyKubernetesVersion = "v1.11.0"
+	dummyKubernetesVersion = "v1.12.0"
 )
 
 func TestNewCmdConfigImagesList(t *testing.T) {
@@ -69,12 +69,12 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
-				":v1.11.1",
+				":v1.12.1",
 			},
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1beta1
 				kind: ClusterConfiguration
-				kubernetesVersion: v1.11.1
+				kubernetesVersion: v1.12.1
 			`)),
 		},
 		{
@@ -86,7 +86,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1beta1
 				kind: ClusterConfiguration
-				kubernetesVersion: v1.11.0
+				kubernetesVersion: v1.12.0
 			`)),
 		},
 	}

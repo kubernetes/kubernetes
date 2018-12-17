@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"sync"
 
-	. "k8s.io/kubernetes/test/images/resource-consumer/common"
+	"k8s.io/kubernetes/test/images/resource-consumer/common"
 )
 
 var port = flag.Int("port", 8080, "Port number.")
@@ -35,23 +35,23 @@ var consumerServiceNamespace = flag.String("consumer-service-namespace", "defaul
 
 func main() {
 	flag.Parse()
-	mgr := NewController()
+	mgr := newController()
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), mgr))
 }
 
-type Controller struct {
+type controller struct {
 	responseWriterLock sync.Mutex
 	waitGroup          sync.WaitGroup
 }
 
-func NewController() *Controller {
-	c := &Controller{}
+func newController() *controller {
+	c := &controller{}
 	return c
 }
 
-func (handler *Controller) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (c *controller) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
-		http.Error(w, BadRequest, http.StatusBadRequest)
+		http.Error(w, common.BadRequest, http.StatusBadRequest)
 		return
 	}
 	// parsing POST request data and URL data
@@ -60,30 +60,30 @@ func (handler *Controller) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// handle consumeCPU
-	if req.URL.Path == ConsumeCPUAddress {
-		handler.handleConsumeCPU(w, req.Form)
+	if req.URL.Path == common.ConsumeCPUAddress {
+		c.handleConsumeCPU(w, req.Form)
 		return
 	}
 	// handle consumeMem
-	if req.URL.Path == ConsumeMemAddress {
-		handler.handleConsumeMem(w, req.Form)
+	if req.URL.Path == common.ConsumeMemAddress {
+		c.handleConsumeMem(w, req.Form)
 		return
 	}
 	// handle bumpMetric
-	if req.URL.Path == BumpMetricAddress {
-		handler.handleBumpMetric(w, req.Form)
+	if req.URL.Path == common.BumpMetricAddress {
+		c.handleBumpMetric(w, req.Form)
 		return
 	}
-	http.Error(w, UnknownFunction, http.StatusNotFound)
+	http.Error(w, common.UnknownFunction, http.StatusNotFound)
 }
 
-func (handler *Controller) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
+func (c *controller) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
 	// getting string data for consumeCPU
-	durationSecString := query.Get(DurationSecQuery)
-	millicoresString := query.Get(MillicoresQuery)
-	requestSizeInMillicoresString := query.Get(RequestSizeInMillicoresQuery)
+	durationSecString := query.Get(common.DurationSecQuery)
+	millicoresString := query.Get(common.MillicoresQuery)
+	requestSizeInMillicoresString := query.Get(common.RequestSizeInMillicoresQuery)
 	if durationSecString == "" || millicoresString == "" || requestSizeInMillicoresString == "" {
-		http.Error(w, NotGivenFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.NotGivenFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (handler *Controller) handleConsumeCPU(w http.ResponseWriter, query url.Val
 	millicores, millicoresError := strconv.Atoi(millicoresString)
 	requestSizeInMillicores, requestSizeInMillicoresError := strconv.Atoi(requestSizeInMillicoresString)
 	if durationSecError != nil || millicoresError != nil || requestSizeInMillicoresError != nil || requestSizeInMillicores <= 0 {
-		http.Error(w, IncorrectFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.IncorrectFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -100,23 +100,23 @@ func (handler *Controller) handleConsumeCPU(w http.ResponseWriter, query url.Val
 	rest := millicores - count*requestSizeInMillicores
 	fmt.Fprintf(w, "RC manager: sending %v requests to consume %v millicores each and 1 request to consume %v millicores\n", count, requestSizeInMillicores, rest)
 	if count > 0 {
-		handler.waitGroup.Add(count)
-		handler.sendConsumeCPURequests(w, count, requestSizeInMillicores, durationSec)
+		c.waitGroup.Add(count)
+		c.sendConsumeCPURequests(w, count, requestSizeInMillicores, durationSec)
 	}
 	if rest > 0 {
-		handler.waitGroup.Add(1)
-		go handler.sendOneConsumeCPURequest(w, rest, durationSec)
+		c.waitGroup.Add(1)
+		go c.sendOneConsumeCPURequest(w, rest, durationSec)
 	}
-	handler.waitGroup.Wait()
+	c.waitGroup.Wait()
 }
 
-func (handler *Controller) handleConsumeMem(w http.ResponseWriter, query url.Values) {
+func (c *controller) handleConsumeMem(w http.ResponseWriter, query url.Values) {
 	// getting string data for consumeMem
-	durationSecString := query.Get(DurationSecQuery)
-	megabytesString := query.Get(MegabytesQuery)
-	requestSizeInMegabytesString := query.Get(RequestSizeInMegabytesQuery)
+	durationSecString := query.Get(common.DurationSecQuery)
+	megabytesString := query.Get(common.MegabytesQuery)
+	requestSizeInMegabytesString := query.Get(common.RequestSizeInMegabytesQuery)
 	if durationSecString == "" || megabytesString == "" || requestSizeInMegabytesString == "" {
-		http.Error(w, NotGivenFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.NotGivenFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (handler *Controller) handleConsumeMem(w http.ResponseWriter, query url.Val
 	megabytes, megabytesError := strconv.Atoi(megabytesString)
 	requestSizeInMegabytes, requestSizeInMegabytesError := strconv.Atoi(requestSizeInMegabytesString)
 	if durationSecError != nil || megabytesError != nil || requestSizeInMegabytesError != nil || requestSizeInMegabytes <= 0 {
-		http.Error(w, IncorrectFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.IncorrectFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -133,24 +133,24 @@ func (handler *Controller) handleConsumeMem(w http.ResponseWriter, query url.Val
 	rest := megabytes - count*requestSizeInMegabytes
 	fmt.Fprintf(w, "RC manager: sending %v requests to consume %v MB each and 1 request to consume %v MB\n", count, requestSizeInMegabytes, rest)
 	if count > 0 {
-		handler.waitGroup.Add(count)
-		handler.sendConsumeMemRequests(w, count, requestSizeInMegabytes, durationSec)
+		c.waitGroup.Add(count)
+		c.sendConsumeMemRequests(w, count, requestSizeInMegabytes, durationSec)
 	}
 	if rest > 0 {
-		handler.waitGroup.Add(1)
-		go handler.sendOneConsumeMemRequest(w, rest, durationSec)
+		c.waitGroup.Add(1)
+		go c.sendOneConsumeMemRequest(w, rest, durationSec)
 	}
-	handler.waitGroup.Wait()
+	c.waitGroup.Wait()
 }
 
-func (handler *Controller) handleBumpMetric(w http.ResponseWriter, query url.Values) {
+func (c *controller) handleBumpMetric(w http.ResponseWriter, query url.Values) {
 	// getting string data for handleBumpMetric
-	metric := query.Get(MetricNameQuery)
-	deltaString := query.Get(DeltaQuery)
-	durationSecString := query.Get(DurationSecQuery)
-	requestSizeCustomMetricString := query.Get(RequestSizeCustomMetricQuery)
+	metric := query.Get(common.MetricNameQuery)
+	deltaString := query.Get(common.DeltaQuery)
+	durationSecString := query.Get(common.DurationSecQuery)
+	requestSizeCustomMetricString := query.Get(common.RequestSizeCustomMetricQuery)
 	if durationSecString == "" || metric == "" || deltaString == "" || requestSizeCustomMetricString == "" {
-		http.Error(w, NotGivenFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.NotGivenFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -159,7 +159,7 @@ func (handler *Controller) handleBumpMetric(w http.ResponseWriter, query url.Val
 	delta, deltaError := strconv.Atoi(deltaString)
 	requestSizeCustomMetric, requestSizeCustomMetricError := strconv.Atoi(requestSizeCustomMetricString)
 	if durationSecError != nil || deltaError != nil || requestSizeCustomMetricError != nil || requestSizeCustomMetric <= 0 {
-		http.Error(w, IncorrectFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.IncorrectFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -167,31 +167,31 @@ func (handler *Controller) handleBumpMetric(w http.ResponseWriter, query url.Val
 	rest := delta - count*requestSizeCustomMetric
 	fmt.Fprintf(w, "RC manager: sending %v requests to bump custom metric by %v each and 1 request to bump by %v\n", count, requestSizeCustomMetric, rest)
 	if count > 0 {
-		handler.waitGroup.Add(count)
-		handler.sendConsumeCustomMetric(w, metric, count, requestSizeCustomMetric, durationSec)
+		c.waitGroup.Add(count)
+		c.sendConsumeCustomMetric(w, metric, count, requestSizeCustomMetric, durationSec)
 	}
 	if rest > 0 {
-		handler.waitGroup.Add(1)
-		go handler.sendOneConsumeCustomMetric(w, metric, rest, durationSec)
+		c.waitGroup.Add(1)
+		go c.sendOneConsumeCustomMetric(w, metric, rest, durationSec)
 	}
-	handler.waitGroup.Wait()
+	c.waitGroup.Wait()
 }
 
-func (manager *Controller) sendConsumeCPURequests(w http.ResponseWriter, requests, millicores, durationSec int) {
+func (c *controller) sendConsumeCPURequests(w http.ResponseWriter, requests, millicores, durationSec int) {
 	for i := 0; i < requests; i++ {
-		go manager.sendOneConsumeCPURequest(w, millicores, durationSec)
-	}
-}
-
-func (manager *Controller) sendConsumeMemRequests(w http.ResponseWriter, requests, megabytes, durationSec int) {
-	for i := 0; i < requests; i++ {
-		go manager.sendOneConsumeMemRequest(w, megabytes, durationSec)
+		go c.sendOneConsumeCPURequest(w, millicores, durationSec)
 	}
 }
 
-func (manager *Controller) sendConsumeCustomMetric(w http.ResponseWriter, metric string, requests, delta, durationSec int) {
+func (c *controller) sendConsumeMemRequests(w http.ResponseWriter, requests, megabytes, durationSec int) {
 	for i := 0; i < requests; i++ {
-		go manager.sendOneConsumeCustomMetric(w, metric, delta, durationSec)
+		go c.sendOneConsumeMemRequest(w, megabytes, durationSec)
+	}
+}
+
+func (c *controller) sendConsumeCustomMetric(w http.ResponseWriter, metric string, requests, delta, durationSec int) {
+	for i := 0; i < requests; i++ {
+		go c.sendOneConsumeCustomMetric(w, metric, delta, durationSec)
 	}
 }
 
@@ -200,10 +200,10 @@ func createConsumerURL(suffix string) string {
 }
 
 // sendOneConsumeCPURequest sends POST request for cpu consumption
-func (c *Controller) sendOneConsumeCPURequest(w http.ResponseWriter, millicores int, durationSec int) {
+func (c *controller) sendOneConsumeCPURequest(w http.ResponseWriter, millicores int, durationSec int) {
 	defer c.waitGroup.Done()
-	query := createConsumerURL(ConsumeCPUAddress)
-	_, err := http.PostForm(query, url.Values{MillicoresQuery: {strconv.Itoa(millicores)}, DurationSecQuery: {strconv.Itoa(durationSec)}})
+	query := createConsumerURL(common.ConsumeCPUAddress)
+	_, err := http.PostForm(query, url.Values{common.MillicoresQuery: {strconv.Itoa(millicores)}, common.DurationSecQuery: {strconv.Itoa(durationSec)}})
 	c.responseWriterLock.Lock()
 	defer c.responseWriterLock.Unlock()
 	if err != nil {
@@ -214,10 +214,10 @@ func (c *Controller) sendOneConsumeCPURequest(w http.ResponseWriter, millicores 
 }
 
 // sendOneConsumeMemRequest sends POST request for memory consumption
-func (c *Controller) sendOneConsumeMemRequest(w http.ResponseWriter, megabytes int, durationSec int) {
+func (c *controller) sendOneConsumeMemRequest(w http.ResponseWriter, megabytes int, durationSec int) {
 	defer c.waitGroup.Done()
-	query := createConsumerURL(ConsumeMemAddress)
-	_, err := http.PostForm(query, url.Values{MegabytesQuery: {strconv.Itoa(megabytes)}, DurationSecQuery: {strconv.Itoa(durationSec)}})
+	query := createConsumerURL(common.ConsumeMemAddress)
+	_, err := http.PostForm(query, url.Values{common.MegabytesQuery: {strconv.Itoa(megabytes)}, common.DurationSecQuery: {strconv.Itoa(durationSec)}})
 	c.responseWriterLock.Lock()
 	defer c.responseWriterLock.Unlock()
 	if err != nil {
@@ -228,11 +228,11 @@ func (c *Controller) sendOneConsumeMemRequest(w http.ResponseWriter, megabytes i
 }
 
 // sendOneConsumeCustomMetric sends POST request for custom metric consumption
-func (c *Controller) sendOneConsumeCustomMetric(w http.ResponseWriter, customMetricName string, delta int, durationSec int) {
+func (c *controller) sendOneConsumeCustomMetric(w http.ResponseWriter, customMetricName string, delta int, durationSec int) {
 	defer c.waitGroup.Done()
-	query := createConsumerURL(BumpMetricAddress)
+	query := createConsumerURL(common.BumpMetricAddress)
 	_, err := http.PostForm(query,
-		url.Values{MetricNameQuery: {customMetricName}, DurationSecQuery: {strconv.Itoa(durationSec)}, DeltaQuery: {strconv.Itoa(delta)}})
+		url.Values{common.MetricNameQuery: {customMetricName}, common.DurationSecQuery: {strconv.Itoa(durationSec)}, common.DeltaQuery: {strconv.Itoa(delta)}})
 	c.responseWriterLock.Lock()
 	defer c.responseWriterLock.Unlock()
 	if err != nil {

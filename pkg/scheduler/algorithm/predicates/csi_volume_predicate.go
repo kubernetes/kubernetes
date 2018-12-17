@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -45,7 +45,7 @@ func NewCSIMaxVolumeLimitPredicate(
 }
 
 func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
-	pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 
 	// if feature gate is disable we return
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {

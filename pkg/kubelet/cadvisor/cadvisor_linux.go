@@ -100,7 +100,6 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 	return set
 }
 
-// New creates a cAdvisor and exports its API on the specified port if port > 0.
 func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 

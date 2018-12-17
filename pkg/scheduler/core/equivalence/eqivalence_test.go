@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // makeBasicPod returns a Pod object with many of the fields populated.
@@ -162,7 +162,7 @@ type mockPredicate struct {
 	callCount int
 }
 
-func (p *mockPredicate) predicate(*v1.Pod, algorithm.PredicateMetadata, *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func (p *mockPredicate) predicate(*v1.Pod, algorithm.PredicateMetadata, *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	p.callCount++
 	return p.fit, p.reasons, p.err
 }
@@ -219,7 +219,7 @@ func TestRunPredicate(t *testing.T) {
 	predicateID := 0
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := schedulercache.NewNodeInfo()
+			node := schedulernodeinfo.NewNodeInfo()
 			testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n1"}}
 			node.SetNode(testNode)
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1"}}
@@ -323,7 +323,7 @@ func TestUpdateResult(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := schedulercache.NewNodeInfo()
+			node := schedulernodeinfo.NewNodeInfo()
 			testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: test.nodeName}}
 			node.SetNode(testNode)
 
@@ -469,7 +469,7 @@ func TestLookupResult(t *testing.T) {
 			ecache := NewCache(predicatesOrdering)
 			nodeCache, _ := ecache.GetNodeCache(testNode.Name)
 
-			node := schedulercache.NewNodeInfo()
+			node := schedulernodeinfo.NewNodeInfo()
 			node.SetNode(testNode)
 			// set cached item to equivalence cache
 			nodeCache.updateResult(
@@ -687,7 +687,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	ecache := NewCache(predicatesOrdering)
 
 	for _, test := range tests {
-		node := schedulercache.NewNodeInfo()
+		node := schedulernodeinfo.NewNodeInfo()
 		testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: test.nodeName}}
 		node.SetNode(testNode)
 
@@ -765,7 +765,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 	ecache := NewCache(predicatesOrdering)
 
 	for _, test := range tests {
-		node := schedulercache.NewNodeInfo()
+		node := schedulernodeinfo.NewNodeInfo()
 		testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: test.nodeName}}
 		node.SetNode(testNode)
 

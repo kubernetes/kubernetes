@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 var (
@@ -81,7 +81,7 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 			),
 		},
 	} {
-		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo := schedulernodeinfo.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
 		pod := removeMissingExtendedResources(test.pod, nodeInfo)
 		if !reflect.DeepEqual(pod, test.expectedPod) {

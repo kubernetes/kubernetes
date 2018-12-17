@@ -31,7 +31,7 @@ const APIServerExtraArgs = "apiserver-extra-args"
 // CertificatesDir flag sets the path where to save and read the certificates.
 const CertificatesDir = "cert-dir"
 
-// CfgPath flag sets the path to kubeadm config file. WARNING: Usage of a configuration file is experimental.
+// CfgPath flag sets the path to kubeadm config file.
 const CfgPath = "config"
 
 // ControllerManagerExtraArgs flag sets extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>.

@@ -39,7 +39,13 @@ func New() Prober {
 
 // NewWithTLSConfig takes tls config as parameter.
 func NewWithTLSConfig(config *tls.Config) Prober {
-	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: config, DisableKeepAlives: true})
+	// We do not want the probe use node's local proxy set.
+	transport := utilnet.SetTransportDefaults(
+		&http.Transport{
+			TLSClientConfig:   config,
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyURL(nil),
+		})
 	return httpProber{transport}
 }
 

@@ -105,12 +105,14 @@ var (
 	}
 )
 
+// ResourceOptions holds the related options for '--resource' option
 type ResourceOptions struct {
 	Group       string
 	Resource    string
 	SubResource string
 }
 
+// CreateRoleOptions holds the options for 'create role' sub command
 type CreateRoleOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
@@ -129,6 +131,7 @@ type CreateRoleOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateRoleOptions returns an initialized CreateRoleOptions instance
 func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -137,7 +140,7 @@ func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOpti
 	}
 }
 
-// Role is a command to ease creating Roles.
+// NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
 func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateRoleOptions(ioStreams)
 
@@ -166,6 +169,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -255,6 +259,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return nil
 }
 
+// Validate makes sure there is no discrepency in provided option values
 func (o *CreateRoleOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("name must be specified")
@@ -317,6 +322,7 @@ func (o *CreateRoleOptions) validateResource() error {
 	return nil
 }
 
+// RunCreateRole performs the execution of 'create role' sub command
 func (o *CreateRoleOptions) RunCreateRole() error {
 	role := &rbacv1.Role{
 		// this is ok because we know exactly how we want to be serialized

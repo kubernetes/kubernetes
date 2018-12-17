@@ -53,7 +53,8 @@ import (
 )
 
 var (
-	cloudConfig = &framework.TestContext.CloudConfig
+	cloudConfig      = &framework.TestContext.CloudConfig
+	nodeKillerStopCh = make(chan struct{})
 )
 
 // There are certain operations we only want to run once per overall test invocation
@@ -136,6 +137,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
 
+	if framework.TestContext.NodeKiller.Enabled {
+		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
+		nodeKillerStopCh = make(chan struct{})
+		go nodeKiller.Run(nodeKillerStopCh)
+	}
 	return nil
 
 }, func(data []byte) {
@@ -159,6 +165,9 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 		if err := gatherTestSuiteMetrics(); err != nil {
 			framework.Logf("Error gathering metrics: %v", err)
 		}
+	}
+	if framework.TestContext.NodeKiller.Enabled {
+		close(nodeKillerStopCh)
 	}
 })
 

@@ -91,7 +91,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -1052,6 +1052,25 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 	return fmt.Errorf("PersistentVolumeClaims %v not all in phase %s within %v", pvcNames, phase, timeout)
 }
 
+// findAvailableNamespaceName random namespace name starting with baseName.
+func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
+	var name string
+	err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
+		name = fmt.Sprintf("%v-%v", baseName, randomSuffix())
+		_, err := c.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+		if err == nil {
+			// Already taken
+			return false, nil
+		}
+		if apierrs.IsNotFound(err) {
+			return true, nil
+		}
+		Logf("Unexpected error while getting namespace: %v", err)
+		return false, nil
+	})
+	return name, err
+}
+
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error) {
@@ -1060,11 +1079,19 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	}
 	labels["e2e-run"] = string(RunId)
 
+	// We don't use ObjectMeta.GenerateName feature, as in case of API call
+	// failure we don't know whether the namespace was created and what is its
+	// name.
+	name, err := findAvailableNamespaceName(baseName, c)
+	if err != nil {
+		return nil, err
+	}
+
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
-			Namespace:    "",
-			Labels:       labels,
+			Name:      name,
+			Namespace: "",
+			Labels:    labels,
 		},
 		Status: v1.NamespaceStatus{},
 	}
@@ -1496,10 +1523,12 @@ func eventOccurred(c clientset.Interface, podName, namespace, eventSelector, msg
 		if err != nil {
 			return false, fmt.Errorf("got error while getting pod events: %s", err)
 		}
-		if len(events.Items) == 0 {
-			return false, nil // no events have occurred yet
+		for _, event := range events.Items {
+			if strings.Contains(event.Message, msg) {
+				return true, nil
+			}
 		}
-		return strings.Contains(events.Items[0].Message, msg), nil
+		return false, nil
 	}
 }
 
@@ -2489,7 +2518,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	// 1. it takes tens of minutes or hours to grab all of them
 	// 2. there are so many of them that working with them are mostly impossible
 	// So we dump them only if the cluster is relatively small.
-	maxNodesForDump := 20
+	maxNodesForDump := TestContext.MaxNodesToGather
 	if nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{}); err == nil {
 		if len(nodes.Items) <= maxNodesForDump {
 			dumpAllPodInfo(c)
@@ -2653,7 +2682,7 @@ func isNodeUntainted(node *v1.Node) bool {
 			},
 		},
 	}
-	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(node)
 	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
 	if err != nil {
@@ -2732,7 +2761,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		// However, we only allow non-ready nodes with some specific reasons.
 		if len(notSchedulable) > 0 {
 			// In large clusters, log them only every 10th pass.
-			if len(nodes.Items) >= largeClusterThreshold && attempt%10 == 0 {
+			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
 				Logf("Unschedulable nodes:")
 				for i := range notSchedulable {
 					Logf("-> %s Ready=%t Network=%t Taints=%v",
@@ -3599,44 +3628,43 @@ func DeletePodOrFail(c clientset.Interface, ns, name string) {
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
 // used to SSH to their nodes.
 func GetSigner(provider string) (ssh.Signer, error) {
-	// Get the directory in which SSH keys are located.
-	keydir := filepath.Join(os.Getenv("HOME"), ".ssh")
-
 	// Select the key itself to use. When implementing more providers here,
 	// please also add them to any SSH tests that are disabled because of signer
 	// support.
 	keyfile := ""
-	key := ""
 	switch provider {
 	case "gce", "gke", "kubemark":
-		keyfile = "google_compute_engine"
-	case "aws":
-		// If there is an env. variable override, use that.
-		aws_keyfile := os.Getenv("AWS_SSH_KEY")
-		if len(aws_keyfile) != 0 {
-			return sshutil.MakePrivateKeySignerFromFile(aws_keyfile)
+		keyfile = os.Getenv("GCE_SSH_KEY")
+		if keyfile == "" {
+			keyfile = "google_compute_engine"
 		}
-		// Otherwise revert to home dir
-		keyfile = "kube_aws_rsa"
+	case "aws":
+		keyfile = os.Getenv("AWS_SSH_KEY")
+		if keyfile == "" {
+			keyfile = "kube_aws_rsa"
+		}
 	case "local", "vsphere":
-		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
-		if len(keyfile) == 0 {
+		keyfile = os.Getenv("LOCAL_SSH_KEY")
+		if keyfile == "" {
 			keyfile = "id_rsa"
 		}
 	case "skeleton":
 		keyfile = os.Getenv("KUBE_SSH_KEY")
-		if len(keyfile) == 0 {
+		if keyfile == "" {
 			keyfile = "id_rsa"
 		}
 	default:
 		return nil, fmt.Errorf("GetSigner(...) not implemented for %s", provider)
 	}
 
-	if len(key) == 0 {
-		key = filepath.Join(keydir, keyfile)
+	// Respect absolute paths for keys given by user, fallback to assuming
+	// relative paths are in ~/.ssh
+	if !filepath.IsAbs(keyfile) {
+		keydir := filepath.Join(os.Getenv("HOME"), ".ssh")
+		keyfile = filepath.Join(keydir, keyfile)
 	}
 
-	return sshutil.MakePrivateKeySignerFromFile(key)
+	return sshutil.MakePrivateKeySignerFromFile(keyfile)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
@@ -5269,4 +5297,25 @@ func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.
 		return fmt.Errorf("expect node %v to have taint = %v within %v: %v", nodeName, wantTrue, timeout, err)
 	}
 	return nil
+}
+
+// GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.
+// If the given mask is nil, then the regex will contain the default OS file modes, which are 0644 for Linux and 0775 for Windows.
+func GetFileModeRegex(filePath string, mask *int32) string {
+	var (
+		linuxMask   int32
+		windowsMask int32
+	)
+	if mask == nil {
+		linuxMask = int32(0644)
+		windowsMask = int32(0775)
+	} else {
+		linuxMask = *mask
+		windowsMask = *mask
+	}
+
+	linuxOutput := fmt.Sprintf("mode of file \"%s\": %v", filePath, os.FileMode(linuxMask))
+	windowsOutput := fmt.Sprintf("mode of Windows file \"%v\": %s", filePath, os.FileMode(windowsMask))
+
+	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
 }

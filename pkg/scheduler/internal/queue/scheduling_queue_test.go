@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -93,10 +95,16 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 	}
 
 func TestPriorityQueue_Add(t *testing.T) {
-	q := NewPriorityQueue()
-	q.Add(&medPriorityPod)
-	q.Add(&unschedulablePod)
-	q.Add(&highPriorityPod)
+	q := NewPriorityQueue(nil)
+	if err := q.Add(&medPriorityPod); err != nil {
+		t.Errorf("add failed: %v", err)
+	}
+	if err := q.Add(&unschedulablePod); err != nil {
+		t.Errorf("add failed: %v", err)
+	}
+	if err := q.Add(&highPriorityPod); err != nil {
+		t.Errorf("add failed: %v", err)
+	}
 	expectedNominatedPods := map[string][]*v1.Pod{
 		"node1": {&medPriorityPod, &unschedulablePod},
 	}
@@ -118,7 +126,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 }
 
 func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.unschedulableQ.addOrUpdate(&highPriNominatedPod)
 	q.AddIfNotPresent(&highPriNominatedPod) // Must not add anything.
 	q.AddIfNotPresent(&medPriorityPod)
@@ -144,7 +152,7 @@ func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 }
 
 func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.Add(&highPriNominatedPod)
 	q.AddUnschedulableIfNotPresent(&highPriNominatedPod) // Must not add anything.
 	q.AddUnschedulableIfNotPresent(&medPriorityPod)      // This should go to activeQ.
@@ -170,7 +178,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 }
 
 func TestPriorityQueue_Pop(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -187,7 +195,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 }
 
 func TestPriorityQueue_Update(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.Update(nil, &highPriorityPod)
 	if _, exists, _ := q.activeQ.Get(&highPriorityPod); !exists {
 		t.Errorf("Expected %v to be added to activeQ.", highPriorityPod.Name)
@@ -197,7 +205,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	}
 	// Update highPriorityPod and add a nominatedNodeName to it.
 	q.Update(&highPriorityPod, &highPriNominatedPod)
-	if q.activeQ.data.Len() != 1 {
+	if q.activeQ.Len() != 1 {
 		t.Error("Expected only one item in activeQ.")
 	}
 	if len(q.nominatedPods) != 1 {
@@ -223,10 +231,12 @@ func TestPriorityQueue_Update(t *testing.T) {
 }
 
 func TestPriorityQueue_Delete(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.Update(&highPriorityPod, &highPriNominatedPod)
 	q.Add(&unschedulablePod)
-	q.Delete(&highPriNominatedPod)
+	if err := q.Delete(&highPriNominatedPod); err != nil {
+		t.Errorf("delete failed: %v", err)
+	}
 	if _, exists, _ := q.activeQ.Get(&unschedulablePod); !exists {
 		t.Errorf("Expected %v to be in activeQ.", unschedulablePod.Name)
 	}
@@ -236,19 +246,21 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	if len(q.nominatedPods) != 1 {
 		t.Errorf("Expected nomindatePods to have only 'unschedulablePod': %v", q.nominatedPods)
 	}
-	q.Delete(&unschedulablePod)
+	if err := q.Delete(&unschedulablePod); err != nil {
+		t.Errorf("delete failed: %v", err)
+	}
 	if len(q.nominatedPods) != 0 {
 		t.Errorf("Expected nomindatePods to be empty: %v", q.nominatedPods)
 	}
 }
 
 func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
 	q.unschedulableQ.addOrUpdate(&unschedulablePod)
 	q.unschedulableQ.addOrUpdate(&highPriorityPod)
 	q.MoveAllToActiveQueue()
-	if q.activeQ.data.Len() != 3 {
+	if q.activeQ.Len() != 3 {
 		t.Error("Expected all items to be in activeQ.")
 	}
 }
@@ -289,7 +301,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 		Spec: v1.PodSpec{NodeName: "machine1"},
 	}
 
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
 	// Add a couple of pods to the unschedulableQ.
 	q.unschedulableQ.addOrUpdate(&unschedulablePod)
@@ -310,7 +322,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 }
 
 func TestPriorityQueue_WaitingPodsForNode(t *testing.T) {
-	q := NewPriorityQueue()
+	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
 	q.Add(&unschedulablePod)
 	q.Add(&highPriorityPod)
@@ -489,7 +501,7 @@ func TestSchedulingQueue_Close(t *testing.T) {
 		},
 		{
 			name:        "PriorityQueue close",
-			q:           NewPriorityQueue(),
+			q:           NewPriorityQueue(nil),
 			expectedErr: fmt.Errorf(queueClosed),
 		},
 	}
@@ -510,5 +522,121 @@ func TestSchedulingQueue_Close(t *testing.T) {
 			test.q.Close()
 			wg.Wait()
 		})
+	}
+}
+
+// TestRecentlyTriedPodsGoBack tests that pods which are recently tried and are
+// unschedulable go behind other pods with the same priority. This behavior
+// ensures that an unschedulable pod does not block head of the queue when there
+// are frequent events that move pods to the active queue.
+func TestRecentlyTriedPodsGoBack(t *testing.T) {
+	q := NewPriorityQueue(nil)
+	// Add a few pods to priority queue.
+	for i := 0; i < 5; i++ {
+		p := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("test-pod-%v", i),
+				Namespace: "ns1",
+				UID:       types.UID(fmt.Sprintf("tp00%v", i)),
+			},
+			Spec: v1.PodSpec{
+				Priority: &highPriority,
+			},
+			Status: v1.PodStatus{
+				NominatedNodeName: "node1",
+			},
+		}
+		q.Add(&p)
+	}
+	// Simulate a pod being popped by the scheduler, determined unschedulable, and
+	// then moved back to the active queue.
+	p1, err := q.Pop()
+	if err != nil {
+		t.Errorf("Error while popping the head of the queue: %v", err)
+	}
+	// Update pod condition to unschedulable.
+	podutil.UpdatePodCondition(&p1.Status, &v1.PodCondition{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  v1.PodReasonUnschedulable,
+		Message: "fake scheduling failure",
+	})
+	// Put in the unschedulable queue.
+	q.AddUnschedulableIfNotPresent(p1)
+	// Move all unschedulable pods to the active queue.
+	q.MoveAllToActiveQueue()
+	// Simulation is over. Now let's pop all pods. The pod popped first should be
+	// the last one we pop here.
+	for i := 0; i < 5; i++ {
+		p, err := q.Pop()
+		if err != nil {
+			t.Errorf("Error while popping pods from the queue: %v", err)
+		}
+		if (i == 4) != (p1 == p) {
+			t.Errorf("A pod tried before is not the last pod popped: i: %v, pod name: %v", i, p.Name)
+		}
+	}
+}
+
+// TestHighPriorityBackoff tests that a high priority pod does not block
+// other pods if it is unschedulable
+func TestHighProirotyBackoff(t *testing.T) {
+	q := NewPriorityQueue(nil)
+
+	midPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-midpod",
+			Namespace: "ns1",
+			UID:       types.UID("tp-mid"),
+		},
+		Spec: v1.PodSpec{
+			Priority: &midPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+	highPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-highpod",
+			Namespace: "ns1",
+			UID:       types.UID("tp-high"),
+		},
+		Spec: v1.PodSpec{
+			Priority: &highPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+	q.Add(&midPod)
+	q.Add(&highPod)
+	// Simulate a pod being popped by the scheduler, determined unschedulable, and
+	// then moved back to the active queue.
+	p, err := q.Pop()
+	if err != nil {
+		t.Errorf("Error while popping the head of the queue: %v", err)
+	}
+	if p != &highPod {
+		t.Errorf("Expected to get high prority pod, got: %v", p)
+	}
+	// Update pod condition to unschedulable.
+	podutil.UpdatePodCondition(&p.Status, &v1.PodCondition{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  v1.PodReasonUnschedulable,
+		Message: "fake scheduling failure",
+	})
+	// Put in the unschedulable queue.
+	q.AddUnschedulableIfNotPresent(p)
+	// Move all unschedulable pods to the active queue.
+	q.MoveAllToActiveQueue()
+
+	p, err = q.Pop()
+	if err != nil {
+		t.Errorf("Error while popping the head of the queue: %v", err)
+	}
+	if p != &midPod {
+		t.Errorf("Expected to get mid prority pod, got: %v", p)
 	}
 }

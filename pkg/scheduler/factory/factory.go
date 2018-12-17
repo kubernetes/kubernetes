@@ -63,6 +63,8 @@ import (
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/plugins"
+	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -101,7 +103,7 @@ type Config struct {
 	// successfully binding a pod
 	Ecache     *equivalence.Cache
 	NodeLister algorithm.NodeLister
-	Algorithm  algorithm.ScheduleAlgorithm
+	Algorithm  core.ScheduleAlgorithm
 	GetBinder  func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
@@ -109,6 +111,8 @@ type Config struct {
 	PodConditionUpdater PodConditionUpdater
 	// PodPreemptor is used to evict pods and update pod annotations.
 	PodPreemptor PodPreemptor
+	// PlugingSet has a set of plugins and data used to run them.
+	PluginSet pluginsv1alpha1.PluginSet
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -202,6 +206,8 @@ type configFactory struct {
 	pdbLister policylisters.PodDisruptionBudgetLister
 	// a means to list all StorageClasses
 	storageClassLister storagelisters.StorageClassLister
+	// pluginRunner has a set of plugins and the context used for running them.
+	pluginSet pluginsv1alpha1.PluginSet
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -277,7 +283,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       internalqueue.NewSchedulingQueue(),
+		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
@@ -992,7 +998,14 @@ func (c *configFactory) updateNodeInCache(oldObj, newObj interface{}) {
 	}
 
 	c.invalidateCachedPredicatesOnNodeUpdate(newNode, oldNode)
-	c.podQueue.MoveAllToActiveQueue()
+	// Only activate unschedulable pods if the node became more schedulable.
+	// We skip the node property comparison when there is no unschedulable pods in the queue
+	// to save processing cycles. We still trigger a move to active queue to cover the case
+	// that a pod being processed by the scheduler is determined unschedulable. We want this
+	// pod to be reevaluated when a change in the cluster happens.
+	if c.podQueue.NumUnschedulablePods() == 0 || nodeSchedulingPropertiesChanged(newNode, oldNode) {
+		c.podQueue.MoveAllToActiveQueue()
+	}
 }
 
 func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node, oldNode *v1.Node) {
@@ -1062,6 +1075,53 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		}
 		c.equivalencePodCache.InvalidatePredicatesOnNode(newNode.GetName(), invalidPredicates)
 	}
+}
+
+func nodeSchedulingPropertiesChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	if nodeSpecUnschedulableChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeAllocatableChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeLabelsChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeTaintsChanged(newNode, oldNode) {
+		return true
+	}
+	if nodeConditionsChanged(newNode, oldNode) {
+		return true
+	}
+
+	return false
+}
+
+func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
+}
+
+func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+}
+
+func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !reflect.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
+}
+
+func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	strip := func(conditions []v1.NodeCondition) map[v1.NodeConditionType]v1.ConditionStatus {
+		conditionStatuses := make(map[v1.NodeConditionType]v1.ConditionStatus, len(conditions))
+		for i := range conditions {
+			conditionStatuses[conditions[i].Type] = conditions[i].Status
+		}
+		return conditionStatuses
+	}
+	return !reflect.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
+}
+
+func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && newNode.Spec.Unschedulable == false
 }
 
 func (c *configFactory) deleteNodeFromCache(obj interface{}) {
@@ -1225,6 +1285,9 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
+	// TODO(bsalamat): the default registrar should be able to process config files.
+	c.pluginSet = plugins.NewDefaultPluginSet(pluginsv1alpha1.NewPluginContext(), &c.schedulerCache)
+
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache {
 		c.equivalencePodCache = equivalence.NewCache(predicates.Ordering())
@@ -1239,6 +1302,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
+		c.pluginSet,
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
@@ -1258,6 +1322,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		GetBinder:           c.getBinderFunc(extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
+		PluginSet:           c.pluginSet,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
@@ -1482,8 +1547,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 			// to run on a node, scheduler takes the pod into account when running
 			// predicates for the node.
 			if !util.PodPriorityEnabled() {
-				entry := backoff.GetEntry(podID)
-				if !entry.TryWait(backoff.MaxDuration()) {
+				if !backoff.TryBackoffAndWait(podID, c.StopEverything) {
 					klog.Warningf("Request for pod %v already in flight, abandoning", podID)
 					return
 				}

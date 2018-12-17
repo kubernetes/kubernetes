@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
-
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 // TestSecondsSinceSync verifies that proper results are returned

@@ -173,10 +173,49 @@ type ConditionFunc func() (done bool, err error)
 
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
-	Duration time.Duration // the base duration
-	Factor   float64       // Duration is multiplied by factor each iteration
-	Jitter   float64       // The amount of jitter applied each iteration
-	Steps    int           // Exit with error after this many steps
+	// The initial duration.
+	Duration time.Duration
+	// Duration is multiplied by factor each iteration. Must be greater
+	// than or equal to zero.
+	Factor float64
+	// The amount of jitter applied each iteration. Jitter is applied after
+	// cap.
+	Jitter float64
+	// The number of steps before duration stops changing. If zero, initial
+	// duration is always used. Used for exponential backoff in combination
+	// with Factor.
+	Steps int
+	// The returned duration will never be greater than cap *before* jitter
+	// is applied. The actual maximum cap is `cap * (1.0 + jitter)`.
+	Cap time.Duration
+}
+
+// Step returns the next interval in the exponential backoff. This method
+// will mutate the provided backoff.
+func (b *Backoff) Step() time.Duration {
+	if b.Steps < 1 {
+		if b.Jitter > 0 {
+			return Jitter(b.Duration, b.Jitter)
+		}
+		return b.Duration
+	}
+	b.Steps--
+
+	duration := b.Duration
+
+	// calculate the next step
+	if b.Factor != 0 {
+		b.Duration = time.Duration(float64(b.Duration) * b.Factor)
+		if b.Cap > 0 && b.Duration > b.Cap {
+			b.Duration = b.Cap
+			b.Steps = 0
+		}
+	}
+
+	if b.Jitter > 0 {
+		duration = Jitter(duration, b.Jitter)
+	}
+	return duration
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
@@ -190,19 +229,14 @@ type Backoff struct {
 // If the condition never returns true, ErrWaitTimeout is returned. All other
 // errors terminate immediately.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
-	duration := backoff.Duration
-	for i := 0; i < backoff.Steps; i++ {
-		if i != 0 {
-			adjusted := duration
-			if backoff.Jitter > 0.0 {
-				adjusted = Jitter(duration, backoff.Jitter)
-			}
-			time.Sleep(adjusted)
-			duration = time.Duration(float64(duration) * backoff.Factor)
-		}
+	for backoff.Steps > 0 {
 		if ok, err := condition(); err != nil || ok {
 			return err
 		}
+		if backoff.Steps == 1 {
+			break
+		}
+		time.Sleep(backoff.Step())
 	}
 	return ErrWaitTimeout
 }

@@ -23,9 +23,8 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	cloudprovider "k8s.io/cloud-provider"
-
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 )
 
@@ -96,7 +95,8 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 		addresses := []v1.NodeAddress{
 			{Type: v1.NodeHostName, Address: string(name)},
 		}
-		for _, address := range ipAddress.IPV4.IPAddress {
+		if len(ipAddress.IPV4.IPAddress) > 0 && len(ipAddress.IPV4.IPAddress[0].PrivateIP) > 0 {
+			address := ipAddress.IPV4.IPAddress[0]
 			addresses = append(addresses, v1.NodeAddress{
 				Type:    v1.NodeInternalIP,
 				Address: address.PrivateIP,
@@ -108,7 +108,8 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 				})
 			}
 		}
-		for _, address := range ipAddress.IPV6.IPAddress {
+		if len(ipAddress.IPV6.IPAddress) > 0 && len(ipAddress.IPV6.IPAddress[0].PrivateIP) > 0 {
+			address := ipAddress.IPV6.IPAddress[0]
 			addresses = append(addresses, v1.NodeAddress{
 				Type:    v1.NodeInternalIP,
 				Address: address.PrivateIP,
@@ -120,6 +121,13 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 				})
 			}
 		}
+
+		if len(addresses) == 1 {
+			// No IP addresses is got from instance metadata service, clean up cache and report errors.
+			az.metadata.imsCache.Delete(metadataCacheKey)
+			return nil, fmt.Errorf("get empty IP addresses from instance metadata service")
+		}
+
 		return addresses, nil
 	}
 
@@ -155,6 +163,9 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
 		return false, err
 	}
 

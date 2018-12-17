@@ -177,7 +177,7 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.2.24-1) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.10-0) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -425,8 +425,8 @@ fi
 
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
-FLUENTD_GCP_YAML_VERSION="v3.1.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.5-1.5.36-1-k8s}"
+FLUENTD_GCP_YAML_VERSION="v3.2.0"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"

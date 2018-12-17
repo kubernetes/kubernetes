@@ -28,9 +28,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 // SetupTempDir is a utility function for kubeadm testing, that creates a temporary directory
@@ -66,7 +66,7 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: v1.11.0
+		kubernetesVersion: v1.12.0
 		`)))
 
 	f, err := os.Create(cfgPath)

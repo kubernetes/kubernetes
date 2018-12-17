@@ -23,7 +23,7 @@ spec:
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: gcr.io/projectcalico-org/typha:v0.5.6
+      - image: gcr.io/projectcalico-org/typha:v3.3.1
         name: calico-typha
         ports:
         - containerPort: 5473
@@ -58,12 +58,14 @@ spec:
           httpGet:
             path: /liveness
             port: 9098
+            host: localhost
           periodSeconds: 30
           initialDelaySeconds: 30
         readinessProbe:
           httpGet:
             path: /readiness
             port: 9098
+            host: localhost
           periodSeconds: 10
       volumes:
       - name: etc-calico

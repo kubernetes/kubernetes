@@ -105,7 +105,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Use:                   "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Show details of a specific resource or group of resources"),
-		Long:                  describeLong + "\n\n" + cmdutil.SuggestApiResources(parent),
+		Long:                  describeLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               describeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
@@ -133,7 +133,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-		return fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestApiResources(o.CmdParent))
+		return fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
 	}
 
 	o.BuilderArgs = args
