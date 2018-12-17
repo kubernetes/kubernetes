@@ -27,7 +27,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -626,7 +626,7 @@ func (c *configFactory) invalidatePredicatesForStorageClass(sc *storagev1.Storag
 		}
 	}
 
-	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)
+	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
 }
 
 func (c *configFactory) onServiceAdd(obj interface{}) {
