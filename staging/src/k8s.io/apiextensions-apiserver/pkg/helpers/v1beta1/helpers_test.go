@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package helpers
+package v1beta1
 
 import (
 	"reflect"
@@ -51,7 +51,7 @@ func TestCRDHasFinalizer(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		actual := CRDHasFinalizer(tc.crd, tc.finalizerToCheck)
+		actual := HasFinalizer(tc.crd, tc.finalizerToCheck)
 		if tc.expected != actual {
 			t.Errorf("%v expected %v, got %v", tc.name, tc.expected, actual)
 		}
@@ -84,7 +84,7 @@ func TestCRDRemoveFinalizer(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		CRDRemoveFinalizer(tc.crd, tc.finalizerToCheck)
+		RemoveFinalizer(tc.crd, tc.finalizerToCheck)
 		if !reflect.DeepEqual(tc.expected, tc.crd.Finalizers) {
 			t.Errorf("%v expected %v, got %v", tc.name, tc.expected, tc.crd.Finalizers)
 		}

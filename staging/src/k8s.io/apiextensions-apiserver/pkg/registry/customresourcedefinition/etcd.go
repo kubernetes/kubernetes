@@ -119,7 +119,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 					existingCRD.DeletionTimestamp = &now
 				}
 
-				if !helpers.CRDHasFinalizer(existingCRD, apiextensions.CustomResourceCleanupFinalizer) {
+				if !helpers.HasFinalizer(existingCRD, apiextensions.CustomResourceCleanupFinalizer) {
 					existingCRD.Finalizers = append(existingCRD.Finalizers, apiextensions.CustomResourceCleanupFinalizer)
 				}
 				// update the status condition too

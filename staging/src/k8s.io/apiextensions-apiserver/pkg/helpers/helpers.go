@@ -100,8 +100,8 @@ func IsCRDConditionEquivalent(lhs, rhs *apiextensions.CustomResourceDefinitionCo
 	return lhs.Message == rhs.Message && lhs.Reason == rhs.Reason && lhs.Status == rhs.Status && lhs.Type == rhs.Type
 }
 
-// CRDHasFinalizer returns true if the finalizer is in the list
-func CRDHasFinalizer(crd *apiextensions.CustomResourceDefinition, needle string) bool {
+// HasFinalizer returns true if the finalizer is in the list
+func HasFinalizer(crd *apiextensions.CustomResourceDefinition, needle string) bool {
 	for _, finalizer := range crd.Finalizers {
 		if finalizer == needle {
 			return true
@@ -111,8 +111,8 @@ func CRDHasFinalizer(crd *apiextensions.CustomResourceDefinition, needle string)
 	return false
 }
 
-// CRDRemoveFinalizer removes the finalizer if present
-func CRDRemoveFinalizer(crd *apiextensions.CustomResourceDefinition, needle string) {
+// RemoveFinalizer removes the finalizer if present
+func RemoveFinalizer(crd *apiextensions.CustomResourceDefinition, needle string) {
 	newFinalizers := []string{}
 	for _, finalizer := range crd.Finalizers {
 		if finalizer != needle {
