@@ -90,7 +90,6 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 		options.WaitForDeletion = *f.Wait
 	}
 
-	options.FilenameOptions.EnableKustomization = true
 	return options
 }
 

@@ -478,7 +478,7 @@ func TestDirectoryBuilder(t *testing.T) {
 
 	for _, tt := range tests {
 		b := newDefaultBuilder().
-			FilenameParam(false, &FilenameOptions{Recursive: false, EnableKustomization: true, Filenames: tt.directories}).
+			FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: tt.directories}).
 			NamespaceParam("test").DefaultNamespace()
 
 		test := &testVisitor{}

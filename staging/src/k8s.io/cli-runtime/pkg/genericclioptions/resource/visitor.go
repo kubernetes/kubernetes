@@ -451,13 +451,13 @@ func FileVisitorForSTDIN(mapper *mapper, schema ContentValidator) Visitor {
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
 // After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
-func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, enableKustomize bool, extensions []string, schema ContentValidator) ([]Visitor, error) {
+func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, extensions []string, schema ContentValidator) ([]Visitor, error) {
 	var visitors []Visitor
 	err := filepath.Walk(paths, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if enableKustomize && isKustomizationDir(path) {
+		if isKustomizationDir(path) {
 			visitors = append(visitors, NewKustomizationVisitor(mapper, path, schema))
 			return filepath.SkipDir
 		}
@@ -471,7 +471,7 @@ func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, ena
 		if path != paths && ignoreFile(path, extensions) {
 			return nil
 		}
-		if enableKustomize && filepath.Base(path) == constants.KustomizationFileName {
+		if filepath.Base(path) == constants.KustomizationFileName {
 			visitors = append(visitors, NewKustomizationVisitor(mapper, filepath.Dir(path), schema))
 			return nil
 		}
