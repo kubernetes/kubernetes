@@ -318,11 +318,6 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 // If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
-	if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
-		klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
-			" No preemption is performed.")
-		return "", nil
-	}
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
 	if err != nil {
 		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
@@ -330,7 +325,6 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	}
 
 	node, victims, nominatedPodsToClear, err := sched.config.Algorithm.Preempt(preemptor, sched.config.NodeLister, scheduleErr)
-	metrics.PreemptionVictims.Set(float64(len(victims)))
 	if err != nil {
 		klog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
 		return "", err
@@ -350,6 +344,7 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 			}
 			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 		}
+		metrics.PreemptionVictims.Set(float64(len(victims)))
 	}
 	// Clearing nominated pods should happen outside of "if node != nil". Node could
 	// be nil when a pod with nominated node name is eligible to preempt again,
@@ -508,11 +503,16 @@ func (sched *Scheduler) scheduleOne() {
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
 		if fitError, ok := err.(*core.FitError); ok {
-			preemptionStartTime := time.Now()
-			sched.preempt(pod, fitError)
-			metrics.PreemptionAttempts.Inc()
-			metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
-			metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+			if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
+				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
+					" No preemption is performed.")
+			} else {
+				preemptionStartTime := time.Now()
+				sched.preempt(pod, fitError)
+				metrics.PreemptionAttempts.Inc()
+				metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
+				metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+			}
 			// Pod did not fit anywhere, so it is counted as a failure. If preemption
 			// succeeds, the pod should get counted as a success the next time we try to
 			// schedule it. (hopefully)

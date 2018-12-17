@@ -134,7 +134,7 @@ type genericScheduler struct {
 	percentageOfNodesToScore int32
 }
 
-// snapshot snapshots equivalane cache and node infos for all fit and priority
+// snapshot snapshots equivalence cache and node infos for all fit and priority
 // functions.
 func (g *genericScheduler) snapshot() error {
 	// IMPORTANT NOTE: We must snapshot equivalence cache before snapshotting
@@ -143,7 +143,7 @@ func (g *genericScheduler) snapshot() error {
 	// 1. snapshot cache
 	// 2. event arrives, updating cache and invalidating predicates or whole node cache
 	// 3. snapshot ecache
-	// 4. evaludate predicates
+	// 4. evaluate predicates
 	// 5. stale result will be written to ecache
 	if g.equivalenceCache != nil {
 		g.equivalenceCache.Snapshot()
@@ -309,7 +309,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 
 	candidateNode := pickOneNodeForPreemption(nodeToVictims)
 	if candidateNode == nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil
 	}
 
 	// Lower priority pods nominated to run on this node, may no longer fit on
@@ -318,7 +318,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	// lets scheduler find another place for them.
 	nominatedPods := g.getLowerPriorityNominatedPods(pod, candidateNode.Name)
 	if nodeInfo, ok := g.cachedNodeInfoMap[candidateNode.Name]; ok {
-		return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, err
+		return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, nil
 	}
 
 	return nil, nil, nil, fmt.Errorf(
