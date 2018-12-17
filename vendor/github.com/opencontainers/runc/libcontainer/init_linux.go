@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 )
@@ -64,7 +66,8 @@ type initConfig struct {
 	CreateConsole    bool                  `json:"create_console"`
 	ConsoleWidth     uint16                `json:"console_width"`
 	ConsoleHeight    uint16                `json:"console_height"`
-	Rootless         bool                  `json:"rootless"`
+	RootlessEUID     bool                  `json:"rootless_euid,omitempty"`
+	RootlessCgroups  bool                  `json:"rootless_cgroups,omitempty"`
 }
 
 type initer interface {
@@ -121,7 +124,7 @@ func finalizeNamespace(config *initConfig) error {
 	// inherited are marked close-on-exec so they stay out of the
 	// container
 	if err := utils.CloseExecFrom(config.PassedFilesCount + 3); err != nil {
-		return err
+		return errors.Wrap(err, "close exec fds")
 	}
 
 	capabilities := &configs.Capabilities{}
@@ -136,20 +139,20 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	// drop capabilities in bounding set before changing user
 	if err := w.ApplyBoundingSet(); err != nil {
-		return err
+		return errors.Wrap(err, "apply bounding set")
 	}
 	// preserve existing capabilities while we change users
 	if err := system.SetKeepCaps(); err != nil {
-		return err
+		return errors.Wrap(err, "set keep caps")
 	}
 	if err := setupUser(config); err != nil {
-		return err
+		return errors.Wrap(err, "setup user")
 	}
 	if err := system.ClearKeepCaps(); err != nil {
-		return err
+		return errors.Wrap(err, "clear keep caps")
 	}
 	if err := w.ApplyCaps(); err != nil {
-		return err
+		return errors.Wrap(err, "apply caps")
 	}
 	if config.Cwd != "" {
 		if err := unix.Chdir(config.Cwd); err != nil {
@@ -217,11 +220,7 @@ func syncParentReady(pipe io.ReadWriter) error {
 	}
 
 	// Wait for parent to give the all-clear.
-	if err := readSync(pipe, procRun); err != nil {
-		return err
-	}
-
-	return nil
+	return readSync(pipe, procRun)
 }
 
 // syncParentHooks sends to the given pipe a JSON payload which indicates that
@@ -234,11 +233,7 @@ func syncParentHooks(pipe io.ReadWriter) error {
 	}
 
 	// Wait for parent to give the all-clear.
-	if err := readSync(pipe, procResume); err != nil {
-		return err
-	}
-
-	return nil
+	return readSync(pipe, procResume)
 }
 
 // setupUser changes the groups, gid, and uid for the user inside the container
@@ -282,7 +277,7 @@ func setupUser(config *initConfig) error {
 		return fmt.Errorf("cannot set gid to unmapped user in user namespace")
 	}
 
-	if config.Rootless {
+	if config.RootlessEUID {
 		// We cannot set any additional groups in a rootless container and thus
 		// we bail if the user asked us to do so. TODO: We currently can't do
 		// this check earlier, but if libcontainer.Process.User was typesafe
@@ -298,11 +293,18 @@ func setupUser(config *initConfig) error {
 		return err
 	}
 
+	setgroups, err := ioutil.ReadFile("/proc/self/setgroups")
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
 	// This isn't allowed in an unprivileged user namespace since Linux 3.19.
 	// There's nothing we can do about /etc/group entries, so we silently
 	// ignore setting groups here (since the user didn't explicitly ask us to
 	// set the group).
-	if !config.Rootless {
+	allowSupGroups := !config.RootlessEUID && strings.TrimSpace(string(setgroups)) != "deny"
+
+	if allowSupGroups {
 		suppGroups := append(execUser.Sgids, addGroups...)
 		if err := unix.Setgroups(suppGroups); err != nil {
 			return err
