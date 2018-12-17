@@ -95,7 +95,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Extensions().V1beta1().DaemonSets(),
-		nil, // CloudProvider
 		cs,
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
