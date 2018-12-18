@@ -3,8 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["autoneg.go"],
-    importmap = "k8s.io/kubernetes/vendor/bitbucket.org/ww/goautoneg",
-    importpath = "bitbucket.org/ww/goautoneg",
+    importmap = "k8s.io/kubernetes/vendor/github.com/munnerz/goautoneg",
+    importpath = "github.com/munnerz/goautoneg",
     visibility = ["//visibility:public"],
 )
 
