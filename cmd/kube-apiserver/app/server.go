@@ -51,6 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -120,6 +121,7 @@ cluster's shared state through which all other components interact.`,
 	namedFlagSets := s.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	logs.AddFlags(namedFlagSets.FlagSet("logging"))
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)

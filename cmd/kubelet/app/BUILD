@@ -123,6 +123,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",

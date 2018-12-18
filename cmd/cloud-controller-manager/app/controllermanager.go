@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cloudprovider "k8s.io/cloud-provider"
@@ -86,6 +87,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	logs.AddFlags(namedFlagSets.FlagSet("logging"))
 	cmoptions.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)

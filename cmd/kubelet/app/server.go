@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -268,6 +269,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	kubeletFlags.AddFlags(cleanFlagSet)
 	options.AddKubeletConfigFlags(cleanFlagSet, kubeletConfig)
 	options.AddGlobalFlags(cleanFlagSet)
+	logs.AddFlags(cleanFlagSet)
 	cleanFlagSet.BoolP("help", "h", false, fmt.Sprintf("help for %s", cmd.Name()))
 
 	// ugly, but necessary, because Cobra's default UsageFunc and HelpFunc pollute the flagset with global flags

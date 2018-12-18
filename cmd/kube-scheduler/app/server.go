@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/logs"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -84,6 +85,7 @@ through the API as necessary.`,
 	namedFlagSets := opts.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	logs.AddFlags(namedFlagSets.FlagSet("logging"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}

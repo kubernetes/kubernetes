@@ -25,11 +25,9 @@ import (
 	"github.com/spf13/pflag"
 
 	// libs that provide registration functions
-	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	// ensure libs have a chance to globally register their flags
-	_ "k8s.io/klog"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 )
@@ -41,7 +39,6 @@ func AddGlobalFlags(fs *pflag.FlagSet) {
 	addCadvisorFlags(fs)
 	addCredentialProviderFlags(fs)
 	verflag.AddFlags(fs)
-	logs.AddFlags(fs)
 }
 
 // normalize replaces underscores with hyphens

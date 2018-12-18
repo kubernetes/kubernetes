@@ -6,10 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/globalflag",
     importpath = "k8s.io/apiserver/pkg/util/globalflag",
     visibility = ["//visibility:public"],
-    deps = [
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
-    ],
+    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 go_test(

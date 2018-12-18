@@ -34,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/routes:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/globalflag:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

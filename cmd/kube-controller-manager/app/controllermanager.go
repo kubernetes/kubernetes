@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/logs"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -116,6 +117,7 @@ controller, and serviceaccounts controller.`,
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
+	logs.AddFlags(namedFlagSets.FlagSet("logging"))
 	cmoptions.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)

@@ -22,16 +22,12 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-
-	"k8s.io/apiserver/pkg/util/logs"
 )
 
-// AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
-// against the global flagsets from "flag" and "k8s.io/klog".
-// We do this in order to prevent unwanted flags from leaking into the component's flagset.
+// AddGlobalFlags explicitly registers flags that libraries (verflag, etc.) register
+// against the global flagsets from "flag".  We do this in order to prevent unwanted
+// flags from leaking into the component's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet, name string) {
-	logs.AddFlags(fs)
-
 	fs.BoolP("help", "h", false, fmt.Sprintf("help for %s", name))
 }
 
