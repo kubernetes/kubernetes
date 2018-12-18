@@ -325,7 +325,7 @@ run_kubectl_all_namespace_tests() {
 
   ### Verify a specific namespace is ignored when all-namespaces is provided
   # Command
-  kubectl get pods --all-namespaces --namespace=default
+  kubectl get pods -A --namespace=default
 
   ### Check --all-namespaces option shows namespaces
   # Create objects in multiple namespaces
