@@ -72,13 +72,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 		}
 	}
-	if err := internal.RemoveObjectManagedFields(newObj); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from new obj: %v", err)
-	}
-	if err := internal.RemoveObjectManagedFields(liveObj); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
-	}
-
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
@@ -86,6 +79,12 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(liveObjVersioned); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(newObjVersioned); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from new obj: %v", err)
 	}
 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
@@ -116,15 +115,14 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
-	if err := internal.RemoveObjectManagedFields(liveObj); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
-	}
-
 	// We can assume that patchObj is already on the proper version:
 	// it shouldn't have to be converted so that it's not defaulted.
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(liveObjVersioned); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
 	}
 
 	patchObjTyped, err := f.typeConverter.YAMLToTyped(patch)
