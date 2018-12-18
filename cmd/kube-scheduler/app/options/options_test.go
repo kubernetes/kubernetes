@@ -225,8 +225,7 @@ users:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
 			},
 		},
 		{
@@ -306,8 +305,7 @@ users:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
 			},
 		},
 		{
