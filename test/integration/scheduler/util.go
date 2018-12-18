@@ -33,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -46,7 +44,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -91,7 +88,6 @@ func createConfiguratorWithPodInformer(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		BindTimeoutSeconds:             600,
@@ -149,7 +145,7 @@ func initTestScheduler(
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, nil, false, true, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, nil, false, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -161,16 +157,8 @@ func initTestSchedulerWithOptions(
 	policy *schedulerapi.Policy,
 	pluginSet plugins.PluginSet,
 	disablePreemption bool,
-	disableEquivalenceCache bool,
 	resyncPeriod time.Duration,
 ) *TestContext {
-	if !disableEquivalenceCache {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(
-			t,
-			utilfeature.DefaultFeatureGate,
-			features.EnableEquivalenceClassCache, true)()
-	}
-
 	// 1. Create scheduler
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
 
@@ -264,7 +252,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), true, nil, nil, true, true, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil, nil, true, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called

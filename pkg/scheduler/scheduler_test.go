@@ -639,7 +639,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 	algo := core.NewGenericScheduler(
 		scache,
 		nil,
-		nil,
 		predicateMap,
 		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
@@ -691,7 +690,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]algorithm.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
-		nil,
 		nil,
 		predicateMap,
 		algorithm.EmptyPredicateMetadataProducer,

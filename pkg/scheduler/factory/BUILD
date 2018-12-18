@@ -12,7 +12,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
@@ -21,7 +20,6 @@ go_library(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/validation:go_default_library",
         "//pkg/scheduler/core:go_default_library",
-        "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/debugger:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",

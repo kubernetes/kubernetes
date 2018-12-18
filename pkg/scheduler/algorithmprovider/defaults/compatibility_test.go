@@ -36,8 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
-const enableEquivalenceCache = true
-
 func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
@@ -987,7 +985,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			EnableEquivalenceClassCache:    enableEquivalenceCache,
 			DisablePreemption:              false,
 			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		}).CreateFromConfig(policy); err != nil {
