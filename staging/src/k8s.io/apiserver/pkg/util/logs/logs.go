@@ -27,20 +27,19 @@ import (
 	"k8s.io/klog"
 )
 
-const logFlushFreqFlagName = "log-flush-frequency"
+// logFlushFreq is frequency at which we flush logs after calling InitLogs.
+var logFlushFreq time.Duration
 
-var logFlushFreq = pflag.Duration(logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
-
-// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
-func init() {
-	klog.InitFlags(flag.CommandLine)
-	flag.Set("logtostderr", "true")
-}
-
-// AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
-// same value as the global flags.
+// AddFlags registers this package's flags (plus the klog flags used by this package) on arbitrary FlagSets.
+// You should call this on *some* flag set.
 func AddFlags(fs *pflag.FlagSet) {
-	fs.AddFlag(pflag.Lookup(logFlushFreqFlagName))
+	fs.DurationVar(&logFlushFreq, "log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
+	var gologFlagSet flag.FlagSet
+	klog.InitFlags(&gologFlagSet)
+	fs.AddGoFlagSet(&gologFlagSet)
+
+	// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
+	flag.Set("logtostderr", "true")
 }
 
 // KlogWriter serves as a bridge between the standard log package and the glog package.
@@ -57,7 +56,7 @@ func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
 	// The default glog flush interval is 5 seconds.
-	go wait.Forever(klog.Flush, *logFlushFreq)
+	go wait.Forever(klog.Flush, logFlushFreq)
 }
 
 // FlushLogs flushes logs immediately.

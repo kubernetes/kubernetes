@@ -30,24 +30,9 @@ import (
 // against the global flagsets from "flag" and "k8s.io/klog".
 // We do this in order to prevent unwanted flags from leaking into the component's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet, name string) {
-	addGlogFlags(fs)
 	logs.AddFlags(fs)
 
 	fs.BoolP("help", "h", false, fmt.Sprintf("help for %s", name))
-}
-
-// addGlogFlags explicitly registers flags that klog libraries(k8s.io/klog) register.
-func addGlogFlags(fs *pflag.FlagSet) {
-	// lookup flags of klog libraries in global flag set and re-register the values with our flagset
-	Register(fs, "logtostderr")
-	Register(fs, "alsologtostderr")
-	Register(fs, "v")
-	Register(fs, "skip_headers")
-	Register(fs, "stderrthreshold")
-	Register(fs, "vmodule")
-	Register(fs, "log_backtrace_at")
-	Register(fs, "log_dir")
-	Register(fs, "log_file")
 }
 
 // normalize replaces underscores with hyphens

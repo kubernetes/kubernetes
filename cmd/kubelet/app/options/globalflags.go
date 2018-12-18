@@ -38,7 +38,6 @@ import (
 // against the global flagsets from "flag" and "github.com/spf13/pflag".
 // We do this in order to prevent unwanted flags from leaking into the Kubelet's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet) {
-	addGlogFlags(fs)
 	addCadvisorFlags(fs)
 	addCredentialProviderFlags(fs)
 	verflag.AddFlags(fs)
@@ -87,24 +86,6 @@ func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	// TODO(#58034): This is not a static file, so it's not quite as straightforward as --google-json-key.
 	// We need to figure out how ACR users can dynamically provide pull credentials before we can deprecate this.
 	pflagRegister(global, local, "azure-container-registry-config")
-
-	fs.AddFlagSet(local)
-}
-
-// addGlogFlags adds flags from k8s.io/klog
-func addGlogFlags(fs *pflag.FlagSet) {
-	// lookup flags in global flag set and re-register the values with our flagset
-	global := flag.CommandLine
-	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
-
-	register(global, local, "logtostderr")
-	register(global, local, "alsologtostderr")
-	register(global, local, "v")
-	register(global, local, "stderrthreshold")
-	register(global, local, "vmodule")
-	register(global, local, "log_backtrace_at")
-	register(global, local, "log_dir")
-	register(global, local, "log_file")
 
 	fs.AddFlagSet(local)
 }
