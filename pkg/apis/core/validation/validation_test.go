@@ -4931,7 +4931,7 @@ func TestValidateDisabledSubpath(t *testing.T) {
 					SubPath:   "baz",
 				},
 			},
-			true,
+			false, // validation should not fail, dropping the field is handled in PrepareForCreate/PrepareForUpdate
 		},
 	}
 

@@ -81,7 +81,7 @@ func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	controller.Generation = 1
 
 	if controller.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&controller.Spec.Template.Spec)
+		pod.DropDisabledFields(&controller.Spec.Template.Spec, nil)
 	}
 }
 
@@ -92,12 +92,16 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// update is not allowed to set status
 	newController.Status = oldController.Status
 
+	var newSpec, oldSpec *api.PodSpec
 	if oldController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&oldController.Spec.Template.Spec)
+		oldSpec = &oldController.Spec.Template.Spec
 	}
 	if newController.Spec.Template != nil {
-		pod.DropDisabledAlphaFields(&newController.Spec.Template.Spec)
+		newSpec = &newController.Spec.Template.Spec
+	} else {
+		newSpec = &api.PodSpec{}
 	}
+	pod.DropDisabledFields(newSpec, oldSpec)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

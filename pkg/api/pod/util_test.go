@@ -17,10 +17,12 @@ limitations under the License.
 package pod
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -307,7 +309,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// now test dropping the fields - should not be dropped
-	DropDisabledAlphaFields(&testPod.Spec)
+	DropDisabledFields(&testPod.Spec, nil)
 
 	// check to make sure VolumeDevices is still present
 	// if featureset is set to true
@@ -322,14 +324,108 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 
 	// now test dropping the fields
-	DropDisabledAlphaFields(&testPod.Spec)
+	DropDisabledFields(&testPod.Spec, nil)
 
 	// check to make sure VolumeDevices is nil
 	// if featureset is set to false
 	if testPod.Spec.Containers[0].VolumeDevices != nil {
-		t.Error("DropDisabledAlphaFields for Containers failed")
+		t.Error("DropDisabledFields for Containers failed")
 	}
 	if testPod.Spec.InitContainers[0].VolumeDevices != nil {
-		t.Error("DropDisabledAlphaFields for InitContainers failed")
+		t.Error("DropDisabledFields for InitContainers failed")
+	}
+}
+
+func TestDropSubPath(t *testing.T) {
+	podWithSubpaths := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyNever,
+				Containers:     []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: "foo"}, {Name: "a", SubPath: "foo2"}, {Name: "a", SubPath: "foo3"}}}},
+				InitContainers: []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: "foo"}, {Name: "a", SubPath: "foo2"}}}},
+				Volumes:        []api.Volume{{Name: "a", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/dev/xvdc"}}}},
+			},
+		}
+	}
+	podWithoutSubpaths := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyNever,
+				Containers:     []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: ""}, {Name: "a", SubPath: ""}, {Name: "a", SubPath: ""}}}},
+				InitContainers: []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: ""}, {Name: "a", SubPath: ""}}}},
+				Volumes:        []api.Volume{{Name: "a", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/dev/xvdc"}}}},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasSubpaths bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "has subpaths",
+			hasSubpaths: true,
+			pod:         podWithSubpaths,
+		},
+		{
+			description: "does not have subpaths",
+			hasSubpaths: false,
+			pod:         podWithoutSubpaths,
+		},
+		{
+			description: "is nil",
+			hasSubpaths: false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSubpaths, oldPod := oldPodInfo.hasSubpaths, oldPodInfo.pod()
+				newPodHasSubpaths, newPod := newPodInfo.hasSubpaths, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					DropDisabledFields(&newPod.Spec, oldPodSpec)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasSubpaths:
+						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSubpaths:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have subpaths
+						if !reflect.DeepEqual(newPod, podWithoutSubpaths()) {
+							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutSubpaths()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
 	}
 }
