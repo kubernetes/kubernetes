@@ -170,7 +170,7 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 			By("creating a StorageClass " + r.sc.Name)
 			var err error
 			r.sc, err = cs.StorageV1().StorageClasses().Create(r.sc)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			if r.sc != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPVFromDynamicProvisionSC(
@@ -276,16 +276,16 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 
 	var err error
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	pv, err := cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	volSource := &v1.VolumeSource{
 		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -321,6 +321,6 @@ func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 func deleteStorageClass(cs clientset.Interface, className string) {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	}
 }

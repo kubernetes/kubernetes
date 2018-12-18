@@ -118,7 +118,7 @@ func GetClusterName(instancePrefix string) string {
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
 func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIpRange string) []*compute.Firewall {
 	instancePrefix, err := GetInstancePrefix(masterName)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	clusterName := GetClusterName(instancePrefix)
 
 	fws := []*compute.Firewall{}

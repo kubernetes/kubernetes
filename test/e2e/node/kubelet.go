@@ -163,13 +163,13 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 		},
 	}
 	rtnPod, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	err = f.WaitForPodReady(rtnPod.Name) // running & ready
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return rtnPod
 }
 
@@ -186,7 +186,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	mountDir := filepath.Join(podDir, "volumes", "kubernetes.io~nfs")
 	// use ip rather than hostname in GCE
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	condMsg := "deleted"
 	if !expectClean {
@@ -213,7 +213,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.Poll(poll, timeout, func() (bool, error) {
 			result, err := framework.NodeExec(nodeIP, test.cmd)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			framework.LogSSHResult(result)
 			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
 			if expectClean && ok { // keep trying

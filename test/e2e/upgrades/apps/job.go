@@ -42,11 +42,11 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	t.job = framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
 	job, err := framework.CreateJob(f.ClientSet, t.namespace, t.job)
 	t.job = job
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	By("Ensuring active pods == parallelism")
 	err = framework.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 }
 
 // Test verifies that the Jobs Pods are running after the an upgrade
@@ -54,7 +54,7 @@ func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgr
 	<-done
 	By("Ensuring active pods == parallelism")
 	running, err := framework.CheckForAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(running).To(BeTrue())
 }
 

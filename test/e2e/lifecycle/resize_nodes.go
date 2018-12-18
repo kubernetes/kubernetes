@@ -51,7 +51,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
@@ -104,7 +104,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
 			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 
 		It("should be able to delete nodes", func() {
@@ -112,20 +112,20 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			numNodes, err := framework.NumberOfRegisteredNodes(c)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
 			By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			err = framework.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
 				"the now non-existent node and the RC to recreate it")
@@ -133,7 +133,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 
 			By("verifying whether the pods from the removed node are recreated")
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 
 		// TODO: Bug here - testName is not correct
@@ -143,26 +143,26 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
 			numNodes, err := framework.NumberOfRegisteredNodes(c)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
 			By(fmt.Sprintf("increasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			err = framework.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
 			err = resizeRC(c, ns, name, originalNodeCount+1)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount+1)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 	})
 })

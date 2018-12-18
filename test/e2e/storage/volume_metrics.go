@@ -85,14 +85,14 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		storageOpMetrics := getControllerStorageMetrics(controllerMetrics)
 
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(pvc).ToNot(Equal(nil))
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 
 		pod := framework.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForPodRunningInNamespace(c, pod)
 		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
@@ -114,19 +114,19 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	It("should create volume metrics with the correct PVC ref", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(pvc).ToNot(Equal(nil))
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForPodRunningInNamespace(c, pod)
 		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		// Verify volume stat metrics were collected for the referenced PVC
 		volumeStatKeys := []string{
@@ -171,19 +171,19 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	It("should create metrics for total time taken in volume operations in P/V Controller", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(pvc).ToNot(Equal(nil))
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForPodRunningInNamespace(c, pod)
 		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 		if err != nil {
@@ -202,22 +202,22 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	It("should create volume metrics in Volume Manager", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(pvc).ToNot(Equal(nil))
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 		pod := framework.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForPodRunningInNamespace(c, pod)
 		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		kubeMetrics, err := metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		// Metrics should have dimensions plugin_name and state available
 		totalVolumesKey := "volume_manager_total_volumes"
@@ -232,7 +232,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	It("should create metrics for total number of volumes in A/D Controller", func() {
 		var err error
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(pvc).ToNot(Equal(nil))
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
@@ -246,11 +246,11 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		// Create pod
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		err = framework.WaitForPodRunningInNamespace(c, pod)
 		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		// Get updated metrics
 		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager()

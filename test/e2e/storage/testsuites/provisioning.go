@@ -204,7 +204,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 	if class != nil {
 		By("creating a StorageClass " + class.Name)
 		class, err = client.StorageV1().StorageClasses().Create(class)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
@@ -213,7 +213,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 
 	By("creating a claim")
 	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	defer func() {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
@@ -223,16 +223,16 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 		}
 	}()
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	By("checking the claim")
 	// Get new copy of the claim
 	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	// Get the bound PV
 	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	// Check sizes
 	expectedCapacity := resource.MustParse(t.ExpectedSize)
@@ -263,7 +263,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 	// Run the checker
 	if t.PvCheck != nil {
 		err = t.PvCheck(pv)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	}
 
 	if !t.SkipWriteReadCheck {

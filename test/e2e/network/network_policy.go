@@ -51,7 +51,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 			By("Waiting for pod ready", func() {
 				err := f.WaitForPodReady(podServer.Name)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(framework.HaveOccurredAt())
 			})
 
 			// Create pods, which should be able to communicate with the server on port 80 and 81.
@@ -76,7 +76,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			// Create a pod with name 'client-cannot-connect', which will attempt to communicate with the server,
@@ -111,7 +111,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Creating client-a which should be able to contact the server.", func() {
@@ -131,12 +131,12 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			// Create Server with Service in NS-B
 			framework.Logf("Waiting for server to come up.")
 			err = framework.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			// Create Policy for that service that allows traffic only via namespace B
 			By("Creating a network policy for the server which allows traffic from namespace-b.")
@@ -164,7 +164,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				},
 			}
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, nsA, "client-a", service, 80)
@@ -193,7 +193,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Testing pods can connect only to the port allowed by the policy.")
@@ -223,7 +223,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Creating a network policy for the Service which allows traffic only to another port.")
@@ -247,7 +247,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				},
 			}
 			policy2, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy2)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy2)
 
 			By("Testing pods can connect to both ports when both policies are present.")
@@ -270,7 +270,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Testing pods can connect to both ports when an 'allow-all' policy is present.")
@@ -300,7 +300,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Creating client-a which should be able to contact the server.", func() {
@@ -342,7 +342,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Creating client-a which should be able to contact the server.", func() {
@@ -507,7 +507,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.Logf("Created pod %v", pod.ObjectMeta.Name)
 
 	svcName := fmt.Sprintf("svc-%s", podName)
@@ -523,7 +523,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 			},
 		},
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.Logf("Created service %s", svc.Name)
 
 	return pod, svc
@@ -568,7 +568,7 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 		},
 	})
 
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	return pod
 }

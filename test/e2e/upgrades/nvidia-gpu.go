@@ -53,7 +53,7 @@ func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	if upgrade == MasterUpgrade {
 		// MasterUpgrade should be totally hitless.
 		job, err := framework.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(job.Status.Failed).To(BeZero(), "Job pods failed during master upgrade: %v", job.Status.Failed)
 	}
 }
@@ -85,11 +85,11 @@ func (t *NvidiaGPUUpgradeTest) startJob(f *framework.Framework) {
 	}
 	ns := f.Namespace.Name
 	_, err := framework.CreateJob(f.ClientSet, ns, testJob)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.Logf("Created job %v", testJob)
 	By("Waiting for gpu job pod start")
 	err = framework.WaitForAllJobPodsRunning(f.ClientSet, ns, testJob.Name, 1)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	By("Done with gpu job pod start")
 }
 
@@ -98,9 +98,9 @@ func (t *NvidiaGPUUpgradeTest) verifyJobPodSuccess(f *framework.Framework) {
 	// Wait for client pod to complete.
 	ns := f.Namespace.Name
 	err := framework.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, "cuda-add", 1)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	pods, err := framework.GetJobPods(f.ClientSet, f.Namespace.Name, "cuda-add")
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	createdPod := pods.Items[0].Name
 	framework.Logf("Created pod %v", createdPod)
 	f.PodClient().WaitForSuccess(createdPod, 5*time.Minute)

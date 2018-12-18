@@ -155,7 +155,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
 	nodeName := framework.TestContext.NodeName
 	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
 	if !ok {

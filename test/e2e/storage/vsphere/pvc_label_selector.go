@@ -81,21 +81,21 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 		})
 		It("should bind volume with claim for given label", func() {
 			volumePath, pv_ssd, pvc_ssd, pvc_vvol, err = testSetupVSpherePVClabelselector(c, nodeInfo, ns, ssdlabels, vvollabels)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("wait for the pvc_ssd to bind with pv_ssd")
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv_ssd, pvc_ssd))
 
 			By("Verify status of pvc_vvol is pending")
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, pvc_vvol.Name, 3*time.Second, 300*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("delete pvc_ssd")
 			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_ssd.Name, ns), "Failed to delete PVC ", pvc_ssd.Name)
 
 			By("verify pv_ssd is deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv_ssd.Name, 3*time.Second, 300*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			volumePath = ""
 
 			By("delete pvc_vvol")

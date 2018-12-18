@@ -52,12 +52,12 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 	It("should check that the kubernetes-dashboard instance is alive", func() {
 		By("Checking whether the kubernetes-dashboard service exists.")
 		err := framework.WaitForService(f.ClientSet, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Checking to make sure the kubernetes-dashboard pods are running")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
 		err = testutils.WaitForPodsWithLabelRunning(f.ClientSet, uiNamespace, selector)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(framework.Poll, serverStartTimeout, func() (bool, error) {
@@ -90,6 +90,6 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 			// Don't return err here as it aborts polling.
 			return status == http.StatusOK, nil
 		})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	})
 })

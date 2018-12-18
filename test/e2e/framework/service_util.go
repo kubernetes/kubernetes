@@ -348,7 +348,7 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 
 func PickNodeIP(c clientset.Interface) string {
 	publicIps, err := GetNodePublicIps(c)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	if len(publicIps) == 0 {
 		Failf("got unexpected number (%d) of public IPs", len(publicIps))
 	}

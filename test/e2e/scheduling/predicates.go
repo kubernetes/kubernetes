@@ -711,7 +711,7 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, n
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
 	success, err := common.ObserveEventAfterAction(f, predicate, action)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(success).To(Equal(true))
 }
 

@@ -825,7 +825,7 @@ func LogContainersInPodsWithLabels(c clientset.Interface, ns string, match map[s
 func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) ([]string, error) {
 	By("Deleting namespaces")
 	nsList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	var deleted []string
 	var wg sync.WaitGroup
 OUTER:
@@ -1830,7 +1830,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurredAt())
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
@@ -1862,7 +1862,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	successes := 0
 	options := metav1.ListOptions{LabelSelector: r.label.String()}
 	currentPods, err := r.c.CoreV1().Pods(r.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.
 		if !isElementOf(pod.UID, currentPods) {
@@ -2298,7 +2298,7 @@ func (b kubectlBuilder) ExecOrDie() string {
 		Logf("stdout: %q", retryStr)
 		Logf("err: %v", retryErr)
 	}
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	return str
 }
 
@@ -2493,7 +2493,7 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 
 	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
@@ -3580,7 +3580,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		tweak(execPod)
 	}
 	created, err := client.CoreV1().Pods(ns).Create(execPod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
 		if err != nil {
@@ -3591,7 +3591,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	return created.Name
 }
 
@@ -3616,13 +3616,13 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 		},
 	}
 	_, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 }
 
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 }
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be

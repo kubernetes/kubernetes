@@ -85,7 +85,7 @@ func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string,
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	By("Expect claim to fail provisioning volume")

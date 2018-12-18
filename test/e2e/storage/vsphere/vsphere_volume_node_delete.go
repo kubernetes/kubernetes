@@ -44,7 +44,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		workingDir = os.Getenv("VSPHERE_WORKING_DIR")
 		Expect(workingDir).NotTo(BeEmpty())
 
@@ -69,10 +69,10 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		defer cancel()
 
 		vmHost, err := vmObject.HostSystem(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		vmPool, err := vmObject.ResourcePool(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		// Unregister Node VM
 		By("Unregister a node VM")

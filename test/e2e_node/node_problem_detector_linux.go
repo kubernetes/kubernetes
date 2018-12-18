@@ -156,13 +156,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
 			By("Create the test log file")
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			By("Create config map for the node problem detector")
 			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
@@ -233,7 +233,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				},
 			})
 			pod, err := f.PodClient().Get(name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
@@ -329,7 +329,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				if test.messageNum > 0 {
 					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
 					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
-					Expect(err).NotTo(HaveOccurred())
+					Expect(err).NotTo(framework.HaveOccurredAt())
 				}
 
 				By(fmt.Sprintf("Wait for %d events generated", test.events))

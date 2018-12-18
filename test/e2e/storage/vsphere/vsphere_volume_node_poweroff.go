@@ -106,7 +106,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
 		isAttached, err := diskIsAttached(volumePath, node1)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(isAttached).To(BeTrue(), "Disk is not attached to the node")
 
 		By(fmt.Sprintf("Power off the node: %v", node1))
@@ -116,7 +116,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		_, err = vm.PowerOff(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		defer vm.PowerOn(ctx)
 
 		err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)

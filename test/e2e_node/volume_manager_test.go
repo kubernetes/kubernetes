@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						},
 					})
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
-					Expect(err).NotTo(HaveOccurred())
+					Expect(err).NotTo(framework.HaveOccurredAt())
 				})
 				By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						}
 						<-time.After(10 * time.Second)
 					}
-					Expect(err).NotTo(HaveOccurred())
+					Expect(err).NotTo(framework.HaveOccurredAt())
 				})
 			})
 		})

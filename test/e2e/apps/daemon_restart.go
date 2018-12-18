@@ -113,7 +113,7 @@ func (r *restartDaemonConfig) waitUp() {
 func (r *restartDaemonConfig) kill() {
 	framework.Logf("Killing %v", r)
 	_, err := framework.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName))
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 }
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up

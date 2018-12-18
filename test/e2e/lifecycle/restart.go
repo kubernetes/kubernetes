@@ -78,14 +78,14 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		numNodes, err = framework.NumberOfRegisteredNodes(f.ClientSet)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		systemNamespace = metav1.NamespaceSystem
 
 		By("ensuring all nodes are ready")
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		framework.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
 		By("ensuring all pods are running and ready")
@@ -111,11 +111,11 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 	It("should restart all nodes and ensure all nodes and pods recover", func() {
 		By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("ensuring all nodes are ready after the restart")
 		nodesAfter, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		framework.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 
 		// Make sure that we have the same number of nodes. We're not checking
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		By("ensuring the same number of pods are running and ready after restart")
 		podCheckStart := time.Now()
 		podNamesAfter, err := waitForNPods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()

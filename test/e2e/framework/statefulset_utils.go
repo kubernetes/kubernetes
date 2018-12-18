@@ -98,18 +98,18 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 
 	Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
 	ss, err := manifest.StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	Logf("Parsing service from %v", mkpath("service.yaml"))
 	svc, err := manifest.SvcFromManifest(mkpath("service.yaml"))
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 
 	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
 	_, err = s.c.CoreV1().Services(ns).Create(svc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 
 	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
 	_, err = s.c.AppsV1().StatefulSets(ns).Create(ss)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	return ss
 }

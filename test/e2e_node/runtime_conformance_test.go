@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
 					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
-					Expect(err).NotTo(HaveOccurred())
+					Expect(err).NotTo(framework.HaveOccurredAt())
 					defer os.Remove(configFile)
 
 					// checkContainerStatus checks whether the container status matches expectation.

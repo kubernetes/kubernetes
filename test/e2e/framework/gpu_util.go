@@ -53,7 +53,7 @@ func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
 func NVIDIADevicePlugin() *v1.Pod {
 	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),

@@ -84,20 +84,20 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		for i := 0; i < numNodes; i++ {
 			By(fmt.Sprintf("%d: Creating a test vsphere volume", i))
 			volumePath, err := nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			volumePaths = append(volumePaths, volumePath)
 
 			By(fmt.Sprintf("Creating pod %d on node %v", i, nodeNameList[i]))
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
 			pod, err := client.CoreV1().Pods(namespace).Create(podspec)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer framework.DeletePodWithWait(f, client, pod)
 
 			By("Waiting for pod to be ready")
 			Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
 
 			pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			pods = append(pods, pod)
 
@@ -113,7 +113,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 
 		By("Verifying the kubelet on master node is up")
 		err = framework.WaitForKubeletUp(masterAddress)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		for i, pod := range pods {
 			volumePath := volumePaths[i]
@@ -124,15 +124,15 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 
 			By(fmt.Sprintf("Deleting pod on node %s", nodeName))
 			err = framework.DeletePodWithWait(f, client, pod)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By(fmt.Sprintf("Waiting for volume %s to be detached from the node %s", volumePath, nodeName))
 			err = waitForVSphereDiskToDetach(volumePath, nodeName)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By(fmt.Sprintf("Deleting volume %s", volumePath))
 			err = nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		}
 	})
 })

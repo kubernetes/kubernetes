@@ -86,7 +86,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.Logf("Service endpoint is up")
 
 	By("Adding 2 dummy users")
@@ -96,7 +96,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Verifying that the users exist")
 	users, err := t.listUsers()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(len(users)).To(Equal(2))
 }
 
@@ -139,7 +139,7 @@ func (t *EtcdUpgradeTest) addUser(name string) error {
 
 func (t *EtcdUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -195,6 +195,6 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 // Teardown does one final check of the data's availability.
 func (t *EtcdUpgradeTest) Teardown(f *framework.Framework) {
 	users, err := t.listUsers()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(len(users) >= t.successfulWrites).To(BeTrue())
 }

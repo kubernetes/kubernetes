@@ -156,15 +156,15 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			pvcClaimList = append(pvcClaimList, getClaimsForPod(&pod, volumesPerPod)...)
 			By("Deleting pod")
 			err = framework.DeletePodWithWait(f, client, &pod)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		}
 		By("Waiting for volumes to be detached from the node")
 		err = waitForVSphereDisksToDetach(nodeVolumeMap)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		for _, pvcClaim := range pvcClaimList {
 			err = framework.DeletePersistentVolumeClaim(client, pvcClaim, namespace)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		}
 	})
 })
@@ -193,19 +193,19 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		for i := 0; i < volumesPerPod; i++ {
 			By("Creating PVC using the Storage Class")
 			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", sc[index%len(sc)]))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			pvclaims[i] = pvclaim
 		}
 
 		By("Waiting for claim to be in bound phase")
 		persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Creating pod to attach PV to the node")
 		nodeSelector := nodeSelectorList[nodeSelectorIndex%len(nodeSelectorList)]
 		// Create pod to attach Volume to Node
 		pod, err := framework.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		for _, pv := range persistentvolumes {
 			nodeVolumeMap[pod.Spec.NodeName] = append(nodeVolumeMap[pod.Spec.NodeName], pv.Spec.VsphereVolume.VolumePath)

@@ -156,7 +156,7 @@ func execTestVolumeIO(input *volumeIOTestInput) {
 		cs := f.ClientSet
 
 		err := testVolumeIO(f, cs, input.config, input.volSource, &input.podSec, input.testFile, input.fileSizes)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	})
 }
 

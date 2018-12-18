@@ -189,7 +189,7 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
 
 	usagePerNode := make(framework.ResourceUsagePerNode)

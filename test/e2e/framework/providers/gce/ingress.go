@@ -137,7 +137,7 @@ func (cont *GCEIngressController) ListGlobalForwardingRules() []*compute.Forward
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	fwdList := []*compute.ForwardingRule{}
 	l, err := gceCloud.ListGlobalForwardingRules()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, fwd := range l {
 		if cont.isOwned(fwd.Name) {
 			fwdList = append(fwdList, fwd)
@@ -171,7 +171,7 @@ func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
 func (cont *GCEIngressController) GetGlobalAddress(ipName string) *compute.Address {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	ip, err := gceCloud.GetGlobalAddress(ipName)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return ip
 }
 
@@ -199,7 +199,7 @@ func (cont *GCEIngressController) ListTargetHttpProxies() []*compute.TargetHttpP
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	tpList := []*compute.TargetHttpProxy{}
 	l, err := gceCloud.ListTargetHTTPProxies()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, tp := range l {
 		if cont.isOwned(tp.Name) {
 			tpList = append(tpList, tp)
@@ -212,7 +212,7 @@ func (cont *GCEIngressController) ListTargetHttpsProxies() []*compute.TargetHttp
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	tpsList := []*compute.TargetHttpsProxy{}
 	l, err := gceCloud.ListTargetHTTPSProxies()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, tps := range l {
 		if cont.isOwned(tps.Name) {
 			tpsList = append(tpsList, tps)
@@ -260,7 +260,7 @@ func (cont *GCEIngressController) ListUrlMaps() []*compute.UrlMap {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	umList := []*compute.UrlMap{}
 	l, err := gceCloud.ListURLMaps()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, um := range l {
 		if cont.isOwned(um.Name) {
 			umList = append(umList, um)
@@ -302,7 +302,7 @@ func (cont *GCEIngressController) ListGlobalBackendServices() []*compute.Backend
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList := []*compute.BackendService{}
 	l, err := gceCloud.ListGlobalBackendServices()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, be := range l {
 		if cont.isOwned(be.Name) {
 			beList = append(beList, be)
@@ -374,7 +374,7 @@ func (cont *GCEIngressController) ListSslCertificates() []*compute.SslCertificat
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	sslList := []*compute.SslCertificate{}
 	l, err := gceCloud.ListSslCertificates()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, ssl := range l {
 		if cont.isOwned(ssl.Name) {
 			sslList = append(sslList, ssl)
@@ -415,7 +415,7 @@ func (cont *GCEIngressController) ListInstanceGroups() []*compute.InstanceGroup 
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	igList := []*compute.InstanceGroup{}
 	l, err := gceCloud.ListInstanceGroups(cont.Cloud.Zone)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	for _, ig := range l {
 		if cont.isOwned(ig.Name) {
 			igList = append(igList, ig)
@@ -565,7 +565,7 @@ func (cont *GCEIngressController) GetFirewallRuleName() string {
 // methods here to be consistent with rest of the code in this repo.
 func (cont *GCEIngressController) GetFirewallRule() *compute.Firewall {
 	fw, err := cont.GetFirewallRuleOrError()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return fw
 }
 

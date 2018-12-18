@@ -1050,7 +1050,7 @@ func (c *cinderDriver) CreateVolume(volType testpatterns.TestVolType) interface{
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
 	framework.Logf("cinder output:\n%s", outputString)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	// Parse 'id'' from stdout. Expected format:
 	// |     attachments     |                  []                  |
@@ -1212,7 +1212,7 @@ func (g *gcePdDriver) CreateVolume(volType testpatterns.TestVolType) interface{}
 	}
 	By("creating a test gce pd volume")
 	vname, err := framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return &gcePdTestResource{
 		volumeName: vname,
 	}
@@ -1329,7 +1329,7 @@ func (v *vSphereDriver) CreateVolume(volType testpatterns.TestVolType) interface
 	vspheretest.Bootstrap(f)
 	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return &vSphereTestResource{
 		volumePath: volumePath,
 		nodeInfo:   nodeInfo,
@@ -1445,7 +1445,7 @@ func (a *azureDriver) CleanupDriver() {
 func (a *azureDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
 	By("creating a test azure disk volume")
 	volumeName, err := framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return &azureTestResource{
 		volumeName: volumeName,
 	}
@@ -1555,7 +1555,7 @@ func (a *awsDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
 	By("creating a test aws volume")
 	var err error
 	a.volumeName, err = framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 }
 
 func (a *awsDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {

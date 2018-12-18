@@ -78,7 +78,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		})
 		// Verify that service has been updated properly.
 		svcTier, err := gcecloud.GetServiceNetworkTier(svc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(svcTier).To(Equal(cloud.NetworkTierStandard))
 		// Record the LB name for test cleanup.
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
@@ -93,7 +93,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		})
 		// Verify that service has been updated properly.
 		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(svcTier).To(Equal(cloud.NetworkTierDefault))
 
 		// Wait until the ingress IP changes. Each tier has its own pool of
@@ -104,7 +104,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		By("reserving a static IP for the load balancer")
 		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunId)
 		gceCloud, err := gce.GetGCECloud()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		requestedIP, err := reserveAlphaRegionalAddress(gceCloud, requestedAddrName, cloud.NetworkTierStandard)
 		Expect(err).NotTo(HaveOccurred(), "failed to reserve a STANDARD tiered address")
 		defer func() {
@@ -115,7 +115,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 				}
 			}
 		}()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		framework.Logf("Allocated static IP to be used by the load balancer: %q", requestedIP)
 
 		By("updating the Service to use the standard tier with a requested IP")
@@ -126,7 +126,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		// Verify that service has been updated properly.
 		Expect(svc.Spec.LoadBalancerIP).To(Equal(requestedIP))
 		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(svcTier).To(Equal(cloud.NetworkTierStandard))
 
 		// Wait until the ingress IP changes and verifies the LB.
@@ -162,7 +162,7 @@ func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existin
 
 	// Verify the network tier matches the desired.
 	svcNetTier, err := gcecloud.GetServiceNetworkTier(svc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	netTier, err := getLBNetworkTierByIP(ingressIP)
 	Expect(err).NotTo(HaveOccurred(), "failed to get the network tier of the load balancer")
 	Expect(netTier).To(Equal(svcNetTier))

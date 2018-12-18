@@ -67,12 +67,12 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating service " + headlessSvcName + " in namespace " + ns)
 	_, err := f.ClientSet.CoreV1().Services(ns).Create(t.service)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
 	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(t.set)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	By("Saturating stateful set " + t.set.Name)
 	t.tester.Saturate(t.set)

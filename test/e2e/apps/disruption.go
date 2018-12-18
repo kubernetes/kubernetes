@@ -71,7 +71,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 			return pdb.Status.PodDisruptionsAllowed > 0, nil
 		})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	})
 
 	evictionCases := []struct {
@@ -178,7 +178,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 				return false, nil
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			e := &policy.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -210,7 +210,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 						return true, nil
 					}
 				})
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(framework.HaveOccurredAt())
 			}
 		})
 	}
@@ -228,7 +228,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
@@ -243,7 +243,7 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 }
 
 func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {

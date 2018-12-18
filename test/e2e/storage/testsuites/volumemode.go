@@ -247,16 +247,16 @@ func testVolumeModeFailForPreprovisionedPV(input *volumeModeTestInput) {
 
 		By("Creating sc")
 		input.sc, err = cs.StorageV1().StorageClasses().Create(input.sc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Creating pv and pvc")
 		input.pv, err = cs.CoreV1().PersistentVolumes().Create(input.pv)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		// Prebind pv
 		input.pvc.Spec.VolumeName = input.pv.Name
 		input.pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(input.pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		framework.ExpectNoError(framework.WaitOnPVandPVC(cs, ns.Name, input.pv, input.pvc))
 
@@ -280,16 +280,16 @@ func testVolumeModeSuccessForPreprovisionedPV(input *volumeModeTestInput) {
 
 		By("Creating sc")
 		input.sc, err = cs.StorageV1().StorageClasses().Create(input.sc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Creating pv and pvc")
 		input.pv, err = cs.CoreV1().PersistentVolumes().Create(input.pv)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		// Prebind pv
 		input.pvc.Spec.VolumeName = input.pv.Name
 		input.pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(input.pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		framework.ExpectNoError(framework.WaitOnPVandPVC(cs, ns.Name, input.pv, input.pvc))
 
@@ -300,7 +300,7 @@ func testVolumeModeSuccessForPreprovisionedPV(input *volumeModeTestInput) {
 		defer func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
 		}()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Checking if persistent volume exists as expected volume mode")
 		utils.CheckVolumeModeOfPath(pod, input.volMode, "/mnt/volume1")
@@ -320,11 +320,11 @@ func testVolumeModeFailForDynamicPV(input *volumeModeTestInput) {
 
 		By("Creating sc")
 		input.sc, err = cs.StorageV1().StorageClasses().Create(input.sc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Creating pv and pvc")
 		input.pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(input.pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, input.pvc.Namespace, input.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		Expect(err).To(HaveOccurred())
@@ -340,20 +340,20 @@ func testVolumeModeSuccessForDynamicPV(input *volumeModeTestInput) {
 
 		By("Creating sc")
 		input.sc, err = cs.StorageV1().StorageClasses().Create(input.sc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Creating pv and pvc")
 		input.pvc, err = cs.CoreV1().PersistentVolumeClaims(ns.Name).Create(input.pvc)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, input.pvc.Namespace, input.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		input.pvc, err = cs.CoreV1().PersistentVolumeClaims(input.pvc.Namespace).Get(input.pvc.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		input.pv, err = cs.CoreV1().PersistentVolumes().Get(input.pvc.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Creating pod")
 		pod, err := framework.CreateSecPodWithNodeName(cs, ns.Name, []*v1.PersistentVolumeClaim{input.pvc},
@@ -362,7 +362,7 @@ func testVolumeModeSuccessForDynamicPV(input *volumeModeTestInput) {
 		defer func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
 		}()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Checking if persistent volume exists as expected volume mode")
 		utils.CheckVolumeModeOfPath(pod, input.volMode, "/mnt/volume1")

@@ -154,13 +154,13 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					if CurrentGinkgoTestDescription().Failed {
 						By("Dump all running containers")
 						runtime, _, err := getCRIClient()
-						Expect(err).NotTo(HaveOccurred())
+						Expect(err).NotTo(framework.HaveOccurredAt())
 						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},
 						})
-						Expect(err).NotTo(HaveOccurred())
+						Expect(err).NotTo(framework.HaveOccurredAt())
 						framework.Logf("Running containers:")
 						for _, c := range containers {
 							framework.Logf("%+v", c)

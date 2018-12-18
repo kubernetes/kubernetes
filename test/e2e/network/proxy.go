@@ -114,7 +114,7 @@ var _ = SIGDescribe("Proxy", func() {
 					},
 				},
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			// Make an RC with a single pod. The 'porter' image is
 			// a simple server which serves the values of the
@@ -296,7 +296,7 @@ func pickNode(cs clientset.Interface) (string, error) {
 
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	node, err := pickNode(f.ClientSet)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
@@ -307,7 +307,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			Expect(status).To(Equal(http.StatusOK))
 			Expect(d).To(BeNumerically("<", proxyHTTPCallTimeout))
 		}

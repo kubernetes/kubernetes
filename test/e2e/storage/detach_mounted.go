@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		clientPod := getFlexVolumePod(volumeSource, node.Name)
 		By("Creating pod that uses slow format volume")
 		pod, err := cs.CoreV1().Pods(ns.Name).Create(clientPod)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 

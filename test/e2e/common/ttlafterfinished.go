@@ -50,11 +50,11 @@ func cleanupJob(f *framework.Framework, job *batch.Job) {
 		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
 	}
 	_, err := framework.UpdateJobWithRetries(c, ns, job.Name, removeFinalizerFunc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.WaitForJobGone(c, ns, job.Name, wait.ForeverTestTimeout)
 
 	err = framework.WaitForAllJobPodsGone(c, ns, job.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 }
 
 func testFinishedJob(f *framework.Framework) {
@@ -73,19 +73,19 @@ func testFinishedJob(f *framework.Framework) {
 
 	framework.Logf("Create a Job %s/%s with TTL", job.Namespace, job.Name)
 	job, err := framework.CreateJob(c, ns, job)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	framework.Logf("Wait for the Job to finish")
 	err = framework.WaitForJobFinish(c, ns, job.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	framework.Logf("Wait for TTL after finished controller to delete the Job")
 	err = framework.WaitForJobDeleting(c, ns, job.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	framework.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = framework.GetJob(c, ns, job.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	finishTime := framework.JobFinishTime(job)
 	finishTimeUTC := finishTime.UTC()
 	Expect(finishTime.IsZero()).NotTo(BeTrue())

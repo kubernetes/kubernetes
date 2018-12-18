@@ -68,7 +68,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			namespaceName := metav1.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
 			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			for _, e := range events.Items {
 				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)

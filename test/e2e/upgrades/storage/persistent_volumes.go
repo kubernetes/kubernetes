@@ -67,7 +67,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating the PV and PVC")
 	t.pv, t.pvc, err = framework.CreatePVPVC(f.ClientSet, pvConfig, pvcConfig, ns, true)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.ExpectNoError(framework.WaitOnPVandPVC(f.ClientSet, ns, t.pv, t.pvc))
 
 	By("Consuming the PV before upgrade")

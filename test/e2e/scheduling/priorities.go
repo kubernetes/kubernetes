@@ -78,7 +78,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
 		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	})
 
 	It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
@@ -187,7 +187,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
 		}
 		success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(success).To(Equal(true))
 
 		defer framework.RemoveAvoidPodsOffNode(cs, nodeName)
@@ -198,7 +198,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		testPods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{
 			LabelSelector: "name=scheduler-priority-avoid-pod",
 		})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		By(fmt.Sprintf("Verify the pods should not scheduled to the node: %s", nodeName))
 		for _, pod := range testPods.Items {
 			Expect(pod.Spec.NodeName).NotTo(Equal(nodeName))
@@ -231,7 +231,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		By("Pod should prefer scheduled to the node don't have the taint.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 
 		By("Trying to apply 10 taint on the first node.")
@@ -251,7 +251,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err = cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 	})
 })
@@ -385,7 +385,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 		},
 	}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(rc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return rc
 }
 

@@ -218,7 +218,7 @@ while true; do sleep 1; done
 
 					By("get the container status")
 					status, err := c.GetStatus()
-					Expect(err).NotTo(HaveOccurred())
+					Expect(err).NotTo(framework.HaveOccurredAt())
 
 					By("the container should be terminated")
 					Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
@@ -314,7 +314,7 @@ while true; do sleep 1; done
 						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 						By("create image pull secret")
 						_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
-						Expect(err).NotTo(HaveOccurred())
+						Expect(err).NotTo(framework.HaveOccurredAt())
 						defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
 						container.ImagePullSecrets = []string{secret.Name}
 					}

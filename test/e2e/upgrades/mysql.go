@@ -65,7 +65,7 @@ func mysqlKubectlCreate(ns, file string) {
 
 func (t *MySqlUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -103,7 +103,7 @@ func (t *MySqlUpgradeTest) Setup(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.Logf("Service endpoint is up")
 
 	By("Adding 2 names to the database")
@@ -112,7 +112,7 @@ func (t *MySqlUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(count).To(Equal(2))
 }
 
@@ -164,7 +164,7 @@ func (t *MySqlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 // Teardown performs one final check of the data's availability.
 func (t *MySqlUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(count >= t.successfulWrites).To(BeTrue())
 }
 

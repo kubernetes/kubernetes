@@ -79,7 +79,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.CoreV1().Services(ns).Create(headlessService)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 
 		AfterEach(func() {
@@ -99,7 +99,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Saturating stateful set " + ss.Name)
 			sst.Saturate(ss)
@@ -141,7 +141,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			ss.Kind = kind
 
 			By("Saturating stateful set " + ss.Name)
@@ -223,7 +223,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			sst.WaitForRunning(1, 0, ss)
 
@@ -290,7 +290,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}(),
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -314,7 +314,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Creating a new revision")
 			ss = sst.WaitForStatus(ss)
@@ -361,7 +361,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					}(),
 				}
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			ss, pods = sst.WaitForPartitionedRollingUpdate(ss)
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -442,7 +442,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}(),
 					}
 				})
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(framework.HaveOccurredAt())
 				ss, pods = sst.WaitForPartitionedRollingUpdate(ss)
 				for i := range pods.Items {
 					if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -494,7 +494,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -534,7 +534,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Creating a new revision")
 			ss = sst.WaitForStatus(ss)
@@ -576,14 +576,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Creating stateful set " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -614,13 +614,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return len(expectedOrder) == 0, nil
 
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Scale down will halt with unhealthy stateful pod")
 			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			sst.BreakHttpProbe(ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
@@ -647,7 +647,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return len(expectedOrder) == 0, nil
 
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 
 		/*
@@ -664,7 +664,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -790,7 +790,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
 			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 
@@ -1090,7 +1090,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	sst := framework.NewStatefulSetTester(c)
 	sst.SetHttpProbe(ss)
 	ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	ss = sst.WaitForStatus(ss)
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -1108,7 +1108,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	}
 	sst.SortStatefulPods(pods)
 	err = sst.BreakPodHttpProbe(ss, &pods.Items[1])
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 	newImage := NewNginxImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
@@ -1118,7 +1118,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	By("Creating a new revision")
 	ss = sst.WaitForStatus(ss)
@@ -1130,7 +1130,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	pods = sst.GetPodList(ss)
 	sst.SortStatefulPods(pods)
 	err = sst.RestorePodHttpProbe(ss, &pods.Items[1])
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
 	ss, pods = sst.WaitForRollingUpdate(ss)
 	Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
@@ -1156,14 +1156,14 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 
 	By("Rolling back to a previous revision")
 	err = sst.BreakPodHttpProbe(ss, &pods.Items[1])
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 	priorRevision := currentRevision
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = oldImage
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	ss = sst.WaitForStatus(ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	Expect(currentRevision).NotTo(Equal(updateRevision),

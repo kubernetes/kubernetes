@@ -537,7 +537,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	injectPod, err := podClient.Create(injectPod)
 	ExpectNoError(err, "Failed to create injector pod: %v", err)
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 }
 
 func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {

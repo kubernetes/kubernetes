@@ -216,7 +216,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	Expect(content).To(ContainSubstring(testContent))
 
 	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	// Confirm that the file can be accessed from a second
 	// pod using host_path with the same MCS label

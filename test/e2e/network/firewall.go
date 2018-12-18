@@ -49,7 +49,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		cs = f.ClientSet
 		cloudConfig = framework.TestContext.CloudConfig
 		gceCloud, err = gce.GetGCECloud()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	})
 
 	// This test takes around 6 minutes to run
@@ -61,7 +61,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		By("Getting cluster ID")
 		clusterID, err := gce.GetClusterID(cs)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		framework.Logf("Got cluster ID: %v", clusterID)
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -87,20 +87,20 @@ var _ = SIGDescribe("Firewall rule", func() {
 			By("Waiting for the local traffic health check firewall rule to be deleted")
 			localHCFwName := gce.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), false)
 			_, err := gce.WaitForFirewallRule(gceCloud, localHCFwName, false, framework.LoadBalancerCleanupTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		}()
 		svcExternalIP := svc.Status.LoadBalancer.Ingress[0].IP
 
 		By("Checking if service's firewall rule is correct")
 		lbFw := gce.ConstructFirewallForLBService(svc, cloudConfig.NodeTag)
 		fw, err := gceCloud.GetFirewall(lbFw.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(gce.VerifyFirewallRule(fw, lbFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		By("Checking if service's nodes health check firewall rule is correct")
 		nodesHCFw := gce.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, true)
 		fw, err = gceCloud.GetFirewall(nodesHCFw.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(gce.VerifyFirewallRule(fw, nodesHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
@@ -111,12 +111,12 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		By("Waiting for the nodes health check firewall rule to be deleted")
 		_, err = gce.WaitForFirewallRule(gceCloud, nodesHCFw.Name, false, framework.LoadBalancerCleanupTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Waiting for the correct local traffic health check firewall rule to be created")
 		localHCFw := gce.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
 		fw, err = gce.WaitForFirewallRule(gceCloud, localHCFw.Name, true, framework.LoadBalancerCreateTimeoutDefault)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(gce.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("Creating netexec pods on at most %v nodes", framework.MaxNodesForEndpointsTests))
@@ -167,7 +167,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		By("Checking if e2e firewall rules are correct")
 		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
 			fw, err := gceCloud.GetFirewall(expFw.Name)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			Expect(gce.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 		}
 

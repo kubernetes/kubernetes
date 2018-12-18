@@ -55,14 +55,14 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 	case MasterUpgrade:
 		By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(pod.Status.Phase).To(Equal(v1.PodRunning))
 	}
 
 	By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
 	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(t.invalidPod.Name, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	}
 	if err == nil {
 		Expect(pod.Status.Phase).NotTo(Equal(v1.PodRunning))
@@ -86,7 +86,7 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 
 	By("Making sure the valid pod launches")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 		framework.Skipf("No sysctl support in Docker <1.12")
 	}
@@ -104,7 +104,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 
 	By("Making sure the invalid pod failed")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 		framework.Skipf("No sysctl support in Docker <1.12")
 	}

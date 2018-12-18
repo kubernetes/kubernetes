@@ -705,7 +705,7 @@ func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		}
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurredAt())
 }
 
 // Does an HTTP GET, but does not reuse TCP connections

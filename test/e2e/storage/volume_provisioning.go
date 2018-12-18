@@ -70,7 +70,7 @@ func testBindingWaitForFirstConsumerMultiPVC(client clientset.Interface, claims 
 
 	By("creating a storage class " + class.Name)
 	class, err = client.StorageV1().StorageClasses().Create(class)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	defer deleteStorageClass(client, class.Name)
 
 	By("creating claims")
@@ -80,7 +80,7 @@ func testBindingWaitForFirstConsumerMultiPVC(client clientset.Interface, claims 
 		c, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 		claimNames = append(claimNames, c.Name)
 		createdClaims = append(createdClaims, c)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	}
 	defer func() {
 		var errors map[string]error
@@ -104,33 +104,33 @@ func testBindingWaitForFirstConsumerMultiPVC(client clientset.Interface, claims 
 	for _, claim := range createdClaims {
 		// Get new copy of the claim
 		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 	}
 
 	By("creating a pod referring to the claims")
 	// Create a pod referring to the claim and wait for it to get to running
 	pod, err := framework.CreatePod(client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	defer func() {
 		framework.DeletePodOrFail(client, pod.Namespace, pod.Name)
 	}()
 	// collect node details
 	node, err := client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	By("re-checking the claims to see they binded")
 	var pvs []*v1.PersistentVolume
 	for _, claim := range createdClaims {
 		// Get new copy of the claim
 		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		// make sure claim did bind
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		pvs = append(pvs, pv)
 	}
 	Expect(len(pvs)).ToNot(Equal(0))
@@ -509,7 +509,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				class := newBetaStorageClass(*betaTest, "beta")
 				// we need to create the class manually, testDynamicProvisioning does not accept beta class
 				class, err := c.StorageV1beta1().StorageClasses().Create(class)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(framework.HaveOccurredAt())
 				defer deleteStorageClass(c, class.Name)
 
 				claim := newClaim(*betaTest, ns, "beta")
@@ -561,15 +561,15 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			managedZones := sets.NewString() // subset of allZones
 
 			gceCloud, err := gce.GetGCECloud()
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			// Get all k8s managed zones (same as zones with nodes in them for test)
 			managedZones, err = gceCloud.GetAllZonesFromCloudProvider()
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 
 			// Get a list of all zones in the project
 			zones, err := gceCloud.ComputeServices().GA.Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			for _, z := range zones.Items {
 				allZones.Insert(z.Name)
 			}
@@ -592,14 +592,14 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 			sc := newStorageClass(test, ns, suffix)
 			sc, err = c.StorageV1().StorageClasses().Create(sc)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer deleteStorageClass(c, sc.Name)
 
 			By("Creating a claim and expecting it to timeout")
 			pvc := newClaim(test, ns, suffix)
 			pvc.Spec.StorageClassName = &sc.Name
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer func() {
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 			}()
@@ -629,7 +629,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			class := newStorageClass(test, ns, "race")
 			class, err := c.StorageV1().StorageClasses().Create(class)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer deleteStorageClass(c, class.Name)
 
 			// To increase chance of detection, attempt multiple iterations
@@ -638,13 +638,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				claim := newClaim(test, ns, suffix)
 				claim.Spec.StorageClassName = &class.Name
 				tmpClaim, err := framework.CreatePVC(c, ns, claim)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(framework.HaveOccurredAt())
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns))
 			}
 
 			By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
 			residualPVs, err = waitForProvisionedVolumesDeleted(c, class.Name)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			// Cleanup the test resources before breaking
 			defer deleteProvisionedVolumesAndDisks(c, residualPVs)
 
@@ -730,7 +730,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			By("waiting for the PV to get deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, framework.PVDeletingTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 	})
 
@@ -819,7 +819,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(test, ns, "default")
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer func() {
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns))
 			}()
@@ -829,7 +829,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 		})
 
@@ -850,7 +850,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			By("creating a claim with default storageclass and expecting it to timeout")
 			claim := newClaim(test, ns, "default")
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer func() {
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns))
 			}()
@@ -860,7 +860,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 		})
 	})
@@ -903,7 +903,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			suffix := fmt.Sprintf("invalid-aws")
 			class := newStorageClass(test, ns, suffix)
 			class, err := c.StorageV1().StorageClasses().Create(class)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer func() {
 				framework.Logf("deleting storage class %s", class.Name)
 				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil))
@@ -913,7 +913,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			claim := newClaim(test, ns, suffix)
 			claim.Spec.StorageClassName = &class.Name
 			claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 			defer func() {
 				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
@@ -925,7 +925,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// Watch events until the message about invalid key appears
 			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{})
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(framework.HaveOccurredAt())
 				for _, event := range events.Items {
 					if strings.Contains(event.Message, "failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key") {
 						return true, nil
@@ -933,7 +933,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}
 				return false, nil
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(framework.HaveOccurredAt())
 		})
 	})
 	Describe("DynamicProvisioner delayed binding [Slow]", func() {
@@ -1008,13 +1008,13 @@ func getDefaultStorageClassName(c clientset.Interface) string {
 
 func verifyDefaultStorageClass(c clientset.Interface, scName string, expectedDefault bool) {
 	sc, err := c.StorageV1().StorageClasses().Get(scName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	Expect(storageutil.IsDefaultAnnotation(sc.ObjectMeta)).To(Equal(expectedDefault))
 }
 
 func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr string) {
 	sc, err := c.StorageV1().StorageClasses().Get(scName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	if defaultStr == "" {
 		delete(sc.Annotations, storageutil.BetaIsDefaultStorageClassAnnotation)
@@ -1028,7 +1028,7 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 	}
 
 	sc, err = c.StorageV1().StorageClasses().Update(sc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 
 	expectedDefault := false
 	if defaultStr == "true" {
@@ -1232,7 +1232,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 func deleteStorageClass(c clientset.Interface, className string) {
 	err := c.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 	}
 }
 

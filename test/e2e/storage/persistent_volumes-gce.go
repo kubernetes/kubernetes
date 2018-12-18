@@ -33,9 +33,9 @@ import (
 // verifyGCEDiskAttached performs a sanity check to verify the PD attached to the node
 func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 	gceCloud, err := gce.GetGCECloud()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return isAttached
 }
 
@@ -43,12 +43,12 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	By("Creating the PV and PVC")
 	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 	By("Creating the Client Pod")
 	clientPod, err := framework.CreateClientPod(c, ns, pvc)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(framework.HaveOccurredAt())
 	return clientPod, pv, pvc
 }
 
@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		By("Initializing Test Spec")
 		diskName, err = framework.CreatePDWithRetry()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 		pvConfig = framework.PersistentVolumeConfig{
 			NamePrefix: "gce-",
 			Labels:     volLabel,
@@ -152,10 +152,10 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 
 		By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(ns, nil)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(framework.HaveOccurredAt())
 
 		By("Verifying Persistent Disk detaches")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
