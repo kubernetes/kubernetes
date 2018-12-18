@@ -18,6 +18,7 @@ package get
 
 import (
 	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -575,7 +576,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 	w.Flush()
 	if nonEmptyObjCount == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
-		fmt.Fprintln(o.ErrOut, "No resources found.")
+		buf := bytes.NewBuffer(nil)
+		fmt.Fprintln(buf, "No resources found.")
+		return fmt.Errorf("%v", buf.String())
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
