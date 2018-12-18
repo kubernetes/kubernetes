@@ -31,15 +31,17 @@ import (
 type versionConverter struct {
 	typeConverter   TypeConverter
 	objectConvertor runtime.ObjectConvertor
+	hubVersion      schema.GroupVersion
 }
 
 var _ merge.Converter = &versionConverter{}
 
 // NewVersionConverter builds a VersionConverter from a TypeConverter and an ObjectConvertor.
-func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor) merge.Converter {
+func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
 	return &versionConverter{
 		typeConverter:   t,
 		objectConvertor: o,
+		hubVersion:      h,
 	}
 }
 
@@ -58,14 +60,10 @@ func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.AP
 	}
 
 	// Convert to internal
-	internalVersion := schema.GroupVersion{
-		Group:   objectToConvert.GetObjectKind().GroupVersionKind().Group,
-		Version: runtime.APIVersionInternal,
-	}
-	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, internalVersion)
+	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, v.hubVersion)
 	if err != nil {
 		return object, fmt.Errorf("failed to convert object (%v to %v): %v",
-			objectToConvert.GetObjectKind().GroupVersionKind(), internalVersion, err)
+			objectToConvert.GetObjectKind().GroupVersionKind(), v.hubVersion, err)
 	}
 
 	// Convert the object into the target version

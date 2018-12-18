@@ -36,12 +36,13 @@ type FieldManager struct {
 	objectConverter runtime.ObjectConvertor
 	objectDefaulter runtime.ObjectDefaulter
 	groupVersion    schema.GroupVersion
+	hubVersion      schema.GroupVersion
 	updater         merge.Updater
 }
 
 // NewFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion) (*FieldManager, error) {
+func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (*FieldManager, error) {
 	typeConverter, err := internal.NewTypeConverter(models)
 	if err != nil {
 		return nil, err
@@ -51,8 +52,9 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
+		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(typeConverter, objectConverter),
+			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub),
 		},
 	}, nil
 }
@@ -166,5 +168,5 @@ func (f *FieldManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
 }
 
 func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
-	return f.objectConverter.ConvertToVersion(obj, schema.GroupVersion{Group: f.groupVersion.Group, Version: runtime.APIVersionInternal})
+	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
 }

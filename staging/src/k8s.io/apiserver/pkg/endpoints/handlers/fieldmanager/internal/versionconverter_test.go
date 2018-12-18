@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
@@ -48,7 +47,7 @@ func TestVersionConverter(t *testing.T) {
 		gvkForVersion("v1beta1"): objForGroupVersion("apps/v1beta1"),
 		gvkForVersion("v1"):      objForGroupVersion("apps/v1"),
 	}
-	vc := internal.NewVersionConverter(tc, oc)
+	vc := internal.NewVersionConverter(tc, oc, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal})
 
 	input, err := tc.ObjectToTyped(objForGroupVersion("apps/v1beta1"))
 	if err != nil {
