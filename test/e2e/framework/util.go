@@ -286,95 +286,99 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
-func Skipf(format string, args ...interface{}) {
+func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	ginkgowrapper.Skip(nowStamp() + ": " + msg)
+	ginkgowrapper.Skip(msg, caller+1)
+}
+
+func Skipf(format string, args ...interface{}) {
+	skipInternalf(1, format, args...)
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	if TestContext.CloudConfig.NumNodes < minNodeCount {
-		Skipf("Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
+		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
 
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	if TestContext.CloudConfig.NumNodes > maxNodeCount {
-		Skipf("Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
+		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
 
 func SkipUnlessAtLeast(value int, minValue int, message string) {
 	if value < minValue {
-		Skipf(message)
+		skipInternalf(1, message)
 	}
 }
 
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
-		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
+		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
 	}
 }
 
 func SkipUnlessLocalEphemeralStorageEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		Skipf("Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
+		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
 	}
 }
 
 func SkipUnlessSSHKeyPresent() {
 	if _, err := GetSigner(TestContext.Provider); err != nil {
-		Skipf("No SSH Key for provider %s: '%v'", TestContext.Provider, err)
+		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
 	}
 }
 
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !ProviderIs(supportedProviders...) {
-		Skipf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
+		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
 	}
 }
 
 func SkipUnlessMultizone(c clientset.Interface) {
 	zones, err := GetClusterZones(c)
 	if err != nil {
-		Skipf("Error listing cluster zones")
+		skipInternalf(1, "Error listing cluster zones")
 	}
 	if zones.Len() <= 1 {
-		Skipf("Requires more than one zone")
+		skipInternalf(1, "Requires more than one zone")
 	}
 }
 
 func SkipIfMultizone(c clientset.Interface) {
 	zones, err := GetClusterZones(c)
 	if err != nil {
-		Skipf("Error listing cluster zones")
+		skipInternalf(1, "Error listing cluster zones")
 	}
 	if zones.Len() > 1 {
-		Skipf("Requires at most one zone")
+		skipInternalf(1, "Requires at most one zone")
 	}
 }
 
 func SkipUnlessClusterMonitoringModeIs(supportedMonitoring ...string) {
 	if !ClusterMonitoringModeIs(supportedMonitoring...) {
-		Skipf("Only next monitoring modes are supported %v (not %s)", supportedMonitoring, TestContext.ClusterMonitoringMode)
+		skipInternalf(1, "Only next monitoring modes are supported %v (not %s)", supportedMonitoring, TestContext.ClusterMonitoringMode)
 	}
 }
 
 func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
 	if !TestContext.EnablePrometheusMonitoring {
-		Skipf("Skipped because prometheus monitoring is not enabled")
+		skipInternalf(1, "Skipped because prometheus monitoring is not enabled")
 	}
 }
 
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {
-		Skipf("Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
+		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
 	}
 }
 
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !NodeOSDistroIs(supportedNodeOsDistros...) {
-		Skipf("Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
+		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
 	}
 }
 
@@ -389,21 +393,21 @@ func SkipUnlessSecretExistsAfterWait(c clientset.Interface, name, namespace stri
 		}
 		return true, nil
 	}) != nil {
-		Skipf("Secret %v in namespace %v did not exist after timeout of %v", name, namespace, timeout)
+		skipInternalf(1, "Secret %v in namespace %v did not exist after timeout of %v", name, namespace, timeout)
 	}
 	Logf("Secret %v in namespace %v found after duration %v", name, namespace, time.Since(start))
 }
 
 func SkipUnlessTaintBasedEvictionsEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
-		Skipf("Only supported when %v feature is enabled", features.TaintBasedEvictions)
+		skipInternalf(1, "Only supported when %v feature is enabled", features.TaintBasedEvictions)
 	}
 }
 
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {
-			Skipf("Not supported under container runtime %s", runtime)
+			skipInternalf(1, "Not supported under container runtime %s", runtime)
 		}
 	}
 }
@@ -414,7 +418,7 @@ func RunIfContainerRuntimeIs(runtimes ...string) {
 			return
 		}
 	}
-	Skipf("Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
+	skipInternalf(1, "Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
 }
 
 func RunIfSystemSpecNameIs(names ...string) {
@@ -423,7 +427,7 @@ func RunIfSystemSpecNameIs(names ...string) {
 			return
 		}
 	}
-	Skipf("Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
+	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
 }
 
 func ProviderIs(providers ...string) bool {
@@ -497,7 +501,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 		Failf("Failed to get server version: %v", err)
 	}
 	if !gte {
-		Skipf("Not supported for server versions before %q", v)
+		skipInternalf(1, "Not supported for server versions before %q", v)
 	}
 }
 
@@ -507,7 +511,7 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 	if err != nil {
 		// not all resources support list, so we ignore those
 		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
-			Skipf("Could not find %s resource, skipping test: %#v", gvr, err)
+			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
 		}
 		Failf("Unexpected error getting %v: %v", gvr, err)
 	}
@@ -1943,7 +1947,7 @@ func SkipUnlessKubectlVersionGTE(v *utilversion.Version) {
 		Failf("Failed to get kubectl version: %v", err)
 	}
 	if !gte {
-		Skipf("Not supported for kubectl versions before %q", v)
+		skipInternalf(1, "Not supported for kubectl versions before %q", v)
 	}
 }
 
