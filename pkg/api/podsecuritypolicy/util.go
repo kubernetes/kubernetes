@@ -22,9 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// DropDisabledAlphaFields removes disabled fields from the pod security policy spec.
+// DropDisabledFields removes disabled fields from the pod security policy spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a od security policy spec.
-func DropDisabledAlphaFields(pspSpec *policy.PodSecurityPolicySpec) {
+func DropDisabledFields(pspSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
 		pspSpec.AllowedProcMountTypes = nil
 	}
