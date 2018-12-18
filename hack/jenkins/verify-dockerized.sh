@@ -38,6 +38,6 @@ export ARTIFACTS_DIR=${WORKSPACE}/artifacts
 
 export LOG_LEVEL=4
 
-cd /go/src/k8s.io/kubernetes
+cd "${GOPATH}/src/k8s.io/kubernetes"
 
 make verify
