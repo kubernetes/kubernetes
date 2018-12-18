@@ -58,15 +58,14 @@ func (strategy) AllowUnconditionalUpdate() bool {
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	psp := obj.(*policy.PodSecurityPolicy)
 
-	psputil.DropDisabledFields(&psp.Spec)
+	psputil.DropDisabledFields(&psp.Spec, nil)
 }
 
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPsp := obj.(*policy.PodSecurityPolicy)
 	oldPsp := old.(*policy.PodSecurityPolicy)
 
-	psputil.DropDisabledFields(&newPsp.Spec)
-	psputil.DropDisabledFields(&oldPsp.Spec)
+	psputil.DropDisabledFields(&newPsp.Spec, &oldPsp.Spec)
 }
 
 func (strategy) Canonicalize(obj runtime.Object) {

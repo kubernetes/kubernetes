@@ -39,7 +39,7 @@ func TestDropAlphaPVCVolumeMode(t *testing.T) {
 	// Enable alpha feature BlockVolume
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 	// now test dropping the fields - should not be dropped
-	DropDisabledFields(&pvc.Spec)
+	DropDisabledFields(&pvc.Spec, nil)
 
 	// check to make sure VolumeDevices is still present
 	// if featureset is set to true
@@ -50,7 +50,7 @@ func TestDropAlphaPVCVolumeMode(t *testing.T) {
 	// Disable alpha feature BlockVolume
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 	// now test dropping the fields
-	DropDisabledFields(&pvc.Spec)
+	DropDisabledFields(&pvc.Spec, nil)
 
 	// check to make sure VolumeDevices is nil
 	// if featureset is set to false

@@ -23,9 +23,13 @@ import (
 )
 
 // DropDisabledFields removes disabled fields from the StorageClass object.
-func DropDisabledFields(class *storage.StorageClass) {
+func DropDisabledFields(class, oldClass *storage.StorageClass) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		class.VolumeBindingMode = nil
 		class.AllowedTopologies = nil
+		if oldClass != nil {
+			oldClass.VolumeBindingMode = nil
+			oldClass.AllowedTopologies = nil
+		}
 	}
 }
