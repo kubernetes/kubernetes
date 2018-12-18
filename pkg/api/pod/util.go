@@ -259,6 +259,20 @@ func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
+		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
+		for i := range podSpec.Containers {
+			for j := range podSpec.Containers[i].VolumeMounts {
+				podSpec.Containers[i].VolumeMounts[j].SubPath = ""
+			}
+		}
+		for i := range podSpec.InitContainers {
+			for j := range podSpec.InitContainers[i].VolumeMounts {
+				podSpec.InitContainers[i].VolumeMounts[j].SubPath = ""
+			}
+		}
+	}
+
 	dropDisabledVolumeDevicesAlphaFields(podSpec, oldPodSpec)
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
@@ -360,4 +374,26 @@ func dropDisabledVolumeDevicesAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 			}
 		}
 	}
+}
+
+// subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
+func subpathInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		for j := range podSpec.Containers[i].VolumeMounts {
+			if len(podSpec.Containers[i].VolumeMounts[j].SubPath) > 0 {
+				return true
+			}
+		}
+	}
+	for i := range podSpec.InitContainers {
+		for j := range podSpec.InitContainers[i].VolumeMounts {
+			if len(podSpec.InitContainers[i].VolumeMounts[j].SubPath) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
