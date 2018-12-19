@@ -46,6 +46,7 @@ func init() {
 	}
 }
 
+// LoadPolicyFromFile will  return the policy from the specified file
 func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
@@ -63,6 +64,7 @@ func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 	return ret, nil
 }
 
+// LoadPolicyFromBytes will  return the policy from the specified bytes
 func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	policy := &auditinternal.Policy{}
 	decoder := audit.Codecs.UniversalDecoder(apiGroupVersions...)

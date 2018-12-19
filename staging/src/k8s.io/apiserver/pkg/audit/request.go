@@ -42,6 +42,7 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
+// NewEventFromRequest is use to generate new event from the request.
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),

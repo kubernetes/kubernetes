@@ -538,8 +538,6 @@ staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
 staging/src/k8s.io/apiserver/pkg/apis/example2
 staging/src/k8s.io/apiserver/pkg/apis/example2/v1
-staging/src/k8s.io/apiserver/pkg/audit
-staging/src/k8s.io/apiserver/pkg/audit/policy
 staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory
 staging/src/k8s.io/apiserver/pkg/authentication/group
 staging/src/k8s.io/apiserver/pkg/authentication/request/anonymous

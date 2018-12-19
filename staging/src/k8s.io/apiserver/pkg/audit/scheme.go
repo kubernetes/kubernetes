@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // TODO: Delete this file if we generate a clientset.
+
 package audit
 
 import (
@@ -23,12 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/apps/v1"
 )
 
+// Scheme variable has value of runtime newschema
 var Scheme = runtime.NewScheme()
+
+// Codecs has object of serialized schema.
 var Codecs = serializer.NewCodecFactory(Scheme)
 
 func init() {

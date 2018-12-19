@@ -20,6 +20,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
 
+// Sink is use for the processEvents handling.
 type Sink interface {
 	// ProcessEvents handles events. Per audit ID it might be that ProcessEvents is called up to three times.
 	// Errors might be logged by the sink itself. If an error should be fatal, leading to an internal
@@ -29,6 +30,7 @@ type Sink interface {
 	ProcessEvents(events ...*auditinternal.Event) bool
 }
 
+// Backend interface manage the run and shutdown  events in the backend.
 type Backend interface {
 	Sink
 
