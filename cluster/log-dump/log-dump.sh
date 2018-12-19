@@ -435,25 +435,24 @@ function detect_node_failures() {
   fi
 
   detect-node-names
-  if [ -z "$INSTANCE_GROUPS" ]; then
-    return
+  if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
+      for group in "${INSTANCE_GROUPS[@]}"; do
+        local creation_timestamp=$(gcloud compute instance-groups managed describe \
+                                  "${group}" \
+                                  --project "${PROJECT}" \
+                                  --zone "${ZONE}" \
+                                  --format='value(creationTimestamp)')
+        echo "Failures for ${group}"
+        gcloud logging read --order=asc \
+              --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
+              --project "${PROJECT}" \
+              "resource.type=\"gce_instance\"
+               logName=\"projects/${PROJECT}/logs/compute.googleapis.com%2Factivity_log\"
+               (jsonPayload.event_subtype=\"compute.instances.hostError\" OR jsonPayload.event_subtype=\"compute.instances.automaticRestart\")
+               jsonPayload.resource.name:\"${group}\"
+               timestamp >= \"${creation_timestamp}\""
+      done
   fi
-  for group in "${INSTANCE_GROUPS[@]}"; do
-    local creation_timestamp=$(gcloud compute instance-groups managed describe \
-                              "${group}" \
-                              --project "${PROJECT}" \
-                              --zone "${ZONE}" \
-                              --format='value(creationTimestamp)')
-    echo "Failures for ${group}"
-    gcloud logging read --order=asc \
-          --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
-          --project "${PROJECT}" \
-          "resource.type=\"gce_instance\"
-           logName=\"projects/${PROJECT}/logs/compute.googleapis.com%2Factivity_log\"
-           (jsonPayload.event_subtype=\"compute.instances.hostError\" OR jsonPayload.event_subtype=\"compute.instances.automaticRestart\")
-           jsonPayload.resource.name:\"${group}\"
-           timestamp >= \"${creation_timestamp}\""
-  done
 }
 
 function main() {
