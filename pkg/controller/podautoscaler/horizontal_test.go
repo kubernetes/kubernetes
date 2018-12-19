@@ -51,8 +51,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
 
 var statusOk = []autoscalingv2.HorizontalPodAutoscalerCondition{
@@ -862,7 +862,7 @@ func TestScaleUpDeployment(t *testing.T) {
 		useMetricsAPI:           true,
 		resource: &fakeResource{
 			name:       "test-dep",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "apps/v1",
 			kind:       "Deployment",
 		},
 	}
@@ -882,7 +882,7 @@ func TestScaleUpReplicaSet(t *testing.T) {
 		useMetricsAPI:           true,
 		resource: &fakeResource{
 			name:       "test-replicaset",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "apps/v1",
 			kind:       "ReplicaSet",
 		},
 	}
@@ -1033,7 +1033,7 @@ func TestScaleUpCMObject(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -1183,7 +1183,7 @@ func TestScaleDownCMObject(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -1392,7 +1392,7 @@ func TestToleranceCMObject(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
@@ -1860,7 +1860,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
 					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "extensions/v1beta1",
+						APIVersion: "apps/v1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},

@@ -666,7 +666,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			replicaOk += rc.Status.ReadyReplicas
 		}
 
-		rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{})
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
@@ -3092,11 +3092,11 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.ExtensionsV1beta1().DaemonSets(ns).Get(name, metav1.GetOptions{})
+		return c.AppsV1().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	case batchinternal.Kind("Job"):
 		return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
 	default:
@@ -3110,9 +3110,15 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 		return labels.SelectorFromSet(typed.Spec.Selector), nil
 	case *extensions.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.ReplicaSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.Deployment:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.Deployment:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.DaemonSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *batch.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
@@ -3133,12 +3139,24 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *apps.ReplicaSet:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	case *extensions.Deployment:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *apps.Deployment:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	case *extensions.DaemonSet:
+		return 0, nil
+	case *apps.DaemonSet:
 		return 0, nil
 	case *batch.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods

@@ -22,9 +22,9 @@ import (
 	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
+	appsv1 "k8s.io/api/apps/v1"
 	as "k8s.io/api/autoscaling/v2beta1"
 	corev1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -219,7 +219,7 @@ type CustomMetricTestCase struct {
 	framework       *framework.Framework
 	hpa             *as.HorizontalPodAutoscaler
 	kubeClient      clientset.Interface
-	deployment      *extensions.Deployment
+	deployment      *appsv1.Deployment
 	pod             *corev1.Pod
 	initialReplicas int
 	scaledReplicas  int
@@ -282,9 +282,9 @@ func (tc *CustomMetricTestCase) Run() {
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.scaledReplicas)
 }
 
-func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *extensions.Deployment, pod *corev1.Pod) error {
+func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *corev1.Pod) error {
 	if deployment != nil {
-		_, err := cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Create(deployment)
+		_, err := cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Create(deployment)
 		if err != nil {
 			return err
 		}
@@ -298,9 +298,9 @@ func createDeploymentToScale(f *framework.Framework, cs clientset.Interface, dep
 	return nil
 }
 
-func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *extensions.Deployment, pod *corev1.Pod) {
+func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface, deployment *appsv1.Deployment, pod *corev1.Pod) {
 	if deployment != nil {
-		_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(deployment.ObjectMeta.Name, &metav1.DeleteOptions{})
+		_ = cs.AppsV1().Deployments(f.Namespace.ObjectMeta.Name).Delete(deployment.ObjectMeta.Name, &metav1.DeleteOptions{})
 	}
 	if pod != nil {
 		_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(pod.ObjectMeta.Name, &metav1.DeleteOptions{})
@@ -333,7 +333,7 @@ func podsHPA(namespace string, deploymentName string, metricTargets map[string]i
 			MaxReplicas: 3,
 			MinReplicas: &minReplicas,
 			ScaleTargetRef: as.CrossVersionObjectReference{
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Kind:       "Deployment",
 				Name:       deploymentName,
 			},
@@ -365,7 +365,7 @@ func objectHPA(namespace string, metricTarget int64) *as.HorizontalPodAutoscaler
 			MaxReplicas: 3,
 			MinReplicas: &minReplicas,
 			ScaleTargetRef: as.CrossVersionObjectReference{
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Kind:       "Deployment",
 				Name:       dummyDeploymentName,
 			},
@@ -424,7 +424,7 @@ func externalHPA(namespace string, metricTargets map[string]externalMetricTarget
 			MaxReplicas: 3,
 			MinReplicas: &minReplicas,
 			ScaleTargetRef: as.CrossVersionObjectReference{
-				APIVersion: "extensions/v1beta1",
+				APIVersion: "apps/v1",
 				Kind:       "Deployment",
 				Name:       dummyDeploymentName,
 			},
@@ -437,7 +437,7 @@ func externalHPA(namespace string, metricTargets map[string]externalMetricTarget
 func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := cs.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		deployment, err := cs.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}

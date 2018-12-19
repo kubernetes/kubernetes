@@ -50,9 +50,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
 
 func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
@@ -588,7 +588,7 @@ func TestLegacyScaleUpDeployment(t *testing.T) {
 		useMetricsAPI:       true,
 		resource: &fakeResource{
 			name:       "test-dep",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "apps/v1",
 			kind:       "Deployment",
 		},
 	}
@@ -608,7 +608,7 @@ func TestLegacyScaleUpReplicaSet(t *testing.T) {
 		useMetricsAPI:       true,
 		resource: &fakeResource{
 			name:       "test-replicaset",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "apps/v1",
 			kind:       "ReplicaSet",
 		},
 	}

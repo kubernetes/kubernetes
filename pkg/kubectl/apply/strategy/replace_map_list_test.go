@@ -26,7 +26,7 @@ var _ = Describe("Replacing fields of type list without openapi", func() {
 	Context("where a field is has been updated", func() {
 		It("should replace the field", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   bar:
@@ -36,7 +36,7 @@ spec:
     value: 2
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   bar:
@@ -46,7 +46,7 @@ spec:
     value: 2
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   bar:
@@ -58,7 +58,7 @@ spec:
     value: 4
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Foo
 spec:
   bar:

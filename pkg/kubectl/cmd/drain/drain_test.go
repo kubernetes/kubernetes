@@ -33,9 +33,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -294,13 +294,13 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds := extensionsv1beta1.DaemonSet{
+	ds := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
-		Spec: extensionsv1beta1.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -313,7 +313,7 @@ func TestDrain(t *testing.T) {
 			Labels:            labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "extensions/v1beta1",
+					APIVersion:         "apps/v1",
 					Kind:               "DaemonSet",
 					Name:               "ds",
 					BlockOwnerDeletion: boolptr(true),
@@ -334,7 +334,7 @@ func TestDrain(t *testing.T) {
 			Labels:            labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "extensions/v1beta1",
+					APIVersion:         "apps/v1",
 					Kind:               "DaemonSet",
 					Name:               "ds",
 					BlockOwnerDeletion: boolptr(true),
@@ -358,7 +358,7 @@ func TestDrain(t *testing.T) {
 			Labels:            labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "extensions/v1beta1",
+					APIVersion:         "apps/v1",
 					Kind:               "DaemonSet",
 					Name:               "ds",
 					BlockOwnerDeletion: boolptr(true),
@@ -457,14 +457,14 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	rs := extensionsv1beta1.ReplicaSet{
+	rs := appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rs",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 		},
-		Spec: extensionsv1beta1.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -546,7 +546,7 @@ func TestDrain(t *testing.T) {
 		expected      *corev1.Node
 		pods          []corev1.Pod
 		rcs           []corev1.ReplicationController
-		replicaSets   []extensionsv1beta1.ReplicaSet
+		replicaSets   []appsv1.ReplicaSet
 		args          []string
 		expectWarning string
 		expectFatal   bool
@@ -648,7 +648,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordonedNode,
 			pods:         []corev1.Pod{rsPod},
-			replicaSets:  []extensionsv1beta1.ReplicaSet{rs},
+			replicaSets:  []appsv1.ReplicaSet{rs},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -776,7 +776,7 @@ func TestDrain(t *testing.T) {
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
 							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.DaemonSet{})}, nil
+							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
 							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
@@ -1027,6 +1027,6 @@ func (m *MyReq) isFor(method string, path string) bool {
 
 	return method == req.Method && (req.URL.Path == path ||
 		req.URL.Path == strings.Join([]string{"/api/v1", path}, "") ||
-		req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, "") ||
+		req.URL.Path == strings.Join([]string{"/apis/apps/v1", path}, "") ||
 		req.URL.Path == strings.Join([]string{"/apis/batch/v1", path}, ""))
 }

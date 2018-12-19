@@ -66,7 +66,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		{
 			// version enabled by runtimeConfig override.
 			runtimeConfig: map[string]string{
-				"extensions/v1beta1": "",
+				"apps/v1": "",
 			},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()

@@ -330,9 +330,9 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.D
 		informers.Core().V1().Pods(),
 		informers.Policy().V1beta1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Extensions().V1beta1().Deployments(),
-		informers.Apps().V1beta1().StatefulSets(),
+		informers.Apps().V1().ReplicaSets(),
+		informers.Apps().V1().Deployments(),
+		informers.Apps().V1().StatefulSets(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "disruption-controller")),
 	)
 	return s, closeFn, rm, informers, clientSet

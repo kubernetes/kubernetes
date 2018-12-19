@@ -34,9 +34,10 @@ import (
 	"strings"
 	"time"
 
+	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 
-	compute "google.golang.org/api/compute/v1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -896,12 +897,12 @@ func generateBacksideHTTPSServiceSpec() *v1.Service {
 	}
 }
 
-func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
-	return &extensions.Deployment{
+func generateBacksideHTTPSDeploymentSpec() *apps.Deployment {
+	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "echoheaders-https",
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"app": "echoheaders-https",
 			}},
@@ -929,8 +930,8 @@ func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
 }
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
-func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*extensions.Deployment, *v1.Service, *extensions.Ingress, error) {
-	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
+func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*apps.Deployment, *v1.Service, *extensions.Ingress, error) {
+	deployCreated, err := cs.AppsV1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -953,7 +954,7 @@ func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, names
 }
 
 // DeleteTestResource deletes given deployment, service and ingress.
-func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *extensions.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
+func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *apps.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
 	var errs []error
 	if ing != nil {
 		if err := j.runDelete(ing); err != nil {
@@ -966,7 +967,7 @@ func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *exte
 		}
 	}
 	if deploy != nil {
-		if err := cs.ExtensionsV1beta1().Deployments(deploy.Namespace).Delete(deploy.Name, nil); err != nil {
+		if err := cs.AppsV1().Deployments(deploy.Namespace).Delete(deploy.Name, nil); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", deploy.Namespace, deploy.Name, err))
 		}
 	}
