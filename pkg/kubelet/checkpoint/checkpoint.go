@@ -103,7 +103,11 @@ func LoadPods(cpm checkpointmanager.CheckpointManager) ([]*v1.Pod, error) {
 			klog.Errorf("Failed to retrieve checkpoint for pod %q: %v", key, err)
 			continue
 		}
-		pods = append(pods, checkpoint.GetPod())
+                // clear NodeSelector when restoring from checkpoint otherwise pod cannot be restarted
+		// when there is no connection to api-server
+		var p *v1.Pod = checkpoint.GetPod()
+		p.Spec.NodeSelector = nil
+		pods = append(pods, p)
 	}
 	return pods, nil
 }
