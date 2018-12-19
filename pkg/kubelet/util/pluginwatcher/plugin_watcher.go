@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -183,6 +184,10 @@ func (w *Watcher) traversePluginDir(dir string) error {
 
 		switch mode := info.Mode(); {
 		case mode.IsDir():
+			if w.containsBlacklistedDir(path) {
+				return filepath.SkipDir
+			}
+
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
@@ -204,6 +209,10 @@ func (w *Watcher) traversePluginDir(dir string) error {
 // Handle filesystem notify event.
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	glog.V(6).Infof("Handling create event: %v", event)
+
+	if w.containsBlacklistedDir(event.Name) {
+		return nil
+	}
 
 	fi, err := os.Stat(event.Name)
 	if err != nil {
@@ -399,4 +408,11 @@ func dial(unixSocketPath string, timeout time.Duration) (registerapi.Registratio
 	}
 
 	return registerapi.NewRegistrationClient(c), c, nil
+}
+
+// To prevent 1.12 from filling the fd limit we will explicitly blacklist
+// kubernetes.io directory.
+func (w *Watcher) containsBlacklistedDir(path string) bool {
+	return strings.HasPrefix(path, w.path+"/kubernetes.io/") ||
+		path == w.path+"/kubernetes.io"
 }
