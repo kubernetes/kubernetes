@@ -170,14 +170,18 @@ aliases:
     - smarterclayton
     - soltysh
   sig-testing-reviewers:
+    - bentheelder
+    - cblecker
     - fejta
+    - krzyzacy
     - ixdy
-    - rmmh
     - spiffxp
   sig-testing-approvers:
+    - bentheelder
+    - cblecker
     - fejta
+    - krzyzacy
     - ixdy
-    - rmmh
     - spiffxp
   sig-node-reviewers:
     - Random-Liu
