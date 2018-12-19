@@ -40,8 +40,8 @@ export KUBE_RACE=-race
 # Disable coverage report
 export KUBE_COVER="n"
 # Produce a JUnit-style XML test report for Jenkins.
-export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
-export ARTIFACTS_DIR=${WORKSPACE}/artifacts
+export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS:-${WORKSPACE}/artifacts}"
+export ARTIFACTS_DIR="${ARTIFACTS:-${WORKSPACE}/artifacts}"
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
