@@ -87,7 +87,6 @@ pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
 pkg/cloudprovider/providers/fake
-pkg/cloudprovider/providers/gce/cloud
 pkg/cloudprovider/providers/photon
 pkg/cloudprovider/providers/vsphere
 pkg/cloudprovider/providers/vsphere/vclib

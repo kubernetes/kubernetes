@@ -120,6 +120,26 @@
 			"Rev": "c02ca9a983da5807ddf7d796784928f5be4afd09"
 		},
 		{
+			"ImportPath": "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud",
+			"Comment": "1.2.0",
+			"Rev": "773c7a284e1399960745d0e2c501f577a20d4947"
+		},
+		{
+			"ImportPath": "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter",
+			"Comment": "1.2.0",
+			"Rev": "773c7a284e1399960745d0e2c501f577a20d4947"
+		},
+		{
+			"ImportPath": "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta",
+			"Comment": "1.2.0",
+			"Rev": "773c7a284e1399960745d0e2c501f577a20d4947"
+		},
+		{
+			"ImportPath": "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock",
+			"Comment": "1.2.0",
+			"Rev": "773c7a284e1399960745d0e2c501f577a20d4947"
+		},
+		{
 			"ImportPath": "github.com/JeffAshton/win_pdh",
 			"Rev": "76bb4ee9f0ab50f77826f2a2ee7fb9d3880d6ec2"
 		},
