@@ -251,6 +251,25 @@ func (aq affinityQuery) clone() affinityQuery {
 	return copy
 }
 
+func (aq affinityQuery) append(toAppend affinityQuery) {
+	for i := range toAppend {
+		if len(aq[i]) == 0 {
+			aq[i] = toAppend[i]
+			continue
+		}
+		for topologyPair, podNames := range toAppend[i] {
+			existingPodNames, ok := aq[i][topologyPair]
+			if !ok {
+				aq[i][topologyPair] = podNames
+				continue
+			}
+			for podName := range podNames {
+				existingPodNames[podName] = sets.Empty{}
+			}
+		}
+	}
+}
+
 func (aq affinityQuery) removePod(delPod *v1.Pod) bool {
 	var updated bool
 	delPodFullName := podName(delPod)
@@ -306,7 +325,6 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 
 func updateAffinityQuery(query affinityQuery, terms []v1.PodAffinityTerm, node *v1.Node,
 	incomingPod, existingPod *v1.Pod) (bool, error) {
-	var mutex sync.Mutex
 	var updated bool
 	for i, term := range terms {
 		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(incomingPod, &term)
@@ -321,12 +339,10 @@ func updateAffinityQuery(query affinityQuery, terms []v1.PodAffinityTerm, node *
 			}
 			updated = true
 			pair := schedulernodeinfo.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
-			mutex.Lock()
 			if query[i][pair] == nil {
 				query[i][pair] = make(sets.String)
 			}
 			query[i][pair][podName(existingPod)] = sets.Empty{}
-			mutex.Unlock()
 		}
 	}
 	return updated, nil
@@ -581,12 +597,16 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 	for name := range nodeInfoMap {
 		allNodeNames = append(allNodeNames, name)
 	}
+	affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
+	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
 
 	var lock sync.Mutex
 	var firstError error
 	topologyPairsAntiAffinityPodsMaps := newTopologyPairsMaps()
-	appendResult := func(nodeName string, nodeTopologyPairsAntiAffinityPodsMaps *topologyPairsMaps) {
+	query := newAffinityQuery(len(affinityTerms))
+	appendResult := func(q affinityQuery, nodeName string, nodeTopologyPairsAntiAffinityPodsMaps *topologyPairsMaps) {
 		lock.Lock()
+		query.append(q)
 		if len(nodeTopologyPairsAntiAffinityPodsMaps.topologyPairToPods) > 0 {
 			topologyPairsAntiAffinityPodsMaps.appendMaps(nodeTopologyPairsAntiAffinityPodsMaps)
 		}
@@ -601,10 +621,6 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		lock.Unlock()
 	}
 
-	affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
-	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
-	query := newAffinityQuery(len(affinityTerms))
-
 	processNode := func(i int) {
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
@@ -613,12 +629,17 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			return
 		}
 		nodeTopologyPairsAntiAffinityPodsMaps := newTopologyPairsMaps()
+		q := newAffinityQuery(len(affinityTerms))
+		updated := false
 		for _, existingPod := range nodeInfo.Pods() {
 			// Update podAffinityQuery according to affinity properties.
-			if _, err := updateAffinityQuery(query, affinityTerms, node, pod, existingPod); err != nil {
+			u, err := updateAffinityQuery(q, affinityTerms, node, pod, existingPod)
+			if err != nil {
 				catchError(err)
 				return
 			}
+			updated = updated || u
+
 			// Update nodeTopologyPairsAntiAffinityPodsMaps according to anti-affinity properties.
 			if err := updateAntiAffinityInTPM(nodeTopologyPairsAntiAffinityPodsMaps,
 				antiAffinityTerms, node, pod, existingPod); err != nil {
@@ -626,8 +647,8 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				return
 			}
 		}
-		if len(nodeTopologyPairsAntiAffinityPodsMaps.topologyPairToPods) > 0 {
-			appendResult(node.Name, nodeTopologyPairsAntiAffinityPodsMaps)
+		if updated || len(nodeTopologyPairsAntiAffinityPodsMaps.topologyPairToPods) > 0 {
+			appendResult(q, node.Name, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
