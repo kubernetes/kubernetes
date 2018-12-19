@@ -47,8 +47,27 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_reposit
 
 go_rules_dependencies()
 
+# The version of rules_go we're using here is no longer supported, so
+# we must manually download a newer version of the go sdk.
+go_download_sdk(
+    name = "go_sdk",
+    sdks = {
+        "darwin_amd64": ("go1.10.7.darwin-amd64.tar.gz", "700725a36d29d6e5d474a887acbf490c3d2762d719bdfef8370e22198077297d"),
+        "freebsd_386": ("go1.10.7.freebsd-386.tar.gz", "d45bd54c38169ba228a67a17c92560e5a455405f6f5116a030c512510b06987c"),
+        "freebsd_amd64": ("go1.10.7.freebsd-amd64.tar.gz", "21c9bda5fa37d668348e65b2374de6da84c85d601e45bbba4d8e2c86450f2a95"),
+        "linux_386": ("go1.10.7.linux-386.tar.gz", "55cd25e550cb8ce8250dbc9eda56b9c10b3097c7f6beed45066fbaaf8c6c1ebd"),
+        "linux_amd64": ("go1.10.7.linux-amd64.tar.gz", "1aabe10919048822f3bb1865f7a22f8b78387a12c03cd573101594bc8fb33579"),
+        "linux_arm64": ("go1.10.7.linux-arm64.tar.gz", "cb5a274f7c8f6186957e4503e724dda8aeffe84b76a146748c55ea5bb22d9ae4"),
+        "linux_arm": ("go1.10.7.linux-armv6l.tar.gz", "1f81c995f829c8fc7def4d0cc1bde63cac1834386e6f650f2cd7be56ab5e8b98"),
+        "linux_ppc64le": ("go1.10.7.linux-ppc64le.tar.gz", "11279ffebfcfa875b0552839d428cc72e2056e68681286429b57173c0da91fb4"),
+        "linux_s390x": ("go1.10.7.linux-s390x.tar.gz", "e0d7802029ed8d2720a2b27ec1816e71cb29f818380abb8b449080e97547881e"),
+        "windows_386": ("go1.10.7.windows-386.zip", "bbd297a456aded5dcafe91194aafec883802cd0982120c735d15a39810248ea7"),
+        "windows_amd64": ("go1.10.7.windows-amd64.zip", "791e2d5a409932157ac87f4da7fa22d5e5468b784d5933121e4a747d89639e15"),
+    },
+)
+
 go_register_toolchains(
-    go_version = "1.10.3",
+    go_version = "overridden by go_download_sdk",
 )
 
 docker_repositories()
