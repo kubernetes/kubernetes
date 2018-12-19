@@ -46,7 +46,6 @@ func DecodeObjectManagedFields(from runtime.Object) (fieldpath.ManagedFields, er
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
-	accessor.SetManagedFields(nil)
 
 	managed, err := decodeManagedFields(accessor.GetManagedFields())
 	if err != nil {

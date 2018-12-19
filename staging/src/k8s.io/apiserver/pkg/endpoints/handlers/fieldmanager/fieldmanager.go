@@ -36,12 +36,13 @@ type FieldManager struct {
 	objectConverter runtime.ObjectConvertor
 	objectDefaulter runtime.ObjectDefaulter
 	groupVersion    schema.GroupVersion
+	hubVersion      schema.GroupVersion
 	updater         merge.Updater
 }
 
 // NewFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion) (*FieldManager, error) {
+func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (*FieldManager, error) {
 	typeConverter, err := internal.NewTypeConverter(models)
 	if err != nil {
 		return nil, err
@@ -51,8 +52,9 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
+		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(typeConverter, objectConverter),
+			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub),
 		},
 	}, nil
 }
@@ -70,13 +72,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 		}
 	}
-	if err := internal.RemoveObjectManagedFields(newObj); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from new obj: %v", err)
-	}
-	if err := internal.RemoveObjectManagedFields(liveObj); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
-	}
-
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
@@ -84,6 +79,12 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(liveObjVersioned); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(newObjVersioned); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from new obj: %v", err)
 	}
 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
@@ -114,15 +115,14 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
-	if err := internal.RemoveObjectManagedFields(liveObj); err != nil {
-		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
-	}
-
 	// We can assume that patchObj is already on the proper version:
 	// it shouldn't have to be converted so that it's not defaulted.
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
+	}
+	if err := internal.RemoveObjectManagedFields(liveObjVersioned); err != nil {
+		return nil, fmt.Errorf("failed to remove managed fields from live obj: %v", err)
 	}
 
 	patchObjTyped, err := f.typeConverter.YAMLToTyped(patch)
@@ -166,5 +166,5 @@ func (f *FieldManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
 }
 
 func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
-	return f.objectConverter.ConvertToVersion(obj, schema.GroupVersion{Group: f.groupVersion.Group, Version: runtime.APIVersionInternal})
+	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
 }

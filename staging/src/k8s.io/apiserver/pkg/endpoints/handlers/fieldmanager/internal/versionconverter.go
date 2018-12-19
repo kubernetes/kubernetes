@@ -17,9 +17,10 @@ limitations under the License.
 package internal
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
 	"sigs.k8s.io/structured-merge-diff/typed"
@@ -30,15 +31,17 @@ import (
 type versionConverter struct {
 	typeConverter   TypeConverter
 	objectConvertor runtime.ObjectConvertor
+	hubVersion      schema.GroupVersion
 }
 
 var _ merge.Converter = &versionConverter{}
 
 // NewVersionConverter builds a VersionConverter from a TypeConverter and an ObjectConvertor.
-func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor) merge.Converter {
+func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
 	return &versionConverter{
 		typeConverter:   t,
 		objectConvertor: o,
+		hubVersion:      h,
 	}
 }
 
@@ -56,10 +59,18 @@ func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.AP
 		return object, err
 	}
 
-	// Convert the object into the target version
-	convertedObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, groupVersion)
+	// Convert to internal
+	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, v.hubVersion)
 	if err != nil {
-		return object, err
+		return object, fmt.Errorf("failed to convert object (%v to %v): %v",
+			objectToConvert.GetObjectKind().GroupVersionKind(), v.hubVersion, err)
+	}
+
+	// Convert the object into the target version
+	convertedObject, err := v.objectConvertor.ConvertToVersion(internalObject, groupVersion)
+	if err != nil {
+		return object, fmt.Errorf("failed to convert object (%v to %v): %v",
+			internalObject.GetObjectKind().GroupVersionKind(), groupVersion, err)
 	}
 
 	// Convert the object back to a smd typed value and return it.
