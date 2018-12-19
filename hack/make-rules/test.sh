@@ -120,6 +120,10 @@ KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
+# If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
+if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
+    export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
+fi
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
