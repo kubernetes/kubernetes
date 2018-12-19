@@ -17,9 +17,11 @@ limitations under the License.
 package collectors
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
@@ -63,11 +65,11 @@ func TestMetricsCollected(t *testing.T) {
 		},
 	}
 
-	err := gatherAndCompare(collector, `
+	err := testutil.CollectAndCompare(collector, strings.NewReader(`
 		# HELP kubelet_container_log_filesystem_used_bytes Bytes used by the container's logs on the filesystem.
 		# TYPE kubelet_container_log_filesystem_used_bytes gauge
 		kubelet_container_log_filesystem_used_bytes{container="containerName1",namespace="some-namespace",pod="podName1"} 18
-`, nil)
+`), "kubelet_container_log_filesystem_used_bytes")
 	if err != nil {
 		t.Fatal(err)
 	}
