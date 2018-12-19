@@ -50,15 +50,15 @@ var (
 	order         = []string{"false", "true", "matches", "nopods", algorithmpredicates.MatchInterPodAffinityPred}
 )
 
-func falsePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
+func falsePredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func truePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func truePredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func matchesPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func matchesPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -66,14 +66,14 @@ func matchesPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	if pod.Name == node.Name {
 		return true, nil, nil
 	}
-	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
+	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func hasNoPodsPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func hasNoPodsPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	if len(nodeInfo.Pods()) == 0 {
 		return true, nil, nil
 	}
-	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
+	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
 func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
@@ -238,7 +238,7 @@ func TestGenericScheduler(t *testing.T) {
 	algorithmpredicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name                     string
-		predicates               map[string]algorithm.FitPredicate
+		predicates               map[string]algorithmpredicates.FitPredicate
 		prioritizers             []algorithm.PriorityConfig
 		alwaysCheckAllPredicates bool
 		nodes                    []string
@@ -250,7 +250,7 @@ func TestGenericScheduler(t *testing.T) {
 		wErr                     error
 	}{
 		{
-			predicates:   map[string]algorithm.FitPredicate{"false": falsePredicate},
+			predicates:   map[string]algorithmpredicates.FitPredicate{"false": falsePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			expectsErr:   true,
@@ -260,12 +260,12 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
 				FailedPredicates: FailedPredicateMap{
-					"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
-					"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				}},
 		},
 		{
-			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
@@ -275,7 +275,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Fits on a machine where the pod ID matches the machine name
-			predicates:    map[string]algorithm.FitPredicate{"matches": matchesPredicate},
+			predicates:    map[string]algorithmpredicates.FitPredicate{"matches": matchesPredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
@@ -284,7 +284,7 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
@@ -293,7 +293,7 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			predicates:    map[string]algorithm.FitPredicate{"matches": matchesPredicate},
+			predicates:    map[string]algorithmpredicates.FitPredicate{"matches": matchesPredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
@@ -302,7 +302,7 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}, {Function: reverseNumericPriority, Weight: 2}},
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
@@ -311,7 +311,7 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate},
+			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "false": falsePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:        []string{"3", "2", "1"},
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
@@ -321,14 +321,14 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 3,
 				FailedPredicates: FailedPredicateMap{
-					"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
-					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
-					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
 			},
 		},
 		{
-			predicates: map[string]algorithm.FitPredicate{
+			predicates: map[string]algorithmpredicates.FitPredicate{
 				"nopods":  hasNoPodsPredicate,
 				"matches": matchesPredicate,
 			},
@@ -352,14 +352,14 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
 				FailedPredicates: FailedPredicateMap{
-					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
-					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
 			},
 		},
 		{
 			// Pod with existing PVC
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			pvcs:         []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC"}}},
@@ -383,7 +383,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with non existing PVC
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			pod: &v1.Pod{
@@ -406,7 +406,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with deleting PVC
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			pvcs:         []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", DeletionTimestamp: &metav1.Time{}}}},
@@ -430,7 +430,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// alwaysCheckAllPredicates is true
-			predicates:               map[string]algorithm.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
+			predicates:               map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
 			prioritizers:             []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			alwaysCheckAllPredicates: true,
 			nodes:                    []string{"1"},
@@ -440,12 +440,12 @@ func TestGenericScheduler(t *testing.T) {
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 1,
 				FailedPredicates: FailedPredicateMap{
-					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate, algorithmpredicates.ErrFakePredicate},
+					"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate, algorithmpredicates.ErrFakePredicate},
 				},
 			},
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: falseMapPriority, Weight: 1}, {Map: trueMapPriority, Reduce: getNodeReducePriority, Weight: 2}},
 			nodes:        []string{"2", "1"},
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
@@ -471,7 +471,7 @@ func TestGenericScheduler(t *testing.T) {
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				test.predicates,
-				algorithm.EmptyPredicateMetadataProducer,
+				algorithmpredicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				algorithm.EmptyPriorityMetadataProducer,
 				emptyPluginSet,
@@ -495,7 +495,7 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 // makeScheduler makes a simple genericScheduler for testing.
-func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Node) *genericScheduler {
+func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes []*v1.Node) *genericScheduler {
 	algorithmpredicates.SetPredicatesOrdering(order)
 	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
 	for _, n := range nodes {
@@ -507,7 +507,7 @@ func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Nod
 		cache,
 		internalqueue.NewSchedulingQueue(nil),
 		predicates,
-		algorithm.EmptyPredicateMetadataProducer,
+		algorithmpredicates.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
 		emptyPluginSet,
@@ -519,7 +519,7 @@ func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Nod
 }
 
 func TestFindFitAllError(t *testing.T) {
-	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
+	predicates := map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
@@ -547,7 +547,7 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
+	predicates := map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
@@ -602,9 +602,9 @@ func TestHumanReadableFitError(t *testing.T) {
 		Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 		NumAllNodes: 3,
 		FailedPredicates: FailedPredicateMap{
-			"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
-			"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
-			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+			"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
+			"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+			"3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 		},
 	}
 	if strings.Contains(err.Error(), "0/3 nodes are available") {
@@ -796,7 +796,7 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return &node, nil
 }
 
-func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) algorithm.PredicateMetadata {
+func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) algorithmpredicates.PredicateMetadata {
 	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p})(p, nodeInfo)
 }
 
@@ -856,7 +856,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	algorithmpredicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name                 string
-		predicates           map[string]algorithm.FitPredicate
+		predicates           map[string]algorithmpredicates.FitPredicate
 		nodes                []string
 		pod                  *v1.Pod
 		pods                 []*v1.Pod
@@ -865,7 +865,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	}{
 		{
 			name:       "a pod that does not fit on any machine",
-			predicates: map[string]algorithm.FitPredicate{"matches": falsePredicate},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": falsePredicate},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "new", UID: types.UID("new")}, Spec: v1.PodSpec{Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -875,7 +875,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "a pod that fits with no preemption",
-			predicates: map[string]algorithm.FitPredicate{"matches": truePredicate},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": truePredicate},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "new", UID: types.UID("new")}, Spec: v1.PodSpec{Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -885,7 +885,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "a pod that fits on one machine with no preemption",
-			predicates: map[string]algorithm.FitPredicate{"matches": matchesPredicate},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": matchesPredicate},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -895,7 +895,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "a pod that fits on both machines when lower priority pods are preempted",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -905,7 +905,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "a pod that would fit on the machines, but other pods running are higher priority",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &lowPriority}},
 			pods: []*v1.Pod{
@@ -915,7 +915,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "medium priority pod is preempted, but lower priority one stays as it is small",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -926,7 +926,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "mixed priority pods are preempted",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -939,7 +939,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name:       "pod with anti-affinity is preempted",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2"},
 			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{
 				Name:   "machine1",
@@ -1002,7 +1002,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	algorithmpredicates.SetPredicatesOrdering(order)
 	tests := []struct {
 		name       string
-		predicates map[string]algorithm.FitPredicate
+		predicates map[string]algorithmpredicates.FitPredicate
 		nodes      []string
 		pod        *v1.Pod
 		pods       []*v1.Pod
@@ -1010,7 +1010,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	}{
 		{
 			name:       "No node needs preemption",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1019,7 +1019,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 		},
 		{
 			name:       "a pod that fits on both machines when lower priority pods are preempted",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1030,7 +1030,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 		},
 		{
 			name:       "a pod that fits on a machine with no preemption",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2", "machine3"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1041,7 +1041,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 		},
 		{
 			name:       "machine with min highest priority pod is picked",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2", "machine3"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: veryLargeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1058,7 +1058,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 		},
 		{
 			name:       "when highest priorities are the same, minimum sum of priorities is picked",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2", "machine3"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: veryLargeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1075,7 +1075,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 		},
 		{
 			name:       "when highest priority and sum are the same, minimum number of pods is picked",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2", "machine3"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: veryLargeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1097,7 +1097,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			// pickOneNodeForPreemption adjusts pod priorities when finding the sum of the victims. This
 			// test ensures that the logic works correctly.
 			name:       "sum of adjusted priorities is considered",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2", "machine3"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}, Spec: v1.PodSpec{Containers: veryLargeContainers, Priority: &highPriority}},
 			pods: []*v1.Pod{
@@ -1116,7 +1116,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 		},
 		{
 			name:       "non-overlapping lowest high priority, sum priorities, and number of pods",
-			predicates: map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			predicates: map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 			nodes:      []string{"machine1", "machine2", "machine3", "machine4"},
 			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{Containers: veryLargeContainers, Priority: &veryHighPriority}},
 			pods: []*v1.Pod{
@@ -1177,72 +1177,72 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "No node should be attempted",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrTaintsTolerationsNotMatch},
-				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeLabelPresenceViolated},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTaintsTolerationsNotMatch},
+				"machine4": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeLabelPresenceViolated},
 			},
 			expected: map[string]bool{},
 		},
 		{
 			name: "ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnschedulable},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnschedulable},
 			},
 			expected: map[string]bool{"machine1": true, "machine4": true},
 		},
 		{
 			name: "pod with both pod affinity and anti-affinity should be tried",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
 		{
 			name: "ErrPodAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityRulesNotMatch},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityRulesNotMatch},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
 			},
 			expected: map[string]bool{"machine2": true, "machine3": true, "machine4": true},
 		},
 		{
 			name: "Mix of failed predicates works fine",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeUnderDiskPressure, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName, algorithmpredicates.ErrDiskConflict},
-				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
-				"machine4": []algorithm.PredicateFailureReason{},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeUnderDiskPressure, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName, algorithmpredicates.ErrDiskConflict},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
+				"machine4": []algorithmpredicates.PredicateFailureReason{},
 			},
 			expected: map[string]bool{"machine3": true, "machine4": true},
 		},
 		{
 			name: "Node condition errors should be considered unresolvable",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderPIDPressure},
-				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderPIDPressure},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
 			},
 			expected: map[string]bool{"machine4": true},
 		},
 		{
 			name: "Node condition errors and ErrNodeUnknownCondition should be considered unresolvable",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeNotReady},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeNetworkUnavailable},
-				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnknownCondition},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeNotReady},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeNetworkUnavailable},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnknownCondition},
 			},
 			expected: map[string]bool{"machine4": true},
 		},
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
 			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrVolumeZoneConflict},
-				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrVolumeNodeConflict},
-				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrVolumeBindConflict},
+				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrVolumeZoneConflict},
+				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrVolumeNodeConflict},
+				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrVolumeBindConflict},
 			},
 			expected: map[string]bool{"machine4": true},
 		},
@@ -1265,9 +1265,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 func TestPreempt(t *testing.T) {
 	failedPredMap := FailedPredicateMap{
-		"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
-		"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrDiskConflict},
-		"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
+		"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
+		"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrDiskConflict},
+		"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 	}
 	// Prepare 3 node names.
 	nodeNames := []string{}
@@ -1431,8 +1431,8 @@ func TestPreempt(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
-				map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
-				algorithm.EmptyPredicateMetadataProducer,
+				map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+				algorithmpredicates.EmptyPredicateMetadataProducer,
 				[]algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 				algorithm.EmptyPriorityMetadataProducer,
 				emptyPluginSet,

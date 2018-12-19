@@ -64,6 +64,7 @@ go_test(
     deps = [
         "//pkg/api/testing:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
+        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",

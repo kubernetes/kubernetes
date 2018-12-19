@@ -62,7 +62,7 @@ const (
 )
 
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
-type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
+type FailedPredicateMap map[string][]predicates.PredicateFailureReason
 
 // FitError describes a fit error of a pod.
 type FitError struct {
@@ -112,7 +112,7 @@ type ScheduleAlgorithm interface {
 	Preempt(*v1.Pod, algorithm.NodeLister, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Predicates() returns a pointer to a map of predicate functions. This is
 	// exposed for testing.
-	Predicates() map[string]algorithm.FitPredicate
+	Predicates() map[string]predicates.FitPredicate
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
 	Prioritizers() []algorithm.PriorityConfig
@@ -121,9 +121,9 @@ type ScheduleAlgorithm interface {
 type genericScheduler struct {
 	cache                    schedulerinternalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
-	predicates               map[string]algorithm.FitPredicate
+	predicates               map[string]predicates.FitPredicate
 	priorityMetaProducer     algorithm.PriorityMetadataProducer
-	predicateMetaProducer    algorithm.PredicateMetadataProducer
+	predicateMetaProducer    predicates.PredicateMetadataProducer
 	prioritizers             []algorithm.PriorityConfig
 	pluginSet                pluginsv1alpha1.PluginSet
 	extenders                []algorithm.SchedulerExtender
@@ -213,7 +213,7 @@ func (g *genericScheduler) Prioritizers() []algorithm.PriorityConfig {
 
 // Predicates returns a map containing all the scheduler's predicate
 // functions. It is exposed for testing only.
-func (g *genericScheduler) Predicates() map[string]algorithm.FitPredicate {
+func (g *genericScheduler) Predicates() map[string]predicates.FitPredicate {
 	return g.predicates
 }
 
@@ -486,7 +486,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 			for failedNodeName, failedMsg := range failedMap {
 				if _, found := failedPredicateMap[failedNodeName]; !found {
-					failedPredicateMap[failedNodeName] = []algorithm.PredicateFailureReason{}
+					failedPredicateMap[failedNodeName] = []predicates.PredicateFailureReason{}
 				}
 				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
 			}
@@ -502,8 +502,8 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
 // any pod was found, 2) augmented meta data, 3) augmented nodeInfo.
-func addNominatedPods(pod *v1.Pod, meta algorithm.PredicateMetadata,
-	nodeInfo *schedulernodeinfo.NodeInfo, queue internalqueue.SchedulingQueue) (bool, algorithm.PredicateMetadata,
+func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
+	nodeInfo *schedulernodeinfo.NodeInfo, queue internalqueue.SchedulingQueue) (bool, predicates.PredicateMetadata,
 	*schedulernodeinfo.NodeInfo) {
 	if queue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
@@ -513,7 +513,7 @@ func addNominatedPods(pod *v1.Pod, meta algorithm.PredicateMetadata,
 	if nominatedPods == nil || len(nominatedPods) == 0 {
 		return false, meta, nodeInfo
 	}
-	var metaOut algorithm.PredicateMetadata
+	var metaOut predicates.PredicateMetadata
 	if meta != nil {
 		metaOut = meta.ShallowCopy()
 	}
@@ -541,13 +541,13 @@ func addNominatedPods(pod *v1.Pod, meta algorithm.PredicateMetadata,
 // It removes victims from meta and NodeInfo before calling this function.
 func podFitsOnNode(
 	pod *v1.Pod,
-	meta algorithm.PredicateMetadata,
+	meta predicates.PredicateMetadata,
 	info *schedulernodeinfo.NodeInfo,
-	predicateFuncs map[string]algorithm.FitPredicate,
+	predicateFuncs map[string]predicates.FitPredicate,
 	queue internalqueue.SchedulingQueue,
 	alwaysCheckAllPredicates bool,
-) (bool, []algorithm.PredicateFailureReason, error) {
-	var failedPredicates []algorithm.PredicateFailureReason
+) (bool, []predicates.PredicateFailureReason, error) {
+	var failedPredicates []predicates.PredicateFailureReason
 
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
@@ -579,14 +579,14 @@ func podFitsOnNode(
 		for _, predicateKey := range predicates.Ordering() {
 			var (
 				fit     bool
-				reasons []algorithm.PredicateFailureReason
+				reasons []predicates.PredicateFailureReason
 				err     error
 			)
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
 				if err != nil {
-					return false, []algorithm.PredicateFailureReason{}, err
+					return false, []predicates.PredicateFailureReason{}, err
 				}
 
 				if !fit {
@@ -887,8 +887,8 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 func selectNodesForPreemption(pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	potentialNodes []*v1.Node,
-	predicates map[string]algorithm.FitPredicate,
-	metadataProducer algorithm.PredicateMetadataProducer,
+	fitPredicates map[string]predicates.FitPredicate,
+	metadataProducer predicates.PredicateMetadataProducer,
 	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
@@ -899,11 +899,11 @@ func selectNodesForPreemption(pod *v1.Pod,
 	meta := metadataProducer(pod, nodeNameToInfo)
 	checkNode := func(i int) {
 		nodeName := potentialNodes[i].Name
-		var metaCopy algorithm.PredicateMetadata
+		var metaCopy predicates.PredicateMetadata
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], predicates, queue, pdbs)
+		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
 			resultLock.Lock()
 			victims := schedulerapi.Victims{
@@ -974,9 +974,9 @@ func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruption
 // these predicates can be satisfied by removing more pods from the node.
 func selectVictimsOnNode(
 	pod *v1.Pod,
-	meta algorithm.PredicateMetadata,
+	meta predicates.PredicateMetadata,
 	nodeInfo *schedulernodeinfo.NodeInfo,
-	fitPredicates map[string]algorithm.FitPredicate,
+	fitPredicates map[string]predicates.FitPredicate,
 	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, bool) {
@@ -1143,8 +1143,8 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 func NewGenericScheduler(
 	cache schedulerinternalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
-	predicates map[string]algorithm.FitPredicate,
-	predicateMetaProducer algorithm.PredicateMetadataProducer,
+	predicates map[string]predicates.FitPredicate,
+	predicateMetaProducer predicates.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.PriorityMetadataProducer,
 	pluginSet pluginsv1alpha1.PluginSet,
