@@ -52,7 +52,7 @@ func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 		class.AllowVolumeExpansion = nil
 	}
 
-	storageutil.DropDisabledAlphaFields(class)
+	storageutil.DropDisabledFields(class, nil)
 }
 
 func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -77,8 +77,7 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 		newClass.AllowVolumeExpansion = nil
 		oldClass.AllowVolumeExpansion = nil
 	}
-	storageutil.DropDisabledAlphaFields(oldClass)
-	storageutil.DropDisabledAlphaFields(newClass)
+	storageutil.DropDisabledFields(oldClass, newClass)
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

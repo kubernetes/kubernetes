@@ -52,7 +52,7 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj r
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
 
-	pvcutil.DropDisabledAlphaFields(&pvc.Spec)
+	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 }
 
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -74,8 +74,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
 
-	pvcutil.DropDisabledAlphaFields(&newPvc.Spec)
-	pvcutil.DropDisabledAlphaFields(&oldPvc.Spec)
+	pvcutil.DropDisabledFields(&newPvc.Spec, &oldPvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

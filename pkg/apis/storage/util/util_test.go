@@ -46,7 +46,7 @@ func TestDropAlphaFields(t *testing.T) {
 		VolumeBindingMode: &bindingMode,
 		AllowedTopologies: allowedTopologies,
 	}
-	DropDisabledAlphaFields(class)
+	DropDisabledFields(class, nil)
 	if class.VolumeBindingMode != nil {
 		t.Errorf("VolumeBindingMode field didn't get dropped: %+v", class.VolumeBindingMode)
 	}
@@ -60,7 +60,7 @@ func TestDropAlphaFields(t *testing.T) {
 		AllowedTopologies: allowedTopologies,
 	}
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
-	DropDisabledAlphaFields(class)
+	DropDisabledFields(class, nil)
 	if class.VolumeBindingMode != &bindingMode {
 		t.Errorf("VolumeBindingMode field got unexpectantly modified: %+v", class.VolumeBindingMode)
 	}

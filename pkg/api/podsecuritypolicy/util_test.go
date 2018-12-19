@@ -38,7 +38,7 @@ func TestDropAlphaProcMountType(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
 
 	// now test dropping the fields - should not be dropped
-	DropDisabledAlphaFields(&psp.Spec)
+	DropDisabledFields(&psp.Spec, nil)
 
 	// check to make sure AllowedProcMountTypes is still present
 	// if featureset is set to true
@@ -52,13 +52,13 @@ func TestDropAlphaProcMountType(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, false)()
 
 	// now test dropping the fields
-	DropDisabledAlphaFields(&psp.Spec)
+	DropDisabledFields(&psp.Spec, nil)
 
 	// check to make sure AllowedProcMountTypes is nil
 	// if featureset is set to false
 	if utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
 		if psp.Spec.AllowedProcMountTypes != nil {
-			t.Error("DropDisabledAlphaFields AllowedProcMountTypes for psp.Spec failed")
+			t.Error("DropDisabledFields AllowedProcMountTypes for psp.Spec failed")
 		}
 	}
 }
