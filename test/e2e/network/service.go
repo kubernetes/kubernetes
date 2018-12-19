@@ -1687,6 +1687,67 @@ var _ = SIGDescribe("Services", func() {
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 		execAffinityTestForLBService(f, cs, svc, true)
 	})
+
+	It("should implement service.kubernetes.io/service-proxy-name", func() {
+		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		// this test does not work if the Node does not support SSH Key
+		framework.SkipUnlessSSHKeyPresent()
+
+		ns := f.Namespace.Name
+		numPods, servicePort := 3, defaultServeHostnameServicePort
+		serviceProxyNameLabels := map[string]string{"service.kubernetes.io/service-proxy-name": "foo-bar"}
+
+		// We will create 2 services to test creating services in both states and also dynamic updates
+		// svcDisabled: Created with the label, will always be disabled. We create this early and
+		//              test again late to make sure it never becomes available.
+		// svcToggled: Created without the label then the label is toggled verifying reachability at each step.
+
+		By("creating service-disabled in namespace " + ns)
+		svcDisabled := getServeHostnameService("service-disabled")
+		svcDisabled.ObjectMeta.Labels = serviceProxyNameLabels
+		_, svcDisabledIP, err := framework.StartServeHostnameService(cs, internalClientset, svcDisabled, ns, numPods)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating service in namespace " + ns)
+		svcToggled := getServeHostnameService("service")
+		podToggledNames, svcToggledIP, err := framework.StartServeHostnameService(cs, internalClientset, svcToggled, ns, numPods)
+		Expect(err).NotTo(HaveOccurred())
+
+		jig := framework.NewServiceTestJig(cs, svcToggled.ObjectMeta.Name)
+
+		hosts, err := framework.NodeSSHHosts(cs)
+		Expect(err).NotTo(HaveOccurred())
+		if len(hosts) == 0 {
+			framework.Failf("No ssh-able nodes")
+		}
+		host := hosts[0]
+
+		By("verifying service is up")
+		framework.ExpectNoError(framework.VerifyServeHostnameServiceUp(cs, ns, host, podToggledNames, svcToggledIP, servicePort))
+
+		By("verifying service-disabled is not up")
+		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
+
+		By("adding service-proxy-name label")
+		jig.UpdateServiceOrFail(ns, svcToggled.ObjectMeta.Name, func(svc *v1.Service) {
+			svc.ObjectMeta.Labels = serviceProxyNameLabels
+		})
+
+		By("verifying service is not up")
+		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svcToggledIP, servicePort))
+
+		By("removing service-proxy-name annotation")
+		jig.UpdateServiceOrFail(ns, svcToggled.ObjectMeta.Name, func(svc *v1.Service) {
+			svc.ObjectMeta.Labels = nil
+		})
+
+		By("verifying service is up")
+		framework.ExpectNoError(framework.VerifyServeHostnameServiceUp(cs, ns, host, podToggledNames, svcToggledIP, servicePort))
+
+		By("verifying service-disabled is still not up")
+		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
+	})
 })
 
 // TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
