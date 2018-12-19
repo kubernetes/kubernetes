@@ -84,13 +84,13 @@ func (az *Cloud) getAvailabilitySetID(resourceGroup, availabilitySetName string)
 }
 
 // returns the full identifier of a loadbalancer frontendipconfiguration.
-func (az *Cloud) getFrontendIPConfigID(lbName, backendPoolName string) string {
+func (az *Cloud) getFrontendIPConfigID(lbName, fipConfigName string) string {
 	return fmt.Sprintf(
 		frontendIPConfigIDTemplate,
 		az.SubscriptionID,
 		az.ResourceGroup,
 		lbName,
-		backendPoolName)
+		fipConfigName)
 }
 
 // returns the full identifier of a loadbalancer backendpool.
