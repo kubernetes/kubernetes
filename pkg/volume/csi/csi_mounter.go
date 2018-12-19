@@ -289,20 +289,6 @@ func (c *csiMountMgr) TearDown() error {
 func (c *csiMountMgr) TearDownAt(dir string) error {
 	klog.V(4).Infof(log("Unmounter.TearDown(%s)", dir))
 
-	// is dir even mounted ?
-	// TODO (vladimirvivien) this check may not work for an emptyDir or local storage
-	// see https://github.com/kubernetes/kubernetes/pull/56836#discussion_r155834524
-	mounted, err := isDirMounted(c.plugin, dir)
-	if err != nil {
-		klog.Error(log("unmounter.Teardown failed while checking mount status for dir [%s]: %v", dir, err))
-		return err
-	}
-
-	if !mounted {
-		klog.V(4).Info(log("unmounter.Teardown skipping unmount, dir not mounted [%s]", dir))
-		return nil
-	}
-
 	volID := c.volumeID
 	csi := c.csiClient
 
