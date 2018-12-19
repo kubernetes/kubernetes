@@ -4074,6 +4074,106 @@
 			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
 		},
 		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/commands/build",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/constants",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/expansion",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/factory",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/fs",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/gvk",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/ifc",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/ifc/transformer",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/internal/error",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/loader",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/patch",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/patch/transformer",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/resid",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/resmap",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/resource",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/target",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers/config",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/kustomize/pkg/types",
+			"Comment": "v1.0.10-69-gef51cceff55b17",
+			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
+		},
+		{
 			"ImportPath": "sigs.k8s.io/yaml",
 			"Comment": "v1.1.0",
 			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
