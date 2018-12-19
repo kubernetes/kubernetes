@@ -921,6 +921,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 		expectedVolumeID   *string
 		expectedEC2Volumes []*ec2.Volume
 		expectedLabels     map[string]string
+		expectedSupported  bool
 		expectedError      error
 	}{
 		{
@@ -931,6 +932,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			false,
 			nil,
 		},
 		{
@@ -947,6 +949,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			false,
 			nil,
 		},
 		{
@@ -963,6 +966,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			defaultVolume,
 			nil,
 			nil,
+			true,
 			fmt.Errorf("no volumes found"),
 		},
 		{
@@ -985,6 +989,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 				kubeletapis.LabelZoneFailureDomain: "us-east-1a",
 				kubeletapis.LabelZoneRegion:        "us-east-1",
 			},
+			true,
 			nil,
 		},
 	}
@@ -997,8 +1002,9 @@ func TestGetLabelsForVolume(t *testing.T) {
 			c, err := newAWSCloud(CloudConfig{}, awsServices)
 			assert.Nil(t, err, "Error building aws cloud: %v", err)
 
-			l, err := c.GetLabelsForVolume(context.TODO(), test.pv)
+			l, s, err := c.GetLabelsForVolume(context.TODO(), test.pv)
 			assert.Equal(t, test.expectedLabels, l)
+			assert.Equal(t, test.expectedSupported, s)
 			assert.Equal(t, test.expectedError, err)
 		})
 

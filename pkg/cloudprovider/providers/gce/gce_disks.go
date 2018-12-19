@@ -503,10 +503,10 @@ func newDiskMetricContextRegional(request, region string) *metricContext {
 }
 
 // GetLabelsForVolume retrieved the label info for the provided volume
-func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, bool, error) {
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.GCEPersistentDisk.PDName == volume.ProvisionedVolumeName {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// If the zone is already labeled, honor the hint
@@ -514,10 +514,10 @@ func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 
 	labels, err := g.GetAutoLabelsForPD(pv.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 
-	return labels, nil
+	return labels, true, nil
 }
 
 // AttachDisk attaches given disk to the node with the specified NodeName.

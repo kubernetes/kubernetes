@@ -188,12 +188,15 @@ func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinity(key string) er
 
 func (pvlc *PersistentVolumeLabelController) addLabelsAndAffinityToVolume(vol *v1.PersistentVolume) error {
 	var volumeLabels map[string]string
-	// Only add labels if the next pending initializer.
+	// Only add labels, if the next pending initializer is pvlabel.kubernetes.io.
 	if needsInitialization(vol.Initializers, initializerName) {
 		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
-			labels, err := labeler.GetLabelsForVolume(context.TODO(), vol)
+			labels, update, err := labeler.GetLabelsForVolume(context.TODO(), vol)
 			if err != nil {
 				return fmt.Errorf("error querying volume %v: %v", vol.Spec, err)
+			}
+			if !update {
+				return nil
 			}
 			volumeLabels = labels
 		} else {

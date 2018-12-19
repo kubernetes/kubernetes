@@ -2327,24 +2327,24 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 }
 
 // GetLabelsForVolume gets the volume labels for a volume
-func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, bool, error) {
 	// Ignore if not AWSElasticBlockStore.
 	if pv.Spec.AWSElasticBlockStore == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	spec := KubernetesVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
 	labels, err := c.GetVolumeLabels(spec)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 
-	return labels, nil
+	return labels, true, nil
 }
 
 // GetVolumeLabels implements Volumes.GetVolumeLabels

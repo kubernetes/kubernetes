@@ -18,24 +18,22 @@ package cloud
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
-	"time"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	sets "k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
 
 func nodeSelectorRequirementsEqual(r1, r2 v1.NodeSelectorRequirement) bool {
@@ -497,77 +495,120 @@ func TestAddLabelsToVolume(t *testing.T) {
 		vol                       v1.PersistentVolume
 		initializers              *metav1.Initializers
 		shouldLabelAndSetAffinity bool
+		update                    bool
+		patchErr                  error
+		labelErr                  error
 	}{
 		"PV without initializer": {
 			vol:                       pv,
 			initializers:              nil,
 			shouldLabelAndSetAffinity: false,
+			update:                    true,
 		},
 		"PV with initializer to remove": {
 			vol:                       pv,
 			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
 			shouldLabelAndSetAffinity: true,
+			update:                    true,
+		},
+		"PV with initializer to remove with patch error": {
+			vol:                       pv,
+			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
+			shouldLabelAndSetAffinity: true,
+			update:                    true,
+			patchErr:                  errors.New("patch error"),
+		},
+		"PV with initializer to remove with label query error": {
+			vol:                       pv,
+			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
+			shouldLabelAndSetAffinity: false,
+			update:                    true,
+			labelErr:                  errors.New("label error"),
+		},
+		"PV not updated": {
+			vol:                       pv,
+			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: initializerName}}},
+			shouldLabelAndSetAffinity: false,
+			update:                    false,
 		},
 		"PV with other initializers only": {
 			vol:                       pv,
 			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}}},
 			shouldLabelAndSetAffinity: false,
+			update:                    true,
 		},
 		"PV with other initializers first": {
 			vol:                       pv,
 			initializers:              &metav1.Initializers{Pending: []metav1.Initializer{{Name: "OtherInit"}, {Name: initializerName}}},
 			shouldLabelAndSetAffinity: false,
+			update:                    true,
 		},
 	}
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
 	for d, tc := range testCases {
-		labeledCh := make(chan bool, 1)
-		client := fake.NewSimpleClientset()
-		client.PrependReactor("patch", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			patch := action.(core.PatchActionImpl).GetPatch()
-			obj := &v1.PersistentVolume{}
-			json.Unmarshal(patch, obj)
-			if obj.ObjectMeta.Labels["a"] != "1" {
-				return false, nil, nil
+		tc := tc
+		t.Run(d, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			client.PrependReactor("patch", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				if tc.patchErr != nil {
+					return true, nil, tc.patchErr
+				}
+				patch := action.(core.PatchActionImpl).GetPatch()
+				obj := &v1.PersistentVolume{}
+				if err := json.Unmarshal(patch, obj); err != nil {
+					return false, nil, err
+				}
+				if obj.ObjectMeta.Labels["a"] != "1" {
+					return false, nil, nil
+				}
+				if obj.Spec.NodeAffinity == nil {
+					return false, nil, nil
+				}
+				if obj.Spec.NodeAffinity.Required == nil {
+					return false, nil, nil
+				}
+				if len(obj.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+					return false, nil, nil
+				}
+				reqs := obj.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions
+				if len(reqs) != 1 {
+					return false, nil, nil
+				}
+				if reqs[0].Key != "a" || reqs[0].Values[0] != "1" || reqs[0].Operator != v1.NodeSelectorOpIn {
+					return false, nil, nil
+				}
+				return true, nil, nil
+			})
+
+			fakeCloud := &fakecloud.FakeCloud{
+				VolumeLabelMap: map[string]fakecloud.FakeVolume{
+					"awsPV": {
+						Annotations: map[string]string{"a": "1"},
+						Update:      tc.update,
+						Error:       tc.labelErr,
+					},
+				},
 			}
-			if obj.Spec.NodeAffinity == nil {
-				return false, nil, nil
+			pvlController := &PersistentVolumeLabelController{kubeClient: client, cloud: fakeCloud}
+			tc.vol.ObjectMeta.Initializers = tc.initializers
+
+			err := pvlController.addLabelsAndAffinityToVolume(&tc.vol)
+
+			if tc.patchErr != nil || tc.labelErr != nil {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
-			if obj.Spec.NodeAffinity.Required == nil {
-				return false, nil, nil
+
+			actions := client.Actions()
+			if tc.shouldLabelAndSetAffinity {
+				assert.Len(t, actions, 1, "Label and affinity must be set on PV")
+			} else {
+				assert.Empty(t, actions, "label and affinity must not be set on PV")
 			}
-			if len(obj.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-				return false, nil, nil
-			}
-			reqs := obj.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions
-			if len(reqs) != 1 {
-				return false, nil, nil
-			}
-			if reqs[0].Key != "a" || reqs[0].Values[0] != "1" || reqs[0].Operator != v1.NodeSelectorOpIn {
-				return false, nil, nil
-			}
-			labeledCh <- true
-			return true, nil, nil
+
 		})
-
-		fakeCloud := &fakecloud.FakeCloud{
-			VolumeLabelMap: map[string]map[string]string{"awsPV": {"a": "1"}},
-		}
-		pvlController := &PersistentVolumeLabelController{kubeClient: client, cloud: fakeCloud}
-		tc.vol.ObjectMeta.Initializers = tc.initializers
-		pvlController.addLabelsAndAffinityToVolume(&tc.vol)
-
-		select {
-		case l := <-labeledCh:
-			if l != tc.shouldLabelAndSetAffinity {
-				t.Errorf("%s: label and affinity setting of pv failed.  expected %t got %t", d, tc.shouldLabelAndSetAffinity, l)
-			}
-		case <-time.After(500 * time.Millisecond):
-			if tc.shouldLabelAndSetAffinity != false {
-				t.Errorf("%s: timed out waiting for label and affinity setting notification", d)
-			}
-		}
 	}
 }

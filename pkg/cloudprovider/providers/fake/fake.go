@@ -80,11 +80,16 @@ type FakeCloud struct {
 	Provider      string
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
-	VolumeLabelMap map[string]map[string]string
+	VolumeLabelMap map[string]FakeVolume
 
 	RequestDelay time.Duration
 }
 
+type FakeVolume struct {
+	Annotations map[string]string
+	Update      bool
+	Error       error
+}
 type FakeRoute struct {
 	ClusterName string
 	Route       cloudprovider.Route
@@ -350,9 +355,11 @@ func (f *FakeCloud) DeleteRoute(ctx context.Context, clusterName string, route *
 	return nil
 }
 
-func (c *FakeCloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
-	if val, ok := c.VolumeLabelMap[pv.Name]; ok {
-		return val, nil
+func (f *FakeCloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, bool, error) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	if fv, ok := f.VolumeLabelMap[pv.Name]; ok {
+		return fv.Annotations, fv.Update, fv.Error
 	}
-	return nil, fmt.Errorf("label not found for volume")
+	return nil, false, fmt.Errorf("label not found for volume")
 }

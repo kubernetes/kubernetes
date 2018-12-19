@@ -275,18 +275,19 @@ func getResourceGroupFromDiskURI(diskURI string) (string, error) {
 }
 
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
-func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, bool, error) {
 	// Ignore if not AzureDisk.
 	if pv.Spec.AzureDisk == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.AzureDisk.DiskName == volume.ProvisionedVolumeName {
-		return nil, nil
+		return nil, false, nil
 	}
 
-	return c.GetAzureDiskLabels(pv.Spec.AzureDisk.DataDiskURI)
+	labels, err := c.GetAzureDiskLabels(pv.Spec.AzureDisk.DataDiskURI)
+	return labels, true, err
 }
 
 // GetAzureDiskLabels gets availability zone labels for Azuredisk.

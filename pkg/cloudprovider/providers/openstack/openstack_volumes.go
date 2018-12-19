@@ -696,21 +696,21 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 }
 
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
-func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, bool, error) {
 	// Ignore if not Cinder.
 	if pv.Spec.Cinder == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	// Get Volume
 	volume, err := os.getVolume(pv.Spec.Cinder.VolumeID)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 
 	// Construct Volume Labels
@@ -719,7 +719,7 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 	labels[kubeletapis.LabelZoneRegion] = os.region
 	klog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
 
-	return labels, nil
+	return labels, true, nil
 }
 
 // recordOpenstackOperationMetric records openstack operation metrics
