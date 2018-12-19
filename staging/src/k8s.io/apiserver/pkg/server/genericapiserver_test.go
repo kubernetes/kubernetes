@@ -529,7 +529,6 @@ func TestGracefulShutdown(t *testing.T) {
 		graceShutdown = true
 	})
 	okHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		wg.Done()
 		w.WriteHeader(http.StatusOK)
 	})
 
