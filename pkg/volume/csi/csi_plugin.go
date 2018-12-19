@@ -28,7 +28,7 @@ import (
 
 	"context"
 
-	"k8s.io/klog"
+	csiPlugins "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins"
 
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -41,11 +41,10 @@ import (
 	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
 	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
 	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
-
-	csiPlugins "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins"
 )
 
 const (
@@ -277,49 +276,55 @@ func initializeCSINodeInfo(host volume.VolumeHost) {
 		klog.V(4).Infof("Skipping CSINodeInfo initialization, not running on Kubelet or KubeClient doesn't exist")
 		return
 	}
+
 	go func() {
 		host.SetKubeletError(fmt.Errorf("Could not find CSINodeInfo CRD. Please install the CSINodeInfo CRD"))
-		crdTicker := time.NewTicker(30 * time.Second)
-		defer crdTicker.Stop()
-		found := false
+
+		// TODO(dyzz) fine tune the backoff parameters for CRD Installation and Initialize migrated drivers
+		crdBackoff := wait.Backoff{
+			Steps:    4,
+			Duration: 10 * time.Millisecond,
+			Factor:   5.0,
+			Jitter:   0.1,
+		}
 		for {
-			select {
-			case <-crdTicker.C:
+			err := wait.ExponentialBackoff(crdBackoff, func() (bool, error) {
 				groupResource, err := kubeClient.Discovery().ServerResourcesForGroupVersion("csi.storage.k8s.io" + "/" + "v1alpha1")
 				if err != nil {
 					klog.Warningf("Failed to get groupResource: %v", err)
-					continue
+					return false, nil
 				}
 
 				for _, g := range groupResource.APIResources {
 					if g.Name == "csinodeinfos" {
 						klog.V(4).Infof("Found the csinodeinfos CRD installed on API Server")
-						found = true
+						return true, nil
 					}
 				}
-			}
-			if found {
+				return false, nil
+			})
+			if err == nil {
 				break
 			}
 		}
 
 		host.SetKubeletError(fmt.Errorf("Found CSINodeInfo CRD. Waiting for CSINodeInfo initialization"))
 
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
 		for {
-			select {
-			// No timeout case because this is blocking Kubelet Ready
-			case <-ticker.C:
+			err := wait.ExponentialBackoff(crdBackoff, func() (bool, error) {
 				klog.V(4).Infof("Intializing migrated drivers on CSINodeInfo")
 				err := nim.InitializeMigratedDrivers()
 				if err != nil {
 					klog.Warningf("Failed to initialize migrated drivers: %v", err)
-				} else {
-					// Successfully initialized drivers, allow Kubelet to post Ready
-					host.SetKubeletError(nil)
-					return
+					return false, nil
 				}
+
+				// Successfully initialized drivers, allow Kubelet to post Ready
+				host.SetKubeletError(nil)
+				return true, nil
+			})
+			if err == nil {
+				break
 			}
 		}
 	}()
