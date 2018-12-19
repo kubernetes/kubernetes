@@ -429,3 +429,92 @@ func TestDropSubPath(t *testing.T) {
 		}
 	}
 }
+
+func TestDropRuntimeClass(t *testing.T) {
+	runtimeClassName := "some_container_engine"
+	podWithoutRuntimeClass := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RuntimeClassName: nil,
+			},
+		}
+	}
+	podWithRuntimeClass := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RuntimeClassName: &runtimeClassName,
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description            string
+		hasPodRuntimeClassName bool
+		pod                    func() *api.Pod
+	}{
+		{
+			description:            "pod Without RuntimeClassName",
+			hasPodRuntimeClassName: false,
+			pod:                    podWithoutRuntimeClass,
+		},
+		{
+			description:            "pod With RuntimeClassName",
+			hasPodRuntimeClassName: true,
+			pod:                    podWithRuntimeClass,
+		},
+		{
+			description:            "is nil",
+			hasPodRuntimeClassName: false,
+			pod:                    func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasRuntimeClassName, oldPod := oldPodInfo.hasPodRuntimeClassName, oldPodInfo.pod()
+				newPodHasRuntimeClassName, newPod := newPodInfo.hasPodRuntimeClassName, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					DropDisabledFields(&newPod.Spec, oldPodSpec)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasRuntimeClassName:
+						// new pod should not be changed if the feature is enabled, or if the old pod had RuntimeClass
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasRuntimeClassName:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have RuntimeClass
+						if !reflect.DeepEqual(newPod, podWithoutRuntimeClass()) {
+							t.Errorf("new pod had PodRuntimeClassName: %v", diff.ObjectReflectDiff(newPod, podWithoutRuntimeClass()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
