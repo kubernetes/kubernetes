@@ -303,8 +303,9 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	}
 
 	originalSpec := volumeToAttach.VolumeSpec
-	// isMigrated will check both CSIMigration and the plugin specific feature gate
-	if isMigrated(og.volumePluginMgr, volumeToAttach.VolumeSpec) {
+	// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
+	// TODO: need to also check CSINodeInfo for Kubelet migration status
+	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) {
 		// The volume represented by this spec is CSI and thus should be migrated
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 		if err != nil || attachableVolumePlugin == nil {
@@ -314,6 +315,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
 		if err != nil {
+			eventRecorderFunc(&err)
 			return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.TranslateSpec failed", err)
 		}
 
@@ -395,8 +397,9 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	if volumeToDetach.VolumeSpec != nil {
 		// Get attacher plugin
-		// isMigrated will check both CSIMigration and the plugin specific feature gate
-		if isMigrated(og.volumePluginMgr, volumeToDetach.VolumeSpec) {
+		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
+		// TODO: need to also check CSINodeInfo for Kubelet migration status
+		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -1496,7 +1499,8 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 	return deviceOpened, nil
 }
 
-func isMigrated(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
+// TODO: need to also add logic to check CSINodeInfo for Kubelet migration status
+func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 	if csimig.IsPVMigratable(spec.PersistentVolume) || csimig.IsInlineMigratable(spec.Volume) {
 		migratable, err := vpm.IsPluginMigratableBySpec(spec)
 		if err == nil && migratable {

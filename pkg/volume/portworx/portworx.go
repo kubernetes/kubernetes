@@ -95,7 +95,7 @@ func (plugin *portworxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PortworxVolume != nil)
 }
 
-func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
+func (plugin *portworxVolumePlugin) IsMigratableToCSI() bool {
 	return false
 }
 

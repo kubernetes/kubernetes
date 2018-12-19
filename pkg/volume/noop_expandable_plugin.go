@@ -48,7 +48,7 @@ func (n *noopExpandableVolumePluginInstance) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (n *noopExpandableVolumePluginInstance) IsMigratedToCSI() bool {
+func (n *noopExpandableVolumePluginInstance) IsMigratableToCSI() bool {
 	return false
 }
 

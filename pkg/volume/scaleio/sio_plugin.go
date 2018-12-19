@@ -72,7 +72,7 @@ func (p *sioPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.ScaleIO != nil)
 }
 
-func (plugin *sioPlugin) IsMigratedToCSI() bool {
+func (plugin *sioPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

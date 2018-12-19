@@ -75,7 +75,7 @@ func (plugin *testPlugins) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *testPlugins) IsMigratedToCSI() bool {
+func (plugin *testPlugins) IsMigratableToCSI() bool {
 	return false
 }
 

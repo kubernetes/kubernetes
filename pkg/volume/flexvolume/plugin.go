@@ -149,7 +149,7 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return sourceDriver == plugin.driverName
 }
 
-func (plugin *flexVolumePlugin) IsMigratedToCSI() bool {
+func (plugin *flexVolumePlugin) IsMigratableToCSI() bool {
 	return false
 }
 

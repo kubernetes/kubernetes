@@ -77,7 +77,7 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
-func (plugin *configMapPlugin) IsMigratedToCSI() bool {
+func (plugin *configMapPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

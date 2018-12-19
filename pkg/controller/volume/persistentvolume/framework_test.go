@@ -1168,7 +1168,7 @@ func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 	return true
 }
 
-func (plugin *mockVolumePlugin) IsMigratedToCSI() bool {
+func (plugin *mockVolumePlugin) IsMigratableToCSI() bool {
 	return false
 }
 
