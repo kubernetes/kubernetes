@@ -6,4 +6,5 @@ approvers:
 - dcbw
 reviewers:
 - sig-network-reviewers
-
+labels:
+- sig/network

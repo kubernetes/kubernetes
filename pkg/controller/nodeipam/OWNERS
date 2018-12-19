@@ -7,3 +7,5 @@ reviewers:
 - ingvagabund
 - aveshagarwal
 - k82cn
+labels:
+- sig/network

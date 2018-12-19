@@ -7,3 +7,5 @@ approvers:
 - thockin
 - brendandburns
 - m1093782566
+labels:
+- sig/network

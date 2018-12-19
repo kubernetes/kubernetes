@@ -2,3 +2,5 @@ approvers:
 - thockin
 reviewers:
 - sig-network-reviewers
+labels:
+- sig/network

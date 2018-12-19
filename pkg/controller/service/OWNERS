@@ -12,3 +12,5 @@ approvers:
 - matchstick
 - andrewsykim
 - cheftako
+labels:
+- sig/network

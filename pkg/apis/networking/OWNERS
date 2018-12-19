@@ -3,3 +3,5 @@ reviewers:
 - cmluciano
 - danwinship
 - thockin
+labels:
+- sig/network

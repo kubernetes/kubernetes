@@ -4,3 +4,5 @@ reviewers:
 - smarterclayton
 - brendandburns
 - freehan
+labels:
+- sig/network
