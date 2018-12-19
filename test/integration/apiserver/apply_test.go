@@ -96,3 +96,82 @@ func TestCreateOnApplyFailsWithUID(t *testing.T) {
 		t.Fatalf("Expected conflict error but got: %v", err)
 	}
 }
+
+func TestApplyUpdateApplyConflictForced(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+                        "labels": {"app": "nginx"}
+		},
+		"spec": {
+                        "replicas": 3,
+                        "selector": {
+                                "matchLabels": {
+                                         "app": "nginx"
+                                }
+                        },
+                        "template": {
+                                "metadata": {
+                                        "labels": {
+                                                "app": "nginx"
+                                        }
+                                },
+                                "spec": {
+				        "containers": [{
+					        "name":  "nginx",
+					        "image": "nginx:latest"
+				        }]
+                                }
+                        }
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body([]byte(`{"spec":{"replicas": 5}}`)).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to patch object: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body([]byte(obj)).Do().Get()
+	// TODO: We should check that this is a conflict.
+	if err == nil {
+		t.Fatalf("Expecting to get conflicts when applying object")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("force", "true").
+		Body([]byte(obj)).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object with force: %v", err)
+	}
+}
