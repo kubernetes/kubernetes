@@ -119,11 +119,12 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		transformers := []rest.TransformFunc{}
 		if scope.FieldManager != nil {
 			transformers = append(transformers, func(_ context.Context, liveObj, newObj runtime.Object) (runtime.Object, error) {
-				newObj, err := scope.FieldManager.Update(liveObj, newObj, "update")
-				if err != nil {
-					klog.Warningf("FieldManager: Failed to update object managed fields: %v", err)
+				if obj, err := scope.FieldManager.Update(liveObj, newObj, "update"); err == nil {
+					return obj, nil
+				} else {
+					klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
+					return newObj, nil
 				}
-				return newObj, nil
 			})
 		}
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
