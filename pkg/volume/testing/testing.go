@@ -530,6 +530,10 @@ func (f *FakeBasicVolumePlugin) CanSupport(spec *Spec) bool {
 	return strings.HasPrefix(spec.Name(), f.GetPluginName())
 }
 
+func (f *FakeBasicVolumePlugin) IsMigratableToCSI() bool {
+	return false
+}
+
 func (f *FakeBasicVolumePlugin) ConstructVolumeSpec(ame, mountPath string) (*Spec, error) {
 	return f.Plugin.ConstructVolumeSpec(ame, mountPath)
 }
