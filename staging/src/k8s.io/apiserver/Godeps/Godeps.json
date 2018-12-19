@@ -467,14 +467,6 @@
 			"Rev": "4201258b820c74ac8e6922fc9e6b52f71fe46f8d"
 		},
 		{
-			"ImportPath": "github.com/gregjones/httpcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
-		},
-		{
-			"ImportPath": "github.com/gregjones/httpcache/diskcache",
-			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
-		},
-		{
 			"ImportPath": "github.com/grpc-ecosystem/go-grpc-middleware",
 			"Rev": "498ae206fc3cfe81cd82e48c1d4354026fa5f9ec"
 		},
@@ -545,10 +537,6 @@
 		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
-		},
-		{
-			"ImportPath": "github.com/peterbourgon/diskv",
-			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
