@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/discovery"
@@ -70,6 +71,9 @@ const maxRetries = 4
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
 
+	ServerSideApply bool
+	ForceConflicts  bool
+
 	OpenAPISchema    openapi.Resources
 	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
@@ -105,7 +109,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f))
+			cmdutil.CheckErr(options.Complete(f, cmd))
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(options.Run())
 		},
@@ -113,6 +117,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	usage := "contains the configuration to diff"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddServerSideApplyFlags(cmd)
 	cmd.MarkFlagRequired("filename")
 
 	return cmd
@@ -246,11 +251,13 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-	LocalObj runtime.Object
-	Info     *resource.Info
-	Encoder  runtime.Encoder
-	OpenAPI  openapi.Resources
-	Force    bool
+	LocalObj        runtime.Object
+	Info            *resource.Info
+	Encoder         runtime.Encoder
+	OpenAPI         openapi.Resources
+	Force           bool
+	ServerSideApply bool
+	ForceConflicts  bool
 }
 
 var _ Object = &InfoObject{}
@@ -263,6 +270,24 @@ func (obj InfoObject) Live() runtime.Object {
 // Returns the "merged" object, as it would look like if applied or
 // created.
 func (obj InfoObject) Merged() (runtime.Object, error) {
+	if obj.ServerSideApply {
+		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj.LocalObj)
+		if err != nil {
+			return nil, err
+		}
+		options := metav1.PatchOptions{
+			Force:  &obj.ForceConflicts,
+			DryRun: []string{metav1.DryRunAll},
+		}
+		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).Patch(
+			obj.Info.Namespace,
+			obj.Info.Name,
+			types.ApplyPatchType,
+			data,
+			&options,
+		)
+	}
+
 	// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.
 	if obj.Live() == nil {
 		// Dry-run create if the object doesn't exist.
@@ -357,11 +382,20 @@ func isConflict(err error) bool {
 	return err != nil && errors.IsConflict(err)
 }
 
-func (o *DiffOptions) Complete(f cmdutil.Factory) error {
+func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
-	o.OpenAPISchema, err = f.OpenAPISchema()
-	if err != nil {
-		return err
+
+	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	if o.ForceConflicts && !o.ServerSideApply {
+		return fmt.Errorf("--force-conflicts only works with --server-side")
+	}
+
+	if !o.ServerSideApply {
+		o.OpenAPISchema, err = f.OpenAPISchema()
+		if err != nil {
+			return err
+		}
 	}
 
 	o.DiscoveryClient, err = f.ToDiscoveryClient()
@@ -437,11 +471,13 @@ func (o *DiffOptions) Run() error {
 				)
 			}
 			obj := InfoObject{
-				LocalObj: local,
-				Info:     info,
-				Encoder:  scheme.DefaultJSONEncoder(),
-				OpenAPI:  o.OpenAPISchema,
-				Force:    force,
+				LocalObj:        local,
+				Info:            info,
+				Encoder:         scheme.DefaultJSONEncoder(),
+				OpenAPI:         o.OpenAPISchema,
+				Force:           force,
+				ServerSideApply: o.ServerSideApply,
+				ForceConflicts:  o.ForceConflicts,
 			}
 
 			err = differ.Diff(obj, printer)
