@@ -1,19 +1,18 @@
 approvers:
 - saad-ali
-- thockin
-- jsafrane
 - rootfs
-- gnufied
-- childsb
+- gnufied 
+- jingxu97
+- jsafrane
 - msau42
 reviewers:
 - saad-ali
-- jsafrane
 - rootfs
+- gnufied 
 - jingxu97
+- jsafrane
 - msau42
-- gnufied
+- jeffvance
+- copejon
 - verult
 - davidz627
-labels:
-- sig/storage
