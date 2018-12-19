@@ -9,7 +9,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 # https://github.com/kubernetes-incubator/ip-masq-agent/blob/v2.0.0/README.md
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: ip-masq-agent
@@ -17,6 +17,10 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile  
 spec:
+  selector:
+    matchLabels:
+      labels:
+        k8s-app: ip-masq-agent
   template:
     metadata:
       labels:

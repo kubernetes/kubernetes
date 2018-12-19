@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: fluentd-gcp-{{ fluentd_gcp_yaml_version }}
@@ -9,6 +9,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: {{ fluentd_gcp_yaml_version }}
 spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-gcp
+      version: {{ fluentd_gcp_yaml_version }}
   updateStrategy:
     type: RollingUpdate
   template:
