@@ -17,14 +17,37 @@ limitations under the License.
 package apiserver
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	if len(groupVersions) > 0 {
+		resourceConfig := master.DefaultAPIResourceConfigSource()
+		resourceConfig.EnableVersions(groupVersions...)
+		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+	}
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+
+	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+	return s, clientSet, closeFn
+}
 
 // TestApplyAlsoCreates makes sure that PATCH requests with the apply content type
 // will create the object if it doesn't already exist
