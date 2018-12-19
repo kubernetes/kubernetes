@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
@@ -67,21 +69,35 @@ const maxRetries = 4
 
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
+
+	OpenAPISchema    openapi.Resources
+	DiscoveryClient  discovery.DiscoveryInterface
+	DynamicClient    dynamic.Interface
+	DryRunVerifier   *apply.DryRunVerifier
+	CmdNamespace     string
+	EnforceNamespace bool
+	Builder          *resource.Builder
+	Diff             *DiffProgram
 }
 
-func checkDiffArgs(cmd *cobra.Command, args []string) error {
+func validateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
 	return nil
 }
 
-func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	var options DiffOptions
-	diff := DiffProgram{
-		Exec:      exec.New(),
-		IOStreams: streams,
+func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
+	return &DiffOptions{
+		Diff: &DiffProgram{
+			Exec:      exec.New(),
+			IOStreams: ioStreams,
+		},
 	}
+}
+
+func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	options := NewDiffOptions(streams)
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
@@ -89,8 +105,9 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(checkDiffArgs(cmd, args))
-			cmdutil.CheckErr(RunDiff(f, &diff, &options))
+			cmdutil.CheckErr(options.Complete(f))
+			cmdutil.CheckErr(validateArgs(cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -340,30 +357,41 @@ func isConflict(err error) bool {
 	return err != nil && errors.IsConflict(err)
 }
 
+func (o *DiffOptions) Complete(f cmdutil.Factory) error {
+	var err error
+	o.OpenAPISchema, err = f.OpenAPISchema()
+	if err != nil {
+		return err
+	}
+
+	o.DiscoveryClient, err = f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.DryRunVerifier = &apply.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+		OpenAPIGetter: o.DiscoveryClient,
+	}
+
+	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	o.Builder = f.NewBuilder()
+	return nil
+}
+
 // RunDiff uses the factory to parse file arguments, find the version to
 // diff, and find each Info object for each files, and runs against the
 // differ.
-func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
-	schema, err := f.OpenAPISchema()
-	if err != nil {
-		return err
-	}
-
-	discovery, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
-	dynamic, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	dryRunVerifier := &apply.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamic)),
-		OpenAPIGetter: discovery,
-	}
-
+func (o *DiffOptions) Run() error {
 	differ, err := NewDiffer("LIVE", "MERGED")
 	if err != nil {
 		return err
@@ -372,15 +400,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 
 	printer := Printer{}
 
-	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	r := f.NewBuilder().
+	r := o.Builder.
 		Unstructured().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		NamespaceParam(o.CmdNamespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -392,7 +415,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 			return err
 		}
 
-		if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 			return err
 		}
 
@@ -417,7 +440,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 				LocalObj: local,
 				Info:     info,
 				Encoder:  scheme.DefaultJSONEncoder(),
-				OpenAPI:  schema,
+				OpenAPI:  o.OpenAPISchema,
 				Force:    force,
 			}
 
@@ -432,5 +455,5 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		return err
 	}
 
-	return differ.Run(diff)
+	return differ.Run(o.Diff)
 }
