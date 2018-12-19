@@ -435,7 +435,7 @@ function detect_node_failures() {
   fi
 
   detect-node-names
-  if [ -z "$INSTANCE_GROUPS" ]; then
+  if [ -z "${INSTANCE_GROUPS:-}" ]; then
     return
   fi
   for group in "${INSTANCE_GROUPS[@]}"; do
