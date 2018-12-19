@@ -305,7 +305,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		klog.Error(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 		return err
 	}
-	klog.V(4).Infof(log("mounte.TearDownAt successfully unmounted dir [%s]", dir))
+	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
 }
