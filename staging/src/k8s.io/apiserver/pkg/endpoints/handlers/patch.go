@@ -307,7 +307,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 		if obj, err := p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher"); err == nil {
 			objToUpdate = obj
 		} else {
-			klog.Warningf("FieldManager: Failed to update object managed fields: %v", err)
+			klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
 		}
 	}
 	return objToUpdate, nil
@@ -371,7 +371,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 		if obj, err := p.fieldManager.Update(currentObject, newObj, "smPatcher"); err == nil {
 			newObj = obj
 		} else {
-			klog.Warningf("FieldManager: Failed to update object managed fields: %v", err)
+			klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
 		}
 	}
 	return newObj, nil
