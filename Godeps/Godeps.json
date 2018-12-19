@@ -2386,11 +2386,11 @@
 		},
 		{
 			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library",
-			"Rev": "586160581de2d27a1ec80132617da764cf266809"
+			"Rev": "6e91e84bbec8675e9e4354c900102377151e4453"
 		},
 		{
 			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins",
-			"Rev": "586160581de2d27a1ec80132617da764cf266809"
+			"Rev": "6e91e84bbec8675e9e4354c900102377151e4453"
 		},
 		{
 			"ImportPath": "github.com/kubernetes/repo-infra/kazel",

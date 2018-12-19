@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	AWSEBSDriverName       = "com.amazon.aws.csi.ebs"
+	AWSEBSDriverName       = "ebs.csi.aws.com"
 	AWSEBSInTreePluginName = "kubernetes.io/aws-ebs"
 )
 
