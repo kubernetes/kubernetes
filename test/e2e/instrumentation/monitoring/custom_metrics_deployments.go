@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"strings"
 
+	"os/exec"
+
 	gcm "google.golang.org/api/monitoring/v3"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"os/exec"
 )
 
 var (
@@ -71,7 +72,7 @@ type CustomMetricContainerSpec struct {
 
 // SimpleStackdriverExporterDeployment is a Deployment of simple application that exports a metric of
 // fixed value to Stackdriver in a loop.
-func SimpleStackdriverExporterDeployment(name, namespace string, replicas int32, metricValue int64) *extensions.Deployment {
+func SimpleStackdriverExporterDeployment(name, namespace string, replicas int32, metricValue int64) *appsv1.Deployment {
 	return StackdriverExporterDeployment(name, namespace, replicas,
 		[]CustomMetricContainerSpec{
 			{
@@ -86,18 +87,18 @@ func SimpleStackdriverExporterDeployment(name, namespace string, replicas int32,
 // an arbitrary amount of metrics of fixed value to Stackdriver in a loop. Each metric
 // is exposed by a different container in one pod.
 // The metric names and values are configured via the containers parameter.
-func StackdriverExporterDeployment(name, namespace string, replicas int32, containers []CustomMetricContainerSpec) *extensions.Deployment {
+func StackdriverExporterDeployment(name, namespace string, replicas int32, containers []CustomMetricContainerSpec) *appsv1.Deployment {
 	podSpec := corev1.PodSpec{Containers: []corev1.Container{}}
 	for _, containerSpec := range containers {
 		podSpec.Containers = append(podSpec.Containers, stackdriverExporterContainerSpec(containerSpec.Name, namespace, containerSpec.MetricName, containerSpec.MetricValue))
 	}
 
-	return &extensions.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"name": name},
 			},
@@ -175,13 +176,13 @@ func stackdriverExporterContainerSpec(name string, namespace string, metricName 
 // PrometheusExporterDeployment is a Deployment of simple application with two containers
 // one exposing a metric in prometheus format and second a prometheus-to-sd container
 // that scrapes the metric and pushes it to stackdriver.
-func PrometheusExporterDeployment(name, namespace string, replicas int32, metricValue int64) *extensions.Deployment {
-	return &extensions.Deployment{
+func PrometheusExporterDeployment(name, namespace string, replicas int32, metricValue int64) *appsv1.Deployment {
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"name": name},
 			},

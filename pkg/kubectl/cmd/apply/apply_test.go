@@ -32,8 +32,8 @@ import (
 	"github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/spf13/cobra"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -876,7 +876,7 @@ const (
 
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
-	obj := &extensionsv1beta1.Deployment{}
+	obj := &appsv1.Deployment{}
 	if err := runtime.DecodeInto(codec, raw, obj); err != nil {
 		t.Fatal(err)
 	}
@@ -948,7 +948,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 			cmd.Run(cmd, []string{})
 
-			expected := "deployment.extensions/" + deploymentName + "\n"
+			expected := "deployment.apps/" + deploymentName + "\n"
 			if buf.String() != expected {
 				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 			}

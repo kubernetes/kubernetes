@@ -471,6 +471,7 @@ func TestRSSelectorImmutability(t *testing.T) {
 	createRSsPods(t, clientSet, []*apps.ReplicaSet{rs}, []*v1.Pod{})
 
 	// test to ensure extensions/v1beta1 selector is mutable
+	// TODO: remove the extensions/v1beta1 portion of the test once we stop serving extensions/v1beta1
 	newSelectorLabels := map[string]string{"changed_name_extensions_v1beta1": "changed_test_extensions_v1beta1"}
 	rsExt, err := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(rs.Name, metav1.GetOptions{})
 	if err != nil {

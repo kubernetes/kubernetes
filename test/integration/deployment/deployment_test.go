@@ -109,7 +109,9 @@ func TestNewDeployment(t *testing.T) {
 	}
 }
 
-// Deployments should support roll out, roll back, and roll over
+// Deployments should support roll out, roll back, and roll over.
+// TODO: drop the rollback portions of this test when extensions/v1beta1 is no longer served
+// and rollback endpoint is no longer supported.
 func TestDeploymentRollingUpdate(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
@@ -239,6 +241,7 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	}
 
 	// test to ensure extensions/v1beta1 selector is mutable
+	// TODO: drop the extensions/v1beta1 portion of this test when extensions/v1beta1 is no longer served
 	newSelectorLabels := map[string]string{"name_extensions_v1beta1": "test_extensions_v1beta1"}
 	deploymentExtensionsV1beta1, err := c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -553,6 +556,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 }
 
 // Deployment supports rollback even when there's old replica set without revision.
+// TODO: drop this test when extensions/v1beta1 is no longer served
 func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()

@@ -421,6 +421,7 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.StorageV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AppsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AppsV1beta2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AppsV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.PolicyV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 

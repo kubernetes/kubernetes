@@ -3110,9 +3110,15 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 		return labels.SelectorFromSet(typed.Spec.Selector), nil
 	case *extensions.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.ReplicaSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.Deployment:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.Deployment:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.DaemonSet:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *batch.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
@@ -3133,12 +3139,24 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *apps.ReplicaSet:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	case *extensions.Deployment:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
+	case *apps.Deployment:
+		if typed.Spec.Replicas != nil {
+			return *typed.Spec.Replicas, nil
+		}
+		return 0, nil
 	case *extensions.DaemonSet:
+		return 0, nil
+	case *apps.DaemonSet:
 		return 0, nil
 	case *batch.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods

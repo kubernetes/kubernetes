@@ -185,7 +185,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				By(fmt.Sprintf("expected %d pods, got %d pods", num, len(pods.Items)))
 			}
 		case "Deployments":
-			deployments, err := f.ClientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
+			deployments, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %v", err)
 			}
@@ -194,7 +194,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				By(fmt.Sprintf("expected %d Deployments, got %d Deployments", num, len(deployments.Items)))
 			}
 		case "ReplicaSets":
-			rs, err := f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+			rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %v", err)
 			}

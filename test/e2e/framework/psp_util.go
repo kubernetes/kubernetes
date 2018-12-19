@@ -78,7 +78,7 @@ func PrivilegedPSP(name string) *policy.PodSecurityPolicy {
 
 func IsPodSecurityPolicyEnabled(f *Framework) bool {
 	isPSPEnabledOnce.Do(func() {
-		psps, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
+		psps, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
@@ -103,7 +103,7 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 	}
 	// Create the privileged PSP & role
 	privilegedPSPOnce.Do(func() {
-		_, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Get(
+		_, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Get(
 			podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
 			// Privileged PSP was already created.

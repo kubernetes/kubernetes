@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -305,7 +305,7 @@ func TestRESTClientSingleObject(t *testing.T) {
 		targetTimestamp:      1,
 		reportedMetricPoints: []metricPoint{{10, 1}},
 		singleObject: &autoscalingapi.CrossVersionObjectReference{
-			APIVersion: "extensions/v1beta1",
+			APIVersion: "apps/v1",
 			Kind:       "Deployment",
 			Name:       "some-dep",
 		},
