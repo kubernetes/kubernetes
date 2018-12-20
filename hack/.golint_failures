@@ -686,6 +686,7 @@ staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake
 staging/src/k8s.io/metrics/pkg/client/custom_metrics/scheme
 staging/src/k8s.io/metrics/pkg/client/external_metrics
 staging/src/k8s.io/metrics/pkg/client/external_metrics/fake
+staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
