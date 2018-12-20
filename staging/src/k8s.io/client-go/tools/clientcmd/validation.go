@@ -179,10 +179,6 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 			validationErrors = append(validationErrors, fmt.Errorf("no server found for cluster %q", clusterName))
 		}
 	}
-	// Make sure CA data and CA file aren't both specified
-	if len(clusterInfo.CertificateAuthority) != 0 && len(clusterInfo.CertificateAuthorityData) != 0 {
-		validationErrors = append(validationErrors, fmt.Errorf("certificate-authority-data and certificate-authority are both specified for %v. certificate-authority-data will override.", clusterName))
-	}
 	if len(clusterInfo.CertificateAuthority) != 0 {
 		clientCertCA, err := os.Open(clusterInfo.CertificateAuthority)
 		defer clientCertCA.Close()
@@ -208,14 +204,6 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 	}
 
 	if len(authInfo.ClientCertificate) != 0 || len(authInfo.ClientCertificateData) != 0 {
-		// Make sure cert data and file aren't both specified
-		if len(authInfo.ClientCertificate) != 0 && len(authInfo.ClientCertificateData) != 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("client-cert-data and client-cert are both specified for %v. client-cert-data will override.", authInfoName))
-		}
-		// Make sure key data and file aren't both specified
-		if len(authInfo.ClientKey) != 0 && len(authInfo.ClientKeyData) != 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("client-key-data and client-key are both specified for %v; client-key-data will override", authInfoName))
-		}
 		// Make sure a key is specified
 		if len(authInfo.ClientKey) == 0 && len(authInfo.ClientKeyData) == 0 {
 			validationErrors = append(validationErrors, fmt.Errorf("client-key-data or client-key must be specified for %v to use the clientCert authentication method.", authInfoName))

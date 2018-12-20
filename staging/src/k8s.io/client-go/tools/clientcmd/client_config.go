@@ -208,7 +208,9 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	// configClusterInfo holds the information identify the server provided by .kubeconfig
 	configClientConfig := &restclient.Config{}
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
-	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
+	if len(configClientConfig.CAFile) == 0 {
+		configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
+	}
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
 	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
 
@@ -245,9 +247,13 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	}
 	if len(configAuthInfo.ClientCertificate) > 0 || len(configAuthInfo.ClientCertificateData) > 0 {
 		mergedConfig.CertFile = configAuthInfo.ClientCertificate
-		mergedConfig.CertData = configAuthInfo.ClientCertificateData
+		if len(mergedConfig.CertFile) == 0 {
+			mergedConfig.CertData = configAuthInfo.ClientCertificateData
+		}
 		mergedConfig.KeyFile = configAuthInfo.ClientKey
-		mergedConfig.KeyData = configAuthInfo.ClientKeyData
+		if len(mergedConfig.KeyFile) == 0 {
+			mergedConfig.KeyData = configAuthInfo.ClientKeyData
+		}
 	}
 	if len(configAuthInfo.Username) > 0 || len(configAuthInfo.Password) > 0 {
 		mergedConfig.Username = configAuthInfo.Username
