@@ -277,11 +277,9 @@ func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
+		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
-		if oldPodSpec != nil {
-			oldPodSpec.RuntimeClassName = nil
-		}
 	}
 
 	dropDisabledProcMountField(podSpec, oldPodSpec)
@@ -394,6 +392,17 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+// runtimeClassInUse returns true if the pod spec is non-nil and has a RuntimeClassName set
+func runtimeClassInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.RuntimeClassName != nil {
+		return true
 	}
 	return false
 }
