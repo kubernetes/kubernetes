@@ -68,7 +68,6 @@ const (
 	makeSchedulableDelay   = 20 * time.Second
 	freshStatusLimit       = 20 * time.Second
 
-	gkeEndpoint        = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout   = 15 * time.Minute
 	gkeNodepoolNameKey = "cloud.google.com/gke-nodepool"
 
@@ -1035,13 +1034,24 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	verifyFunction(increasedSize)
 }
 
+func getGkeApiEndpoint() string {
+	gkeApiEndpoint := os.Getenv("CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER")
+	if gkeApiEndpoint == "" {
+		gkeApiEndpoint = "https://test-container.sandbox.googleapis.com"
+	}
+	if strings.HasSuffix(gkeApiEndpoint, "/") {
+		gkeApiEndpoint = gkeApiEndpoint[:len(gkeApiEndpoint)-1]
+	}
+	return gkeApiEndpoint
+}
+
 func getGKEURL(apiVersion string, suffix string) string {
 	out, err := execCmd("gcloud", "auth", "print-access-token").Output()
 	framework.ExpectNoError(err)
 	token := strings.Replace(string(out), "\n", "", -1)
 
 	return fmt.Sprintf("%s/%s/%s?access_token=%s",
-		gkeEndpoint,
+		getGkeApiEndpoint(),
 		apiVersion,
 		suffix,
 		token)
