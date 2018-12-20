@@ -34,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -569,6 +570,126 @@ type CloudConfig struct {
 		//yourself in an non-AWS cloud and open an issue, please indicate that in the
 		//issue body.
 		DisableStrictZoneCheck bool
+
+		// Allows AWS endpoints to be overridden
+		// Useful in deployments to private edge nodes where amazonaws.com does not resolve
+		OverrideEndpoints bool
+
+		// Delimiter to use to separate servicename from its configuration parameters
+		// NOTE: semi-colon ';' truncates the input line in INI files, do not use ';'
+		// Defaults "|"
+		ServicenameDelimiter string
+
+		// Delimiter to use to separate region of occurrence, url and signing region for each override
+		// NOTE: semi-colon ';' truncates the input line in INI files, do not use ';'
+		// Defaults to ","
+		OverrideSeparator string
+
+		// Delimiter to use to separate overridden services
+		// NOTE: semi-colon ';' truncates the input line in INI files, do not use ';'
+		// Defaults to "&"
+		ServiceDelimiter string
+
+		// These are of format servicename ServicenameDelimiter url OverrideSeparator signing_region ServiceDelimiter nextservice
+		// s3|region1, https://s3.foo.bar, some signing_region & ec2|region1, https://ec2.foo.bar, signing_region
+		ServiceOverrides string
+	}
+}
+
+const (
+	ServicenameDelimiterDefault = "|"
+	ServicesDelimiterDefault    = "&"
+	OverrideSeparatorDefault    = ","
+)
+
+type CustomEndpoint struct {
+	Endpoint      string
+	SigningRegion string
+}
+
+var overridesActive = false
+var overrides map[string]CustomEndpoint
+
+func IsOverridesActive() bool {
+	return overridesActive
+}
+
+func SetOverridesDefaults(cfg *CloudConfig) error {
+	if cfg.Global.OverrideEndpoints {
+		if cfg.Global.ServiceDelimiter == "" {
+			cfg.Global.ServiceDelimiter = ServicesDelimiterDefault
+		} else if cfg.Global.ServiceDelimiter == ";" {
+			return fmt.Errorf("semi-colon may not be used as a service delimiter, it truncates the input")
+		}
+		if cfg.Global.ServicenameDelimiter == "" {
+			cfg.Global.ServicenameDelimiter = ServicenameDelimiterDefault
+		} else if cfg.Global.ServicenameDelimiter == ";" {
+			return fmt.Errorf("semi-colon may not be used as a service name delimiter, it truncates the input")
+		}
+		if cfg.Global.OverrideSeparator == "" {
+			cfg.Global.OverrideSeparator = OverrideSeparatorDefault
+		} else if cfg.Global.OverrideSeparator == ";" {
+			return fmt.Errorf("semi-colon may not be used as a override separator, it truncates the input")
+		}
+	}
+	return nil
+}
+
+func MakeRegionEndpointSignature(serviceName, region string) string {
+	return fmt.Sprintf("%s__%s", strings.TrimSpace(serviceName), strings.TrimSpace(region))
+}
+
+func ParseOverrides(cfg *CloudConfig) error {
+	if cfg.Global.OverrideEndpoints {
+		if err := SetOverridesDefaults(cfg); err != nil {
+			return err
+		}
+		overrides = make(map[string]CustomEndpoint)
+		allOverrides := strings.Split(cfg.Global.ServiceOverrides, cfg.Global.ServiceDelimiter)
+		for _, o := range allOverrides {
+			if idx := strings.Index(o, cfg.Global.ServicenameDelimiter); idx != -1 {
+				name := strings.TrimSpace(o[:idx])
+				values := o[idx+1:]
+				tuple := strings.Split(values, cfg.Global.OverrideSeparator)
+				if len(tuple) != 3 {
+					return errors.New(fmt.Sprintf("3 parameters (region, url, signing region) are required for [%s] in %s",
+						name, o))
+				}
+				signature := MakeRegionEndpointSignature(name, tuple[0])
+				overrides[signature] = CustomEndpoint{Endpoint: strings.TrimSpace(tuple[1]), SigningRegion: strings.TrimSpace(tuple[2])}
+			} else {
+				cfg.Global.OverrideEndpoints = false
+				overridesActive = false
+				return errors.New(fmt.Sprintf("Unable to find ServicenameSeparator [%s] in %s",
+					cfg.Global.ServicenameDelimiter, o))
+			}
+		}
+		overridesActive = true
+	} else {
+		overridesActive = false
+	}
+	return nil
+}
+
+func loadCustomResolver() func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+	defaultResolver := endpoints.DefaultResolver()
+	defaultResolverFn := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		return defaultResolver.EndpointFor(service, region, optFns...)
+	}
+	if IsOverridesActive() {
+		customResolverFn := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+			signature := MakeRegionEndpointSignature(service, region)
+			if ep, ok := overrides[signature]; ok {
+				return endpoints.ResolvedEndpoint{
+					URL:           ep.Endpoint,
+					SigningRegion: ep.SigningRegion,
+				}, nil
+			}
+			return defaultResolver.EndpointFor(service, region, optFns...)
+		}
+		return customResolverFn
+	} else {
+		return defaultResolverFn
 	}
 }
 
@@ -651,7 +772,8 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(endpoints.ResolverFunc(loadCustomResolver()))
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -672,7 +794,8 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(endpoints.ResolverFunc(loadCustomResolver()))
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -689,7 +812,8 @@ func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(endpoints.ResolverFunc(loadCustomResolver()))
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -707,7 +831,8 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(endpoints.ResolverFunc(loadCustomResolver()))
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -721,7 +846,7 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 }
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
-	sess, err := session.NewSession(&aws.Config{})
+	sess, err := session.NewSession(&aws.Config{EndpointResolver: endpoints.ResolverFunc(loadCustomResolver())})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -735,7 +860,8 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 		Region:      &regionName,
 		Credentials: p.creds,
 	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
+		WithEndpointResolver(endpoints.ResolverFunc(loadCustomResolver()))
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -958,6 +1084,10 @@ func init() {
 		cfg, err := readAWSCloudConfig(config)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
+		}
+
+		if err = ParseOverrides(cfg); err != nil {
+			return nil, fmt.Errorf("unable to parse custom endpoint overrides: %v", err)
 		}
 
 		sess, err := session.NewSession(&aws.Config{})

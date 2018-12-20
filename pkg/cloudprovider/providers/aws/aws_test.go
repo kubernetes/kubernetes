@@ -186,6 +186,295 @@ func TestReadAWSCloudConfig(t *testing.T) {
 	}
 }
 
+func TestOverridesActiveConfig(t *testing.T) {
+	tests := []struct {
+		name string
+
+
+		reader io.Reader
+		aws    Services
+
+		expectError        bool
+		active             bool
+		servicesOverridden []string
+		regions []string
+	}{
+		{
+			"No overrides in config",
+			strings.NewReader("[global]\nServiceOverrides=s3|sregion, https://s3.foo.bar, sregion"),
+			nil,
+			false, false,
+			[]string{}, []string{},
+		},
+		{
+			"Missing Servicename Separator",
+			strings.NewReader("[global]\nOverrideEndpoints=true\nServiceOverrides=s3sregion, https://s3.foo.bar, sregion"),
+			nil,
+			true, false,
+			[]string{}, []string{},
+		},
+		{
+			"Missing Service Region",
+			strings.NewReader("[global]\nOverrideEndpoints=true\nServiceOverrides=s3|https://s3.foo.bar, sregion"),
+			nil,
+			true, false,
+			[]string{}, []string{},
+		},
+		{
+			"Semi-colon in service delimiter",
+			strings.NewReader("[global]\nOverrideEndpoints=true\nServiceDelimiter=;"),
+			nil,
+			true, false,
+			[]string{}, []string{},
+		},
+		{
+			"Semi-colon in service name delimiter",
+			strings.NewReader("[global]\nOverrideEndpoints=true\nServicenameDelimiter=;"),
+			nil,
+			true, false,
+			[]string{}, []string{},
+		},
+		{
+			"Semi-colon in service name delimiter",
+			strings.NewReader("[global]\nOverrideEndpoints=true\nOverrideSeparator=;"),
+			nil,
+			true, false,
+			[]string{}, []string{},
+		},
+		{
+			"Active Overrides",
+			strings.NewReader("[global]\nOverrideEndpoints=true\nServiceOverrides=s3|sregion, https://s3.foo.bar, sregion"),
+			nil,
+			false, true,
+			[]string{"s3"}, []string{"sregion"},
+		},
+		{
+			"Multiple Overriden Services",
+			strings.NewReader("[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|sregion, https://s3.foo.bar, sregion & ec2|sregion, https://ec2.foo.bar, sregion"),
+			nil,
+			false, true,
+			[]string{"s3", "ec2"}, []string{"sregion", "sregion"},
+		},
+		{
+			"Multiple Overriden Services in Multiple regions",
+			strings.NewReader("[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|region1, https://s3.foo.bar, sregion & ec2|region2, https://ec2.foo.bar, sregion"),
+			nil,
+			false, true,
+			[]string{"s3", "ec2"}, []string{"region1", "region2"},
+		},
+		{
+			"Multiple regions, Same Service",
+			strings.NewReader("[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|region1, https://s3.foo.bar, sregion & s3|region2, https://s3.foo.bar, sregion"),
+			nil,
+			false, true,
+			[]string{"s3", "s3"}, []string{"region1", "region2"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		cfg, err := readAWSCloudConfig(test.reader)
+		if err == nil {
+			err = ParseOverrides(cfg)
+		}
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Should error for case %s (cfg=%v)", test.name, cfg)
+			}
+			if IsOverridesActive() != test.active {
+				t.Errorf("Incorrect active flag (%v vs %v) for case: %s",
+					IsOverridesActive(), test.active, test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Should succeed for case: %s", test.name)
+			}
+			if IsOverridesActive() != test.active {
+				t.Errorf("Incorrect active flag (%v vs %v) for case: %s",
+					IsOverridesActive(), test.active, test.name)
+			}
+			if len(overrides) != len(test.servicesOverridden) {
+				t.Errorf("Expected %d overridden services, received %d for case %s",
+					len(test.servicesOverridden), len(overrides), test.name)
+			} else {
+				for i, name := range test.servicesOverridden {
+					signature := MakeRegionEndpointSignature(name, test.regions[i])
+					ep, ok := overrides[signature]
+					if !ok {
+						t.Errorf("Missing override for service %s in case %s",
+							name, test.name)
+					} else {
+						if ep.SigningRegion != "sregion" {
+							t.Errorf("Expected signing region 'sregion', received '%s' for case %s",
+								ep.SigningRegion, test.name)
+						}
+						targetName := fmt.Sprintf("https://%s.foo.bar", name)
+						if ep.Endpoint != targetName {
+							t.Errorf("Expected Endpoint '%s', received '%s' for case %s",
+								targetName, ep.Endpoint, test.name)
+						}
+
+						fn := loadCustomResolver()
+						ep1, e := fn(name, test.regions[i], nil)
+						if e != nil {
+							t.Errorf("Expected a valid endpoint for %s in case %s",
+								name, test.name)
+						} else {
+							targetName := fmt.Sprintf("https://%s.foo.bar", name)
+							if ep1.URL != targetName {
+								t.Errorf("Expected endpoint url: %s, received %s in case %s",
+									targetName, ep1.URL, test.name)
+							}
+							if ep1.SigningRegion != "sregion" {
+								t.Errorf("Expected signing region 'sregion', received '%s' in case %s",
+									ep1.SigningRegion, test.name)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestOverridesDefaults(t *testing.T) {
+	tests := []struct {
+		name string
+
+		configString string
+
+		expectError        bool
+		active             bool
+		servicesOverridden []string
+		defaults           []string
+	}{
+		{
+			"Bad Servicename Delimiter",
+			"[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|sregion, https://s3.foo.bar,  sregion\n" +
+				"ServicenameDelimiter=?",
+			true, false,
+			[]string{},
+			[]string{";", "?", ","},
+		},
+		{
+			"Custom ServicenameDelimiter",
+			"[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3?sregion, https://s3.foo.bar,  sregion\n" +
+				"ServicenameDelimiter=?",
+			false, true,
+			[]string{"s3"},
+			[]string{"&", "?", ","},
+		},
+		{
+			"Custom OverrideSeparator",
+			"[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|sregion + https://s3.foo.bar + sregion \n" +
+				"OverrideSeparator=+",
+			false, true,
+			[]string{"s3"},
+			[]string{"&", "|", "+"},
+		},
+		{
+			"Custom Services Delimiter",
+			"[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|sregion, https://s3.foo.bar, sregion + ec2|sregion, https://ec2.foo.bar , sregion\n" +
+				"ServiceDelimiter=+",
+			false, true,
+			[]string{"s3", "ec2"},
+			[]string{"+", "|", ","},
+		},
+		{
+			"Active Overrides",
+			"[global]\nOverrideEndpoints=true\n" +
+				"ServiceOverrides=s3|sregion, https://s3.foo.bar , sregion & ec2|sregion, https://ec2.foo.bar, sregion",
+			false, true,
+			[]string{"s3", "ec2"},
+			[]string{"&", "|", ","},
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		cfg, err := readAWSCloudConfig(strings.NewReader(test.configString))
+		if err == nil {
+			err = ParseOverrides(cfg)
+		}
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Should error for case %s (cfg=%v)", test.name, cfg)
+			}
+			if IsOverridesActive() != test.active {
+				t.Errorf("Incorrect active flag (%v vs %v) for case: %s",
+					IsOverridesActive(), test.active, test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Should succeed for case: %s", test.name)
+			}
+			if IsOverridesActive() != test.active {
+				t.Errorf("Incorrect active flag (%v vs %v) for case: %s",
+					IsOverridesActive(), test.active, test.name)
+			}
+			if cfg.Global.ServiceDelimiter != test.defaults[0] {
+				t.Errorf("Incorrect ServiceDelimter (%s vs %s) for case %s",
+					cfg.Global.ServiceDelimiter, test.defaults[0], test.name)
+			}
+			if cfg.Global.ServicenameDelimiter != test.defaults[1] {
+				t.Errorf("Incorrect ServicenameDelimiter (%s vs %s) for case %s",
+					cfg.Global.ServicenameDelimiter, test.defaults[1], test.name)
+			}
+			if cfg.Global.OverrideSeparator != test.defaults[2] {
+				t.Errorf("Incorrect OverrideSeparator (%s vs %s) for case %s",
+					cfg.Global.OverrideSeparator, test.defaults[2], test.name)
+			}
+			if len(overrides) != len(test.servicesOverridden) {
+				t.Errorf("Expected %d overridden services, received %d for case %s",
+					len(test.servicesOverridden), len(overrides), test.name)
+			} else {
+				for _, name := range test.servicesOverridden {
+					signature := MakeRegionEndpointSignature(name, "sregion")
+					ep, ok := overrides[signature]
+					if !ok {
+						t.Errorf("Missing override for service %s in case %s",
+							name, test.name)
+					} else {
+						if ep.SigningRegion != "sregion" {
+							t.Errorf("Expected signing region 'sregion', received '%s' for case %s",
+								ep.SigningRegion, test.name)
+						}
+						targetName := fmt.Sprintf("https://%s.foo.bar", name)
+						if ep.Endpoint != targetName {
+							t.Errorf("Expected Endpoint '%s', received '%s' for case %s",
+								targetName, ep.Endpoint, test.name)
+						}
+
+						fn := loadCustomResolver()
+						ep1, e := fn(name, "sregion", nil)
+						if e != nil {
+							t.Errorf("Expected a valid endpoint for %s in case %s",
+								name, test.name)
+						} else {
+							targetName := fmt.Sprintf("https://%s.foo.bar", name)
+							if ep1.URL != targetName {
+								t.Errorf("Expected endpoint url: %s, received %s in case %s",
+									targetName, ep1.URL, test.name)
+							}
+							if ep1.SigningRegion != "sregion" {
+								t.Errorf("Expected signing region 'sregion', received '%s' in case %s",
+									ep1.SigningRegion, test.name)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestNewAWSCloud(t *testing.T) {
 	tests := []struct {
 		name string
