@@ -690,17 +690,17 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	url, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, *streamOpts)
+	attachURL, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
 
 	if s.redirectContainerStreaming {
-		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
+		http.Redirect(response.ResponseWriter, request.Request, attachURL.String(), http.StatusFound)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	proxyStream(response.ResponseWriter, request.Request, attachURL)
 }
 
 // getExec handles requests to run a command inside a container.
@@ -719,16 +719,16 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	url, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
+	execURL, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
 	if s.redirectContainerStreaming {
-		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
+		http.Redirect(response.ResponseWriter, request.Request, execURL.String(), http.StatusFound)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	proxyStream(response.ResponseWriter, request.Request, execURL)
 }
 
 // getRun handles requests to run a command inside a container.
@@ -785,16 +785,16 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	url, err := s.host.GetPortForward(pod.Name, pod.Namespace, pod.UID, *portForwardOptions)
+	portForwardURL, err := s.host.GetPortForward(pod.Name, pod.Namespace, pod.UID, *portForwardOptions)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
 	if s.redirectContainerStreaming {
-		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
+		http.Redirect(response.ResponseWriter, request.Request, portForwardURL.String(), http.StatusFound)
 		return
 	}
-	proxyStream(response.ResponseWriter, request.Request, url)
+	proxyStream(response.ResponseWriter, request.Request, portForwardURL)
 }
 
 // ServeHTTP responds to HTTP requests on the Kubelet.
