@@ -18,6 +18,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+printf "\n\n\n\nDebugging EKS 1!!!!!!!!!!!\n\n\n\n"
+env
+echo "${KUBECONFIG}"
+echo 1 KUBECTL: "${KUBECTL}"
+export KUBECTL="/tmp/aws-k8s-tester/kubectl --kubeconfig=/tmp/aws-k8s-tester/kubeconfig"
+echo 2 KUBECTL: "${KUBECTL}"
+printf "\n\n\n\nDebugging EKS 2!!!!!!!!!!!\n\n\n\n"
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"
