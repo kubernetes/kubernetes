@@ -22,12 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // storageClassStrategy implements behavior for StorageClass objects
@@ -47,10 +45,6 @@ func (storageClassStrategy) NamespaceScoped() bool {
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	class := obj.(*storage.StorageClass)
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		class.AllowVolumeExpansion = nil
-	}
 
 	storageutil.DropDisabledFields(class, nil)
 }
@@ -73,10 +67,6 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	newClass := obj.(*storage.StorageClass)
 	oldClass := old.(*storage.StorageClass)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		newClass.AllowVolumeExpansion = nil
-		oldClass.AllowVolumeExpansion = nil
-	}
 	storageutil.DropDisabledFields(oldClass, newClass)
 }
 

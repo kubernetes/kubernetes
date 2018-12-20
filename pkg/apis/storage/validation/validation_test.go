@@ -140,32 +140,6 @@ func TestValidateStorageClass(t *testing.T) {
 	}
 }
 
-func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
-	deleteReclaimPolicy := api.PersistentVolumeReclaimPolicy("Delete")
-	falseVar := false
-	testSC := &storage.StorageClass{
-		// empty parameters
-		ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
-		Provisioner:          "kubernetes.io/foo-provisioner",
-		Parameters:           map[string]string{},
-		ReclaimPolicy:        &deleteReclaimPolicy,
-		AllowVolumeExpansion: &falseVar,
-		VolumeBindingMode:    &immediateMode1,
-	}
-
-	// Enable feature ExpandPersistentVolumes
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
-	if errs := ValidateStorageClass(testSC); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-	// Disable feature ExpandPersistentVolumes
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
-	if errs := ValidateStorageClass(testSC); len(errs) == 0 {
-		t.Errorf("expected failure, but got no error")
-	}
-
-}
-
 func TestVolumeAttachmentValidation(t *testing.T) {
 	volumeName := "pv-name"
 	empty := ""
