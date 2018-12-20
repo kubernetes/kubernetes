@@ -884,7 +884,6 @@ func TestFinishRequest(t *testing.T) {
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				panic("my panic")
-				return nil, nil
 			},
 			expectedObj:   nil,
 			expectedErr:   nil,
@@ -895,7 +894,6 @@ func TestFinishRequest(t *testing.T) {
 			timeout: time.Second,
 			fn: func() (runtime.Object, error) {
 				panic("my panic")
-				return nil, nil
 			},
 			expectedObj:   nil,
 			expectedErr:   nil,

@@ -515,7 +515,6 @@ staging/src/k8s.io/apimachinery/pkg/util/runtime
 staging/src/k8s.io/apimachinery/pkg/util/sets/types
 staging/src/k8s.io/apimachinery/pkg/util/strategicpatch
 staging/src/k8s.io/apimachinery/pkg/util/uuid
-staging/src/k8s.io/apimachinery/pkg/util/validation
 staging/src/k8s.io/apimachinery/pkg/util/wait
 staging/src/k8s.io/apimachinery/pkg/util/yaml
 staging/src/k8s.io/apimachinery/pkg/watch
