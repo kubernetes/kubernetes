@@ -223,7 +223,7 @@ spec:
     - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
     - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-    - --address=127.0.0.1
+    - --bind-address=127.0.0.1
     - --use-service-account-credentials=true
     image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
@@ -298,7 +298,7 @@ spec:
         - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
         - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-        - --address=127.0.0.1
+        - --bind-address=127.0.0.1
         - --use-service-account-credentials=true
         image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
@@ -372,7 +372,7 @@ spec:
     - kube-scheduler
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
-    - --address=127.0.0.1
+    - --bind-address=127.0.0.1
     image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
@@ -423,7 +423,7 @@ spec:
         - kube-scheduler
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
-        - --address=127.0.0.1
+        - --bind-address=127.0.0.1
         image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
