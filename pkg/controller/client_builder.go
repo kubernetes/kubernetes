@@ -146,15 +146,15 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				}
 				validConfig, valid, err := b.getAuthenticatedConfig(sa, string(secret.Data[v1.ServiceAccountTokenKey]))
 				if err != nil {
-					klog.Warningf("error validating API token for %s/%s in secret %s: %v", sa.Name, sa.Namespace, secret.Name, err)
+					klog.Warningf("error validating API token for %s/%s in secret %s: %v", sa.Namespace, sa.Name, secret.Name, err)
 					// continue watching for good tokens
 					return false, nil
 				}
 				if !valid {
-					klog.Warningf("secret %s contained an invalid API token for %s/%s", secret.Name, sa.Name, sa.Namespace)
+					klog.Warningf("secret %s contained an invalid API token for %s/%s", secret.Name, sa.Namespace, sa.Name)
 					// try to delete the secret containing the invalid token
 					if err := b.CoreClient.Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-						klog.Warningf("error deleting secret %s containing invalid API token for %s/%s: %v", secret.Name, sa.Name, sa.Namespace, err)
+						klog.Warningf("error deleting secret %s containing invalid API token for %s/%s: %v", secret.Name, sa.Namespace, sa.Name, err)
 					}
 					// continue watching for good tokens
 					return false, nil
@@ -208,14 +208,14 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	tokenReview := &v1authenticationapi.TokenReview{Spec: v1authenticationapi.TokenReviewSpec{Token: token}}
 	if tokenResult, err := b.AuthenticationClient.TokenReviews().Create(tokenReview); err == nil {
 		if !tokenResult.Status.Authenticated {
-			klog.Warningf("Token for %s/%s did not authenticate correctly", sa.Name, sa.Namespace)
+			klog.Warningf("Token for %s/%s did not authenticate correctly", sa.Namespace, sa.Name)
 			return nil, false, nil
 		}
 		if tokenResult.Status.User.Username != username {
-			klog.Warningf("Token for %s/%s authenticated as unexpected username: %s", sa.Name, sa.Namespace, tokenResult.Status.User.Username)
+			klog.Warningf("Token for %s/%s authenticated as unexpected username: %s", sa.Namespace, sa.Name, tokenResult.Status.User.Username)
 			return nil, false, nil
 		}
-		klog.V(4).Infof("Verified credential for %s/%s", sa.Name, sa.Namespace)
+		klog.V(4).Infof("Verified credential for %s/%s", sa.Namespace, sa.Name)
 		return clientConfig, true, nil
 	}
 
@@ -229,7 +229,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	}
 	err = client.Get().AbsPath("/apis").Do().Error()
 	if apierrors.IsUnauthorized(err) {
-		klog.Warningf("Token for %s/%s did not authenticate correctly: %v", sa.Name, sa.Namespace, err)
+		klog.Warningf("Token for %s/%s did not authenticate correctly: %v", sa.Namespace, sa.Name, err)
 		return nil, false, nil
 	}
 
