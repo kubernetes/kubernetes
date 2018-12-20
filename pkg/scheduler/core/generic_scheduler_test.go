@@ -1483,3 +1483,56 @@ func TestPreempt(t *testing.T) {
 		})
 	}
 }
+
+func TestNumFeasibleNodesToFind(t *testing.T) {
+	tests := []struct {
+		name                     string
+		percentageOfNodesToScore int32
+		numAllNodes              int32
+		wantNumNodes             int32
+	}{
+		{
+			name:         "not set percentageOfNodesToScore and nodes number not more than 50",
+			numAllNodes:  10,
+			wantNumNodes: 10,
+		},
+		{
+			name:                     "set percentageOfNodesToScore and nodes number not more than 50",
+			percentageOfNodesToScore: 40,
+			numAllNodes:              10,
+			wantNumNodes:             10,
+		},
+		{
+			name:         "not set percentageOfNodesToScore and nodes number more than 50",
+			numAllNodes:  1000,
+			wantNumNodes: 420,
+		},
+		{
+			name:                     "set percentageOfNodesToScore and nodes number more than 50",
+			percentageOfNodesToScore: 40,
+			numAllNodes:              1000,
+			wantNumNodes:             400,
+		},
+		{
+			name:         "not set percentageOfNodesToScore and nodes number more than 50*125",
+			numAllNodes:  6000,
+			wantNumNodes: 300,
+		},
+		{
+			name:                     "set percentageOfNodesToScore and nodes number more than 50*125",
+			percentageOfNodesToScore: 40,
+			numAllNodes:              6000,
+			wantNumNodes:             2400,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &genericScheduler{
+				percentageOfNodesToScore: tt.percentageOfNodesToScore,
+			}
+			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
+			}
+		})
+	}
+}

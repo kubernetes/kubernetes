@@ -54,6 +54,11 @@ const (
 	// certain minimum of nodes are checked for feasibility. This in turn helps
 	// ensure a minimum level of spreading.
 	minFeasibleNodesToFind = 100
+	// minFeasibleNodesPercentageToFind is the minimum percentage of nodes that
+	// would be scored in each scheduling cycle. This is a semi-arbitrary value
+	// to ensure that a certain minimum of nodes are checked for feasibility.
+	// This in turn helps ensure a minimum level of spreading.
+	minFeasibleNodesPercentageToFind = 5
 )
 
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
@@ -375,15 +380,24 @@ func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName s
 
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
 // its search for more feasible nodes.
-func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) int32 {
-	if numAllNodes < minFeasibleNodesToFind || g.percentageOfNodesToScore <= 0 ||
-		g.percentageOfNodesToScore >= 100 {
+func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes int32) {
+	if numAllNodes < minFeasibleNodesToFind || g.percentageOfNodesToScore >= 100 {
 		return numAllNodes
 	}
-	numNodes := numAllNodes * g.percentageOfNodesToScore / 100
+
+	adaptivePercentage := g.percentageOfNodesToScore
+	if adaptivePercentage <= 0 {
+		adaptivePercentage = schedulerapi.DefaultPercentageOfNodesToScore - numAllNodes/125
+		if adaptivePercentage < minFeasibleNodesPercentageToFind {
+			adaptivePercentage = minFeasibleNodesPercentageToFind
+		}
+	}
+
+	numNodes = numAllNodes * adaptivePercentage / 100
 	if numNodes < minFeasibleNodesToFind {
 		return minFeasibleNodesToFind
 	}
+
 	return numNodes
 }
 

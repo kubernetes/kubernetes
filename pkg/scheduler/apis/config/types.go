@@ -79,7 +79,8 @@ type KubeSchedulerConfiguration struct {
 	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
 	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
-	// When the value is 0, default percentage (50%) of the nodes will be scored.
+	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored.
 	PercentageOfNodesToScore int32
 
 	// DEPRECATED.

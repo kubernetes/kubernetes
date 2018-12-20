@@ -81,11 +81,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 		obj.LeaderElection.LockObjectName = kubescedulerconfigv1alpha1.SchedulerDefaultLockObjectName
 	}
 
-	if obj.PercentageOfNodesToScore == 0 {
-		// by default, stop finding feasible nodes once the number of feasible nodes is 50% of the cluster.
-		obj.PercentageOfNodesToScore = 50
-	}
-
 	if len(obj.FailureDomains) == 0 {
 		obj.FailureDomains = kubeletapis.DefaultFailureDomains
 	}
