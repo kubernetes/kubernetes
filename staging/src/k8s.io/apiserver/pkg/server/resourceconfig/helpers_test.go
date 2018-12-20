@@ -117,6 +117,11 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.EnableVersions(scheme.PrioritizedVersionsAllGroups()...)
+				config.EnableResources(
+					extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+					extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+					extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+				)
 				return config
 			},
 			err: false,
@@ -133,9 +138,70 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				config.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
 				return config
 			},
 			err: false,
+		},
+		{
+			// enable specific extensions resources
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/deployments": "true",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.EnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable specific extensions resources
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1/ingresses": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable all extensions resources
+			runtimeConfig: map[string]string{
+				"extensions/v1beta1": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable a non-extensions resource
+			runtimeConfig: map[string]string{
+				"apps/v1/deployments": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				return config
+			},
+			err: true,
 		},
 	}
 	for index, test := range testCases {
@@ -160,6 +226,14 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
+	)
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+	)
+	ret.DisableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
 	)
 
 	return ret
