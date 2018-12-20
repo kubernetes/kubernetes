@@ -538,10 +538,11 @@ func (s *ProxyServer) Run() error {
 				// the only remediation we know is to restart the docker daemon.
 				// Here we'll send an node event with specific reason and message, the
 				// administrator should decide whether and how to handle this issue,
-				// whether to drain the node and restart docker.
+				// whether to drain the node and restart docker.  Occurs in other container runtimes
+				// as well.
 				// TODO(random-liu): Remove this when the docker bug is fixed.
-				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: " +
-					"cannot modify conntrack limits, problems may arise later."
+				const message = "CRI error: /sys is read-only: " +
+					"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
 				s.Recorder.Eventf(s.NodeRef, api.EventTypeWarning, err.Error(), message)
 			}
 		}
