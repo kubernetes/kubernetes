@@ -79,9 +79,11 @@ func KubernetesReleaseVersion(version string) (string, error) {
 
 	// kubeReleaseLabelRegex matches labels such as: latest, latest-1, latest-1.10
 	if kubeReleaseLabelRegex.MatchString(versionLabel) {
-		var clientVersion string
 		// Try to obtain a client version.
-		clientVersion, _ = kubeadmVersion(pkgversion.Get().String())
+		// pkgversion.Get().String() should always return a correct version added by the golang
+		// linker and the build system. The version can still be missing when doing unit tests
+		// on individual packages.
+		clientVersion, clientVersionErr := kubeadmVersion(pkgversion.Get().String())
 		// Fetch version from the internet.
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetchFromURL(url, getReleaseVersionTimeout)
@@ -95,6 +97,12 @@ func KubernetesReleaseVersion(version string) (string, error) {
 			klog.Infof("falling back to the local client version: %s", clientVersion)
 			return KubernetesReleaseVersion(clientVersion)
 		}
+
+		if clientVersionErr != nil {
+			klog.Warningf("could not obtain client version; using remote version: %s", body)
+			return KubernetesReleaseVersion(body)
+		}
+
 		// both the client and the remote version are obtained; validate them and pick a stable version
 		body, err = validateStableVersion(body, clientVersion)
 		if err != nil {
@@ -216,11 +224,6 @@ func kubeadmVersion(info string) (string, error) {
 // This is done to conform with "stable-X" and only allow remote versions from
 // the same Patch level release.
 func validateStableVersion(remoteVersion, clientVersion string) (string, error) {
-	if clientVersion == "" {
-		klog.Infof("could not obtain client version; using remote version: %s", remoteVersion)
-		return remoteVersion, nil
-	}
-
 	verRemote, err := versionutil.ParseGeneric(remoteVersion)
 	if err != nil {
 		return "", pkgerrors.Wrap(err, "remote version error")
