@@ -74,6 +74,13 @@ const (
 	PodCleanupTimeout = 20 * time.Second
 )
 
+// SizeRange encapsulates a size range (along with its units) [min,max] that a storage driver supports.
+type SizeRange struct {
+	Max   float64 // Max size specified
+	Min   float64 // Min size specified
+	Units string  // The units in which Min and Max were specified
+}
+
 // Configuration of one tests. The test consist of:
 // - server pod - runs serverImage, exports ports[]
 // - client pod - does not need any special configuration
