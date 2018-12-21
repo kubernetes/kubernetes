@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -262,4 +264,9 @@ func TestFieldSelectorParsing(t *testing.T) {
 			t.Errorf("%s: expected verb %v, actual %v", tc.name, e, a)
 		}
 	}
+}
+
+func TestNilContext(t *testing.T) {
+	_, ok := RequestInfoFrom(nil)
+	assert.False(t, ok)
 }

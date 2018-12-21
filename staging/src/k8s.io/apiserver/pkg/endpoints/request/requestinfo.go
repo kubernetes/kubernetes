@@ -259,6 +259,9 @@ func WithRequestInfo(parent context.Context, info *RequestInfo) context.Context 
 
 // RequestInfoFrom returns the value of the RequestInfo key on the ctx
 func RequestInfoFrom(ctx context.Context) (*RequestInfo, bool) {
+	if ctx == nil {
+		return nil, false
+	}
 	info, ok := ctx.Value(requestInfoKey).(*RequestInfo)
 	return info, ok
 }
