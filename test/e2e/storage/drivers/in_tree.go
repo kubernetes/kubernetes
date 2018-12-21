@@ -88,6 +88,11 @@ func InitNFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[Capability]bool{
@@ -233,6 +238,11 @@ func InitGlusterFSDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "gluster",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -351,6 +361,11 @@ func InitISCSIDriver() TestDriver {
 			Name:        "iscsi",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -591,6 +606,11 @@ func InitCephFSDriver() TestDriver {
 			Name:        "ceph",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -691,6 +711,11 @@ func InitHostPathDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "hostPath",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -763,6 +788,11 @@ func InitHostPathSymlinkDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "hostPathSymlink",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -969,6 +999,11 @@ func InitCinderDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "cinder",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
@@ -1132,6 +1167,11 @@ func InitGcePdDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[Capability]bool{
 				CapPersistence: true,
@@ -1246,6 +1286,11 @@ func InitVSphereDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "vSphere",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1364,6 +1409,11 @@ func InitAzureDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "azure",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1479,6 +1529,11 @@ func InitAwsDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "aws",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",

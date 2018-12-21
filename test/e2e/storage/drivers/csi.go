@@ -63,6 +63,11 @@ func InitHostPathCSIDriver() TestDriver {
 			Name:        "csi-hostpath",
 			FeatureTag:  "",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -152,6 +157,11 @@ func InitHostV0PathCSIDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			Capabilities: map[Capability]bool{
 				CapPersistence: true,
 			},
@@ -235,6 +245,11 @@ func InitGcePDCSIDriver() TestDriver {
 			Name:        "pd.csi.storage.gke.io",
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(3),
+				Units: "Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -331,6 +346,11 @@ func InitGcePDExternalCSIDriver() TestDriver {
 				"ext4",
 				"xfs",
 			),
+			SupportedVolSize: framework.SizeRange{
+				Min:   float64(1),
+				Max:   float64(1),
+				Units: "Gi",
+			},
 			Capabilities: map[Capability]bool{
 				CapPersistence: true,
 				CapFsGroup:     true,
