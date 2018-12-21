@@ -64,7 +64,7 @@ func InitHostPathCSIDriver() TestDriver {
 			FeatureTag:  "",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedVolSize: framework.SizeRange{
-				Min:   float64(1),
+				Min:   float64(1), // TODO: choose appropriate values
 				Max:   float64(3),
 				Units: "Gi",
 			},
@@ -158,7 +158,7 @@ func InitHostV0PathCSIDriver() TestDriver {
 				"", // Default fsType
 			),
 			SupportedVolSize: framework.SizeRange{
-				Min:   float64(1),
+				Min:   float64(1), // TODO: choose appropriate value
 				Max:   float64(3),
 				Units: "Gi",
 			},
@@ -246,7 +246,7 @@ func InitGcePDCSIDriver() TestDriver {
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedVolSize: framework.SizeRange{
-				Min:   float64(1),
+				Min:   float64(1), // TODO: choose appropriate value
 				Max:   float64(3),
 				Units: "Gi",
 			},
@@ -347,7 +347,7 @@ func InitGcePDExternalCSIDriver() TestDriver {
 				"xfs",
 			),
 			SupportedVolSize: framework.SizeRange{
-				Min:   float64(1),
+				Min:   float64(1), // TODO: choose appropriate value
 				Max:   float64(1),
 				Units: "Gi",
 			},
