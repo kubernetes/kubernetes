@@ -31,6 +31,11 @@ import (
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
 // used to SSH to their nodes.
 func GetSigner(provider string) (ssh.Signer, error) {
+	// honor a consistent SSH key across all providers
+	if path := os.Getenv("KUBE_SSH_KEY_PATH"); len(path) > 0 {
+		return sshutil.MakePrivateKeySignerFromFile(path)
+	}
+
 	// Select the key itself to use. When implementing more providers here,
 	// please also add them to any SSH tests that are disabled because of signer
 	// support.
