@@ -167,8 +167,8 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
 			// Get intersection of the test size range and the driver size range
 			// and then take the minimum of the intersection as the claim size
-			sizeRangeIntersection := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.SupportedSizeRange)
-			claimSize := fmt.Sprintf("%.6f%s", math.Min(sizeRangeIntersection), sizeRangeIntersection.Units)
+			sizeRangeIntersection := getSizeRangesIntersection(pattern.SupportedSizeRange, driver.GetDriverInfo().SupportedSizeRange)
+			claimSize := fmt.Sprintf("%.6f%s", sizeRangeIntersection.Min, sizeRangeIntersection.Units)
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)
