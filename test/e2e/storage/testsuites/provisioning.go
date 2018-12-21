@@ -295,7 +295,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 	if claim.Spec.DataSource != nil {
 		By("checking the created volume whether has the pre-populated data")
 		command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-snapshot-reader", t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
 	}
 
 	if !t.SkipWriteReadCheck {
@@ -313,10 +313,10 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 		}
 		command += " || (mount | grep 'on /mnt/test'; false)"
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-writer", t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
 
 		By("checking the created volume is readable and retains data")
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, "grep 'hello world' /mnt/test/data", t.NodeSelector, t.ExpectUnschedulable)
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", t.NodeName, "grep 'hello world' /mnt/test/data", t.NodeSelector, t.ExpectUnschedulable)
 	}
 
 	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
@@ -427,14 +427,14 @@ func TestBindingWaitForFirstConsumerMultiPVC(t StorageClassTest, client clientse
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command string, nodeSelector map[string]string, unschedulable bool) {
+func runInPodWithVolume(c clientset.Interface, ns, claimName, podName, nodeName, command string, nodeSelector map[string]string, unschedulable bool) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-volume-tester-",
+			GenerateName: podName + "-",
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
@@ -525,7 +525,7 @@ func prepareDataSourceForProvisioning(
 	// write namespace to the /mnt/test (= the volume).
 	By("[Initialize dataSource]write data to volume")
 	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
-	runInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
+	runInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", t.NodeName, command, t.NodeSelector, t.ExpectUnschedulable)
 
 	By("[Initialize dataSource]creating a SnapshotClass")
 	snapshotClass, err = dynamicClient.Resource(snapshotClassGVR).Create(snapshotClass, metav1.CreateOptions{})
