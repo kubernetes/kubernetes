@@ -11,6 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

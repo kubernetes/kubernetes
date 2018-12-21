@@ -22,7 +22,6 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -92,6 +91,9 @@ type NodeLister interface {
 	List() ([]*v1.Node, error)
 }
 
+// PodFilter is a function to filter a pod. If pod passed return true else return false.
+type PodFilter func(*v1.Pod) bool
+
 // PodLister interface represents anything that can list pods for a scheduler.
 type PodLister interface {
 	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
@@ -99,7 +101,7 @@ type PodLister interface {
 	List(labels.Selector) ([]*v1.Pod, error)
 	// This is similar to "List()", but the returned slice does not
 	// contain pods that don't pass `podFilter`.
-	FilteredList(podFilter schedulerinternalcache.PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }
 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
