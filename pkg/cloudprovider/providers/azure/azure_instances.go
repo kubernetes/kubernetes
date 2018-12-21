@@ -47,7 +47,7 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	}
 
 	addressGetter := func(nodeName types.NodeName) ([]v1.NodeAddress, error) {
-		ip, publicIP, err := az.GetIPForMachineWithRetry(nodeName)
+		ip, publicIP, err := az.getIPForMachine(nodeName)
 		if err != nil {
 			klog.V(2).Infof("NodeAddresses(%s) abort backoff: %v", nodeName, err)
 			return nil, err
