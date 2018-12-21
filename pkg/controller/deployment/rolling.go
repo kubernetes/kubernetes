@@ -66,6 +66,11 @@ func (dc *DeploymentController) rolloutRolling(d *apps.Deployment, rsList []*app
 }
 
 func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
+	isFriday := (nowFn().Weekday() == 5)
+	if isFriday {
+		return false, fmt.Errorf("No deploy Friday. Enjoy your weekend!")
+	}
+
 	if *(newRS.Spec.Replicas) == *(deployment.Spec.Replicas) {
 		// Scaling not required.
 		return false, nil

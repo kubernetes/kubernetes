@@ -19,6 +19,7 @@ package deployment
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -221,6 +222,7 @@ func (f *fixture) run_(deploymentName string, startInformers bool, expectError b
 		informers.Start(stopCh)
 	}
 
+	nowFn = func() time.Time { return time.Date(2018, 10, 20, 16, 59, 59, 0, time.UTC) }
 	err = c.syncDeployment(deploymentName)
 	if !expectError && err != nil {
 		f.t.Errorf("error syncing deployment: %v", err)

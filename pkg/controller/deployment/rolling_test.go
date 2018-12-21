@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -25,6 +26,9 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 )
+
+var AFriday = time.Date(2018, 12, 21, 16, 59, 59, 0, time.UTC)
+var NotAFriday = time.Date(2018, 12, 20, 16, 59, 59, 0, time.UTC)
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 	tests := []struct {
@@ -373,6 +377,103 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		}
 		updated := updateAction.GetObject().(*apps.ReplicaSet)
 		if e, a := test.expectedOldReplicas, int(*(updated.Spec.Replicas)); e != a {
+			t.Errorf("expected update to %d replicas, got %d", e, a)
+		}
+	}
+}
+
+func TestDeploymentController_noDeployFridays(t *testing.T) {
+	tests := []struct {
+		deploymentReplicas  int
+		maxSurge            intstr.IntOrString
+		oldReplicas         int
+		newReplicas         int
+		scaleExpected       bool
+		expectedNewReplicas int
+		nowFn               func() time.Time
+	}{
+		{
+			// Should not scale up on Fridays
+			deploymentReplicas: 10,
+			maxSurge:           intstr.FromInt(0),
+			oldReplicas:        10,
+			newReplicas:        0,
+			scaleExpected:      false,
+			nowFn:              func() time.Time { return AFriday },
+		},
+		{
+			deploymentReplicas:  10,
+			maxSurge:            intstr.FromInt(2),
+			oldReplicas:         10,
+			newReplicas:         0,
+			scaleExpected:       false,
+			expectedNewReplicas: 2,
+			nowFn:               func() time.Time { return AFriday },
+		},
+		{
+			deploymentReplicas:  10,
+			maxSurge:            intstr.FromInt(2),
+			oldReplicas:         5,
+			newReplicas:         0,
+			scaleExpected:       false,
+			expectedNewReplicas: 7,
+			nowFn:               func() time.Time { return AFriday },
+		},
+		{
+			deploymentReplicas: 10,
+			maxSurge:           intstr.FromInt(2),
+			oldReplicas:        10,
+			newReplicas:        2,
+			scaleExpected:      false,
+			nowFn:              func() time.Time { return AFriday },
+		},
+		{
+			// Should scale down.
+			deploymentReplicas:  10,
+			maxSurge:            intstr.FromInt(2),
+			oldReplicas:         2,
+			newReplicas:         11,
+			scaleExpected:       false,
+			expectedNewReplicas: 10,
+			nowFn:               func() time.Time { return AFriday },
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		nowFn = test.nowFn
+		t.Logf("executing scenario %d", i)
+		newRS := rs("foo-v2", test.newReplicas, nil, noTimestamp)
+		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
+		allRSs := []*apps.ReplicaSet{newRS, oldRS}
+		maxUnavailable := intstr.FromInt(0)
+		deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &maxUnavailable, map[string]string{"foo": "bar"})
+		fake := fake.Clientset{}
+		controller := &DeploymentController{
+			client:        &fake,
+			eventRecorder: &record.FakeRecorder{},
+		}
+		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
+		if err == nil {
+			t.Errorf("expected error")
+			continue
+		}
+		if !test.scaleExpected {
+			if scaled || len(fake.Actions()) > 0 {
+				t.Errorf("unexpected scaling: %v", fake.Actions())
+			}
+			continue
+		}
+		if test.scaleExpected && !scaled {
+			t.Errorf("expected scaling to occur")
+			continue
+		}
+		if len(fake.Actions()) != 1 {
+			t.Errorf("expected 1 action during scale, got: %v", fake.Actions())
+			continue
+		}
+		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*apps.ReplicaSet)
+		if e, a := test.expectedNewReplicas, int(*(updated.Spec.Replicas)); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
