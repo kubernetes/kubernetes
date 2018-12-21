@@ -24,6 +24,7 @@ env
 echo "[DEBUG 2] starting ginkgo-e2e.sh"
 echo "[DEBUG 3] KUBECTL:" ${KUBECTL}
 
+export KUBECONFIG="/tmp/aws-k8s-tester/kubeconfig"
 export KUBECTL="/tmp/aws-k8s-tester/kubectl --kubeconfig=/tmp/aws-k8s-tester/kubeconfig"
 echo "[DEBUG 4] after set KUBECTL 1:" ${KUBECTL}
 
@@ -51,12 +52,14 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
-echo "[DEBUG 5] after KUBECTL KUBE_CONFIG_FILE:" ${KUBECTL}
 
+echo "[DEBUG 5-1] after cluster/kube-util"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+echo "[DEBUG 5-2] after cluster/kube-util"
 
+echo "[DEBUG 6-1] set KUBECTL:" ${KUBECTL}
 export KUBECTL="/tmp/aws-k8s-tester/kubectl --kubeconfig=/tmp/aws-k8s-tester/kubeconfig"
-echo "[DEBUG 6] after set KUBECTL 2:" ${KUBECTL}
+echo "[DEBUG 6-2] set KUBECTL:" ${KUBECTL}
 
 function detect-master-from-kubeconfig() {
     export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}

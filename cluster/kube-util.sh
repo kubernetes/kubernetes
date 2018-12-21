@@ -38,5 +38,6 @@ PROVIDER_VARS=""
 
 PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 if [ -f ${PROVIDER_UTILS} ]; then
+    echo "[DEBUG] loading:" ${PROVIDER_UTILS}
     source "${PROVIDER_UTILS}"
 fi
