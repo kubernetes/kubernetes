@@ -338,6 +338,22 @@ func TestPriorityQueue_WaitingPodsForNode(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_PendingPods(t *testing.T) {
+	q := NewPriorityQueue(nil)
+	q.Add(&medPriorityPod)
+	q.unschedulableQ.addOrUpdate(&unschedulablePod)
+	q.unschedulableQ.addOrUpdate(&highPriorityPod)
+	expectedList := []*v1.Pod{&medPriorityPod, &unschedulablePod, &highPriorityPod}
+	if !reflect.DeepEqual(expectedList, q.PendingPods()) {
+		t.Error("Unexpected list of pending Pods for node.")
+	}
+	// Move all to active queue. We should still see the same set of pods.
+	q.MoveAllToActiveQueue()
+	if !reflect.DeepEqual(expectedList, q.PendingPods()) {
+		t.Error("Unexpected list of pending Pods for node.")
+	}
+}
+
 func TestUnschedulablePodsMap(t *testing.T) {
 	var pods = []*v1.Pod{
 		{

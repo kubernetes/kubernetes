@@ -65,7 +65,7 @@ type SchedulingQueue interface {
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
 	WaitingPodsForNode(nodeName string) []*v1.Pod
-	WaitingPods() []*v1.Pod
+	PendingPods() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -131,8 +131,8 @@ func (f *FIFO) Pop() (*v1.Pod, error) {
 	return result.(*v1.Pod), err
 }
 
-// WaitingPods returns all the waiting pods in the queue.
-func (f *FIFO) WaitingPods() []*v1.Pod {
+// PendingPods returns all the pods in the queue.
+func (f *FIFO) PendingPods() []*v1.Pod {
 	result := []*v1.Pod{}
 	for _, pod := range f.FIFO.List() {
 		result = append(result, pod.(*v1.Pod))
@@ -675,13 +675,17 @@ func (p *PriorityQueue) WaitingPodsForNode(nodeName string) []*v1.Pod {
 	return nil
 }
 
-// WaitingPods returns all the waiting pods in the queue.
-func (p *PriorityQueue) WaitingPods() []*v1.Pod {
+// PendingPods returns all the pending pods in the queue. This function is
+// used for debugging purposes in the scheduler cache dumper and comparer.
+func (p *PriorityQueue) PendingPods() []*v1.Pod {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	result := []*v1.Pod{}
 	for _, pod := range p.activeQ.List() {
+		result = append(result, pod.(*v1.Pod))
+	}
+	for _, pod := range p.podBackoffQ.List() {
 		result = append(result, pod.(*v1.Pod))
 	}
 	for _, pod := range p.unschedulableQ.pods {
