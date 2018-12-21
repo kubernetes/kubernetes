@@ -518,3 +518,97 @@ func TestDropRuntimeClass(t *testing.T) {
 		}
 	}
 }
+
+func TestDropProcMount(t *testing.T) {
+	procMount := api.UnmaskedProcMount
+	defaultProcMount := api.DefaultProcMount
+	podWithProcMount := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyNever,
+				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &procMount}}},
+				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &procMount}}},
+			},
+		}
+	}
+	podWithoutProcMount := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyNever,
+				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
+				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description  string
+		hasProcMount bool
+		pod          func() *api.Pod
+	}{
+		{
+			description:  "has ProcMount",
+			hasProcMount: true,
+			pod:          podWithProcMount,
+		},
+		{
+			description:  "does not have ProcMount",
+			hasProcMount: false,
+			pod:          podWithoutProcMount,
+		},
+		{
+			description:  "is nil",
+			hasProcMount: false,
+			pod:          func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasProcMount, oldPod := oldPodInfo.hasProcMount, oldPodInfo.pod()
+				newPodHasProcMount, newPod := newPodInfo.hasProcMount, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					DropDisabledFields(&newPod.Spec, oldPodSpec)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasProcMount:
+						// new pod should not be changed if the feature is enabled, or if the old pod had ProcMount
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasProcMount:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have ProcMount
+						if !reflect.DeepEqual(newPod, podWithoutProcMount()) {
+							t.Errorf("new pod had ProcMount: %v", diff.ObjectReflectDiff(newPod, podWithoutProcMount()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

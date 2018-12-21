@@ -3468,7 +3468,6 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsGroup"), *(securityContext.RunAsGroup), msg))
 			}
 		}
-
 		for g, gid := range securityContext.SupplementalGroups {
 			for _, msg := range validation.IsValidGroupID(gid) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
@@ -5272,6 +5271,12 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 		}
 	}
 
+	if sc.ProcMount != nil {
+		if err := IsValidProcMount(*sc.ProcMount); err != nil {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("procMount"), *sc.ProcMount, []string{string(core.DefaultProcMount), string(core.UnmaskedProcMount)}))
+		}
+	}
+
 	if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
 		if sc.Privileged != nil && *sc.Privileged {
 			allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `privileged` to true"))
@@ -5371,4 +5376,15 @@ func IsDecremented(update, old *int32) bool {
 		return false
 	}
 	return *update < *old
+}
+
+// IsValidProcMount tests that the argument is a valid ProcMountType.
+func IsValidProcMount(procMountType core.ProcMountType) error {
+	switch procMountType {
+	case core.DefaultProcMount:
+	case core.UnmaskedProcMount:
+	default:
+		return fmt.Errorf("unsupported ProcMount type %s", procMountType)
+	}
+	return nil
 }

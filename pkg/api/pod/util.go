@@ -322,31 +322,18 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related
-// to ProcMount
+// to ProcMount only if it is not already used by the old spec
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
-		defProcMount := api.DefaultProcMount
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
+		defaultProcMount := api.DefaultProcMount
 		for i := range podSpec.Containers {
 			if podSpec.Containers[i].SecurityContext != nil {
-				podSpec.Containers[i].SecurityContext.ProcMount = &defProcMount
+				podSpec.Containers[i].SecurityContext.ProcMount = &defaultProcMount
 			}
 		}
 		for i := range podSpec.InitContainers {
 			if podSpec.InitContainers[i].SecurityContext != nil {
-				podSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
-			}
-		}
-
-		if oldPodSpec != nil {
-			for i := range oldPodSpec.Containers {
-				if oldPodSpec.Containers[i].SecurityContext != nil {
-					oldPodSpec.Containers[i].SecurityContext.ProcMount = &defProcMount
-				}
-			}
-			for i := range oldPodSpec.InitContainers {
-				if oldPodSpec.InitContainers[i].SecurityContext != nil {
-					oldPodSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
-				}
+				podSpec.InitContainers[i].SecurityContext.ProcMount = &defaultProcMount
 			}
 		}
 	}
@@ -403,6 +390,32 @@ func runtimeClassInUse(podSpec *api.PodSpec) bool {
 	}
 	if podSpec.RuntimeClassName != nil {
 		return true
+	}
+	return false
+}
+
+// procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set
+func procMountInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].SecurityContext != nil {
+			if podSpec.Containers[i].SecurityContext.ProcMount != nil {
+				if *podSpec.Containers[i].SecurityContext.ProcMount != api.DefaultProcMount {
+					return true
+				}
+			}
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].SecurityContext != nil {
+			if podSpec.InitContainers[i].SecurityContext.ProcMount != nil {
+				if *podSpec.InitContainers[i].SecurityContext.ProcMount != api.DefaultProcMount {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }
