@@ -48,6 +48,9 @@ type httpResponseWriterWithInit struct {
 func (w httpResponseWriterWithInit) Write(b []byte) (n int, err error) {
 	if !w.hasWritten {
 		w.innerW.Header().Set("Content-Type", w.mediaType)
+		if w.statusCode == 0 {
+			panic("statusCode should be non-zero!")
+		}
 		w.innerW.WriteHeader(w.statusCode)
 		w.hasWritten = true
 	}
@@ -100,6 +103,9 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 		contentType = "application/octet-stream"
 	}
 	w.Header().Set("Content-Type", contentType)
+	if statusCode == 0 {
+		panic("statusCode should be non-zero!")
+	}
 	w.WriteHeader(statusCode)
 	writer := w.(io.Writer)
 	if flush {
@@ -189,6 +195,9 @@ func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if statusCode == 0 {
+		panic("statusCode should be non-zero!")
+	}
 	w.WriteHeader(statusCode)
 	w.Write(output)
 }

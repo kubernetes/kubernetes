@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -138,6 +138,9 @@ func (c *compressionResponseWriter) Write(p []byte) (int, error) {
 }
 
 func (c *compressionResponseWriter) WriteHeader(status int) {
+	if status == 0 {
+		panic("status should be non-zero!")
+	}
 	c.writer.WriteHeader(status)
 }
 

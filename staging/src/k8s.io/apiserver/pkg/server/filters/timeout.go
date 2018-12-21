@@ -202,6 +202,9 @@ func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	}
 
 	tw.wroteHeader = true
+	if code == 0 {
+		panic("code should be non-zero!")
+	}
 	tw.w.WriteHeader(code)
 }
 

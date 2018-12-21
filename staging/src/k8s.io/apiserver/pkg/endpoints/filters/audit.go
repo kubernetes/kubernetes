@@ -214,6 +214,10 @@ func (a *auditResponseWriter) Write(bs []byte) (int, error) {
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
+	if code == 0 {
+		// Detect if an invalid response code is provided.
+		panic("code should be non-zero!")
+	}
 	a.processCode(code)
 	a.setHttpHeader()
 	a.ResponseWriter.WriteHeader(code)

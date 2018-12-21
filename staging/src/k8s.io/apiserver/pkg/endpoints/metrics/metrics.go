@@ -29,7 +29,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/request"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -306,6 +306,9 @@ type ResponseWriterDelegator struct {
 }
 
 func (r *ResponseWriterDelegator) WriteHeader(code int) {
+	if code == 0 {
+		panic("code should be non-zero!")
+	}
 	r.status = code
 	r.wroteHeader = true
 	r.ResponseWriter.WriteHeader(code)

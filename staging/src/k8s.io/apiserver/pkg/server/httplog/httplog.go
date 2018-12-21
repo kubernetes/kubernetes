@@ -180,6 +180,9 @@ func (rl *respLogger) Flush() {
 
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
+	if status == 0 {
+		panic("status should be non-zero!")
+	}
 	rl.recordStatus(status)
 	rl.w.WriteHeader(status)
 }
