@@ -41,6 +41,7 @@ import (
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -486,6 +487,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		batchapiv1.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
+		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,

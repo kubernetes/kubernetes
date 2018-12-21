@@ -38,6 +38,7 @@ openapi_library(
         "k8s.io/api/batch/v1beta1",
         "k8s.io/api/batch/v2alpha1",
         "k8s.io/api/certificates/v1beta1",
+        "k8s.io/api/coordination/v1",
         "k8s.io/api/coordination/v1beta1",
         "k8s.io/api/core/v1",
         "k8s.io/api/events/v1beta1",

@@ -83,6 +83,7 @@ go_library(
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/coordination/v1:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/events/v1beta1:go_default_library",
