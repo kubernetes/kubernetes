@@ -40,6 +40,7 @@ import (
 	schedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
 	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
 	storageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
+	topologyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/topology/internalversion"
 )
 
 type Interface interface {
@@ -62,6 +63,7 @@ type Interface interface {
 	Scheduling() schedulinginternalversion.SchedulingInterface
 	Settings() settingsinternalversion.SettingsInterface
 	Storage() storageinternalversion.StorageInterface
+	Topology() topologyinternalversion.TopologyInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -86,6 +88,7 @@ type Clientset struct {
 	scheduling            *schedulinginternalversion.SchedulingClient
 	settings              *settingsinternalversion.SettingsClient
 	storage               *storageinternalversion.StorageClient
+	topology              *topologyinternalversion.TopologyClient
 }
 
 // Admissionregistration retrieves the AdmissionregistrationClient
@@ -178,6 +181,11 @@ func (c *Clientset) Storage() storageinternalversion.StorageInterface {
 	return c.storage
 }
 
+// Topology retrieves the TopologyClient
+func (c *Clientset) Topology() topologyinternalversion.TopologyInterface {
+	return c.topology
+}
+
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	if c == nil {
@@ -266,6 +274,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.topology, err = topologyinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -296,6 +308,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.scheduling = schedulinginternalversion.NewForConfigOrDie(c)
 	cs.settings = settingsinternalversion.NewForConfigOrDie(c)
 	cs.storage = storageinternalversion.NewForConfigOrDie(c)
+	cs.topology = topologyinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -322,6 +335,7 @@ func New(c rest.Interface) *Clientset {
 	cs.scheduling = schedulinginternalversion.New(c)
 	cs.settings = settingsinternalversion.New(c)
 	cs.storage = storageinternalversion.New(c)
+	cs.topology = topologyinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

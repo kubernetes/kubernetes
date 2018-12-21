@@ -91,6 +91,7 @@ filegroup(
         "//staging/src/k8s.io/api/storage/v1:all-srcs",
         "//staging/src/k8s.io/api/storage/v1alpha1:all-srcs",
         "//staging/src/k8s.io/api/storage/v1beta1:all-srcs",
+        "//staging/src/k8s.io/api/topology/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

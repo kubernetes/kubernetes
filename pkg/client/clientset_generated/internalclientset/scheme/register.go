@@ -41,6 +41,7 @@ import (
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	settings "k8s.io/kubernetes/pkg/apis/settings/install"
 	storage "k8s.io/kubernetes/pkg/apis/storage/install"
+	topology "k8s.io/kubernetes/pkg/apis/topology/install"
 )
 
 var Scheme = runtime.NewScheme()
@@ -72,4 +73,5 @@ func Install(scheme *runtime.Scheme) {
 	scheduling.Install(scheme)
 	settings.Install(scheme)
 	storage.Install(scheme)
+	topology.Install(scheme)
 }

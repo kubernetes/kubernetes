@@ -52,6 +52,7 @@ import (
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
+	topologyv1alpha1 "k8s.io/client-go/kubernetes/typed/topology/v1alpha1"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 )
@@ -126,6 +127,9 @@ type Interface interface {
 	// Deprecated: please explicitly pick a version if possible.
 	Storage() storagev1.StorageV1Interface
 	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
+	TopologyV1alpha1() topologyv1alpha1.TopologyV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Topology() topologyv1alpha1.TopologyV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -164,6 +168,7 @@ type Clientset struct {
 	storageV1beta1                *storagev1beta1.StorageV1beta1Client
 	storageV1                     *storagev1.StorageV1Client
 	storageV1alpha1               *storagev1alpha1.StorageV1alpha1Client
+	topologyV1alpha1              *topologyv1alpha1.TopologyV1alpha1Client
 }
 
 // AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
@@ -434,6 +439,17 @@ func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return c.storageV1alpha1
 }
 
+// TopologyV1alpha1 retrieves the TopologyV1alpha1Client
+func (c *Clientset) TopologyV1alpha1() topologyv1alpha1.TopologyV1alpha1Interface {
+	return c.topologyV1alpha1
+}
+
+// Deprecated: Topology retrieves the default version of TopologyClient.
+// Please explicitly pick a version.
+func (c *Clientset) Topology() topologyv1alpha1.TopologyV1alpha1Interface {
+	return c.topologyV1alpha1
+}
+
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	if c == nil {
@@ -578,6 +594,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.topologyV1alpha1, err = topologyv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -622,6 +642,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.storageV1beta1 = storagev1beta1.NewForConfigOrDie(c)
 	cs.storageV1 = storagev1.NewForConfigOrDie(c)
 	cs.storageV1alpha1 = storagev1alpha1.NewForConfigOrDie(c)
+	cs.topologyV1alpha1 = topologyv1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -662,6 +683,7 @@ func New(c rest.Interface) *Clientset {
 	cs.storageV1beta1 = storagev1beta1.New(c)
 	cs.storageV1 = storagev1.New(c)
 	cs.storageV1alpha1 = storagev1alpha1.New(c)
+	cs.topologyV1alpha1 = topologyv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

@@ -61,6 +61,8 @@ import (
 	fakesettingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion/fake"
 	storageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 	fakestorageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion/fake"
+	topologyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/topology/internalversion"
+	faketopologyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/topology/internalversion/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -193,4 +195,9 @@ func (c *Clientset) Settings() settingsinternalversion.SettingsInterface {
 // Storage retrieves the StorageClient
 func (c *Clientset) Storage() storageinternalversion.StorageInterface {
 	return &fakestorageinternalversion.FakeStorage{Fake: &c.Fake}
+}
+
+// Topology retrieves the TopologyClient
+func (c *Clientset) Topology() topologyinternalversion.TopologyInterface {
+	return &faketopologyinternalversion.FakeTopology{Fake: &c.Fake}
 }

@@ -88,6 +88,8 @@ import (
 	fakestoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	fakestoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake"
+	topologyv1alpha1 "k8s.io/client-go/kubernetes/typed/topology/v1alpha1"
+	faketopologyv1alpha1 "k8s.io/client-go/kubernetes/typed/topology/v1alpha1/fake"
 	"k8s.io/client-go/testing"
 )
 
@@ -381,4 +383,14 @@ func (c *Clientset) Storage() storagev1.StorageV1Interface {
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
 func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
+}
+
+// TopologyV1alpha1 retrieves the TopologyV1alpha1Client
+func (c *Clientset) TopologyV1alpha1() topologyv1alpha1.TopologyV1alpha1Interface {
+	return &faketopologyv1alpha1.FakeTopologyV1alpha1{Fake: &c.Fake}
+}
+
+// Topology retrieves the TopologyV1alpha1Client
+func (c *Clientset) Topology() topologyv1alpha1.TopologyV1alpha1Interface {
+	return &faketopologyv1alpha1.FakeTopologyV1alpha1{Fake: &c.Fake}
 }

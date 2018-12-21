@@ -42,6 +42,7 @@ import (
 	schedulinginternalversion "k8s.io/kubernetes/pkg/apis/scheduling"
 	settingsinternalversion "k8s.io/kubernetes/pkg/apis/settings"
 	storageinternalversion "k8s.io/kubernetes/pkg/apis/storage"
+	topologyinternalversion "k8s.io/kubernetes/pkg/apis/topology"
 )
 
 var scheme = runtime.NewScheme()
@@ -66,6 +67,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	schedulinginternalversion.AddToScheme,
 	settingsinternalversion.AddToScheme,
 	storageinternalversion.AddToScheme,
+	topologyinternalversion.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

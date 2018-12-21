@@ -49,6 +49,7 @@ filegroup(
         "//pkg/apis/scheduling:all-srcs",
         "//pkg/apis/settings:all-srcs",
         "//pkg/apis/storage:all-srcs",
+        "//pkg/apis/topology:all-srcs",
         "//pkg/auth/authorizer/abac:all-srcs",
         "//pkg/auth/nodeidentifier:all-srcs",
         "//pkg/capabilities:all-srcs",
