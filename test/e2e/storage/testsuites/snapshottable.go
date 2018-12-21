@@ -91,18 +91,17 @@ func createSnapshottableTestInput(driver TestDriver, pattern testpatterns.TestPa
 	resource := snapshottableTestResource{}
 	resource.setupResource(driver, pattern)
 
+	dInfo := driver.GetDriverInfo()
 	input := snapshottableTestInput{
-		testCase: SnapshotClassTest{},
-		cs:       driver.GetDriverInfo().Config.Framework.ClientSet,
-		dc:       driver.GetDriverInfo().Config.Framework.DynamicClient,
-		pvc:      resource.pvc,
-		sc:       resource.sc,
-		vsc:      resource.vsc,
-		dInfo:    driver.GetDriverInfo(),
-	}
-
-	if driver.GetDriverInfo().Config.ClientNodeName != "" {
-		input.testCase.NodeName = driver.GetDriverInfo().Config.ClientNodeName
+		testCase: SnapshotClassTest{
+			NodeName: dInfo.Config.ClientNodeName,
+		},
+		cs:    dInfo.Config.Framework.ClientSet,
+		dc:    dInfo.Config.Framework.DynamicClient,
+		pvc:   resource.pvc,
+		sc:    resource.sc,
+		vsc:   resource.vsc,
+		dInfo: dInfo,
 	}
 
 	return resource, input
