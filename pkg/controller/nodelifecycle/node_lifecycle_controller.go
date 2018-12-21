@@ -95,9 +95,6 @@ var (
 		v1.NodeMemoryPressure: {
 			v1.ConditionTrue: schedulerapi.TaintNodeMemoryPressure,
 		},
-		v1.NodeOutOfDisk: {
-			v1.ConditionTrue: schedulerapi.TaintNodeOutOfDisk,
-		},
 		v1.NodeDiskPressure: {
 			v1.ConditionTrue: schedulerapi.TaintNodeDiskPressure,
 		},
@@ -114,7 +111,6 @@ var (
 		schedulerapi.TaintNodeUnreachable:        v1.NodeReady,
 		schedulerapi.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		schedulerapi.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		schedulerapi.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
 		schedulerapi.TaintNodeDiskPressure:       v1.NodeDiskPressure,
 		schedulerapi.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
@@ -229,7 +225,7 @@ type Controller struct {
 	useTaintBasedEvictions bool
 
 	// if set to true, NodeController will taint Nodes based on its condition for 'NetworkUnavailable',
-	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
+	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
 	taintNodeByCondition bool
 
 	nodeUpdateQueue workqueue.Interface
@@ -921,7 +917,6 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 
 		// remaining node conditions should also be set to Unknown
 		remainingNodeConditionTypes := []v1.NodeConditionType{
-			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			v1.NodePIDPressure,

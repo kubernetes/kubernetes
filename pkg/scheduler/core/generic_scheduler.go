@@ -1075,7 +1075,6 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 				predicates.ErrNodeUnderDiskPressure,
 				predicates.ErrNodeUnderPIDPressure,
 				predicates.ErrNodeUnderMemoryPressure,
-				predicates.ErrNodeOutOfDisk,
 				predicates.ErrNodeUnschedulable,
 				predicates.ErrNodeUnknownCondition,
 				predicates.ErrVolumeZoneConflict,
