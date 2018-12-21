@@ -37,7 +37,7 @@ function find_genfiles() {
 # $1 = filename pattern as in "zz_generated.$1.go"
 # $2 timestamp file
 function newer() {
-    find_genfiles "$1" | while read F; do
+    find_genfiles "$1" | while read -r F; do
         if [[ "${F}" -nt "$2" ]]; then
             echo "${F}"
         fi
@@ -47,7 +47,7 @@ function newer() {
 # $1 = filename pattern as in "zz_generated.$1.go"
 # $2 timestamp file
 function older() {
-    find_genfiles "$1" | while read F; do
+    find_genfiles "$1" | while read -r F; do
         if [[ "$2" -nt "${F}" ]]; then
             echo "${F}"
         fi
