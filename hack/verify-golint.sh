@@ -23,11 +23,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::verify_go_version
 
-if ! which golint > /dev/null; then
-  echo 'Can not find golint, install with:'
-  echo 'go get -u github.com/golang/lint/golint'
-  exit 1
-fi
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
+
+# Install golint from vendor
+echo 'Can not find golint, installing from vendor'
+go install k8s.io/kubernetes/vendor/golang.org/x/lint/golint
 
 cd "${KUBE_ROOT}"
 
