@@ -360,7 +360,6 @@ pkg/serviceaccount
 pkg/ssh
 pkg/util/bandwidth
 pkg/util/config
-pkg/util/configz
 pkg/util/ebtables
 pkg/util/env
 pkg/util/file
