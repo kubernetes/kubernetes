@@ -25,6 +25,7 @@ go_test(
         "//cmd/kube-scheduler/app:go_default_library",
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/controller/volume/persistentvolume/options:go_default_library",
