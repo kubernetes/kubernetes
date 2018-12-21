@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -151,7 +152,8 @@ func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, patt
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = "5Gi"
+			sizeRangesIntersection := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.SupportedSizeRange)
+			p.claimSize = fmt.Sprintf("%.6f%s", math.Min(sizeRangesIntersection.Min), sizeRangesIntersection.Units)
 			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)

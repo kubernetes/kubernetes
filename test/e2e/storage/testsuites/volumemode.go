@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"fmt"
+	"math"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -195,8 +196,8 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 			}
 			s.sc.VolumeBindingMode = &volBindMode
-
-			claimSize := "5Gi"
+			sizeRangesIntersection := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.SupportedSizeRange)
+			claimSize := fmt.Sprintf("%.6f%s", math.Min(sizeRangesIntersection.Min), sizeRangesIntersection.Units)
 			s.pvc = getClaim(claimSize, ns.Name)
 			s.pvc.Spec.StorageClassName = &s.sc.Name
 			s.pvc.Spec.VolumeMode = &volMode
