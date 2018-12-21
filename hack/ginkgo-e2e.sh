@@ -18,6 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "[DEBUG 1] env"
+env
+
+echo "[DEBUG 2] starting ginkgo-e2e.sh"
+echo "[DEBUG 3] KUBECTL:" ${KUBECTL}
+
+export KUBECTL="/tmp/aws-k8s-tester/kubectl --kubeconfig=/tmp/aws-k8s-tester/kubeconfig"
+echo "[DEBUG 4] after set KUBECTL 1:" ${KUBECTL}
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"
@@ -42,8 +51,12 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
+echo "[DEBUG 5] after KUBECTL KUBE_CONFIG_FILE:" ${KUBECTL}
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+export KUBECTL="/tmp/aws-k8s-tester/kubectl --kubeconfig=/tmp/aws-k8s-tester/kubeconfig"
+echo "[DEBUG 6] after set KUBECTL 2:" ${KUBECTL}
 
 function detect-master-from-kubeconfig() {
     export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
