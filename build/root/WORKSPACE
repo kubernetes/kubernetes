@@ -41,7 +41,7 @@ http_archive(
 
 load("@bazel_skylib//:lib.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.16.0")
+versions.check(minimum_bazel_version = "0.17.1")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_repositories")
