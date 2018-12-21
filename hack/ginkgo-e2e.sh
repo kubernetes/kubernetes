@@ -41,6 +41,9 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 : ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
+echo "HELLO WORLD!"
+env
+
 export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
