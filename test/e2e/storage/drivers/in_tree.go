@@ -88,7 +88,7 @@ func InitNFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedVolSize: framework.SizeRange{
+			SupportedSizeRange: framework.SizeRange{
 				Min:   float64(1),
 				Max:   float64(3),
 				Units: "Gi",
@@ -238,7 +238,7 @@ func InitGlusterFSDriver() TestDriver {
 		driverInfo: DriverInfo{
 			Name:        "gluster",
 			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedVolSize: framework.SizeRange{
+			SupportedSizeRange: framework.SizeRange{
 				Min:   float64(1),
 				Max:   float64(3),
 				Units: "Gi",
@@ -361,7 +361,7 @@ func InitISCSIDriver() TestDriver {
 			Name:        "iscsi",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedVolSize: framework.SizeRange{
+			SupportedSizeRange: framework.SizeRange{
 				Min:   float64(1),
 				Max:   float64(3),
 				Units: "Gi",
