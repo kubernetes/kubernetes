@@ -61,6 +61,7 @@ REQUIRED_BINS=(
   "github.com/client9/misspell/cmd/misspell"
   "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
   "github.com/kubernetes/repo-infra/kazel"
+  "golang.org/x/lint/golint"
   "./..."
 )
 
