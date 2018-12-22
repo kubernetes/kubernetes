@@ -382,6 +382,9 @@ var (
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.12.0")
 
+	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.13.0")
+
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		10: "3.1.12",
