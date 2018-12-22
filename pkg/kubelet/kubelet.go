@@ -1306,7 +1306,14 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 // Run starts the kubelet reacting to config updates
 func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.logServer == nil {
-		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
+		file := http.FileServer(http.Dir("/var/log/"))
+		kl.logServer = http.StripPrefix("/logs/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.URL.Path == "journal" {
+				journal.ServeHTTP(w, req)
+				return
+			}
+			file.ServeHTTP(w, req)
+		}))
 	}
 	if kl.kubeClient == nil {
 		klog.Warning("No api server defined - no node status update will be sent.")
