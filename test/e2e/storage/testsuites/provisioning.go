@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -74,10 +73,10 @@ func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (p *provisioningTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
-func createProvisioningTestInput(driver drivers.TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
+func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
 	// Setup test resource for driver and testpattern
 	resource := provisioningTestResource{}
 	resource.setupResource(driver, pattern)
@@ -87,7 +86,7 @@ func createProvisioningTestInput(driver drivers.TestDriver, pattern testpatterns
 			ClaimSize:    resource.claimSize,
 			ExpectedSize: resource.claimSize,
 		},
-		cs:    driver.GetDriverInfo().Framework.ClientSet,
+		cs:    driver.GetDriverInfo().Config.Framework.ClientSet,
 		pvc:   resource.pvc,
 		sc:    resource.sc,
 		dInfo: driver.GetDriverInfo(),
@@ -100,7 +99,7 @@ func createProvisioningTestInput(driver drivers.TestDriver, pattern testpatterns
 	return resource, input
 }
 
-func (p *provisioningTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(p, pattern), func() {
 		var (
 			resource     provisioningTestResource
@@ -132,7 +131,7 @@ func (p *provisioningTestSuite) execTest(driver drivers.TestDriver, pattern test
 }
 
 type provisioningTestResource struct {
-	driver drivers.TestDriver
+	driver TestDriver
 
 	claimSize string
 	sc        *storage.StorageClass
@@ -141,18 +140,18 @@ type provisioningTestResource struct {
 
 var _ TestResource = &provisioningTestResource{}
 
-func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 	// Setup provisioningTest resource
 	switch pattern.VolType {
 	case testpatterns.DynamicPV:
-		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
+		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			p.sc = dDriver.GetDynamicProvisionStorageClass("")
 			if p.sc == nil {
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
 			p.driver = driver
-			p.claimSize = "5Gi"
-			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Framework.Namespace.Name)
+			p.claimSize = dDriver.GetClaimSize()
+			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
 			p.pvc.Spec.StorageClassName = &p.sc.Name
 			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
 		}
@@ -161,7 +160,7 @@ func (p *provisioningTestResource) setupResource(driver drivers.TestDriver, patt
 	}
 }
 
-func (p *provisioningTestResource) cleanupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 type provisioningTestInput struct {
@@ -169,7 +168,7 @@ type provisioningTestInput struct {
 	cs       clientset.Interface
 	pvc      *v1.PersistentVolumeClaim
 	sc       *storage.StorageClass
-	dInfo    *drivers.DriverInfo
+	dInfo    *DriverInfo
 }
 
 func testProvisioning(input *provisioningTestInput) {
@@ -187,7 +186,7 @@ func testProvisioning(input *provisioningTestInput) {
 	})
 
 	It("should create and delete block persistent volumes", func() {
-		if !input.dInfo.Capabilities[drivers.CapBlock] {
+		if !input.dInfo.Capabilities[CapBlock] {
 			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
 		}
 		block := v1.PersistentVolumeBlock

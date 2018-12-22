@@ -55,6 +55,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -65,7 +66,7 @@ type nfsDriver struct {
 	externalProvisionerPod *v1.Pod
 	externalPluginName     string
 
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type nfsTestResource struct {
@@ -73,16 +74,16 @@ type nfsTestResource struct {
 	serverPod *v1.Pod
 }
 
-var _ TestDriver = &nfsDriver{}
-var _ PreprovisionedVolumeTestDriver = &nfsDriver{}
-var _ InlineVolumeTestDriver = &nfsDriver{}
-var _ PreprovisionedPVTestDriver = &nfsDriver{}
-var _ DynamicPVTestDriver = &nfsDriver{}
+var _ testsuites.TestDriver = &nfsDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &nfsDriver{}
+var _ testsuites.InlineVolumeTestDriver = &nfsDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &nfsDriver{}
+var _ testsuites.DynamicPVTestDriver = &nfsDriver{}
 
 // InitNFSDriver returns nfsDriver that implements TestDriver interface
-func InitNFSDriver() TestDriver {
+func InitNFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &nfsDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "nfs",
 			MaxFileSize: testpatterns.FileSizeLarge,
 			SupportedFsType: sets.NewString(
@@ -90,15 +91,17 @@ func InitNFSDriver() TestDriver {
 			),
 			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (n *nfsDriver) GetDriverInfo() *DriverInfo {
+func (n *nfsDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &n.driverInfo
 }
 
@@ -132,17 +135,24 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, test
 func (n *nfsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	provisioner := n.externalPluginName
 	parameters := map[string]string{"mountOptions": "vers=4.1"}
-	ns := n.driverInfo.Framework.Namespace.Name
+	ns := n.driverInfo.Config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", n.driverInfo.Name)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (n *nfsDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (n *nfsDriver) CreateDriver() {
-	f := n.driverInfo.Framework
+	f := n.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
+
+	// Reset config. It might have been modified by a previous CreateVolume call.
+	n.driverInfo.Config.ServerConfig = nil
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
@@ -159,7 +169,7 @@ func (n *nfsDriver) CreateDriver() {
 }
 
 func (n *nfsDriver) CleanupDriver() {
-	f := n.driverInfo.Framework
+	f := n.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
@@ -169,7 +179,7 @@ func (n *nfsDriver) CleanupDriver() {
 }
 
 func (n *nfsDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := n.driverInfo.Framework
+	f := n.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
@@ -181,7 +191,7 @@ func (n *nfsDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
 		fallthrough
 	case testpatterns.PreprovisionedPV:
 		config, serverPod, serverIP := framework.NewNFSServer(cs, ns.Name, []string{})
-		n.driverInfo.Config = config
+		n.driverInfo.Config.ServerConfig = &config
 		return &nfsTestResource{
 			serverIP:  serverIP,
 			serverPod: serverPod,
@@ -195,7 +205,7 @@ func (n *nfsDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
 }
 
 func (n *nfsDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
-	f := n.driverInfo.Framework
+	f := n.driverInfo.Config.Framework
 
 	ntr, ok := testResource.(*nfsTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to NFS Test Resource")
@@ -214,7 +224,7 @@ func (n *nfsDriver) DeleteVolume(volType testpatterns.TestVolType, testResource 
 
 // Gluster
 type glusterFSDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type glusterTestResource struct {
@@ -222,29 +232,31 @@ type glusterTestResource struct {
 	serverPod *v1.Pod
 }
 
-var _ TestDriver = &glusterFSDriver{}
-var _ PreprovisionedVolumeTestDriver = &glusterFSDriver{}
-var _ InlineVolumeTestDriver = &glusterFSDriver{}
-var _ PreprovisionedPVTestDriver = &glusterFSDriver{}
+var _ testsuites.TestDriver = &glusterFSDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &glusterFSDriver{}
+var _ testsuites.InlineVolumeTestDriver = &glusterFSDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &glusterFSDriver{}
 
 // InitGlusterFSDriver returns glusterFSDriver that implements TestDriver interface
-func InitGlusterFSDriver() TestDriver {
+func InitGlusterFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &glusterFSDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "gluster",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (g *glusterFSDriver) GetDriverInfo() *DriverInfo {
+func (g *glusterFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
@@ -286,18 +298,20 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 }
 
 func (g *glusterFSDriver) CreateDriver() {
+	// Reset config. It might have been modified by a previous CreateVolume call.
+	g.driverInfo.Config.ServerConfig = nil
 }
 
 func (g *glusterFSDriver) CleanupDriver() {
 }
 
 func (g *glusterFSDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := g.driverInfo.Framework
+	f := g.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	config, serverPod, _ := framework.NewGlusterfsServer(cs, ns.Name)
-	g.driverInfo.Config = config
+	g.driverInfo.Config.ServerConfig = &config
 	return &glusterTestResource{
 		prefix:    config.Prefix,
 		serverPod: serverPod,
@@ -305,7 +319,7 @@ func (g *glusterFSDriver) CreateVolume(volType testpatterns.TestVolType) interfa
 }
 
 func (g *glusterFSDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
-	f := g.driverInfo.Framework
+	f := g.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
@@ -332,22 +346,22 @@ func (g *glusterFSDriver) DeleteVolume(volType testpatterns.TestVolType, testRes
 // iSCSI
 // The iscsiadm utility and iscsi target kernel modules must be installed on all nodes.
 type iSCSIDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 type iSCSITestResource struct {
 	serverPod *v1.Pod
 	serverIP  string
 }
 
-var _ TestDriver = &iSCSIDriver{}
-var _ PreprovisionedVolumeTestDriver = &iSCSIDriver{}
-var _ InlineVolumeTestDriver = &iSCSIDriver{}
-var _ PreprovisionedPVTestDriver = &iSCSIDriver{}
+var _ testsuites.TestDriver = &iSCSIDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &iSCSIDriver{}
+var _ testsuites.InlineVolumeTestDriver = &iSCSIDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &iSCSIDriver{}
 
 // InitISCSIDriver returns iSCSIDriver that implements TestDriver interface
-func InitISCSIDriver() TestDriver {
+func InitISCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &iSCSIDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "iscsi",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
@@ -358,17 +372,19 @@ func InitISCSIDriver() TestDriver {
 				//"ext3",
 				"ext4",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapBlock:       true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapBlock:       true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (i *iSCSIDriver) GetDriverInfo() *DriverInfo {
+func (i *iSCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &i.driverInfo
 }
 
@@ -413,18 +429,20 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, te
 }
 
 func (i *iSCSIDriver) CreateDriver() {
+	// Reset config. It might have been modified by a previous CreateVolume call.
+	i.driverInfo.Config.ServerConfig = nil
 }
 
 func (i *iSCSIDriver) CleanupDriver() {
 }
 
 func (i *iSCSIDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := i.driverInfo.Framework
+	f := i.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	config, serverPod, serverIP := framework.NewISCSIServer(cs, ns.Name)
-	i.driverInfo.Config = config
+	i.driverInfo.Config.ServerConfig = &config
 	return &iSCSITestResource{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -432,7 +450,7 @@ func (i *iSCSIDriver) CreateVolume(volType testpatterns.TestVolType) interface{}
 }
 
 func (i *iSCSIDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
-	f := i.driverInfo.Framework
+	f := i.driverInfo.Config.Framework
 
 	itr, ok := testResource.(*iSCSITestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to iSCSI Test Resource")
@@ -442,7 +460,7 @@ func (i *iSCSIDriver) DeleteVolume(volType testpatterns.TestVolType, testResourc
 
 // Ceph RBD
 type rbdDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type rbdTestResource struct {
@@ -451,15 +469,15 @@ type rbdTestResource struct {
 	secret    *v1.Secret
 }
 
-var _ TestDriver = &rbdDriver{}
-var _ PreprovisionedVolumeTestDriver = &rbdDriver{}
-var _ InlineVolumeTestDriver = &rbdDriver{}
-var _ PreprovisionedPVTestDriver = &rbdDriver{}
+var _ testsuites.TestDriver = &rbdDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &rbdDriver{}
+var _ testsuites.InlineVolumeTestDriver = &rbdDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &rbdDriver{}
 
 // InitRbdDriver returns rbdDriver that implements TestDriver interface
-func InitRbdDriver() TestDriver {
+func InitRbdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &rbdDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "rbd",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
@@ -470,17 +488,19 @@ func InitRbdDriver() TestDriver {
 				//"ext3",
 				"ext4",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapBlock:       true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapBlock:       true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (r *rbdDriver) GetDriverInfo() *DriverInfo {
+func (r *rbdDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &r.driverInfo
 }
 
@@ -510,7 +530,7 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, testResource i
 }
 
 func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
-	f := r.driverInfo.Framework
+	f := r.driverInfo.Config.Framework
 	ns := f.Namespace
 
 	rtr, ok := testResource.(*rbdTestResource)
@@ -536,18 +556,20 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, test
 }
 
 func (r *rbdDriver) CreateDriver() {
+	// Reset config. It might have been modified by a previous CreateVolume call.
+	r.driverInfo.Config.ServerConfig = nil
 }
 
 func (r *rbdDriver) CleanupDriver() {
 }
 
 func (r *rbdDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := r.driverInfo.Framework
+	f := r.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	config, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
-	r.driverInfo.Config = config
+	r.driverInfo.Config.ServerConfig = &config
 	return &rbdTestResource{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -556,7 +578,7 @@ func (r *rbdDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
 }
 
 func (r *rbdDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
-	f := r.driverInfo.Framework
+	f := r.driverInfo.Config.Framework
 
 	rtr, ok := testResource.(*rbdTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to RBD Test Resource")
@@ -570,7 +592,7 @@ type cephFSDriver struct {
 	serverPod *v1.Pod
 	secret    *v1.Secret
 
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type cephTestResource struct {
@@ -579,30 +601,32 @@ type cephTestResource struct {
 	secret    *v1.Secret
 }
 
-var _ TestDriver = &cephFSDriver{}
-var _ PreprovisionedVolumeTestDriver = &cephFSDriver{}
-var _ InlineVolumeTestDriver = &cephFSDriver{}
-var _ PreprovisionedPVTestDriver = &cephFSDriver{}
+var _ testsuites.TestDriver = &cephFSDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &cephFSDriver{}
+var _ testsuites.InlineVolumeTestDriver = &cephFSDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &cephFSDriver{}
 
 // InitCephFSDriver returns cephFSDriver that implements TestDriver interface
-func InitCephFSDriver() TestDriver {
+func InitCephFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &cephFSDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "ceph",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (c *cephFSDriver) GetDriverInfo() *DriverInfo {
+func (c *cephFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &c.driverInfo
 }
 
@@ -626,7 +650,7 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, testResourc
 }
 
 func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource {
-	f := c.driverInfo.Framework
+	f := c.driverInfo.Config.Framework
 	ns := f.Namespace
 
 	ctr, ok := testResource.(*cephTestResource)
@@ -646,18 +670,20 @@ func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, t
 }
 
 func (c *cephFSDriver) CreateDriver() {
+	// Reset config. It might have been modified by a previous CreateVolume call.
+	c.driverInfo.Config.ServerConfig = nil
 }
 
 func (c *cephFSDriver) CleanupDriver() {
 }
 
 func (c *cephFSDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := c.driverInfo.Framework
+	f := c.driverInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	config, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
-	c.driverInfo.Config = config
+	c.driverInfo.Config.ServerConfig = &config
 	return &cephTestResource{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -666,7 +692,7 @@ func (c *cephFSDriver) CreateVolume(volType testpatterns.TestVolType) interface{
 }
 
 func (c *cephFSDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
-	f := c.driverInfo.Framework
+	f := c.driverInfo.Config.Framework
 
 	ctr, ok := testResource.(*cephTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to Ceph Test Resource")
@@ -678,30 +704,32 @@ func (c *cephFSDriver) DeleteVolume(volType testpatterns.TestVolType, testResour
 type hostPathDriver struct {
 	node v1.Node
 
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
-var _ TestDriver = &hostPathDriver{}
-var _ PreprovisionedVolumeTestDriver = &hostPathDriver{}
-var _ InlineVolumeTestDriver = &hostPathDriver{}
+var _ testsuites.TestDriver = &hostPathDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &hostPathDriver{}
+var _ testsuites.InlineVolumeTestDriver = &hostPathDriver{}
 
 // InitHostPathDriver returns hostPathDriver that implements TestDriver interface
-func InitHostPathDriver() TestDriver {
+func InitHostPathDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &hostPathDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "hostPath",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (h *hostPathDriver) GetDriverInfo() *DriverInfo {
+func (h *hostPathDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
 }
 
@@ -727,7 +755,7 @@ func (h *hostPathDriver) CleanupDriver() {
 }
 
 func (h *hostPathDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := h.driverInfo.Framework
+	f := h.driverInfo.Config.Framework
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
@@ -744,7 +772,7 @@ func (h *hostPathDriver) DeleteVolume(volType testpatterns.TestVolType, testReso
 type hostPathSymlinkDriver struct {
 	node v1.Node
 
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type hostPathSymlinkTestResource struct {
@@ -753,27 +781,29 @@ type hostPathSymlinkTestResource struct {
 	prepPod    *v1.Pod
 }
 
-var _ TestDriver = &hostPathSymlinkDriver{}
-var _ PreprovisionedVolumeTestDriver = &hostPathSymlinkDriver{}
-var _ InlineVolumeTestDriver = &hostPathSymlinkDriver{}
+var _ testsuites.TestDriver = &hostPathSymlinkDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &hostPathSymlinkDriver{}
+var _ testsuites.InlineVolumeTestDriver = &hostPathSymlinkDriver{}
 
 // InitHostPathSymlinkDriver returns hostPathSymlinkDriver that implements TestDriver interface
-func InitHostPathSymlinkDriver() TestDriver {
+func InitHostPathSymlinkDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &hostPathSymlinkDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "hostPathSymlink",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (h *hostPathSymlinkDriver) GetDriverInfo() *DriverInfo {
+func (h *hostPathSymlinkDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
 }
 
@@ -802,7 +832,7 @@ func (h *hostPathSymlinkDriver) CleanupDriver() {
 }
 
 func (h *hostPathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := h.driverInfo.Framework
+	f := h.driverInfo.Config.Framework
 	cs := f.ClientSet
 
 	sourcePath := fmt.Sprintf("/tmp/%v", f.Namespace.Name)
@@ -870,7 +900,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) i
 }
 
 func (h *hostPathSymlinkDriver) DeleteVolume(volType testpatterns.TestVolType, testResource interface{}) {
-	f := h.driverInfo.Framework
+	f := h.driverInfo.Config.Framework
 
 	htr, ok := testResource.(*hostPathSymlinkTestResource)
 	Expect(ok).To(BeTrue(), "Failed to cast test resource to Hostpath Symlink Test Resource")
@@ -890,30 +920,32 @@ func (h *hostPathSymlinkDriver) DeleteVolume(volType testpatterns.TestVolType, t
 
 // emptydir
 type emptydirDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
-var _ TestDriver = &emptydirDriver{}
-var _ PreprovisionedVolumeTestDriver = &emptydirDriver{}
-var _ InlineVolumeTestDriver = &emptydirDriver{}
+var _ testsuites.TestDriver = &emptydirDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &emptydirDriver{}
+var _ testsuites.InlineVolumeTestDriver = &emptydirDriver{}
 
 // InitEmptydirDriver returns emptydirDriver that implements TestDriver interface
-func InitEmptydirDriver() TestDriver {
+func InitEmptydirDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &emptydirDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "emptydir",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[Capability]bool{
-				CapExec: true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapExec: true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (e *emptydirDriver) GetDriverInfo() *DriverInfo {
+func (e *emptydirDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &e.driverInfo
 }
 
@@ -949,7 +981,7 @@ func (e *emptydirDriver) CleanupDriver() {
 // and that the usual OpenStack authentication env. variables are set
 // (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 type cinderDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type cinderTestResource struct {
@@ -957,32 +989,34 @@ type cinderTestResource struct {
 	volumeID   string
 }
 
-var _ TestDriver = &cinderDriver{}
-var _ PreprovisionedVolumeTestDriver = &cinderDriver{}
-var _ InlineVolumeTestDriver = &cinderDriver{}
-var _ PreprovisionedPVTestDriver = &cinderDriver{}
-var _ DynamicPVTestDriver = &cinderDriver{}
+var _ testsuites.TestDriver = &cinderDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &cinderDriver{}
+var _ testsuites.InlineVolumeTestDriver = &cinderDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &cinderDriver{}
+var _ testsuites.DynamicPVTestDriver = &cinderDriver{}
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
-func InitCinderDriver() TestDriver {
+func InitCinderDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &cinderDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "cinder",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (c *cinderDriver) GetDriverInfo() *DriverInfo {
+func (c *cinderDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &c.driverInfo
 }
 
@@ -1028,10 +1062,14 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := c.driverInfo.Framework.Namespace.Name
+	ns := c.driverInfo.Config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", c.driverInfo.Name)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (c *cinderDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (c *cinderDriver) CreateDriver() {
@@ -1041,7 +1079,7 @@ func (c *cinderDriver) CleanupDriver() {
 }
 
 func (c *cinderDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := c.driverInfo.Framework
+	f := c.driverInfo.Config.Framework
 	ns := f.Namespace
 
 	// We assume that namespace.Name is a random string
@@ -1106,23 +1144,23 @@ func deleteCinderVolume(name string) error {
 
 // GCE
 type gcePdDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type gcePdTestResource struct {
 	volumeName string
 }
 
-var _ TestDriver = &gcePdDriver{}
-var _ PreprovisionedVolumeTestDriver = &gcePdDriver{}
-var _ InlineVolumeTestDriver = &gcePdDriver{}
-var _ PreprovisionedPVTestDriver = &gcePdDriver{}
-var _ DynamicPVTestDriver = &gcePdDriver{}
+var _ testsuites.TestDriver = &gcePdDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &gcePdDriver{}
+var _ testsuites.InlineVolumeTestDriver = &gcePdDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &gcePdDriver{}
+var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGceDriver returns gcePdDriver that implements TestDriver interface
-func InitGcePdDriver() TestDriver {
+func InitGcePdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &gcePdDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "gcepd",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -1133,17 +1171,19 @@ func InitGcePdDriver() TestDriver {
 				"xfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapBlock:       true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapBlock:       true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (g *gcePdDriver) GetDriverInfo() *DriverInfo {
+func (g *gcePdDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
@@ -1190,10 +1230,14 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := g.driverInfo.Framework.Namespace.Name
+	ns := g.driverInfo.Config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (h *gcePdDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (g *gcePdDriver) CreateDriver() {
@@ -1206,7 +1250,7 @@ func (g *gcePdDriver) CreateVolume(volType testpatterns.TestVolType) interface{}
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
-		g.driverInfo.Config.NodeSelector = map[string]string{
+		g.driverInfo.Config.ClientNodeSelector = map[string]string{
 			kubeletapis.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 		}
 	}
@@ -1226,7 +1270,7 @@ func (g *gcePdDriver) DeleteVolume(volType testpatterns.TestVolType, testResourc
 
 // vSphere
 type vSphereDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type vSphereTestResource struct {
@@ -1234,31 +1278,33 @@ type vSphereTestResource struct {
 	nodeInfo   *vspheretest.NodeInfo
 }
 
-var _ TestDriver = &vSphereDriver{}
-var _ PreprovisionedVolumeTestDriver = &vSphereDriver{}
-var _ InlineVolumeTestDriver = &vSphereDriver{}
-var _ PreprovisionedPVTestDriver = &vSphereDriver{}
-var _ DynamicPVTestDriver = &vSphereDriver{}
+var _ testsuites.TestDriver = &vSphereDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &vSphereDriver{}
+var _ testsuites.InlineVolumeTestDriver = &vSphereDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &vSphereDriver{}
+var _ testsuites.DynamicPVTestDriver = &vSphereDriver{}
 
 // InitVSphereDriver returns vSphereDriver that implements TestDriver interface
-func InitVSphereDriver() TestDriver {
+func InitVSphereDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &vSphereDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "vSphere",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
-func (v *vSphereDriver) GetDriverInfo() *DriverInfo {
+func (v *vSphereDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &v.driverInfo
 }
 
@@ -1312,10 +1358,14 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(fsType string) *storagev
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := v.driverInfo.Framework.Namespace.Name
+	ns := v.driverInfo.Config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", v.driverInfo.Name)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (v *vSphereDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (v *vSphereDriver) CreateDriver() {
@@ -1325,7 +1375,7 @@ func (v *vSphereDriver) CleanupDriver() {
 }
 
 func (v *vSphereDriver) CreateVolume(volType testpatterns.TestVolType) interface{} {
-	f := v.driverInfo.Framework
+	f := v.driverInfo.Config.Framework
 	vspheretest.Bootstrap(f)
 	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
@@ -1345,40 +1395,42 @@ func (v *vSphereDriver) DeleteVolume(volType testpatterns.TestVolType, testResou
 
 // Azure
 type azureDriver struct {
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
 type azureTestResource struct {
 	volumeName string
 }
 
-var _ TestDriver = &azureDriver{}
-var _ PreprovisionedVolumeTestDriver = &azureDriver{}
-var _ InlineVolumeTestDriver = &azureDriver{}
-var _ PreprovisionedPVTestDriver = &azureDriver{}
-var _ DynamicPVTestDriver = &azureDriver{}
+var _ testsuites.TestDriver = &azureDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &azureDriver{}
+var _ testsuites.InlineVolumeTestDriver = &azureDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &azureDriver{}
+var _ testsuites.DynamicPVTestDriver = &azureDriver{}
 
 // InitAzureDriver returns azureDriver that implements TestDriver interface
-func InitAzureDriver() TestDriver {
+func InitAzureDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &azureDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "azure",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
 			),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapBlock:       true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapBlock:       true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (a *azureDriver) GetDriverInfo() *DriverInfo {
+func (a *azureDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &a.driverInfo
 }
 
@@ -1430,10 +1482,14 @@ func (a *azureDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := a.driverInfo.Framework.Namespace.Name
+	ns := a.driverInfo.Config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (a *azureDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (a *azureDriver) CreateDriver() {
@@ -1462,21 +1518,21 @@ func (a *azureDriver) DeleteVolume(volType testpatterns.TestVolType, testResourc
 type awsDriver struct {
 	volumeName string
 
-	driverInfo DriverInfo
+	driverInfo testsuites.DriverInfo
 }
 
-var _ TestDriver = &awsDriver{}
+var _ testsuites.TestDriver = &awsDriver{}
 
 // TODO: Fix authorization error in attach operation and uncomment below
-//var _ PreprovisionedVolumeTestDriver = &awsDriver{}
-//var _ InlineVolumeTestDriver = &awsDriver{}
-//var _ PreprovisionedPVTestDriver = &awsDriver{}
-var _ DynamicPVTestDriver = &awsDriver{}
+//var _ testsuites.PreprovisionedVolumeTestDriver = &awsDriver{}
+//var _ testsuites.InlineVolumeTestDriver = &awsDriver{}
+//var _ testsuites.PreprovisionedPVTestDriver = &awsDriver{}
+var _ testsuites.DynamicPVTestDriver = &awsDriver{}
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
-func InitAwsDriver() TestDriver {
+func InitAwsDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &awsDriver{
-		driverInfo: DriverInfo{
+		driverInfo: testsuites.DriverInfo{
 			Name:        "aws",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -1484,17 +1540,19 @@ func InitAwsDriver() TestDriver {
 				"ext3",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			Capabilities: map[Capability]bool{
-				CapPersistence: true,
-				CapFsGroup:     true,
-				CapBlock:       true,
-				CapExec:        true,
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: true,
+				testsuites.CapFsGroup:     true,
+				testsuites.CapBlock:       true,
+				testsuites.CapExec:        true,
 			},
+
+			Config: config,
 		},
 	}
 }
 
-func (a *awsDriver) GetDriverInfo() *DriverInfo {
+func (a *awsDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &a.driverInfo
 }
 
@@ -1537,10 +1595,14 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := a.driverInfo.Framework.Namespace.Name
+	ns := a.driverInfo.Config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 
-	return getStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (a *awsDriver) GetClaimSize() string {
+	return "5Gi"
 }
 
 func (a *awsDriver) CreateDriver() {

@@ -14,14 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package drivers
+package testsuites
 
 import (
-	"fmt"
-
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -74,6 +71,11 @@ type DynamicPVTestDriver interface {
 	// It will set fsType to the StorageClass, if TestDriver supports it.
 	// It will return nil, if the TestDriver doesn't support it.
 	GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass
+
+	// GetClaimSize returns the size of the volume that is to be provisioned ("5Gi", "1Mi").
+	// The size must be chosen so that the resulting volume is large enough for all
+	// enabled tests and within the range supported by the underlying storage.
+	GetClaimSize() string
 }
 
 // Capability represents a feature that a volume plugin supports
@@ -97,95 +99,35 @@ type DriverInfo struct {
 	RequiredMountOption  sets.String         // Map of string for required mount option (Optional)
 	Capabilities         map[Capability]bool // Map that represents plugin capabilities
 
-	// Parameters below will be set inside test loop by using SetCommonDriverParameters.
-	// Drivers that implement TestDriver is required to set all the above parameters
-	// and return DriverInfo on GetDriverInfo() call.
-	Framework *framework.Framework       // Framework for the test
-	Config    framework.VolumeTestConfig // VolumeTestConfig for thet test
+	Config TestConfig // Test configuration for the current test.
 }
 
-// GetDriverNameWithFeatureTags returns driver name with feature tags
-// For example)
-//  - [Driver: nfs]
-//  - [Driver: rbd][Feature:Volumes]
-func GetDriverNameWithFeatureTags(driver TestDriver) string {
-	dInfo := driver.GetDriverInfo()
+// TestConfig represents parameters that control test execution.
+// They can still be modified after defining tests, for example
+// in a BeforeEach or when creating the driver.
+type TestConfig struct {
+	// Some short word that gets inserted into dynamically
+	// generated entities (pods, paths) as first part of the name
+	// to make debugging easier. Can be the same for different
+	// tests inside the test suite.
+	Prefix string
 
-	return fmt.Sprintf("[Driver: %s]%s", dInfo.Name, dInfo.FeatureTag)
-}
+	// The framework instance allocated for the current test.
+	Framework *framework.Framework
 
-// CreateVolume creates volume for test unless dynamicPV test
-func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) interface{} {
-	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
-		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
-			return pDriver.CreateVolume(volType)
-		}
-	case testpatterns.DynamicPV:
-		// No need to create volume
-	default:
-		framework.Failf("Invalid volType specified: %v", volType)
-	}
-	return nil
-}
+	// If non-empty, then pods using a volume will be scheduled
+	// onto the node with this name. Otherwise Kubernetes will
+	// pick a node.
+	ClientNodeName string
 
-// DeleteVolume deletes volume for test unless dynamicPV test
-func DeleteVolume(driver TestDriver, volType testpatterns.TestVolType, testResource interface{}) {
-	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
-		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
-			pDriver.DeleteVolume(volType, testResource)
-		}
-	case testpatterns.DynamicPV:
-		// No need to delete volume
-	default:
-		framework.Failf("Invalid volType specified: %v", volType)
-	}
-}
+	// Some tests also support scheduling pods onto nodes with
+	// these label/value pairs. As not all tests use this field,
+	// a driver that absolutely needs the pods on a specific
+	// node must use ClientNodeName.
+	ClientNodeSelector map[string]string
 
-// SetCommonDriverParameters sets a common driver parameters to TestDriver
-// This function is intended to be called in BeforeEach() inside test loop.
-func SetCommonDriverParameters(
-	driver TestDriver,
-	f *framework.Framework,
-	config framework.VolumeTestConfig,
-) {
-	dInfo := driver.GetDriverInfo()
-
-	dInfo.Framework = f
-	dInfo.Config = config
-}
-
-func getStorageClass(
-	provisioner string,
-	parameters map[string]string,
-	bindingMode *storagev1.VolumeBindingMode,
-	ns string,
-	suffix string,
-) *storagev1.StorageClass {
-	if bindingMode == nil {
-		defaultBindingMode := storagev1.VolumeBindingImmediate
-		bindingMode = &defaultBindingMode
-	}
-	return &storagev1.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			// Name must be unique, so let's base it on namespace name
-			Name: ns + "-" + suffix,
-		},
-		Provisioner:       provisioner,
-		Parameters:        parameters,
-		VolumeBindingMode: bindingMode,
-	}
-}
-
-// GetUniqueDriverName returns unique driver name that can be used parallelly in tests
-func GetUniqueDriverName(driver TestDriver) string {
-	return fmt.Sprintf("%s-%s", driver.GetDriverInfo().Name, driver.GetDriverInfo().Framework.UniqueName)
+	// Some test drivers initialize a storage server. This is
+	// the configuration that then has to be used to run tests.
+	// The values above are ignored for such tests.
+	ServerConfig *framework.VolumeTestConfig
 }
