@@ -12,6 +12,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//pkg/apis/core:go_default_library",

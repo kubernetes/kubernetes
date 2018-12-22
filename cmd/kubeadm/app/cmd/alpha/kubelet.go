@@ -17,6 +17,8 @@ limitations under the License.
 package alpha
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -38,13 +40,13 @@ var (
 		"kubelet --version" or respects the --kubelet-version parameter.
 		` + cmdutil.AlphaDisclaimer)
 
-	kubeletConfigDownloadExample = normalizer.Examples(`
+	kubeletConfigDownloadExample = normalizer.Examples(fmt.Sprintf(`
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Autodetects the kubelet version.
 		kubeadm alpha phase kubelet config download
 
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
-		kubeadm alpha phase kubelet config download --kubelet-version v1.12.0
-		`)
+		kubeadm alpha phase kubelet config download --kubelet-version %s
+		`, constants.MinimumKubeletVersion))
 
 	kubeletConfigEnableDynamicLongDesc = normalizer.LongDesc(`
 		Enables or updates dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
@@ -55,13 +57,13 @@ var (
 
 		` + cmdutil.AlphaDisclaimer)
 
-	kubeletConfigEnableDynamicExample = normalizer.Examples(`
+	kubeletConfigEnableDynamicExample = normalizer.Examples(fmt.Sprintf(`
 		# Enables dynamic kubelet configuration for a Node.
-		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version v1.12.0
+		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version %s
 
 		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
-		`)
+		`, constants.MinimumKubeletVersion))
 )
 
 // newCmdKubeletUtility returns command for `kubeadm phase kubelet`

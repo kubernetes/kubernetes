@@ -102,7 +102,7 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		},
 		{
 			name:     "valid version is accepted",
-			args:     "--kubernetes-version=1.12.0",
+			args:     "--kubernetes-version=1.13.0",
 			expected: true,
 		},
 	}

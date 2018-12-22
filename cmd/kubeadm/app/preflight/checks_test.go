@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -647,13 +648,13 @@ func TestKubeletVersionCheck(t *testing.T) {
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v1.13.2", "", false, false},               // check minimally supported version when there is no information about control plane
-		{"v1.11.3", "v1.11.8", true, false},         // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v1.12.0", "v1.12.5", false, false},        // kubelet within same major.minor as control plane
-		{"v1.12.5", "v1.12.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
-		{"v1.12.0", "v1.13.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
-		{"v1.13.0-alpha.1", "v1.12.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v1.13.0", "v1.12.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+		{"v1.13.2", "", false, false},       // check minimally supported version when there is no information about control plane
+		{"v1.11.3", "v1.11.8", true, false}, // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v" + constants.MinimumKubeletVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), false, false},              // kubelet within same major.minor as control plane
+		{"v" + constants.MinimumKubeletVersion.WithPatch(5).String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), false, false}, // kubelet is newer, but still within same major.minor as control plane
+		{"v" + constants.MinimumKubeletVersion.String(), "v1.13.1", false, false},                                                               // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.13.0-alpha.1", constants.MinimumControlPlaneVersion.WithPatch(1).String(), true, false},                                            // kubelet is newer (development build) than control plane, should fail.
+		{"v1.13.0", constants.MinimumControlPlaneVersion.WithPatch(5).String(), true, false},                                                    // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {

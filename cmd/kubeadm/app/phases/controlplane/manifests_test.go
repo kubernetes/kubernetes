@@ -40,6 +40,8 @@ const (
 	etcdDataDir  = "/var/lib/etcd"
 )
 
+var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()
+
 func TestGetStaticPodSpecs(t *testing.T) {
 
 	// Creates a Master Configuration
@@ -574,10 +576,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "custom certs dir for v1.12.0-beta.2",
+			name: "custom certs dir for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.12.0-beta.2",
+				KubernetesVersion: cpVersion,
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -597,11 +599,11 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom cluster-cidr for v1.12.0-beta.2",
+			name: "custom cluster-cidr for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.12.0-beta.2",
+				KubernetesVersion: cpVersion,
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -624,14 +626,14 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom extra-args for v1.12.0-beta.2",
+			name: "custom extra-args for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
 				},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.12.0-beta.2",
+				KubernetesVersion: cpVersion,
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -654,11 +656,11 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom IPv6 networking for v1.12.0-beta.2",
+			name: "custom IPv6 networking for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "2001:db8::/64"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.12.0-beta.2",
+				KubernetesVersion: cpVersion,
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -872,11 +874,11 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 		expectedArgFunc func(dir string) []string
 	}{
 		{
-			name: "caKeyPresent-false for v1.12.0-beta.2",
+			name: "caKeyPresent-false for " + cpVersion,
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					KubernetesVersion: "v1.12.0-beta.2",
+					KubernetesVersion: cpVersion,
 					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				},
 			},
@@ -901,11 +903,11 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			},
 		},
 		{
-			name: "caKeyPresent true for v1.12.0-beta.2",
+			name: "caKeyPresent true for " + cpVersion,
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					KubernetesVersion: "v1.12.0-beta.2",
+					KubernetesVersion: cpVersion,
 					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				},
 			},
