@@ -4292,7 +4292,7 @@ message ServiceSpec {
   // "LoadBalancer" builds on NodePort and creates an
   // external load-balancer (if supported in the current cloud) which routes
   // to the clusterIP.
-  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services---service-types
+  // More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   // +optional
   optional string type = 4;
 
