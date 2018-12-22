@@ -23,7 +23,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -36,7 +35,7 @@ type CSIMaxVolumeLimitChecker struct {
 
 // NewCSIMaxVolumeLimitPredicate returns a predicate for counting CSI volumes
 func NewCSIMaxVolumeLimitPredicate(
-	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
 	c := &CSIMaxVolumeLimitChecker{
 		pvInfo:  pvInfo,
 		pvcInfo: pvcInfo,
@@ -45,7 +44,7 @@ func NewCSIMaxVolumeLimitPredicate(
 }
 
 func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
-	pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 
 	// if feature gate is disable we return
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
@@ -101,7 +100,7 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 		if ok {
 			currentVolumeCount := attachedVolumeCount[volumeLimitKey]
 			if currentVolumeCount+count > int(maxVolumeLimit) {
-				return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
+				return false, []PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
 			}
 		}
 	}

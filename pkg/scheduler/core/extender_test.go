@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -337,7 +338,7 @@ var _ algorithm.SchedulerExtender = &FakeExtender{}
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
 		name         string
-		predicates   map[string]algorithm.FitPredicate
+		predicates   map[string]predicates.FitPredicate
 		prioritizers []algorithm.PriorityConfig
 		extenders    []FakeExtender
 		nodes        []string
@@ -345,7 +346,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		expectsErr   bool
 	}{
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -360,7 +361,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 1",
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -375,7 +376,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 2",
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -390,7 +391,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:         "test 3",
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -405,7 +406,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 4",
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -419,7 +420,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:         "test 5",
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -438,7 +439,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:         "test 6",
 		},
 		{
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
 			extenders: []FakeExtender{
 				{
@@ -459,7 +460,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// If scheduler sends the pod by mistake, the test would fail
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Function: machine2Prioritizer, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -479,7 +480,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			//
 			// If scheduler did not ignore the extender, the test would fail
 			// because of the errors from errorPredicateExtender.
-			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
@@ -512,7 +513,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				cache,
 				queue,
 				test.predicates,
-				algorithm.EmptyPredicateMetadataProducer,
+				predicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				algorithm.EmptyPriorityMetadataProducer,
 				emptyPluginSet,

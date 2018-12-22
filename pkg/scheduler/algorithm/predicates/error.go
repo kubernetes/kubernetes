@@ -134,6 +134,11 @@ func (e *PredicateFailureError) GetReason() string {
 	return e.PredicateDesc
 }
 
+// PredicateFailureReason interface represents the failure reason of a predicate.
+type PredicateFailureReason interface {
+	GetReason() string
+}
+
 // FailureReason describes a failure reason.
 type FailureReason struct {
 	reason string

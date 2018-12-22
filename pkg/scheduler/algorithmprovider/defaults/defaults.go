@@ -38,7 +38,7 @@ const (
 func init() {
 	// Register functions that extract metadata used by predicates and priorities computations.
 	factory.RegisterPredicateMetadataProducerFactory(
-		func(args factory.PluginFactoryArgs) algorithm.PredicateMetadataProducer {
+		func(args factory.PluginFactoryArgs) predicates.PredicateMetadataProducer {
 			return predicates.NewPredicateMetadataFactory(args.PodLister)
 		})
 	factory.RegisterPriorityMetadataProducerFactory(
@@ -101,41 +101,41 @@ func defaultPredicates() sets.String {
 		// Fit is determined by volume zone requirements.
 		factory.RegisterFitPredicateFactory(
 			predicates.NoVolumeZoneConflictPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxEBSVolumeCountPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxGCEPDVolumeCountPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxAzureDiskVolumeCountPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		factory.RegisterFitPredicateFactory(
 			predicates.MaxCSIVolumeCountPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
 			predicates.MatchInterPodAffinityPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
 			},
 		),
@@ -165,7 +165,7 @@ func defaultPredicates() sets.String {
 		// Fit is determined by volume topology requirements.
 		factory.RegisterFitPredicateFactory(
 			predicates.CheckVolumeBindingPred,
-			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			func(args factory.PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewVolumeBindingPredicate(args.VolumeBinder)
 			},
 		),
