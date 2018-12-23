@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -372,6 +373,33 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		storage.Deployment.Store.DestroyFunc()
 		server.Terminate(t)
 	}
+}
+
+func TestCreateDeploymentRollbackValidation(t *testing.T) {
+	storage, server := newStorage(t)
+	rollbackStorage := storage.Rollback
+	rollback := apps.DeploymentRollback{
+		Name:               name,
+		UpdatedAnnotations: map[string]string{},
+		RollbackTo:         apps.RollbackConfig{Revision: 1},
+	}
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+
+	if _, err := storage.Deployment.Create(ctx, validNewDeployment(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	validationError := fmt.Errorf("admission deny")
+	alwaysDenyValidationFunc := func(obj runtime.Object) error { return validationError }
+	_, err := rollbackStorage.Create(ctx, &rollback, alwaysDenyValidationFunc, &metav1.CreateOptions{})
+
+	if err == nil || validationError != err {
+		t.Errorf("expected: %v, got: %v", validationError, err)
+	}
+
+	storage.Deployment.Store.DestroyFunc()
+	server.Terminate(t)
 }
 
 // Ensure that when a deploymentRollback is created for a deployment that has already been deleted

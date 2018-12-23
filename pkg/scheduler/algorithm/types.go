@@ -22,7 +22,6 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -31,10 +30,6 @@ import (
 var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
 	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
 }
-
-// FitPredicate is a function that indicates if a pod fits into an existing node.
-// The failure information is given by the error.
-type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)
 
 // PriorityMapFunction is a function that computes per-node results for a given node.
 // TODO: Figure out the exact API of this method.
@@ -46,9 +41,6 @@ type PriorityMapFunction func(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 // TODO: Figure out the exact API of this method.
 // TODO: Change interface{} to a specific type.
 type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error
-
-// PredicateMetadataProducer is a function that computes predicate metadata for a given pod.
-type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata
 
 // PriorityMetadataProducer is a function that computes metadata for a given pod. This
 // is now used for only for priority functions. For predicates please use PredicateMetadataProducer.
@@ -70,19 +62,9 @@ type PriorityConfig struct {
 	Weight   int
 }
 
-// EmptyPredicateMetadataProducer returns a no-op MetadataProducer type.
-func EmptyPredicateMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
-	return nil
-}
-
 // EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.
 func EmptyPriorityMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) interface{} {
 	return nil
-}
-
-// PredicateFailureReason interface represents the failure reason of a predicate.
-type PredicateFailureReason interface {
-	GetReason() string
 }
 
 // NodeLister interface represents anything that can list nodes for a scheduler.
@@ -92,6 +74,9 @@ type NodeLister interface {
 	List() ([]*v1.Node, error)
 }
 
+// PodFilter is a function to filter a pod. If pod passed return true else return false.
+type PodFilter func(*v1.Pod) bool
+
 // PodLister interface represents anything that can list pods for a scheduler.
 type PodLister interface {
 	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
@@ -99,7 +84,7 @@ type PodLister interface {
 	List(labels.Selector) ([]*v1.Pod, error)
 	// This is similar to "List()", but the returned slice does not
 	// contain pods that don't pass `podFilter`.
-	FilteredList(podFilter schedulerinternalcache.PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }
 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
@@ -169,11 +154,4 @@ type EmptyStatefulSetLister struct{}
 // GetPodStatefulSets of EmptyStatefulSetLister returns nil.
 func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
 	return nil, nil
-}
-
-// PredicateMetadata interface represents anything that can access a predicate metadata.
-type PredicateMetadata interface {
-	ShallowCopy() PredicateMetadata
-	AddPod(addedPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) error
-	RemovePod(deletedPod *v1.Pod) error
 }

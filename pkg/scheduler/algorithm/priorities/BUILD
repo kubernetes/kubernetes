@@ -18,6 +18,7 @@ go_library(
         "node_affinity.go",
         "node_label.go",
         "node_prefer_avoid_pods.go",
+        "priorities.go",
         "reduce.go",
         "requested_to_capacity_ratio.go",
         "resource_allocation.go",

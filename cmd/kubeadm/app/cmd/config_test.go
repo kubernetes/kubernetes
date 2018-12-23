@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -41,10 +42,11 @@ import (
 
 const (
 	defaultNumberOfImages = 8
-	// dummyKubernetesVersion is just used for unit testing, in order to not make
-	// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
-	dummyKubernetesVersion = "v1.12.0"
 )
+
+// dummyKubernetesVersion is just used for unit testing, in order to not make
+// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
+var dummyKubernetesVersion = constants.MinimumControlPlaneVersion.String()
 
 func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
@@ -83,11 +85,11 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			expectedImageSubstrings: []string{
 				"coredns",
 			},
-			configContents: []byte(dedent.Dedent(`
+			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
 				apiVersion: kubeadm.k8s.io/v1beta1
 				kind: ClusterConfiguration
-				kubernetesVersion: v1.12.0
-			`)),
+				kubernetesVersion: %s
+			`, constants.MinimumControlPlaneVersion))),
 		},
 	}
 

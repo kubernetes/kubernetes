@@ -20,11 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
-
-var TestMinVersion = version.MustParseSemantic("v1.12.0-alpha.1")
 
 func TestKnownFeatures(t *testing.T) {
 	var someFeatures = FeatureList{
@@ -130,7 +128,7 @@ func TestNewFeatureGate(t *testing.T) {
 func TestValidateVersion(t *testing.T) {
 	var someFeatures = FeatureList{
 		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}, MinimumVersion: TestMinVersion},
+		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}, MinimumVersion: constants.MinimumControlPlaneVersion.WithPreRelease("alpha.1")},
 	}
 
 	var tests = []struct {
@@ -144,7 +142,7 @@ func TestValidateVersion(t *testing.T) {
 		},
 		{ //min version but correct value given
 			requestedFeatures: map[string]bool{"feature2": true},
-			requestedVersion:  "v1.12.0",
+			requestedVersion:  constants.MinimumControlPlaneVersion.String(),
 			expectedError:     false,
 		},
 		{ //min version and incorrect value given

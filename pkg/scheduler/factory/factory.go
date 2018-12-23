@@ -159,8 +159,8 @@ type Configurator interface {
 	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error)
 
 	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
-	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
-	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
+	GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error)
+	GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error)
 
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
 	GetNodeLister() corelisters.NodeLister
@@ -956,7 +956,7 @@ func (c *configFactory) GetPriorityMetadataProducer() (algorithm.PriorityMetadat
 	return getPriorityMetadataProducer(*pluginArgs)
 }
 
-func (c *configFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
+func (c *configFactory) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -964,7 +964,7 @@ func (c *configFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetad
 	return getPredicateMetadataProducer(*pluginArgs)
 }
 
-func (c *configFactory) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
+func (c *configFactory) GetPredicates(predicateKeys sets.String) (map[string]predicates.FitPredicate, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err

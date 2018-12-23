@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -73,19 +72,19 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
 }
 
-func skipPersistenceTest(driver drivers.TestDriver) {
+func skipPersistenceTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[drivers.CapPersistence] {
+	if !dInfo.Capabilities[CapPersistence] {
 		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
 	}
 }
 
-func skipExecTest(driver drivers.TestDriver) {
+func skipExecTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[drivers.CapExec] {
+	if !dInfo.Capabilities[CapExec] {
 		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
 	}
 }
@@ -94,14 +93,14 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	var fsGroup *int64
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
-	f := dInfo.Framework
+	f := dInfo.Config.Framework
 	volSource := resource.volSource
 
 	if volSource == nil {
 		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 	}
 
-	if dInfo.Capabilities[drivers.CapFsGroup] {
+	if dInfo.Capabilities[CapFsGroup] {
 		fsGroupVal := int64(1234)
 		fsGroup = &fsGroupVal
 	}
@@ -109,7 +108,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	return volumesTestInput{
 		f:        f,
 		name:     dInfo.Name,
-		config:   dInfo.Config,
+		config:   &dInfo.Config,
 		fsGroup:  fsGroup,
 		resource: resource,
 		tests: []framework.VolumeTest{
@@ -124,7 +123,7 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	}
 }
 
-func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
 			resource     genericVolumeTestResource
@@ -159,7 +158,7 @@ func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 type volumesTestInput struct {
 	f        *framework.Framework
 	name     string
-	config   framework.VolumeTestConfig
+	config   *TestConfig
 	fsGroup  *int64
 	tests    []framework.VolumeTest
 	resource genericVolumeTestResource
@@ -169,19 +168,20 @@ func testVolumes(input *volumesTestInput) {
 	It("should be mountable", func() {
 		f := input.f
 		cs := f.ClientSet
-		defer framework.VolumeTestCleanup(f, input.config)
+		defer framework.VolumeTestCleanup(f, convertTestConfig(input.config))
 
 		skipPersistenceTest(input.resource.driver)
 
 		volumeTest := input.tests
-		framework.InjectHtml(cs, input.config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
-		framework.TestVolumeClient(cs, input.config, input.fsGroup, input.tests)
+		config := convertTestConfig(input.config)
+		framework.InjectHtml(cs, config, volumeTest[0].Volume, volumeTest[0].ExpectedContent)
+		framework.TestVolumeClient(cs, config, input.fsGroup, input.tests)
 	})
 	It("should allow exec of files on the volume", func() {
 		f := input.f
 		skipExecTest(input.resource.driver)
 
-		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.config.NodeSelector)
+		testScriptInPod(f, input.resource.volType, input.resource.volSource, input.resource.driver.GetDriverInfo().Config.ClientNodeSelector)
 	})
 }
 

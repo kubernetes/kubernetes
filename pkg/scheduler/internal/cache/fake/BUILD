@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake",
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
+        "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

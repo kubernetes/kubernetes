@@ -46,6 +46,7 @@ pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
 pkg/apis/coordination
+pkg/apis/coordination/v1
 pkg/apis/coordination/v1beta1
 pkg/apis/core
 pkg/apis/core/helper
@@ -359,7 +360,6 @@ pkg/serviceaccount
 pkg/ssh
 pkg/util/bandwidth
 pkg/util/config
-pkg/util/configz
 pkg/util/ebtables
 pkg/util/env
 pkg/util/file
@@ -441,6 +441,7 @@ staging/src/k8s.io/api/batch/v1
 staging/src/k8s.io/api/batch/v1beta1
 staging/src/k8s.io/api/batch/v2alpha1
 staging/src/k8s.io/api/certificates/v1beta1
+staging/src/k8s.io/api/coordination/v1
 staging/src/k8s.io/api/coordination/v1beta1
 staging/src/k8s.io/api/core/v1
 staging/src/k8s.io/api/events/v1beta1

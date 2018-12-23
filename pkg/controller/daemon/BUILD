@@ -20,7 +20,6 @@ go_library(
         "//pkg/controller/daemon/util:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/labels:go_default_library",
