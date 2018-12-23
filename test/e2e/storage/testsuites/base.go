@@ -368,5 +368,5 @@ func getSizeRangesIntersection(first framework.SizeRange, second framework.SizeR
 		Units: first.Units,
 	}
 
-	return fmt.Sprint("%.2f%s", intersection.Min, intersection.Units)
+	return fmt.Sprintf("%.2f%s", intersection.Min, intersection.Units)
 }
