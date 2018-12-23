@@ -146,8 +146,8 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (n *nfsDriver) GetClaimSize() string {
-	return "5Gi"
+func (n *nfsDriver) GetClaimSize() framework.SizeRange {
+	return n.driverInfo.SupportedSizeRange
 }
 
 func (n *nfsDriver) CreateDriver() {
@@ -1103,8 +1103,8 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (c *cinderDriver) GetClaimSize() string {
-	return "5Gi"
+func (c *cinderDriver) GetClaimSize() framework.SizeRange {
+	return c.driverInfo.SupportedSizeRange
 }
 
 func (c *cinderDriver) CreateDriver() {
@@ -1276,8 +1276,8 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (h *gcePdDriver) GetClaimSize() string {
-	return "5Gi"
+func (h *gcePdDriver) GetClaimSize() framework.SizeRange {
+	return h.driverInfo.SupportedSizeRange
 }
 
 func (g *gcePdDriver) CreateDriver() {
@@ -1409,8 +1409,8 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(fsType string) *storagev
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (v *vSphereDriver) GetClaimSize() string {
-	return "5Gi"
+func (v *vSphereDriver) GetClaimSize() framework.SizeRange {
+	return v.driverInfo.SupportedSizeRange
 }
 
 func (v *vSphereDriver) CreateDriver() {
@@ -1538,8 +1538,8 @@ func (a *azureDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (a *azureDriver) GetClaimSize() string {
-	return "5Gi"
+func (a *azureDriver) GetClaimSize() framework.SizeRange {
+	return a.driverInfo.SupportedSizeRange
 }
 
 func (a *azureDriver) CreateDriver() {
@@ -1656,8 +1656,8 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (a *awsDriver) GetClaimSize() string {
-	return "5Gi"
+func (a *awsDriver) GetClaimSize() framework.SizeRange {
+	return a.driverInfo.SupportedSizeRange
 }
 
 func (a *awsDriver) CreateDriver() {

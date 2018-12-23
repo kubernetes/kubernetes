@@ -111,8 +111,8 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *stor
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (h *hostpathCSIDriver) GetClaimSize() string {
-	return "5Gi"
+func (h *hostpathCSIDriver) GetClaimSize() framework.SizeRange {
+	return h.driverInfo.SupportedSizeRange
 }
 
 func (h *hostpathCSIDriver) CreateDriver() {
@@ -223,8 +223,8 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (g *gcePDCSIDriver) GetClaimSize() string {
-	return "5Gi"
+func (g *gcePDCSIDriver) GetClaimSize() framework.SizeRange {
+	return g.driverInfo.SupportedSizeRange
 }
 
 func (g *gcePDCSIDriver) CreateDriver() {
@@ -318,8 +318,8 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (g *gcePDExternalCSIDriver) GetClaimSize() string {
-	return "5Gi"
+func (g *gcePDExternalCSIDriver) GetClaimSize() framework.SizeRange {
+	return g.driverInfo.SupportedSizeRange
 }
 
 func (g *gcePDExternalCSIDriver) CreateDriver() {

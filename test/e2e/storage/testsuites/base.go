@@ -18,6 +18,8 @@ package testsuites
 
 import (
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -163,7 +165,7 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			claimSize := dDriver.GetClaimSize()
+			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSize())
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)
@@ -343,4 +345,28 @@ func convertTestConfig(in *TestConfig) framework.VolumeTestConfig {
 		ClientNodeName: in.ClientNodeName,
 		NodeSelector:   in.ClientNodeSelector,
 	}
+}
+
+// getSizeRangesIntersection takes two instances of storage size ranges and determines the
+// intersection of the intervals (if it exists) and return the minimum of the intersection
+// to be used as the claim size for the test.
+func getSizeRangesIntersection(first framework.SizeRange, second framework.SizeRange) string {
+	if strings.Compare(first.Units, second.Units) != 0 {
+		// both ranges must have same units
+		// TODO: return an error or try to convert the units instead
+		return ""
+	}
+
+	if second.Min > first.Max || first.Min > second.Max {
+		// TODO: this means a NULL intersection, return a better error
+		return ""
+	}
+
+	intersection := framework.SizeRange{
+		Min:   math.Max(first.Min, second.Min),
+		Max:   math.Min(first.Max, second.Max),
+		Units: first.Units,
+	}
+
+	return fmt.Sprint("%.2f%s", intersection.Min, intersection.Units)
 }
