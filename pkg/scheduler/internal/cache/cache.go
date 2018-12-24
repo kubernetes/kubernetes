@@ -424,13 +424,24 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 
 	n, ok := cache.nodes[newNode.Name]
 	if !ok {
+		for _, cond := range newNode.Status.Conditions {
+			if cond.Type != v1.NodeReady {
+				continue
+			}
+			if cond.Status == v1.ConditionTrue {
+				break
+			}
+			klog.V(5).Infof("node %q is in NotReady status, hold off adding it to cache", newNode.Name)
+			return nil
+		}
 		n = schedulernodeinfo.NewNodeInfo()
 		cache.nodes[newNode.Name] = n
+		cache.nodeTree.AddNode(newNode)
 	} else {
 		cache.removeNodeImageStates(n.Node())
+		cache.nodeTree.UpdateNode(oldNode, newNode)
 	}
 
-	cache.nodeTree.UpdateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n)
 	return n.SetNode(newNode)
 }

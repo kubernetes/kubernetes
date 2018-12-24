@@ -653,6 +653,17 @@ func (c *configFactory) addNodeToCache(obj interface{}) {
 		return
 	}
 
+	for _, cond := range node.Status.Conditions {
+		if cond.Type != v1.NodeReady {
+			continue
+		}
+		if cond.Status == v1.ConditionTrue {
+			break
+		}
+		klog.V(5).Infof("node %q is in NotReady status, hold off adding it to cache", node.Name)
+		return
+	}
+
 	if err := c.schedulerCache.AddNode(node); err != nil {
 		klog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
