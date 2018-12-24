@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
 	"k8s.io/klog"
@@ -401,6 +402,18 @@ func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 	return podState.pod, nil
 }
 
+func isNodeReady(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady {
+			return cond.Status == v1.ConditionTrue
+		}
+	}
+	return false
+}
+
 func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -408,6 +421,14 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	n, ok := cache.nodes[node.Name]
 	if !ok {
 		n = schedulernodeinfo.NewNodeInfo()
+		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) && !isNodeReady(node) {
+			n.SetTaints([]v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeNotReady,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			})
+		}
 		cache.nodes[node.Name] = n
 	} else {
 		cache.removeNodeImageStates(n.Node())
@@ -424,24 +445,13 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 
 	n, ok := cache.nodes[newNode.Name]
 	if !ok {
-		for _, cond := range newNode.Status.Conditions {
-			if cond.Type != v1.NodeReady {
-				continue
-			}
-			if cond.Status == v1.ConditionTrue {
-				break
-			}
-			klog.V(5).Infof("node %q is in NotReady status, hold off adding it to cache", newNode.Name)
-			return nil
-		}
 		n = schedulernodeinfo.NewNodeInfo()
 		cache.nodes[newNode.Name] = n
-		cache.nodeTree.AddNode(newNode)
 	} else {
 		cache.removeNodeImageStates(n.Node())
-		cache.nodeTree.UpdateNode(oldNode, newNode)
 	}
 
+	cache.nodeTree.UpdateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n)
 	return n.SetNode(newNode)
 }
