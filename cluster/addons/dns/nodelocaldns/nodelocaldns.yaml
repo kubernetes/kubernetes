@@ -88,6 +88,9 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 10%
   selector:
     matchLabels:
       k8s-app: node-local-dns
