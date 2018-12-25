@@ -42,8 +42,7 @@ func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.Con
 		Long:                  "Delete the specified context from the kubeconfig",
 		Example:               deleteContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := runDeleteContext(out, errOut, configAccess, cmd)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(runDeleteContext(out, errOut, configAccess, cmd))
 		},
 	}
 
