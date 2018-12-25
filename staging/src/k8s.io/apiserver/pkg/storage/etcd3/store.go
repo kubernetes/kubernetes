@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
@@ -111,7 +112,10 @@ func (s *store) Versioner() storage.Versioner {
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, resourceVersion string, out runtime.Object, ignoreNotFound bool) error {
 	key = path.Join(s.pathPrefix, key)
+
+	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	etcdmetrics.RecordRequestLatency("get", typeName(out), startTime)
 	if err != nil {
 		return err
 	}
@@ -156,11 +160,13 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		return storage.NewInternalError(err.Error())
 	}
 
+	startTime := time.Now()
 	txnResp, err := s.client.KV.Txn(ctx).If(
 		notFound(key),
 	).Then(
 		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
+	etcdmetrics.RecordRequestLatency("create", typeName(obj), startTime)
 	if err != nil {
 		return err
 	}
@@ -182,6 +188,8 @@ func (s *store) Delete(ctx context.Context, key string, out runtime.Object, prec
 		panic("unable to convert output object to pointer")
 	}
 	key = path.Join(s.pathPrefix, key)
+	startTime := time.Now()
+	defer etcdmetrics.RecordRequestLatency("delete", typeName(out), startTime)
 	if preconditions == nil {
 		return s.unconditionalDelete(ctx, key, out)
 	}
@@ -339,6 +347,7 @@ func (s *store) GuaranteedUpdate(
 		}
 		trace.Step("Transaction prepared")
 
+		startTime := time.Now()
 		txnResp, err := s.client.KV.Txn(ctx).If(
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
 		).Then(
@@ -346,6 +355,8 @@ func (s *store) GuaranteedUpdate(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
+		etcdmetrics.RecordRequestLatency("GuaranteedUpdate", typeName(out), startTime)
+
 		if err != nil {
 			return err
 		}
@@ -379,7 +390,9 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	}
 
 	key = path.Join(s.pathPrefix, key)
+	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	etcdmetrics.RecordRequestLatency("get", typeName(listPtr), startTime)
 	if err != nil {
 		return err
 	}
@@ -553,9 +566,15 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
+
+	overallStartTime := time.Now()
 	for {
+		listStartTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key, options...)
+		etcdmetrics.RecordRequestLatency("list-get", typeName(listPtr), listStartTime)
+
 		if err != nil {
+			etcdmetrics.RecordRequestLatency("list", typeName(listPtr), overallStartTime)
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
 		hasMore = getResp.More
@@ -605,6 +624,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		}
 		key = string(lastKey) + "\x00"
 	}
+	etcdmetrics.RecordRequestLatency("list", typeName(listPtr), overallStartTime)
 
 	// instruct the client to begin querying from immediately after the last key we returned
 	// we never return a key that the client wouldn't be allowed to see
@@ -785,4 +805,12 @@ func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.Selec
 
 func notFound(key string) clientv3.Cmp {
 	return clientv3.Compare(clientv3.ModRevision(key), "=", 0)
+}
+
+// typeName returns the obj's type.
+// Notice: it won't correctly subdivide metrics for custom resources (CRDs) and
+// could potentially have a skewed latency distribution for a few of our special case resources
+// like endpoint objects to maintain the kubernetes service
+func typeName(obj interface{}) string {
+	return reflect.TypeOf(obj).String()
 }
