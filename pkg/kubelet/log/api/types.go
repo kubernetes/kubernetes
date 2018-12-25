@@ -2,9 +2,11 @@ package api
 
 // log policy event reason
 const (
-	LogPolicyConfigUpdateFailedReason = "LogPolicyConfigUpdateFailed"
-	LogPolicyCreateSuccess            = "LogPolicyCreateSuccess"
-	LogPolicyRemoveSuccess            = "LogPolicyRemoveSuccess"
+	LogPolicyConfigUpdateSuccess = "LogPolicyConfigUpdateSuccess"
+	LogPolicyConfigUpdateFailed  = "LogPolicyConfigUpdateFailed"
+	LogPolicyCreateSuccess       = "LogPolicyCreateSuccess"
+	LogPolicyCreateFailed        = "LogPolicyCreateFailed"
+	LogPolicyRemoveSuccess       = "LogPolicyRemoveSuccess"
 )
 
 const (

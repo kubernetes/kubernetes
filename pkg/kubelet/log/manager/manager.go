@@ -692,7 +692,7 @@ func (m *ManagerImpl) onConfigMapUpdate(configMap *v1.ConfigMap) {
 		podConfigMapKeys, err := m.buildPodLogConfigMapKeys(pod, podLogPolicy)
 		if err != nil {
 			glog.Errorf("build pod log configmap key error, %v, pod: %q", err, format.Pod(pod))
-			m.recorder.Eventf(pod, v1.EventTypeWarning, api.LogPolicyConfigUpdateFailedReason, "build pod log configmap keys error, %v", err)
+			m.recorder.Eventf(pod, v1.EventTypeWarning, api.LogPolicyConfigUpdateFailed, "build pod log configmap keys error, %v", err)
 			continue
 		}
 		m.policyStatusManager.UpdateConfigMapKeys(pod.UID, podConfigMapKeys)
@@ -700,9 +700,12 @@ func (m *ManagerImpl) onConfigMapUpdate(configMap *v1.ConfigMap) {
 		err = m.pushConfigs(pod)
 		if err != nil {
 			glog.Errorf("push configs error, %v, pod: %q", err, format.Pod(pod))
-			m.recorder.Eventf(pod, v1.EventTypeWarning, api.LogPolicyConfigUpdateFailedReason, "push configs to log plugin error, %v", err)
+			m.recorder.Eventf(pod, v1.EventTypeWarning, api.LogPolicyConfigUpdateFailed, "push configs to log plugin error, %v", err)
 			continue
 		}
+
+		glog.Infof("log policy config update success, configmap: %s, pod: %q", configMapKey, format.Pod(pod))
+		m.recorder.Eventf(pod, v1.EventTypeNormal, api.LogPolicyConfigUpdateSuccess, "log policy config update success")
 	}
 }
 
