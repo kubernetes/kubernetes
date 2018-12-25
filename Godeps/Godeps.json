@@ -1621,12 +1621,12 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
-			"Comment": "v0.17.2",
+			"Comment": "v0.18.0",
 			"Rev": "ef5f0afec364d3b9396b7b77b43dbe26bf1f8004"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
-			"Comment": "v0.17.2",
+			"Comment": "v0.18.0",
 			"Rev": "8483a886a90412cd6858df4ea3483dce9c8e35a3"
 		},
 		{
@@ -1656,7 +1656,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/validate",
-			"Comment": "v0.17.2",
+			"Comment": "v0.18.0",
 			"Rev": "d2eab7d93009e9215fc85b2faa2c2f2a98c2af48"
 		},
 		{
