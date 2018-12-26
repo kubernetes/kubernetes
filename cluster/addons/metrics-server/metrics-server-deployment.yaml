@@ -23,6 +23,7 @@ data:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
+  # update Role system:metrics-server when changing this name
   name: metrics-server-v0.3.1
   namespace: kube-system
   labels:
