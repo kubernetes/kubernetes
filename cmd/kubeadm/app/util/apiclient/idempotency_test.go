@@ -69,7 +69,9 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}
 			conditionFunction := apiclient.PatchNodeOnce(client, tc.lookupName, func(node *v1.Node) {
-				node.Name = "testNewNode"
+				node.Annotations = map[string]string{
+					"updatedBy": "test",
+				}
 			})
 			success, err := conditionFunction()
 			if err != nil {
