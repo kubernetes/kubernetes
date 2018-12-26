@@ -43,7 +43,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -359,12 +358,9 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		// do not share underlying transport (which is a default behavior
 		// in Kubernetes). Thus, we are explicitly creating transport for
 		// each client here.
-		transportConfig, err := config.TransportConfig()
+		tlsConfig, err := restclient.TLSConfigFor(config)
 		if err != nil {
-			return nil, nil, nil, err
-		}
-		tlsConfig, err := transport.TLSConfigFor(transportConfig)
-		if err != nil {
+			framework.Logf("failing near TLSconfig")
 			return nil, nil, nil, err
 		}
 		config.Transport = utilnet.SetTransportDefaults(&http.Transport{

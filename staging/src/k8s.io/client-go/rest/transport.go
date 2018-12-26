@@ -73,6 +73,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			CertData:   c.CertData,
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
+			GetCert:    nil,
 		},
 		Username:    c.Username,
 		Password:    c.Password,

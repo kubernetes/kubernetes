@@ -30,7 +30,7 @@ import (
 func New(config *Config) (http.RoundTripper, error) {
 	// Set transport level security
 	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.HasCertCallback() || config.TLS.Insecure) {
-		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
+		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed: '%v' '%v' '%v' '%v' '%v'", config.Transport, config.HasCA(), config.HasCertAuth(), config.HasCertCallback(), config.TLS.Insecure)
 	}
 
 	var (
