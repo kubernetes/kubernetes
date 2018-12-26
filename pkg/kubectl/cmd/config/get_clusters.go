@@ -42,8 +42,7 @@ func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess)
 		Long:    "Display clusters defined in the kubeconfig.",
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := runGetClusters(out, configAccess)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(runGetClusters(out, configAccess))
 		},
 	}
 
