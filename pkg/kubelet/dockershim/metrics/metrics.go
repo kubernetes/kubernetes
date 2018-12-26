@@ -49,11 +49,12 @@ const (
 var (
 	// DockerOperationsLatency collects operation latency numbers by operation
 	// type.
-	DockerOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	DockerOperationsLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DockerOperationsLatencyKey,
 			Help:      "Latency in seconds of Docker operations. Broken down by operation type.",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)

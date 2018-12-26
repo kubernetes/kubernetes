@@ -38,11 +38,12 @@ const (
 var (
 	// NetworkPluginOperationsLatency collects operation latency numbers by operation
 	// type.
-	NetworkPluginOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	NetworkPluginOperationsLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      NetworkPluginOperationsLatencyKey,
 			Help:      "Latency in seconds of network plugin operations. Broken down by operation type.",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
