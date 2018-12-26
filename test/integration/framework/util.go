@@ -19,11 +19,13 @@ limitations under the License.
 package framework
 
 import (
+	"flag"
 	"net/http/httptest"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/logs"
 )
 
 const (
@@ -47,4 +49,8 @@ func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *test
 
 func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
 	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
+}
+
+func init() {
+	logs.AddFlagsGoflags(flag.CommandLine)
 }

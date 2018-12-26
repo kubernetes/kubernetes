@@ -37,6 +37,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/util/logs"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
@@ -67,6 +68,8 @@ func init() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Mark the run-services-mode flag as hidden to prevent user from using it.
 	pflag.CommandLine.MarkHidden("run-services-mode")
+	logs.AddFlagsGoflags(flag.CommandLine)
+
 	// It's weird that if I directly use pflag in TestContext, it will report error.
 	// It seems that someone is using flag.Parse() after init() and TestMain().
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic

@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/logs"
 	informers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -405,6 +406,7 @@ with the apiserver API to configure the proxy.`,
 	}
 
 	opts.AddFlags(cmd.Flags())
+	logs.AddFlags(cmd.Flags())
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
@@ -33,10 +34,16 @@ var logFlushFreq time.Duration
 // AddFlags registers this package's flags (plus the klog flags used by this package) on arbitrary FlagSets.
 // You should call this on *some* flag set.
 func AddFlags(fs *pflag.FlagSet) {
+	var goflagFS flag.FlagSet
+	AddFlagsGoflags(&goflagFS)
+	fs.AddGoFlagSet(&goflagFS)
+}
+
+// AddFlagsGoflags functions identically to AddFlags, except it works on a standard Go flagset.
+// This is to make including these flags in test binaries easier (since those expect standard go flags).
+func AddFlagsGoflags(fs *flag.FlagSet) {
 	fs.DurationVar(&logFlushFreq, "log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
-	var gologFlagSet flag.FlagSet
-	klog.InitFlags(&gologFlagSet)
-	fs.AddGoFlagSet(&gologFlagSet)
+	klog.InitFlags(fs)
 
 	// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
 	flag.Set("logtostderr", "true")

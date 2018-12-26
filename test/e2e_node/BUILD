@@ -166,6 +166,7 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
             "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
             "//test/utils:go_default_library",
             "//vendor/github.com/kardianos/osext:go_default_library",
