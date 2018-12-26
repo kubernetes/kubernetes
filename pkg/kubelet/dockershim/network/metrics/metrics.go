@@ -27,7 +27,9 @@ const (
 	// NetworkPluginOperationsKey is the key for operation count metrics.
 	NetworkPluginOperationsKey = "network_plugin_operations"
 	// NetworkPluginOperationsLatencyKey is the key for the operation latency metrics.
-	NetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_microseconds"
+	NetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_seconds"
+	// DeprecatedNetworkPluginOperationsLatencyKey is the deprecated key for the operation latency metrics.
+	DeprecatedNetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_microseconds"
 
 	// Keep the "kubelet" subsystem for backward compatibility.
 	kubeletSubsystem = "kubelet"
@@ -40,6 +42,17 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      NetworkPluginOperationsLatencyKey,
+			Help:      "Latency in seconds of network plugin operations. Broken down by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+
+	// DeprecatedNetworkPluginOperationsLatency collects operation latency numbers by operation
+	// type.
+	DeprecatedNetworkPluginOperationsLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      DeprecatedNetworkPluginOperationsLatencyKey,
 			Help:      "Latency in microseconds of network plugin operations. Broken down by operation type.",
 		},
 		[]string{"operation_type"},
@@ -52,10 +65,16 @@ var registerMetrics sync.Once
 func Register() {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(NetworkPluginOperationsLatency)
+		prometheus.MustRegister(DeprecatedNetworkPluginOperationsLatency)
 	})
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+}
+
+// SinceInSeconds gets the time since the specified start in seconds.
+func SinceInSeconds(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }
