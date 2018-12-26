@@ -36,6 +36,8 @@ func UnmountPath(mountPath string, mounter Interface) error {
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 func UnmountMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
+	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
+	// the path in the kubelet container, not on the host.
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
@@ -91,6 +93,7 @@ func doUnmountMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 	return fmt.Errorf("Failed to unmount path %v", mountPath)
 }
 
+// TODO: clean this up to use pkg/util/file/FileExists
 // PathExists returns true if the specified path exists.
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
