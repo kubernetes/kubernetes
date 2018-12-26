@@ -28,7 +28,7 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install golint from vendor
-echo 'Can not find golint, installing from vendor'
+echo 'installing golint from vendor'
 go install k8s.io/kubernetes/vendor/golang.org/x/lint/golint
 
 cd "${KUBE_ROOT}"

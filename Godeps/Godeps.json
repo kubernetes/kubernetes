@@ -3333,8 +3333,8 @@
 		{
 			"ImportPath": "golang.org/x/exp/inotify",
 			"Rev": "292a51b8d262487dab23a588950e8052d63d9113"
-        },
-        {
+		},
+		{
 			"ImportPath": "golang.org/x/lint",
 			"Rev": "8f45f776aaf18cebc8d65861cc70c33c60471952"
 		},
