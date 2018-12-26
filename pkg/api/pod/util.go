@@ -235,13 +235,11 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 // DropDisabledFields removes disabled fields from the pod spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
 func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) && !podPriorityInUse(oldPodSpec) {
+		// Set to nil pod's priority fields if the feature is disabled and the old pod
+		// does not specify any values for these fields.
 		podSpec.Priority = nil
 		podSpec.PriorityClassName = ""
-		if oldPodSpec != nil {
-			oldPodSpec.Priority = nil
-			oldPodSpec.PriorityClassName = ""
-		}
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
@@ -416,6 +414,17 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 				}
 			}
 		}
+	}
+	return false
+}
+
+// podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
+func podPriorityInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
+		return true
 	}
 	return false
 }
