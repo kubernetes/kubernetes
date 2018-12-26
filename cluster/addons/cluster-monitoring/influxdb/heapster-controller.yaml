@@ -33,7 +33,7 @@ data:
     apiVersion: nannyconfig/v1alpha1
     kind: NannyConfiguration
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: heapster-v1.6.0-beta.1
