@@ -400,9 +400,6 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		if isBound, _, err := b.isPVCBound(binding.pvc.Namespace, binding.pvc.Name); !isBound || err != nil {
 			return false, err
 		}
-
-		// TODO; what if pvc is bound to the wrong pv? It means our assume cache should be reverted.
-		// Or will pv controller cleanup the pv.ClaimRef?
 	}
 
 	for _, claim := range claimsToProvision {

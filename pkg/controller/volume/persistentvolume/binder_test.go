@@ -519,6 +519,17 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", v1.ClaimBound, nil),
 			noevents, noerrors, testSyncVolume,
 		},
+		{
+			// syncVolume with dynamically provisioned volume bound to claim bound to
+			// another volume. Check that the volume is marked as Released for
+			// external deleters if its ReclaimPolicy is Delete.
+			"4-9 - dynamically provisioned volume bound to claim bound somewhere else",
+			newVolumeArray("volume4-9", "10Gi", "uid4-9", "claim4-9", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, annDynamicallyProvisioned),
+			newVolumeArray("volume4-9", "10Gi", "", "claim4-9", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newClaimArray("claim4-9", "uid4-9", "10Gi", "volume4-9-x", v1.ClaimBound, nil),
+			newClaimArray("claim4-9", "uid4-9", "10Gi", "volume4-9-x", v1.ClaimBound, nil),
+			noevents, noerrors, testSyncVolume,
+		},
 
 		// PVC with class
 		{
