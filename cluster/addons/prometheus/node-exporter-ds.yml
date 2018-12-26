@@ -9,6 +9,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.15.2
 spec:
+  selector:
+    matchLabels:
+      k8s-app: node-exporter 
+      version: v0.15.2
   updateStrategy:
     type: OnDelete
   template:
