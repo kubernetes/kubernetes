@@ -206,9 +206,9 @@ func (m *metricSet) reset() {
 
 // Observe records an observed admission event to all metrics in the metricSet.
 func (m *metricSet) observe(elapsed time.Duration, labels ...string) {
-	elapsedMicroseconds := float64(elapsed / time.Microsecond)
-	m.latencies.WithLabelValues(labels...).Observe(elapsedMicroseconds)
+	elapsedSeconds := elapsed.Seconds()
+	m.latencies.WithLabelValues(labels...).Observe(elapsedSeconds)
 	if m.latenciesSummary != nil {
-		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedMicroseconds)
+		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedSeconds)
 	}
 }
