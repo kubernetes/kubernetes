@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -194,5 +195,33 @@ func Wrappers(fns ...WrapperFunc) WrapperFunc {
 			}
 		}
 		return base
+	}
+}
+
+// ContextCanceller prevents new requests after the provided context is finished.
+// err is returned when the context is closed, allowing the caller to provide a context
+// appropriate error.
+func ContextCanceller(ctx context.Context, err error) WrapperFunc {
+	return func(rt http.RoundTripper) http.RoundTripper {
+		return &contextCanceller{
+			ctx: ctx,
+			rt:  rt,
+			err: err,
+		}
+	}
+}
+
+type contextCanceller struct {
+	ctx context.Context
+	rt  http.RoundTripper
+	err error
+}
+
+func (b *contextCanceller) RoundTrip(req *http.Request) (*http.Response, error) {
+	select {
+	case <-b.ctx.Done():
+		return nil, b.err
+	default:
+		return b.rt.RoundTrip(req)
 	}
 }

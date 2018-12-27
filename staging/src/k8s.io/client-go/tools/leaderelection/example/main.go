@@ -19,9 +19,11 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/transport"
 	"k8s.io/klog"
 )
 
@@ -78,6 +81,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// use a client that will stop allowing new requests once the context ends
+	config.Wrap(transport.ContextCanceller(ctx, fmt.Errorf("the leader is shutting down")))
+	exampleClient := kubernetes.NewForConfigOrDie(config).CoreV1()
+
 	// listen for interrupts or the Linux SIGTERM signal and cancel
 	// our context, which the leader election code will observe and
 	// step down
@@ -115,6 +122,12 @@ func main() {
 			},
 		},
 	})
+
+	// because the context is closed, the client should report errors
+	_, err = exampleClient.ConfigMaps(args[1]).Get(args[2], metav1.GetOptions{})
+	if err == nil || !strings.Contains(err.Error(), "the leader is shutting down") {
+		log.Fatalf("%s: expected to get an error when trying to make a client call: %v", id, err)
+	}
 
 	// we no longer hold the lease, so perform any cleanup and then
 	// exit
