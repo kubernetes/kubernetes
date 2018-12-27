@@ -23,14 +23,12 @@ import (
 	"sync"
 
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -158,25 +156,23 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 			requirements = append(requirements, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-			if volume.Spec.NodeAffinity == nil {
-				volume.Spec.NodeAffinity = new(api.VolumeNodeAffinity)
-			}
-			if volume.Spec.NodeAffinity.Required == nil {
-				volume.Spec.NodeAffinity.Required = new(api.NodeSelector)
-			}
-			if len(volume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-				// Need at least one term pre-allocated whose MatchExpressions can be appended to
-				volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
-			}
-			if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-				klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
-					requirements, volume.Spec.NodeAffinity)
-			} else {
-				for _, req := range requirements {
-					for i := range volume.Spec.NodeAffinity.Required.NodeSelectorTerms {
-						volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions = append(volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions, req)
-					}
+		if volume.Spec.NodeAffinity == nil {
+			volume.Spec.NodeAffinity = new(api.VolumeNodeAffinity)
+		}
+		if volume.Spec.NodeAffinity.Required == nil {
+			volume.Spec.NodeAffinity.Required = new(api.NodeSelector)
+		}
+		if len(volume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+			// Need at least one term pre-allocated whose MatchExpressions can be appended to
+			volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
+		}
+		if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
+			klog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+				requirements, volume.Spec.NodeAffinity)
+		} else {
+			for _, req := range requirements {
+				for i := range volume.Spec.NodeAffinity.Required.NodeSelectorTerms {
+					volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions = append(volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions, req)
 				}
 			}
 		}

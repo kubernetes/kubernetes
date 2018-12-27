@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
@@ -51,7 +50,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -378,16 +376,14 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		},
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	// Setup volume binder
+	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
-		args.StorageClassInformer.Informer().AddEventHandler(
-			cache.ResourceEventHandlerFuncs{
-				AddFunc: c.onStorageClassAdd,
-			},
-		)
-	}
+	args.StorageClassInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: c.onStorageClassAdd,
+		},
+	)
 
 	// Setup cache comparer
 	debugger := cachedebugger.New(
@@ -491,9 +487,6 @@ func (c *configFactory) onPvcAdd(obj interface{}) {
 }
 
 func (c *configFactory) onPvcUpdate(old, new interface{}) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		return
-	}
 	c.podQueue.MoveAllToActiveQueue()
 }
 

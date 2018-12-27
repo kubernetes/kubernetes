@@ -1777,11 +1777,9 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Allow setting NodeAffinity if oldPv NodeAffinity was not set
-		if oldPv.Spec.NodeAffinity != nil {
-			allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
-		}
+	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
+	if oldPv.Spec.NodeAffinity != nil {
+		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
 	return allErrs
@@ -3160,22 +3158,17 @@ func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field
 	exprMap := make(map[string]sets.String)
 	exprPath := fldPath.Child("matchLabelExpressions")
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
+	// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
+	for i, req := range term.MatchLabelExpressions {
+		idxPath := exprPath.Index(i)
+		valueSet, exprErrs := validateTopologySelectorLabelRequirement(req, idxPath)
+		allErrs = append(allErrs, exprErrs...)
 
-		for i, req := range term.MatchLabelExpressions {
-			idxPath := exprPath.Index(i)
-			valueSet, exprErrs := validateTopologySelectorLabelRequirement(req, idxPath)
-			allErrs = append(allErrs, exprErrs...)
-
-			// Validate no duplicate keys exist.
-			if _, exists := exprMap[req.Key]; exists {
-				allErrs = append(allErrs, field.Duplicate(idxPath.Child("key"), req.Key))
-			}
-			exprMap[req.Key] = valueSet
+		// Validate no duplicate keys exist.
+		if _, exists := exprMap[req.Key]; exists {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("key"), req.Key))
 		}
-	} else if len(term.MatchLabelExpressions) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
+		exprMap[req.Key] = valueSet
 	}
 
 	return exprMap, allErrs
@@ -5317,10 +5310,6 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 
 	if nodeAffinity == nil {
 		return false, allErrs
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "Volume node affinity is disabled by feature-gate"))
 	}
 
 	if nodeAffinity.Required != nil {

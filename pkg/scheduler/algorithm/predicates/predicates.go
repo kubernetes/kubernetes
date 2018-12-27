@@ -635,18 +635,16 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
-				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-					scName := v1helper.GetPersistentVolumeClaimClass(pvc)
-					if len(scName) > 0 {
-						class, _ := c.classInfo.GetStorageClassInfo(scName)
-						if class != nil {
-							if class.VolumeBindingMode == nil {
-								return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
-							}
-							if *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-								// Skip unbound volumes
-								continue
-							}
+				scName := v1helper.GetPersistentVolumeClaimClass(pvc)
+				if len(scName) > 0 {
+					class, _ := c.classInfo.GetStorageClassInfo(scName)
+					if class != nil {
+						if class.VolumeBindingMode == nil {
+							return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
+						}
+						if *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+							// Skip unbound volumes
+							continue
 						}
 					}
 				}
@@ -1618,10 +1616,6 @@ func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FitPredicate {
 }
 
 func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		return true, nil, nil
-	}
-
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")

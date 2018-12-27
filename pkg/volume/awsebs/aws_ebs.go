@@ -576,12 +576,10 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
-		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
-	}
+	pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
 
 	return pv, nil
 }
