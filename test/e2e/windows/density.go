@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -48,14 +47,6 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 			{
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
-					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
-				},
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
-				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: framework.LatencyMetric{
 					Perc50: 30 * time.Second,
@@ -104,7 +95,6 @@ type densityTest struct {
 func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Duration, []framework.PodLatencyData) {
 	const (
 		podType               = "density_test_pod"
-		sleepBeforeCreatePods = 30 * time.Second
 	)
 	var (
 		mutex      = &sync.Mutex{}
@@ -119,14 +109,6 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
 	go controller.Run(stopCh)
 	defer close(stopCh)
-
-	// TODO(coufon): in the test we found kubelet starts while it is busy on something, as a result 'syncLoop'
-	// does not response to pod creation immediately. Creating the first pod has a delay around 5s.
-	// The node status has already been 'ready' so `wait and check node being ready does not help here.
-	// Now wait here for a grace period to let 'syncLoop' be ready
-	time.Sleep(sleepBeforeCreatePods)
-
-	//rc.Start()
 
 	By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps
