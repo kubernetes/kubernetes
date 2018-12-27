@@ -45,6 +45,7 @@
         "port": 8080,
         "path": "/healthz"
       },
+      "periodSeconds": 1,
       "timeoutSeconds": 15
     },
     "ports":[
