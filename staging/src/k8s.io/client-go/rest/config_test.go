@@ -287,7 +287,7 @@ func TestAnonymousConfig(t *testing.T) {
 			_, actualError := actual.Dial(context.Background(), "", "")
 			_, expectedError := expected.Dial(context.Background(), "", "")
 			if !reflect.DeepEqual(expectedError, actualError) {
-				t.Fatalf("CopyConfig dropped the Dial field")
+				t.Fatalf("AnonymousClientConfig dropped the Dial field")
 			}
 		} else {
 			actual.Dial = nil
