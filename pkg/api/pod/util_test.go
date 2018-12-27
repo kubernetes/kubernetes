@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -716,6 +717,116 @@ func TestDropPodPriority(t *testing.T) {
 						// new pod should not have PodPriority
 						if !reflect.DeepEqual(newPod, podWithoutPriority()) {
 							t.Errorf("new pod had PodPriority: %v", diff.ObjectReflectDiff(newPod, podWithoutPriority()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropEmptyDirSizeLimit(t *testing.T) {
+	sizeLimit := resource.MustParse("1Gi")
+	podWithEmptyDirSizeLimit := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Volumes: []api.Volume{
+					{
+						Name: "a",
+						VolumeSource: api.VolumeSource{
+							EmptyDir: &api.EmptyDirVolumeSource{
+								Medium:    "memory",
+								SizeLimit: &sizeLimit,
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	podWithoutEmptyDirSizeLimit := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Volumes: []api.Volume{
+					{
+						Name: "a",
+						VolumeSource: api.VolumeSource{
+							EmptyDir: &api.EmptyDirVolumeSource{
+								Medium: "memory",
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description          string
+		hasEmptyDirSizeLimit bool
+		pod                  func() *api.Pod
+	}{
+		{
+			description:          "has EmptyDir Size Limit",
+			hasEmptyDirSizeLimit: true,
+			pod:                  podWithEmptyDirSizeLimit,
+		},
+		{
+			description:          "does not have EmptyDir Size Limit",
+			hasEmptyDirSizeLimit: false,
+			pod:                  podWithoutEmptyDirSizeLimit,
+		},
+		{
+			description:          "is nil",
+			hasEmptyDirSizeLimit: false,
+			pod:                  func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasEmptyDirSizeLimit, oldPod := oldPodInfo.hasEmptyDirSizeLimit, oldPodInfo.pod()
+				newPodHasEmptyDirSizeLimit, newPod := newPodInfo.hasEmptyDirSizeLimit, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					DropDisabledFields(&newPod.Spec, oldPodSpec)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasEmptyDirSizeLimit:
+						// new pod should not be changed if the feature is enabled, or if the old pod had EmptyDir SizeLimit
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasEmptyDirSizeLimit:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have EmptyDir SizeLimit
+						if !reflect.DeepEqual(newPod, podWithoutEmptyDirSizeLimit()) {
+							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutEmptyDirSizeLimit()))
 						}
 					default:
 						// new pod should not need to be changed

@@ -412,14 +412,8 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 	allErrs := field.ErrorList{}
 	if source.EmptyDir != nil {
 		numVolumes++
-		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) != 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field disabled by feature-gate for EmptyDir volumes"))
-			}
-		} else {
-			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
-			}
+		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == core.StorageMediumHugePages {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
@@ -2119,8 +2113,6 @@ func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expr
 		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
 	} else if !expressions.Has(fs.Resource) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("resource"), fs.Resource, expressions.List()))
-	} else if fsResourceIsEphemeralStorage(fs.Resource) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "Containers' ephemeral storage requests/limits disabled by feature-gate for Downward API"))
 	}
 	allErrs = append(allErrs, validateContainerResourceDivisor(fs.Resource, fs.Divisor, fldPath)...)
 	return allErrs
@@ -4451,9 +4443,7 @@ func isLocalStorageResource(name string) bool {
 // Refer to docs/design/resources.md for more details.
 func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
-	if isLocalStorageResource(value) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceQuota"))
-	}
+
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardQuotaResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
@@ -4484,10 +4474,6 @@ func validateLimitRangeTypeName(value string, fldPath *field.Path) field.ErrorLi
 // Validate limit range resource name
 // limit types (other than Pod/Container) could contain storage not just cpu or memory
 func validateLimitRangeResourceName(limitType core.LimitType, value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value == string(core.ResourceEphemeralStorage) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for Resource LimitRange"))
-	}
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
 		return validateContainerResourceName(value, fldPath)
@@ -4802,9 +4788,6 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
-		if resourceName == core.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
-		}
 		if helper.IsHugePageResourceName(resourceName) {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
 				allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))

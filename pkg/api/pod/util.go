@@ -242,17 +242,10 @@ func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
 		podSpec.PriorityClassName = ""
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) && !emptyDirSizeLimitInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
 				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
-			}
-		}
-		if oldPodSpec != nil {
-			for i := range oldPodSpec.Volumes {
-				if oldPodSpec.Volumes[i].EmptyDir != nil {
-					oldPodSpec.Volumes[i].EmptyDir.SizeLimit = nil
-				}
 			}
 		}
 	}
@@ -425,6 +418,21 @@ func podPriorityInUse(podSpec *api.PodSpec) bool {
 	}
 	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
 		return true
+	}
+	return false
+}
+
+// emptyDirSizeLimitInUse returns true if any pod's EptyDir volumes use SizeLimit.
+func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].EmptyDir != nil {
+			if podSpec.Volumes[i].EmptyDir.SizeLimit != nil {
+				return true
+			}
+		}
 	}
 	return false
 }
