@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
@@ -95,13 +96,16 @@ type Config struct {
 
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options. Use WrapTransport
-	// for most client level operations.
+	// to provide additional per-server middleware behavior.
 	Transport http.RoundTripper
 	// WrapTransport will be invoked for custom HTTP behavior after the underlying
 	// transport is initialized (either the transport created from TLSClientConfig,
 	// Transport, or http.DefaultTransport). The config may layer other RoundTrippers
 	// on top of the returned RoundTripper.
-	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+	//
+	// A future release will change this field to an array. Use config.Wrap()
+	// instead of setting this value directly.
+	WrapTransport transport.WrapperFunc
 
 	// QPS indicates the maximum QPS to the master from this client.
 	// If it's zero, the created RESTClient will use DefaultQPS: 5

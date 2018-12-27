@@ -310,3 +310,90 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
+
+type fakeRoundTripper struct {
+	Req  *http.Request
+	Resp *http.Response
+	Err  error
+}
+
+func (rt *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.Req = req
+	return rt.Resp, rt.Err
+}
+
+type chainRoundTripper struct {
+	rt    http.RoundTripper
+	value string
+}
+
+func testChain(value string) WrapperFunc {
+	return func(rt http.RoundTripper) http.RoundTripper {
+		return &chainRoundTripper{rt: rt, value: value}
+	}
+}
+
+func (rt *chainRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := rt.rt.RoundTrip(req)
+	if resp != nil {
+		if resp.Header == nil {
+			resp.Header = make(http.Header)
+		}
+		resp.Header.Set("Value", resp.Header.Get("Value")+rt.value)
+	}
+	return resp, err
+}
+
+func TestWrappers(t *testing.T) {
+	resp1 := &http.Response{}
+	wrapperResp1 := func(rt http.RoundTripper) http.RoundTripper {
+		return &fakeRoundTripper{Resp: resp1}
+	}
+	resp2 := &http.Response{}
+	wrapperResp2 := func(rt http.RoundTripper) http.RoundTripper {
+		return &fakeRoundTripper{Resp: resp2}
+	}
+
+	tests := []struct {
+		name    string
+		fns     []WrapperFunc
+		wantNil bool
+		want    func(*http.Response) bool
+	}{
+		{fns: []WrapperFunc{}, wantNil: true},
+		{fns: []WrapperFunc{nil, nil}, wantNil: true},
+		{fns: []WrapperFunc{nil}, wantNil: false},
+
+		{fns: []WrapperFunc{nil, wrapperResp1}, want: func(resp *http.Response) bool { return resp == resp1 }},
+		{fns: []WrapperFunc{wrapperResp1, nil}, want: func(resp *http.Response) bool { return resp == resp1 }},
+		{fns: []WrapperFunc{nil, wrapperResp1, nil}, want: func(resp *http.Response) bool { return resp == resp1 }},
+		{fns: []WrapperFunc{nil, wrapperResp1, wrapperResp2}, want: func(resp *http.Response) bool { return resp == resp2 }},
+		{fns: []WrapperFunc{wrapperResp1, wrapperResp2}, want: func(resp *http.Response) bool { return resp == resp2 }},
+		{fns: []WrapperFunc{wrapperResp2, wrapperResp1}, want: func(resp *http.Response) bool { return resp == resp1 }},
+
+		{fns: []WrapperFunc{testChain("1")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "1" }},
+		{fns: []WrapperFunc{testChain("1"), testChain("2")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "12" }},
+		{fns: []WrapperFunc{testChain("2"), testChain("1")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "21" }},
+		{fns: []WrapperFunc{testChain("1"), testChain("2"), testChain("3")}, want: func(resp *http.Response) bool { return resp.Header.Get("Value") == "123" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Wrappers(tt.fns...)
+			if got == nil != tt.wantNil {
+				t.Errorf("Wrappers() = %v", got)
+				return
+			}
+			if got == nil {
+				return
+			}
+
+			rt := &fakeRoundTripper{Resp: &http.Response{}}
+			nested := got(rt)
+			req := &http.Request{}
+			resp, _ := nested.RoundTrip(req)
+			if tt.want != nil && !tt.want(resp) {
+				t.Errorf("unexpected response: %#v", resp)
+			}
+		})
+	}
+}

@@ -57,7 +57,10 @@ type Config struct {
 	// from TLSClientConfig, Transport, or http.DefaultTransport). The
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
-	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+	//
+	// A future release will change this field to an array. Use config.Wrap()
+	// instead of setting this value directly.
+	WrapTransport WrapperFunc
 
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
@@ -96,6 +99,14 @@ func (c *Config) HasCertAuth() bool {
 // HasCertCallbacks returns whether the configuration has certificate callback or not.
 func (c *Config) HasCertCallback() bool {
 	return c.TLS.GetCert != nil
+}
+
+// Wrap adds a transport middleware function that will give the caller
+// an opportunity to wrap the underlying http.RoundTripper prior to the
+// first API call being made. The provided function is invoked after any
+// existing transport wrappers are invoked.
+func (c *Config) Wrap(fn WrapperFunc) {
+	c.WrapTransport = Wrappers(c.WrapTransport, fn)
 }
 
 // TLSConfig holds the information needed to set up a TLS transport.

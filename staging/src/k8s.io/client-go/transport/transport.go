@@ -167,3 +167,32 @@ func rootCertPool(caData []byte) *x509.CertPool {
 	certPool.AppendCertsFromPEM(caData)
 	return certPool
 }
+
+// WrapperFunc wraps an http.RoundTripper when a new transport
+// is created for a client, allowing per connection behavior
+// to be injected.
+type WrapperFunc func(rt http.RoundTripper) http.RoundTripper
+
+// Wrappers accepts any number of wrappers and returns a wrapper
+// function that is the equivalent of calling each of them in order. Nil
+// values are ignored, which makes this function convenient for incrementally
+// wrapping a function.
+func Wrappers(fns ...WrapperFunc) WrapperFunc {
+	if len(fns) == 0 {
+		return nil
+	}
+	// optimize the common case of wrapping a possibly nil transport wrapper
+	// with an additional wrapper
+	if len(fns) == 2 && fns[0] == nil {
+		return fns[1]
+	}
+	return func(rt http.RoundTripper) http.RoundTripper {
+		base := rt
+		for _, fn := range fns {
+			if fn != nil {
+				base = fn(base)
+			}
+		}
+		return base
+	}
+}
