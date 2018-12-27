@@ -264,7 +264,7 @@ func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
 		}
 	}
 
-	dropDisabledVolumeDevicesAlphaFields(podSpec, oldPodSpec)
+	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
@@ -330,24 +330,15 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
-// dropDisabledVolumeDevicesAlphaFields removes disabled fields from []VolumeDevice.
+// dropDisabledVolumeDevicesFields removes disabled fields from []VolumeDevice if it has not been already populated.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
-func dropDisabledVolumeDevicesAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeDevicesInUse(oldPodSpec) {
 		for i := range podSpec.Containers {
 			podSpec.Containers[i].VolumeDevices = nil
 		}
 		for i := range podSpec.InitContainers {
 			podSpec.InitContainers[i].VolumeDevices = nil
-		}
-
-		if oldPodSpec != nil {
-			for i := range oldPodSpec.Containers {
-				oldPodSpec.Containers[i].VolumeDevices = nil
-			}
-			for i := range oldPodSpec.InitContainers {
-				oldPodSpec.InitContainers[i].VolumeDevices = nil
-			}
 		}
 	}
 }
@@ -432,6 +423,24 @@ func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 			if podSpec.Volumes[i].EmptyDir.SizeLimit != nil {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// volumeDevicesInUse returns true if the pod spec is non-nil and has VolumeDevices set.
+func volumeDevicesInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].VolumeDevices != nil {
+			return true
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].VolumeDevices != nil {
+			return true
 		}
 	}
 	return false
