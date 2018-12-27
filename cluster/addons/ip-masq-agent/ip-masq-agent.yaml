@@ -19,8 +19,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      labels:
-        k8s-app: ip-masq-agent
+      k8s-app: ip-masq-agent
   template:
     metadata:
       labels:

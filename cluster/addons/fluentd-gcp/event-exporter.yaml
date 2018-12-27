@@ -38,6 +38,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: event-exporter
+      version: v0.2.3
   template:
     metadata:
       labels:
