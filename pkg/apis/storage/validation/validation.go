@@ -46,7 +46,6 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateProvisioner(storageClass.Provisioner, field.NewPath("provisioner"))...)
 	allErrs = append(allErrs, validateParameters(storageClass.Parameters, field.NewPath("parameters"))...)
 	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
-	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
 	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
 
@@ -119,16 +118,6 @@ func validateReclaimPolicy(reclaimPolicy *api.PersistentVolumeReclaimPolicy, fld
 		if !supportedReclaimPolicy.Has(string(*reclaimPolicy)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath, reclaimPolicy, supportedReclaimPolicy.List()))
 		}
-	}
-	return allErrs
-}
-
-// validateAllowVolumeExpansion tests that if ExpandPersistentVolumes feature gate is disabled, whether the AllowVolumeExpansion filed
-// of storage class is set
-func validateAllowVolumeExpansion(allowExpand *bool, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if allowExpand != nil && !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate ExpandPersistentVolumes"))
 	}
 	return allErrs
 }
