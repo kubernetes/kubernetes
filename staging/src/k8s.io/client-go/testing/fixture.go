@@ -18,6 +18,8 @@ package testing
 
 import (
 	"fmt"
+	"reflect"
+	"strconv"
 	"sync"
 
 	"github.com/evanphx/json-patch"
@@ -178,10 +180,11 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 }
 
 type tracker struct {
-	scheme  ObjectScheme
-	decoder runtime.Decoder
-	lock    sync.RWMutex
-	objects map[schema.GroupVersionResource][]runtime.Object
+	scheme    ObjectScheme
+	decoder   runtime.Decoder
+	lock      sync.RWMutex
+	versioner objectVersioner
+	objects   map[schema.GroupVersionResource][]runtime.Object
 	// The value type of watchers is a map of which the key is either a namespace or
 	// all/non namespace aka "" and its value is list of fake watchers.
 	// Manipulations on resources will broadcast the notification events into the
@@ -196,10 +199,11 @@ var _ ObjectTracker = &tracker{}
 // of objects for the fake clientset. Mostly useful for unit tests.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
-		scheme:   scheme,
-		decoder:  decoder,
-		objects:  make(map[schema.GroupVersionResource][]runtime.Object),
-		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		scheme:    scheme,
+		decoder:   decoder,
+		versioner: objectVersioner{},
+		objects:   make(map[schema.GroupVersionResource][]runtime.Object),
+		watchers:  make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 	}
 }
 
@@ -381,6 +385,16 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		}
 		if oldMeta.GetNamespace() == newMeta.GetNamespace() && oldMeta.GetName() == newMeta.GetName() {
 			if replaceExisting {
+				if reflect.DeepEqual(obj, existingObj) {
+					return nil
+				}
+				if t.versioner.CompareResourceVersion(obj, existingObj) != 0 {
+					return errors.NewConflict(gr, newMeta.GetName(), fmt.Errorf("Version conflicts, request %q != existing %q", newMeta.GetResourceVersion(), oldMeta.GetResourceVersion()))
+				}
+				err = t.versioner.IncreaseResourceVersion(obj)
+				if err != nil {
+					return err
+				}
 				for _, w := range t.getWatches(gvr, ns) {
 					w.Modify(obj)
 				}
@@ -396,12 +410,68 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		return errors.NewNotFound(gr, newMeta.GetName())
 	}
 
+	err = t.versioner.IncreaseResourceVersion(obj)
+	if err != nil {
+		return err
+	}
+
 	t.objects[gvr] = append(t.objects[gvr], obj)
 
 	for _, w := range t.getWatches(gvr, ns) {
 		w.Add(obj)
 	}
 
+	return nil
+}
+
+type objectVersioner struct{}
+
+func (a objectVersioner) objectResourceVersion(obj runtime.Object) (uint64, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return 0, err
+	}
+	version := accessor.GetResourceVersion()
+	if len(version) == 0 {
+		return 0, nil
+	}
+	return strconv.ParseUint(version, 10, 64)
+}
+
+// CompareResourceVersion compares resource versions.
+func (a objectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
+	lhsVersion, err := a.objectResourceVersion(lhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+	rhsVersion, err := a.objectResourceVersion(rhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+
+	if lhsVersion == rhsVersion {
+		return 0
+	}
+	if lhsVersion < rhsVersion {
+		return -1
+	}
+
+	return 1
+}
+
+// IncreaseResourceVersion increases resource version.
+func (a objectVersioner) IncreaseResourceVersion(obj runtime.Object) error {
+	oldVersion, err := a.objectResourceVersion(obj)
+	if err != nil {
+		return err
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetResourceVersion(strconv.FormatUint(oldVersion+1, 10))
 	return nil
 }
 
