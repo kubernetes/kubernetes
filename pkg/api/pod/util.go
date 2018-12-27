@@ -279,7 +279,7 @@ func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
 // to RunAsGroup
 func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && !runAsGroupInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
 		}
@@ -291,22 +291,6 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 		for i := range podSpec.InitContainers {
 			if podSpec.InitContainers[i].SecurityContext != nil {
 				podSpec.InitContainers[i].SecurityContext.RunAsGroup = nil
-			}
-		}
-
-		if oldPodSpec != nil {
-			if oldPodSpec.SecurityContext != nil {
-				oldPodSpec.SecurityContext.RunAsGroup = nil
-			}
-			for i := range oldPodSpec.Containers {
-				if oldPodSpec.Containers[i].SecurityContext != nil {
-					oldPodSpec.Containers[i].SecurityContext.RunAsGroup = nil
-				}
-			}
-			for i := range oldPodSpec.InitContainers {
-				if oldPodSpec.InitContainers[i].SecurityContext != nil {
-					oldPodSpec.InitContainers[i].SecurityContext.RunAsGroup = nil
-				}
 			}
 		}
 	}
@@ -440,6 +424,28 @@ func volumeDevicesInUse(podSpec *api.PodSpec) bool {
 	}
 	for i := range podSpec.InitContainers {
 		if podSpec.InitContainers[i].VolumeDevices != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// runAsGroupInUse returns true if the pod spec is non-nil and has a SecurityContext's RunAsGroup field set
+func runAsGroupInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.RunAsGroup != nil {
+		return true
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].SecurityContext != nil && podSpec.Containers[i].SecurityContext.RunAsGroup != nil {
+			return true
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].SecurityContext != nil && podSpec.InitContainers[i].SecurityContext.RunAsGroup != nil {
 			return true
 		}
 	}
