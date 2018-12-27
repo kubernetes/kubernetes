@@ -165,6 +165,7 @@ go_test(
         "kubelet_pods_windows_test.go",
         "kubelet_resources_test.go",
         "kubelet_test.go",
+        "kubelet_volumes_linux_test.go",
         "kubelet_volumes_test.go",
         "oom_watcher_test.go",
         "pod_container_deletor_test.go",
