@@ -27,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -483,6 +485,89 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("0")
 		usedResources[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("0")
 
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should create a ResourceQuota and capture the life of a custom resource.", func() {
+		By("Creating a Custom Resource Definition")
+		testcrd, err := crd.CreateTestCRD(f)
+		Expect(err).NotTo(HaveOccurred())
+		defer testcrd.CleanUp()
+		countResourceName := "count/" + testcrd.Crd.Spec.Names.Plural + "." + testcrd.Crd.Spec.Group
+		// resourcequota controller needs to take 30 seconds at most to detect the new custom resource.
+		// in order to make sure the resourcequota controller knows this resource, we create one test
+		// resourcequota object, and triggering updates on it until the status is updated.
+		quotaName := "quota-for-" + testcrd.Crd.Spec.Names.Plural
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, &v1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{Name: quotaName},
+			Spec: v1.ResourceQuotaSpec{
+				Hard: v1.ResourceList{
+					v1.ResourceName(countResourceName): resource.MustParse("0"),
+				},
+			},
+		})
+		err = updateResourceQuotaUntilUsageAppears(f.ClientSet, f.Namespace.Name, quotaName, v1.ResourceName(countResourceName))
+		Expect(err).NotTo(HaveOccurred())
+		err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Delete(quotaName, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Counting existing ResourceQuota")
+		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ResourceQuota")
+		quotaName = "test-quota"
+		resourceQuota = newTestResourceQuota(quotaName)
+		resourceQuota.Spec.Hard[v1.ResourceName(countResourceName)] = resource.MustParse("1")
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
+		usedResources[v1.ResourceName(countResourceName)] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a custom resource")
+		resourceClient := testcrd.GetV1DynamicClient()
+		testcr, err := instantiateCustomResource(&unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": testcrd.APIGroup + "/" + testcrd.GetAPIVersions()[0],
+				"kind":       testcrd.Crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": "test-cr-1",
+				},
+			},
+		}, resourceClient, testcrd.Crd)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status captures custom resource creation")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceName(countResourceName)] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a second custom resource")
+		_, err = instantiateCustomResource(&unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": testcrd.APIGroup + "/" + testcrd.GetAPIVersions()[0],
+				"kind":       testcrd.Crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": "test-cr-2",
+				},
+			},
+		}, resourceClient, testcrd.Crd)
+		// since we only give one quota, this creation should fail.
+		Expect(err).To(HaveOccurred())
+
+		By("Deleting a custom resource")
+		err = deleteCustomResource(resourceClient, testcr.GetName())
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released usage")
+		usedResources[v1.ResourceName(countResourceName)] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -1522,5 +1607,31 @@ func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used v1.R
 			}
 		}
 		return true, nil
+	})
+}
+
+// updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
+// for the specific resource name.
+func updateResourceQuotaUntilUsageAppears(c clientset.Interface, ns, quotaName string, resourceName v1.ResourceName) error {
+	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		// verify that the quota shows the expected used resource values
+		_, ok := resourceQuota.Status.Used[resourceName]
+		if ok {
+			return true, nil
+		}
+
+		current := resourceQuota.Spec.Hard[resourceName]
+		current.Add(resource.MustParse("1"))
+		resourceQuota.Spec.Hard[resourceName] = current
+		_, err = c.CoreV1().ResourceQuotas(ns).Update(resourceQuota)
+		// ignoring conflicts since someone else may already updated it.
+		if errors.IsConflict(err) {
+			return false, nil
+		}
+		return false, err
 	})
 }

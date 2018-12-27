@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -51,12 +50,6 @@ type NamespacedResourcesFunc func() ([]*metav1.APIResourceList, error)
 // ReplenishmentFunc is a signal that a resource changed in specified namespace
 // that may require quota to be recalculated.
 type ReplenishmentFunc func(groupResource schema.GroupResource, namespace string)
-
-// InformerFactory is all the quota system needs to interface with informers.
-type InformerFactory interface {
-	ForResource(resource schema.GroupVersionResource) (informers.GenericInformer, error)
-	Start(stopCh <-chan struct{})
-}
 
 // ResourceQuotaControllerOptions holds options for creating a quota controller
 type ResourceQuotaControllerOptions struct {
@@ -75,7 +68,7 @@ type ResourceQuotaControllerOptions struct {
 	// InformersStarted knows if informers were started.
 	InformersStarted <-chan struct{}
 	// InformerFactory interfaces with informers.
-	InformerFactory InformerFactory
+	InformerFactory controller.InformerFactory
 	// Controls full resync of objects monitored for replenishment.
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
 }
