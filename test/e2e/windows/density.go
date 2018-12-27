@@ -36,7 +36,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Density [Serial] [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 
 	f := framework.NewDefaultFramework("density-test-windows")
 
