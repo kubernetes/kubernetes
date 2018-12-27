@@ -236,3 +236,49 @@ func newWatcherWithHandler(t *testing.T, hdlr PluginHandler) *Watcher {
 
 	return w
 }
+
+func TestContainsBlacklistedDir(t *testing.T) {
+	testCases := []struct {
+		sockDir  string
+		path     string
+		expected bool
+	}{
+		{
+			sockDir:  "/var/lib/kubelet/plugins_registry",
+			path:     "/var/lib/kubelet/plugins_registry/mydriver.foo/csi.sock",
+			expected: false,
+		},
+		{
+			sockDir:  "/var/lib/kubelet/plugins_registry",
+			path:     "/var/lib/kubelet/plugins_registry/my.driver.com",
+			expected: false,
+		},
+		{
+			sockDir:  "/var/lib/kubelet/plugins_registry",
+			path:     "/var/lib/kubelet/plugins_registry/kubernetes.io/",
+			expected: true,
+		},
+		{
+			sockDir:  "/var/lib/kubelet/plugins_registry",
+			path:     "/var/lib/kubelet/plugins_registry/my-kubernetes.io-plugin",
+			expected: false,
+		},
+		{
+			sockDir:  "/var/lib/kubelet/plugins_registry",
+			path:     "/var/lib/kubelet/plugins_registry",
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		// Arrange & Act
+		watcher := NewWatcher(tc.sockDir)
+
+		actual := watcher.containsBlacklistedDir(tc.path)
+
+		// Assert
+		if tc.expected != actual {
+			t.Fatalf("expecting %v but got %v for testcase: %#v", tc.expected, actual, tc)
+		}
+	}
+}
