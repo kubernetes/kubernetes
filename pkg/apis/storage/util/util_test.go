@@ -24,52 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
 )
-
-func TestDropAlphaFields(t *testing.T) {
-	bindingMode := storage.VolumeBindingWaitForFirstConsumer
-	allowedTopologies := []api.TopologySelectorTerm{
-		{
-			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
-				{
-					Key:    "kubernetes.io/hostname",
-					Values: []string{"node1"},
-				},
-			},
-		},
-	}
-
-	// Test that field gets dropped when feature gate is not set
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
-	class := &storage.StorageClass{
-		VolumeBindingMode: &bindingMode,
-		AllowedTopologies: allowedTopologies,
-	}
-	DropDisabledFields(class, nil)
-	if class.VolumeBindingMode != nil {
-		t.Errorf("VolumeBindingMode field didn't get dropped: %+v", class.VolumeBindingMode)
-	}
-	if class.AllowedTopologies != nil {
-		t.Errorf("AllowedTopologies field didn't get dropped: %+v", class.AllowedTopologies)
-	}
-
-	// Test that field does not get dropped when feature gate is set
-	class = &storage.StorageClass{
-		VolumeBindingMode: &bindingMode,
-		AllowedTopologies: allowedTopologies,
-	}
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
-	DropDisabledFields(class, nil)
-	if class.VolumeBindingMode != &bindingMode {
-		t.Errorf("VolumeBindingMode field got unexpectantly modified: %+v", class.VolumeBindingMode)
-	}
-	if !reflect.DeepEqual(class.AllowedTopologies, allowedTopologies) {
-		t.Errorf("AllowedTopologies field got unexpectantly modified: %+v", class.AllowedTopologies)
-	}
-}
 
 func TestDropAllowVolumeExpansion(t *testing.T) {
 	allowVolumeExpansion := false

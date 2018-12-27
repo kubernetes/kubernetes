@@ -24,12 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -233,14 +231,10 @@ var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImm
 // validateVolumeBindingMode tests that VolumeBindingMode specifies valid values.
 func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		if mode == nil {
-			allErrs = append(allErrs, field.Required(fldPath, ""))
-		} else if !supportedVolumeBindingModes.Has(string(*mode)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeBindingModes.List()))
-		}
-	} else if mode != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
+	if mode == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else if !supportedVolumeBindingModes.Has(string(*mode)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeBindingModes.List()))
 	}
 
 	return allErrs
@@ -252,10 +246,6 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 
 	if topologies == nil || len(topologies) == 0 {
 		return allErrs
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
 	rawTopologies := make([]map[string]sets.String, len(topologies))

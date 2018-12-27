@@ -286,10 +286,6 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 }
 
 func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentVolumeClaim) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		return false, nil
-	}
-
 	// When feature VolumeScheduling enabled,
 	// Scheduler signal to the PV controller to start dynamic
 	// provisioning by setting the "annSelectedNode" annotation

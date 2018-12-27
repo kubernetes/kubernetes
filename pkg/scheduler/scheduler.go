@@ -29,14 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -352,12 +350,10 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 //
 // This function modifies assumed if volume binding is required.
 func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bool, err error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		allBound, err = sched.config.VolumeBinder.Binder.AssumePodVolumes(assumed, host)
-		if err != nil {
-			sched.recordSchedulingFailure(assumed, err, SchedulerError,
-				fmt.Sprintf("AssumePodVolumes failed: %v", err))
-		}
+	allBound, err = sched.config.VolumeBinder.Binder.AssumePodVolumes(assumed, host)
+	if err != nil {
+		sched.recordSchedulingFailure(assumed, err, SchedulerError,
+			fmt.Sprintf("AssumePodVolumes failed: %v", err))
 	}
 	return
 }

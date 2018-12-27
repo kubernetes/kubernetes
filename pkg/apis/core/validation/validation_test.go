@@ -577,19 +577,6 @@ func TestValidateLocalVolumesDisabled(t *testing.T) {
 			}
 		})
 	}
-
-	for name, scenario := range scenarios {
-		t.Run(name+" VolumeScheduling disabled", func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
-			errs := ValidatePersistentVolume(scenario.volume)
-			if len(errs) == 0 && scenario.isExpectedFailure {
-				t.Errorf("Unexpected success for scenario: %s", name)
-			}
-			if len(errs) > 0 && !scenario.isExpectedFailure {
-				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-			}
-		})
-	}
 }
 
 func testVolumeWithNodeAffinity(affinity *core.VolumeNodeAffinity) *core.PersistentVolume {
