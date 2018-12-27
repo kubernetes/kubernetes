@@ -52,9 +52,9 @@ func (d *CacheDumper) dumpNodes() {
 
 // dumpSchedulingQueue writes pods in the scheduling queue to the scheduler logs.
 func (d *CacheDumper) dumpSchedulingQueue() {
-	waitingPods := d.podQueue.WaitingPods()
+	pendingPods := d.podQueue.PendingPods()
 	var podData strings.Builder
-	for _, p := range waitingPods {
+	for _, p := range pendingPods {
 		podData.WriteString(printPod(p))
 	}
 	klog.Infof("Dump of scheduling queue:\n%s", podData.String())
