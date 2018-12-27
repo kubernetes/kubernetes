@@ -149,3 +149,83 @@ func TestDropAllowVolumeExpansion(t *testing.T) {
 		}
 	}
 }
+
+func TestDropVolumeBindingMode(t *testing.T) {
+
+	volumeBindingMode := storage.VolumeBindingImmediate
+	scWithoutVolumeBindingMode := func() *storage.StorageClass {
+		return &storage.StorageClass{}
+	}
+	scWithVolumeBindingMode := func() *storage.StorageClass {
+		return &storage.StorageClass{
+			VolumeBindingMode: &volumeBindingMode,
+		}
+	}
+
+	scInfo := []struct {
+		description          string
+		hasVolumeBindingMode bool
+		sc                   func() *storage.StorageClass
+	}{
+		{
+			description:          "StorageClass Without VolumeBindingMode",
+			hasVolumeBindingMode: false,
+			sc:                   scWithoutVolumeBindingMode,
+		},
+		{
+			description:          "StorageClass With VolumeBindingMode",
+			hasVolumeBindingMode: true,
+			sc:                   scWithVolumeBindingMode,
+		},
+		{
+			description:          "is nil",
+			hasVolumeBindingMode: false,
+			sc:                   func() *storage.StorageClass { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldStorageClassInfo := range scInfo {
+			for _, newStorageClassInfo := range scInfo {
+				oldStorageClassHasVolumeBindingMode, oldStorageClass := oldStorageClassInfo.hasVolumeBindingMode, oldStorageClassInfo.sc()
+				newStorageClassHasVolumeBindingMode, newStorageClass := newStorageClassInfo.hasVolumeBindingMode, newStorageClassInfo.sc()
+				if newStorageClass == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old StorageClass %v, new StorageClass %v", enabled, oldStorageClassInfo.description, newStorageClassInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, enabled)()
+
+					DropDisabledFields(newStorageClass, oldStorageClass)
+
+					// old StorageClass should never be changed
+					if !reflect.DeepEqual(oldStorageClass, oldStorageClassInfo.sc()) {
+						t.Errorf("old StorageClass changed: %v", diff.ObjectReflectDiff(oldStorageClass, oldStorageClassInfo.sc()))
+					}
+
+					switch {
+					case enabled || oldStorageClassHasVolumeBindingMode:
+						// new StorageClass should not be changed if the feature is enabled, or if the old StorageClass had VolumeBindingMode
+						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+						}
+					case newStorageClassHasVolumeBindingMode:
+						// new StorageClass should be changed
+						if reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass was not changed")
+						}
+						// new StorageClass should not have VolumeBindingMode
+						if !reflect.DeepEqual(newStorageClass, scWithoutVolumeBindingMode()) {
+							t.Errorf("new StorageClass had StorageClassVolumeBindingMode: %v", diff.ObjectReflectDiff(newStorageClass, scWithoutVolumeBindingMode()))
+						}
+					default:
+						// new StorageClass should not need to be changed
+						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

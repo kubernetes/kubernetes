@@ -46,7 +46,6 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateProvisioner(storageClass.Provisioner, field.NewPath("provisioner"))...)
 	allErrs = append(allErrs, validateParameters(storageClass.Parameters, field.NewPath("parameters"))...)
 	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
-	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
 
 	return allErrs
@@ -229,22 +228,6 @@ func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.Er
 }
 
 var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))
-
-// validateVolumeBindingMode tests that VolumeBindingMode specifies valid values.
-func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		if mode == nil {
-			allErrs = append(allErrs, field.Required(fldPath, ""))
-		} else if !supportedVolumeBindingModes.Has(string(*mode)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeBindingModes.List()))
-		}
-	} else if mode != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
-	}
-
-	return allErrs
-}
 
 // validateAllowedTopology tests that AllowedTopologies specifies valid values.
 func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {

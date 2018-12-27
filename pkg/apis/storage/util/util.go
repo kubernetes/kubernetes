@@ -25,11 +25,12 @@ import (
 // DropDisabledFields removes disabled fields from the StorageClass object.
 func DropDisabledFields(class, oldClass *storage.StorageClass) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		class.VolumeBindingMode = nil
 		class.AllowedTopologies = nil
 		if oldClass != nil {
-			oldClass.VolumeBindingMode = nil
 			oldClass.AllowedTopologies = nil
+		}
+		if !volumeBindingModeInUse(oldClass) {
+			class.VolumeBindingMode = nil
 		}
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && !allowVolumeExpansionInUse(oldClass) {
@@ -42,6 +43,16 @@ func allowVolumeExpansionInUse(oldClass *storage.StorageClass) bool {
 		return false
 	}
 	if oldClass.AllowVolumeExpansion != nil {
+		return true
+	}
+	return false
+}
+
+func volumeBindingModeInUse(oldClass *storage.StorageClass) bool {
+	if oldClass == nil {
+		return false
+	}
+	if oldClass.VolumeBindingMode != nil {
 		return true
 	}
 	return false
