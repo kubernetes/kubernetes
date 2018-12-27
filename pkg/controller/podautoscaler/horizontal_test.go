@@ -2176,7 +2176,7 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 	finalPods := int32(math.Ceil(resourcesUsedRatio * float64(startPods)))
 
 	// To breach tolerance we will create a utilization ratio difference of tolerance to usageRatioToleranceValue)
-	tc := testCase{
+	tc1 := testCase{
 		minReplicas:             0,
 		maxReplicas:             1000,
 		initialReplicas:         startPods,
@@ -2209,22 +2209,49 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 		useMetricsAPI:   true,
 		recommendations: []timestampedRecommendation{},
 	}
+	tc1.runTest(t)
 
-	tc.runTest(t)
-
-	// Reuse the data structure above, now testing "unscaling".
-	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
 	target = math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .004
 	finalCPUPercentTarget = int32(target * 100)
-	tc.CPUTarget = finalCPUPercentTarget
-	tc.initialReplicas = startPods
-	tc.expectedDesiredReplicas = startPods
-	tc.expectedConditions = statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-		Type:   autoscalingv2.AbleToScale,
-		Status: v1.ConditionTrue,
-		Reason: "ReadyForNewScale",
-	})
-	tc.runTest(t)
+	tc2 := testCase{
+		minReplicas:             0,
+		maxReplicas:             1000,
+		initialReplicas:         startPods,
+		expectedDesiredReplicas: startPods,
+		CPUTarget:               finalCPUPercentTarget,
+		reportedLevels: []uint64{
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+			totalUsedCPUOfAllPods / 10,
+		},
+		reportedCPURequests: []resource.Quantity{
+			resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-10) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-2) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested+1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested-1) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
+		},
+		useMetricsAPI:   true,
+		recommendations: []timestampedRecommendation{},
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+	}
+	tc2.runTest(t)
 }
 
 func TestScaleUpRCImmediately(t *testing.T) {
