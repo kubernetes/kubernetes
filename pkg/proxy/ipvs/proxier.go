@@ -163,6 +163,9 @@ var ipvsModules = []string{
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
+const sysctlConnReuse = "net/ipv4/vs/conn_reuse_mode"
+const sysctlExpireNoDestConn = "net/ipv4/vs/expire_nodest_conn"
+const sysctlExpireQuiescentTemplate = "net/ipv4/vs/expire_quiescent_template"
 const sysctlForward = "net/ipv4/ip_forward"
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
@@ -326,6 +329,27 @@ func NewProxier(ipt utiliptables.Interface,
 	// Set the conntrack sysctl we need for
 	if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
+	}
+
+	// Set the connection reuse mode
+	if val, _ := sysctl.GetSysctl(sysctlConnReuse); val != 0 {
+		if err := sysctl.SetSysctl(sysctlConnReuse, 0); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlConnReuse, err)
+		}
+	}
+
+	// Set the expire_nodest_conn sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlExpireNoDestConn); val != 1 {
+		if err := sysctl.SetSysctl(sysctlExpireNoDestConn, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireNoDestConn, err)
+		}
+	}
+
+	// Set the expire_quiescent_template sysctl we need for
+	if val, _ := sysctl.GetSysctl(sysctlExpireQuiescentTemplate); val != 1 {
+		if err := sysctl.SetSysctl(sysctlExpireQuiescentTemplate, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireQuiescentTemplate, err)
+		}
 	}
 
 	// Set the ip_forward sysctl we need for
