@@ -25,10 +25,17 @@ import (
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
 func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeModeInUse(oldPVCSpec) {
 		pvcSpec.VolumeMode = nil
-		if oldPVCSpec != nil {
-			oldPVCSpec.VolumeMode = nil
-		}
 	}
+}
+
+func volumeModeInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
+	if oldPVCSpec == nil {
+		return false
+	}
+	if oldPVCSpec.VolumeMode != nil {
+		return true
+	}
+	return false
 }
