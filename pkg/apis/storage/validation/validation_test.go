@@ -480,22 +480,6 @@ func makeClass(mode *storage.VolumeBindingMode, topologies []api.TopologySelecto
 	}
 }
 
-// TODO: Remove these tests once feature gate is not required
-func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
-	errorCases := map[string]*storage.StorageClass{
-		"immediate mode": makeClass(&immediateMode1, nil),
-		"waiting mode":   makeClass(&waitingMode, nil),
-		"invalid mode":   makeClass(&invalidMode, nil),
-	}
-
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
-	for testName, storageClass := range errorCases {
-		if errs := ValidateStorageClass(storageClass); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %v", testName)
-		}
-	}
-}
-
 type bindingTest struct {
 	class         *storage.StorageClass
 	shouldSucceed bool

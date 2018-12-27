@@ -29,48 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func TestDropAlphaFields(t *testing.T) {
-	bindingMode := storage.VolumeBindingWaitForFirstConsumer
-	allowedTopologies := []api.TopologySelectorTerm{
-		{
-			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
-				{
-					Key:    "kubernetes.io/hostname",
-					Values: []string{"node1"},
-				},
-			},
-		},
-	}
-
-	// Test that field gets dropped when feature gate is not set
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, false)()
-	class := &storage.StorageClass{
-		VolumeBindingMode: &bindingMode,
-		AllowedTopologies: allowedTopologies,
-	}
-	DropDisabledFields(class, nil)
-	if class.VolumeBindingMode != nil {
-		t.Errorf("VolumeBindingMode field didn't get dropped: %+v", class.VolumeBindingMode)
-	}
-	if class.AllowedTopologies != nil {
-		t.Errorf("AllowedTopologies field didn't get dropped: %+v", class.AllowedTopologies)
-	}
-
-	// Test that field does not get dropped when feature gate is set
-	class = &storage.StorageClass{
-		VolumeBindingMode: &bindingMode,
-		AllowedTopologies: allowedTopologies,
-	}
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
-	DropDisabledFields(class, nil)
-	if class.VolumeBindingMode != &bindingMode {
-		t.Errorf("VolumeBindingMode field got unexpectantly modified: %+v", class.VolumeBindingMode)
-	}
-	if !reflect.DeepEqual(class.AllowedTopologies, allowedTopologies) {
-		t.Errorf("AllowedTopologies field got unexpectantly modified: %+v", class.AllowedTopologies)
-	}
-}
-
 func TestDropAllowVolumeExpansion(t *testing.T) {
 	allowVolumeExpansion := false
 	scWithoutAllowVolumeExpansion := func() *storage.StorageClass {
@@ -137,6 +95,173 @@ func TestDropAllowVolumeExpansion(t *testing.T) {
 						// new StorageClass should not have AllowVolumeExpansion
 						if !reflect.DeepEqual(newStorageClass, scWithoutAllowVolumeExpansion()) {
 							t.Errorf("new StorageClass had StorageClassAllowVolumeExpansion: %v", diff.ObjectReflectDiff(newStorageClass, scWithoutAllowVolumeExpansion()))
+						}
+					default:
+						// new StorageClass should not need to be changed
+						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropVolumeBindingMode(t *testing.T) {
+	volumeBindingMode := storage.VolumeBindingWaitForFirstConsumer
+	scWithoutVolumeBindingMode := func() *storage.StorageClass {
+		return &storage.StorageClass{}
+	}
+	scWithVolumeBindingMode := func() *storage.StorageClass {
+		return &storage.StorageClass{
+			VolumeBindingMode: &volumeBindingMode,
+		}
+	}
+
+	scInfo := []struct {
+		description          string
+		hasVolumeBindingMode bool
+		sc                   func() *storage.StorageClass
+	}{
+		{
+			description:          "StorageClass Without VolumeBindingMode",
+			hasVolumeBindingMode: false,
+			sc:                   scWithoutVolumeBindingMode,
+		},
+		{
+			description:          "StorageClass With VolumeBindingMode",
+			hasVolumeBindingMode: true,
+			sc:                   scWithVolumeBindingMode,
+		},
+		{
+			description:          "is nil",
+			hasVolumeBindingMode: false,
+			sc:                   func() *storage.StorageClass { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldStorageClassInfo := range scInfo {
+			for _, newStorageClassInfo := range scInfo {
+				oldStorageClassHasVolumeBindingMode, oldStorageClass := oldStorageClassInfo.hasVolumeBindingMode, oldStorageClassInfo.sc()
+				newStorageClassHasVolumeBindingMode, newStorageClass := newStorageClassInfo.hasVolumeBindingMode, newStorageClassInfo.sc()
+				if newStorageClass == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old StorageClass %v, new StorageClass %v", enabled, oldStorageClassInfo.description, newStorageClassInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, enabled)()
+
+					DropDisabledFields(newStorageClass, oldStorageClass)
+
+					// old StorageClass should never be changed
+					if !reflect.DeepEqual(oldStorageClass, oldStorageClassInfo.sc()) {
+						t.Errorf("old StorageClass changed: %v", diff.ObjectReflectDiff(oldStorageClass, oldStorageClassInfo.sc()))
+					}
+
+					switch {
+					case enabled || oldStorageClassHasVolumeBindingMode:
+						// new StorageClass should not be changed if the feature is enabled, or if the old StorageClass had VolumeBindingMode
+						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+						}
+					case newStorageClassHasVolumeBindingMode:
+						// new StorageClass should be changed
+						if reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass was not changed")
+						}
+						// new StorageClass should not have VolumeBindingMode
+						if !reflect.DeepEqual(newStorageClass, scWithoutVolumeBindingMode()) {
+							t.Errorf("new StorageClass had StorageClassVolumeBindingMode: %v", diff.ObjectReflectDiff(newStorageClass, scWithoutVolumeBindingMode()))
+						}
+					default:
+						// new StorageClass should not need to be changed
+						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropAllowedTopologies(t *testing.T) {
+	allowedTopologies := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "key1",
+					Values: []string{"value1"},
+				},
+			},
+		},
+	}
+	scWithoutAllowedTopologies := func() *storage.StorageClass {
+		return &storage.StorageClass{}
+	}
+	scWithAllowedTopologies := func() *storage.StorageClass {
+		return &storage.StorageClass{
+			AllowedTopologies: allowedTopologies,
+		}
+	}
+
+	scInfo := []struct {
+		description          string
+		hasAllowedTopologies bool
+		sc                   func() *storage.StorageClass
+	}{
+		{
+			description:          "StorageClass Without AllowedTopologies",
+			hasAllowedTopologies: false,
+			sc:                   scWithoutAllowedTopologies,
+		},
+		{
+			description:          "StorageClass With AllowedTopologies",
+			hasAllowedTopologies: true,
+			sc:                   scWithAllowedTopologies,
+		},
+		{
+			description:          "is nil",
+			hasAllowedTopologies: false,
+			sc:                   func() *storage.StorageClass { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldStorageClassInfo := range scInfo {
+			for _, newStorageClassInfo := range scInfo {
+				oldStorageClassHasAllowedTopologies, oldStorageClass := oldStorageClassInfo.hasAllowedTopologies, oldStorageClassInfo.sc()
+				newStorageClassHasAllowedTopologies, newStorageClass := newStorageClassInfo.hasAllowedTopologies, newStorageClassInfo.sc()
+				if newStorageClass == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old StorageClass %v, new StorageClass %v", enabled, oldStorageClassInfo.description, newStorageClassInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, enabled)()
+
+					DropDisabledFields(newStorageClass, oldStorageClass)
+
+					// old StorageClass should never be changed
+					if !reflect.DeepEqual(oldStorageClass, oldStorageClassInfo.sc()) {
+						t.Errorf("old StorageClass changed: %v", diff.ObjectReflectDiff(oldStorageClass, oldStorageClassInfo.sc()))
+					}
+
+					switch {
+					case enabled || oldStorageClassHasAllowedTopologies:
+						// new StorageClass should not be changed if the feature is enabled, or if the old StorageClass had AllowedTopologies
+						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+						}
+					case newStorageClassHasAllowedTopologies:
+						// new StorageClass should be changed
+						if reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
+							t.Errorf("new StorageClass was not changed")
+						}
+						// new StorageClass should not have AllowedTopologies
+						if !reflect.DeepEqual(newStorageClass, scWithoutAllowedTopologies()) {
+							t.Errorf("new StorageClass had StorageClassAllowedTopologies: %v", diff.ObjectReflectDiff(newStorageClass, scWithoutAllowedTopologies()))
 						}
 					default:
 						// new StorageClass should not need to be changed

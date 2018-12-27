@@ -24,13 +24,11 @@ import (
 
 // DropDisabledFields removes disabled fields from the StorageClass object.
 func DropDisabledFields(class, oldClass *storage.StorageClass) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) && !volumeBindingModeInUse(oldClass) {
 		class.VolumeBindingMode = nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) && !allowedTopologiesInUse(oldClass) {
 		class.AllowedTopologies = nil
-		if oldClass != nil {
-			oldClass.VolumeBindingMode = nil
-			oldClass.AllowedTopologies = nil
-		}
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && !allowVolumeExpansionInUse(oldClass) {
 		class.AllowVolumeExpansion = nil
@@ -42,6 +40,26 @@ func allowVolumeExpansionInUse(oldClass *storage.StorageClass) bool {
 		return false
 	}
 	if oldClass.AllowVolumeExpansion != nil {
+		return true
+	}
+	return false
+}
+
+func volumeBindingModeInUse(class *storage.StorageClass) bool {
+	if class == nil {
+		return false
+	}
+	if class.VolumeBindingMode != nil {
+		return true
+	}
+	return false
+}
+
+func allowedTopologiesInUse(class *storage.StorageClass) bool {
+	if class == nil {
+		return false
+	}
+	if class.AllowedTopologies != nil {
 		return true
 	}
 	return false
