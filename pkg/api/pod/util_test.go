@@ -266,74 +266,146 @@ func TestPodConfigmaps(t *testing.T) {
 }
 
 func TestDropAlphaVolumeDevices(t *testing.T) {
-	testPod := api.Pod{
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyNever,
-			Containers: []api.Container{
-				{
-					Name:  "container1",
-					Image: "testimage",
-					VolumeDevices: []api.VolumeDevice{
-						{
-							Name:       "myvolume",
-							DevicePath: "/usr/test",
+	podWithVolumeDevices := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+						VolumeDevices: []api.VolumeDevice{
+							{
+								Name:       "myvolume",
+								DevicePath: "/usr/test",
+							},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+						VolumeDevices: []api.VolumeDevice{
+							{
+								Name:       "myvolume",
+								DevicePath: "/usr/test",
+							},
+						},
+					},
+				},
+				Volumes: []api.Volume{
+					{
+						Name: "myvolume",
+						VolumeSource: api.VolumeSource{
+							HostPath: &api.HostPathVolumeSource{
+								Path: "/dev/xvdc",
+							},
 						},
 					},
 				},
 			},
-			InitContainers: []api.Container{
-				{
-					Name:  "container1",
-					Image: "testimage",
-					VolumeDevices: []api.VolumeDevice{
-						{
-							Name:       "myvolume",
-							DevicePath: "/usr/test",
+		}
+	}
+	podWithoutVolumeDevices := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+				Volumes: []api.Volume{
+					{
+						Name: "myvolume",
+						VolumeSource: api.VolumeSource{
+							HostPath: &api.HostPathVolumeSource{
+								Path: "/dev/xvdc",
+							},
 						},
 					},
 				},
 			},
-			Volumes: []api.Volume{
-				{
-					Name: "myvolume",
-					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{
-							Path: "/dev/xvdc",
-						},
-					},
-				},
-			},
+		}
+	}
+
+	podInfo := []struct {
+		description      string
+		hasVolumeDevices bool
+		pod              func() *api.Pod
+	}{
+		{
+			description:      "has VolumeDevices",
+			hasVolumeDevices: true,
+			pod:              podWithVolumeDevices,
+		},
+		{
+			description:      "does not have VolumeDevices",
+			hasVolumeDevices: false,
+			pod:              podWithoutVolumeDevices,
+		},
+		{
+			description:      "is nil",
+			hasVolumeDevices: false,
+			pod:              func() *api.Pod { return nil },
 		},
 	}
 
-	// Enable alpha feature BlockVolume
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasVolumeDevices, oldPod := oldPodInfo.hasVolumeDevices, oldPodInfo.pod()
+				newPodHasVolumeDevices, newPod := newPodInfo.hasVolumeDevices, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
 
-	// now test dropping the fields - should not be dropped
-	DropDisabledFields(&testPod.Spec, nil)
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, enabled)()
 
-	// check to make sure VolumeDevices is still present
-	// if featureset is set to true
-	if testPod.Spec.Containers[0].VolumeDevices == nil {
-		t.Error("VolumeDevices in Container should not have been dropped based on feature-gate")
-	}
-	if testPod.Spec.InitContainers[0].VolumeDevices == nil {
-		t.Error("VolumeDevices in InitContainers should not have been dropped based on feature-gate")
-	}
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					DropDisabledFields(&newPod.Spec, oldPodSpec)
 
-	// Disable alpha feature BlockVolume
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
 
-	// now test dropping the fields
-	DropDisabledFields(&testPod.Spec, nil)
-
-	// check to make sure VolumeDevices is nil
-	// if featureset is set to false
-	if testPod.Spec.Containers[0].VolumeDevices != nil {
-		t.Error("DropDisabledFields for Containers failed")
-	}
-	if testPod.Spec.InitContainers[0].VolumeDevices != nil {
-		t.Error("DropDisabledFields for InitContainers failed")
+					switch {
+					case enabled || oldPodHasVolumeDevices:
+						// new pod should not be changed if the feature is enabled, or if the old pod had VolumeDevices
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasVolumeDevices:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have VolumeDevices
+						if !reflect.DeepEqual(newPod, podWithoutVolumeDevices()) {
+							t.Errorf("new pod had VolumeDevices: %v", diff.ObjectReflectDiff(newPod, podWithoutVolumeDevices()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
 	}
 }
 

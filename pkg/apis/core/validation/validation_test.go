@@ -4961,10 +4961,6 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		return
 	}
 
-	disabledAlphaVolDevice := []core.VolumeDevice{
-		{Name: "abc", DevicePath: "/foo"},
-	}
-
 	successCase := []core.VolumeDevice{
 		{Name: "abc", DevicePath: "/foo"},
 		{Name: "abc-123", DevicePath: "/usr/share/test"},
@@ -4992,8 +4988,6 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		{Name: "abc-123", MountPath: "/this/path/exists"},
 	}
 
-	// enable BlockVolume
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 	// Success Cases:
 	// Validate normal success cases - only PVC volumeSource
 	if errs := ValidateVolumeDevices(successCase, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) != 0 {
@@ -5006,12 +5000,6 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		if errs := ValidateVolumeDevices(v, GetVolumeMountMap(badVolumeMounts), vols, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
-	}
-
-	// disable BlockVolume
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
-	if errs := ValidateVolumeDevices(disabledAlphaVolDevice, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) == 0 {
-		t.Errorf("expected failure: %v", errs)
 	}
 }
 
