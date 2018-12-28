@@ -32,72 +32,84 @@ func TestValidateDockerInfo(t *testing.T) {
 		GraphDriver: []string{"driver_1", "driver_2"},
 	}
 	for _, test := range []struct {
+		name string
 		info types.Info
 		err  bool
 		warn bool
 	}{
 		{
+			name: "unsupported Docker version 1.10.1",
 			info: types.Info{Driver: "driver_1", ServerVersion: "1.10.1"},
 			err:  true,
 			warn: false,
 		},
 		{
+			name: "unsupported driver",
 			info: types.Info{Driver: "bad_driver", ServerVersion: "1.11.1"},
 			err:  true,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 1.11.1",
 			info: types.Info{Driver: "driver_1", ServerVersion: "1.11.1"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 1.12.1",
 			info: types.Info{Driver: "driver_2", ServerVersion: "1.12.1"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 1.13.1",
 			info: types.Info{Driver: "driver_2", ServerVersion: "1.13.1"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 17.03.0-ce",
 			info: types.Info{Driver: "driver_2", ServerVersion: "17.03.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 17.06.0-ce",
 			info: types.Info{Driver: "driver_2", ServerVersion: "17.06.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 17.09.0-ce",
 			info: types.Info{Driver: "driver_2", ServerVersion: "17.09.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "valid Docker version 18.06.0-ce",
 			info: types.Info{Driver: "driver_2", ServerVersion: "18.06.0-ce"},
 			err:  false,
 			warn: false,
 		},
 		{
+			name: "Docker version 18.09.0 is not in the list of validated versions",
 			info: types.Info{Driver: "driver_2", ServerVersion: "18.09.0"},
 			err:  false,
 			warn: true,
 		},
 	} {
-		warn, err := v.validateDockerInfo(spec, test.info)
-		if !test.err {
-			assert.Nil(t, err, "Expect error not to occur with docker info %+v", test.info)
-		} else {
-			assert.NotNil(t, err, "Expect error to occur with docker info %+v", test.info)
-		}
-		if !test.warn {
-			assert.Nil(t, warn, "Expect error not to occur with docker info %+v", test.info)
-		} else {
-			assert.NotNil(t, warn, "Expect error to occur with docker info %+v", test.info)
-		}
-
+		t.Run(test.name, func(t *testing.T) {
+			warn, err := v.validateDockerInfo(spec, test.info)
+			if !test.err {
+				assert.Nil(t, err, "Expect error not to occur with docker info %+v", test.info)
+			} else {
+				assert.NotNil(t, err, "Expect error to occur with docker info %+v", test.info)
+			}
+			if !test.warn {
+				assert.Nil(t, warn, "Expect error not to occur with docker info %+v", test.info)
+			} else {
+				assert.NotNil(t, warn, "Expect error to occur with docker info %+v", test.info)
+			}
+		})
 	}
 }
