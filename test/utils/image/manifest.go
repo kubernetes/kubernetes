@@ -128,7 +128,7 @@ var (
 	Porter              = Config{e2eRegistry, "porter", "1.0"}
 	PortForwardTester   = Config{e2eRegistry, "port-forward-tester", "1.0"}
 	Redis               = Config{e2eRegistry, "redis", "1.0"}
-	ResourceConsumer    = Config{e2eRegistry, "resource-consumer", "1.4"}
+	ResourceConsumer    = Config{e2eRegistry, "resource-consumer", "1.5"}
 	ResourceController  = Config{e2eRegistry, "resource-consumer/controller", "1.0"}
 	ServeHostname       = Config{e2eRegistry, "serve-hostname", "1.1"}
 	TestWebserver       = Config{e2eRegistry, "test-webserver", "1.0"}
