@@ -147,7 +147,7 @@ type genericVolumeTestResource struct {
 	pv        *v1.PersistentVolume
 	sc        *storagev1.StorageClass
 
-	driverTestResource interface{}
+	volume TestVolume
 }
 
 var _ TestResource = &genericVolumeTestResource{}
@@ -162,19 +162,19 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	volType := pattern.VolType
 
 	// Create volume for pre-provisioned volume tests
-	r.driverTestResource = CreateVolume(driver, volType)
+	r.volume = CreateVolume(driver, volType)
 
 	switch volType {
 	case testpatterns.InlineVolume:
 		framework.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-			r.volSource = iDriver.GetVolumeSource(false, fsType, r.driverTestResource)
+			r.volSource = iDriver.GetVolumeSource(false, fsType, r.volume)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		framework.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.driverTestResource)
+			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
 			if pvSource != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false)
 			}
@@ -241,7 +241,9 @@ func (r *genericVolumeTestResource) cleanupResource(driver TestDriver, pattern t
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
-	DeleteVolume(driver, volType, r.driverTestResource)
+	if r.volume != nil {
+		r.volume.DeleteVolume()
+	}
 }
 
 func createVolumeSourceWithPVCPV(

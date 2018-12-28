@@ -38,22 +38,28 @@ type TestDriver interface {
 	SkipUnsupportedTest(testpatterns.TestPattern)
 }
 
+// TestVolume is the result of PreprovisionedVolumeTestDriver.CreateVolume.
+// The only common functionality is to delete it. Individual driver interfaces
+// have additional methods that work with volumes created by them.
+type TestVolume interface {
+	DeleteVolume()
+}
+
 // PreprovisionedVolumeTestDriver represents an interface for a TestDriver that has pre-provisioned volume
 type PreprovisionedVolumeTestDriver interface {
 	TestDriver
-	// CreateVolume creates a pre-provisioned volume.
-	CreateVolume(testpatterns.TestVolType) interface{}
-	// DeleteVolume deletes a volume that is created in CreateVolume
-	DeleteVolume(testpatterns.TestVolType, interface{})
+	// CreateVolume creates a pre-provisioned volume of the desired volume type.
+	CreateVolume(volumeType testpatterns.TestVolType) TestVolume
 }
 
 // InlineVolumeTestDriver represents an interface for a TestDriver that supports InlineVolume
 type InlineVolumeTestDriver interface {
 	PreprovisionedVolumeTestDriver
+
 	// GetVolumeSource returns a volumeSource for inline volume.
 	// It will set readOnly and fsType to the volumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource
+	GetVolumeSource(readOnly bool, fsType string, testVolume TestVolume) *v1.VolumeSource
 }
 
 // PreprovisionedPVTestDriver represents an interface for a TestDriver that supports PreprovisionedPV
@@ -63,7 +69,7 @@ type PreprovisionedPVTestDriver interface {
 	// It will set readOnly and fsType to the PersistentVolumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
 	// Volume node affinity is optional, it will be nil for volumes which does not have volume node affinity.
-	GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity)
+	GetPersistentVolumeSource(readOnly bool, fsType string, testVolume TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity)
 }
 
 // DynamicPVTestDriver represents an interface for a TestDriver that supports DynamicPV

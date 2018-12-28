@@ -150,7 +150,7 @@ func (s *subPathTestResource) setupResource(driver TestDriver, pattern testpatte
 	switch volType {
 	case testpatterns.InlineVolume:
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-			s.roVolSource = iDriver.GetVolumeSource(true, fsType, s.genericVolumeTestResource.driverTestResource)
+			s.roVolSource = iDriver.GetVolumeSource(true, fsType, s.genericVolumeTestResource.volume)
 		}
 	case testpatterns.PreprovisionedPV:
 		s.roVolSource = &v1.VolumeSource{
