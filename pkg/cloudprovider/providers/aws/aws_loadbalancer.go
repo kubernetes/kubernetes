@@ -820,31 +820,6 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 	// we use the IpRange.Description field to annotate NLB health check and
 	// client traffic rules
 
-	// Get the actual list of groups that allow ingress for the load-balancer
-	var actualGroups []*ec2.SecurityGroup
-	{
-		// Server side filter
-		describeRequest := &ec2.DescribeSecurityGroupsInput{}
-		filters := []*ec2.Filter{
-			newEc2Filter("ip-permission.protocol", "tcp"),
-		}
-		describeRequest.Filters = c.tagging.addFilters(filters)
-		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
-		if err != nil {
-			return fmt.Errorf("Error querying security groups for NLB: %q", err)
-		}
-		for _, sg := range response {
-			if !c.tagging.hasClusterTag(sg.Tags) {
-				continue
-			}
-			actualGroups = append(actualGroups, sg)
-		}
-
-		// client-side filter
-		// Filter out groups that don't have IP Rules we've annotated for this service
-		actualGroups = filterForIPRangeDescription(actualGroups, lbName)
-	}
-
 	taggedSecurityGroups, err := c.getTaggedSecurityGroups()
 	if err != nil {
 		return fmt.Errorf("Error querying for tagged security groups: %q", err)
@@ -886,6 +861,53 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 		}
 
 		desiredGroupIds = append(desiredGroupIds, id)
+	}
+
+	// Get the actual list of groups that allow ingress for the load-balancer
+	var actualGroups []*ec2.SecurityGroup
+	{
+		// Server side filter
+		describeRequest := &ec2.DescribeSecurityGroupsInput{}
+		filters := []*ec2.Filter{
+			newEc2Filter("ip-permission.protocol", "tcp"),
+		}
+		describeRequest.Filters = c.tagging.addFilters(filters)
+		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
+		if err != nil {
+			return fmt.Errorf("Error querying security groups for NLB: %q", err)
+		}
+		for _, sg := range response {
+			if !c.tagging.hasClusterTag(sg.Tags) {
+				continue
+			}
+			actualGroups = append(actualGroups, sg)
+		}
+
+		// Add desired groups to actual groups if it is not already so, in order to remove old security rules also
+		// from the desired groups
+		for _, desiredGroupId := range desiredGroupIds {
+
+			founded := false
+			for _, actualGroup := range actualGroups {
+				actualGroupId := aws.StringValue(actualGroup.GroupId)
+				if desiredGroupId == actualGroupId {
+					founded = true
+					break
+				}
+			}
+
+			if !founded {
+				missingGroup, err := c.findSecurityGroup(desiredGroupId)
+				if err != nil {
+					return fmt.Errorf("error finding security group with id %s: %q", desiredGroupId, err)
+				}
+				actualGroups = append(actualGroups, missingGroup)
+			}
+		}
+
+		// client-side filter
+		// Filter out groups that don't have IP Rules we've annotated for this service
+		actualGroups = filterForIPRangeDescription(actualGroups, lbName)
 	}
 
 	// Run once for Client traffic
