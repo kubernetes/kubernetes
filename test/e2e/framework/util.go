@@ -1325,6 +1325,7 @@ func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface,
 	if err != nil {
 		return false, err
 	}
+	resources = discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"list", "delete"}}, resources)
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	if err != nil {
 		return false, err
