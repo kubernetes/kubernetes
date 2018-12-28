@@ -59,11 +59,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	fmt.Printf("[certs] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
-	if err := CreateServiceAccountKeyAndPublicKeyFiles(cfg); err != nil {
-		return err
-	}
-
-	return nil
+	return CreateServiceAccountKeyAndPublicKeyFiles(cfg)
 }
 
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
