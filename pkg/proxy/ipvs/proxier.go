@@ -1184,7 +1184,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// currentBindAddrs represents ip addresses bind to DefaultDummyDevice from the system
 	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(DefaultDummyDevice)
 	if err != nil {
-		klog.Errorf("Failed to get bind address, err: %v", err)
+		glog.Errorf("Failed to get bind address, err: %v", err)
 	}
 	legacyBindAddrs := proxier.getLegacyBindAddr(activeBindAddrs, currentBindAddrs)
 
@@ -1621,9 +1621,9 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 				if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
 					continue
 				}
-				klog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
+				glog.V(5).Infof("Using graceful delete to delete: %v", uniqueRS)
 				if err := proxier.gracefuldeleteManager.GracefulDeleteRS(svc, rs); err != nil {
-					klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
+					glog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 				}
 			}
 			// make sure it does not fall within an excluded CIDR range.
@@ -1636,15 +1636,15 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 				}
 			}
 			if okayToDelete {
-				klog.V(4).Infof("Delete service %s", svc.String())
+				glog.V(4).Infof("Delete service %s", svc.String())
 				if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
 					glog.Errorf("Failed to delete service %s, error: %v", svc.String(), err)
 				}
 				addr := svc.Address.String()
 				if _, ok := legacyBindAddrs[addr]; ok {
-					klog.V(4).Infof("Unbinding address %s", addr)
+					glog.V(4).Infof("Unbinding address %s", addr)
 					if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
-						klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+						glog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
 					} else {
 						// In case we delete a multi-port service, avoid trying to unbind multiple times
 						delete(legacyBindAddrs, addr)
