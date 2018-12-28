@@ -68,7 +68,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to create JobList in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to list jobs in namespace: %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(len(activeJobs) >= 2).To(BeTrue())
 
@@ -93,7 +93,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to create JobList in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to list jobs in namespace: %s", f.Namespace.Name)
 		Expect(jobs.Items).To(HaveLen(0))
 
 		By("Removing cronjob")
@@ -120,7 +120,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to create JobList in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to list jobs in namespace: %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
 
@@ -152,7 +152,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to create JobList in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to list jobs in namespace: %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
 
@@ -245,7 +245,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring a finished job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to create JobList in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to list jobs in namespace: %s", f.Namespace.Name)
 		_, finishedJobs := filterActiveJobs(jobs)
 		Expect(len(finishedJobs) == 1).To(BeTrue())
 
@@ -258,7 +258,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring there is 1 finished job by listing jobs explicitly")
 		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to create JobList in namespace: %s", f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to list jobs in namespace: %s", f.Namespace.Name)
 		_, finishedJobs = filterActiveJobs(jobs)
 		Expect(len(finishedJobs) == 1).To(BeTrue())
 
