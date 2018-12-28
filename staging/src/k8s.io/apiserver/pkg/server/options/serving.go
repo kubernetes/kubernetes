@@ -108,7 +108,7 @@ func NewSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
-	if !s.ExternalAddress.IsUnspecified() {
+	if s.ExternalAddress != nil && !s.ExternalAddress.IsUnspecified() {
 		return s.ExternalAddress, nil
 	}
 	return utilnet.ChooseBindAddress(s.BindAddress)
