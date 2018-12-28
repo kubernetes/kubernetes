@@ -27,11 +27,8 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/e2e_node/system"
 	"k8s.io/kubernetes/test/utils"
-)
-
-const (
-	systemSpecPath = "k8s.io/kubernetes/cmd/kubeadm/app/util/system/specs"
 )
 
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
@@ -75,7 +72,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 
 	if systemSpecName != "" {
 		// Copy system spec file
-		source := filepath.Join(rootDir, systemSpecPath, systemSpecName+".yaml")
+		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
 		if _, err := os.Stat(source); err != nil {
 			return fmt.Errorf("failed to locate system spec %q: %v", source, err)
 		}
