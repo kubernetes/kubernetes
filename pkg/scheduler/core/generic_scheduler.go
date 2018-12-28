@@ -1031,7 +1031,7 @@ func selectVictimsOnNode(
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
-			klog.V(5).Infof("Pod %v is a potential preemption victim on node %v.", p.Name, nodeInfo.Node().Name)
+			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", p.Namespace, p.Name, nodeInfo.Node().Name)
 		}
 		return fits
 	}
