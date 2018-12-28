@@ -138,7 +138,7 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return true
 }
 
-func storageRequestMatches(currentSet *apps.StatefulSet, updateSet *apps.StatefulSet) bool {
+func storageRequestsMatch(currentSet *apps.StatefulSet, updateSet *apps.StatefulSet) bool {
 	for index, currentClaim := range currentSet.Spec.VolumeClaimTemplates {
 		updatedClaim := updateSet.Spec.VolumeClaimTemplates[index]
 		currentStorageRequest := currentClaim.Spec.Resources.Requests[v1.ResourceStorage]

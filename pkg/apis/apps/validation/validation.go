@@ -156,11 +156,11 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
 	restoreVolumeClaimTemplates := make([]api.PersistentVolumeClaim, len(statefulSet.Spec.VolumeClaimTemplates))
-	volumeExpansionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes)
+	statefulSetVolumeExpansionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetVolumeExpansion) && utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes)
 	if len(oldStatefulSet.Spec.VolumeClaimTemplates) == len(statefulSet.Spec.VolumeClaimTemplates) {
 		for index, oldVolumeClaimTemplate := range oldStatefulSet.Spec.VolumeClaimTemplates {
 			restoreVolumeClaimTemplates[index] = *statefulSet.Spec.VolumeClaimTemplates[index].DeepCopy()
-			if volumeExpansionEnabled {
+			if statefulSetVolumeExpansionEnabled {
 				oldStorageRequest := oldVolumeClaimTemplate.Spec.Resources.Requests[api.ResourceStorage]
 				newStorageRequest := statefulSet.Spec.VolumeClaimTemplates[index].Spec.Resources.Requests[api.ResourceStorage]
 				if newStorageRequest.Cmp(oldStorageRequest) < 0 {
@@ -173,7 +173,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
 		var errMsg string
-		if volumeExpansionEnabled {
+		if statefulSetVolumeExpansionEnabled {
 			errMsg = "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy' and 'volumeClaimTemplate.Spec.Resources.Requests[storage]' are forbidden"
 		} else {
 			errMsg = "updates to statefulset spec for fields other than 'replicas', 'template' and 'updateStrategy' are forbidden"

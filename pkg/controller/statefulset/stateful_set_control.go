@@ -20,6 +20,7 @@ import (
 	"math"
 	"sort"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
@@ -27,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
@@ -284,6 +286,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	firstUnhealthyOrdinal := math.MaxInt32
 	var firstUnhealthyPod *v1.Pod
 
+	statefulSetVolumeExpansionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetVolumeExpansion) && utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes)
+	storageRequestsMatch := storageRequestsMatch(updateSet, currentSet)
+
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
 		status.Replicas++
@@ -434,7 +439,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
-		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && storageRequestMatches(updateSet, currentSet) {
+		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && (!statefulSetVolumeExpansionEnabled || storageRequestsMatch) {
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache

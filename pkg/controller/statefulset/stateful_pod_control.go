@@ -25,11 +25,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -88,6 +90,8 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(updateSet *apps.StatefulSet, currentSet *apps.StatefulSet, pod *v1.Pod) error {
 	attemptedUpdate := false
+	statefulSetVolumeExpansionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetVolumeExpansion) && utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes)
+	storageRequestsMatch := storageRequestsMatch(updateSet, currentSet)
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
@@ -107,7 +111,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(updateSet *apps.StatefulSet
 			}
 		}
 
-		if !storageRequestMatches(updateSet, currentSet) {
+		if statefulSetVolumeExpansionEnabled && !storageRequestsMatch {
 			if err := spc.updatePersistentVolumeClaims(updateSet, pod); err != nil {
 				spc.recordPodEvent("update", updateSet, pod, err)
 				return err
@@ -208,6 +212,7 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 
 func (spc *realStatefulPodControl) updatePersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
+	inUseVolumeExpansionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes)
 	for _, updatedClaim := range getPersistentVolumeClaims(set, pod) {
 		currentClaim, err := spc.pvcLister.PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name)
 		if err != nil {
@@ -226,7 +231,7 @@ func (spc *realStatefulPodControl) updatePersistentVolumeClaims(set *apps.Statef
 			}
 		}
 
-		if !resizePending(currentClaim) {
+		if !inUseVolumeExpansionEnabled && !resizePending(currentClaim) {
 			errs = append(errs, fmt.Errorf("Controller resize pending for PVC %s", currentClaim.Name))
 		}
 	}

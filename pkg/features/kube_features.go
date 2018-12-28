@@ -106,6 +106,12 @@ const (
 	// Ability to expand persistent volumes' file system without unmounting volumes.
 	ExpandInUsePersistentVolumes utilfeature.Feature = "ExpandInUsePersistentVolumes"
 
+	// owner: @sidakm
+	// alpha: v1.14
+	//
+	// Support volume expansion through statefulsets
+	StatefulSetVolumeExpansion utilfeature.Feature = "StatefulSetVolumeExpansion"
+
 	// owner: @verb
 	// alpha: v1.10
 	//
@@ -424,6 +430,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
+	StatefulSetVolumeExpansion:                  {Default: false, PreRelease: utilfeature.Alpha},
 	AttachVolumeLimit:                           {Default: true, PreRelease: utilfeature.Beta},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
