@@ -17,47 +17,97 @@ limitations under the License.
 package mount
 
 import (
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
-
-	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func TestDoUnmountMountPoint(t *testing.T) {
+	const testMount = "test-mount"
+	const defaultPerm = 0750
 
-	tmpDir1, err1 := utiltesting.MkTmpdir("umount_test1")
-	if err1 != nil {
-		t.Fatalf("error creating temp dir: %v", err1)
-	}
-	defer os.RemoveAll(tmpDir1)
-
-	tmpDir2, err2 := utiltesting.MkTmpdir("umount_test2")
-	if err2 != nil {
-		t.Fatalf("error creating temp dir: %v", err2)
-	}
-	defer os.RemoveAll(tmpDir2)
-
-	// Second part: want no error
-	tests := []struct {
-		mountPath    string
+	tests := map[string]struct {
 		corruptedMnt bool
+		// Function that prepares the directory structure for the test under
+		// the given base directory.
+		// Returns a fake MountPoint, a fake error for the mount point,
+		// and error if the prepare function encountered a fatal error.
+		prepare   func(base string) (MountPoint, error, error)
+		expectErr bool
 	}{
-		{
-			mountPath:    tmpDir1,
+		"mount-ok": {
+			prepare: func(base string) (MountPoint, error, error) {
+				path := filepath.Join(base, testMount)
+				if err := os.MkdirAll(path, defaultPerm); err != nil {
+					return MountPoint{}, nil, err
+				}
+				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
+			},
+		},
+		"mount-corrupted": {
+			prepare: func(base string) (MountPoint, error, error) {
+				path := filepath.Join(base, testMount)
+				if err := os.MkdirAll(path, defaultPerm); err != nil {
+					return MountPoint{}, nil, err
+				}
+				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ESTALE), nil
+			},
 			corruptedMnt: true,
 		},
-		{
-			mountPath:    tmpDir2,
-			corruptedMnt: false,
+		"mount-err-not-corrupted": {
+			prepare: func(base string) (MountPoint, error, error) {
+				path := filepath.Join(base, testMount)
+				if err := os.MkdirAll(path, defaultPerm); err != nil {
+					return MountPoint{}, nil, err
+				}
+				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ETIMEDOUT), nil
+			},
+			expectErr: true,
 		},
 	}
 
-	fake := &FakeMounter{}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 
-	for _, tt := range tests {
-		err := doUnmountMountPoint(tt.mountPath, fake, false, tt.corruptedMnt)
-		if err != nil {
-			t.Errorf("err Expected nil, but got: %v", err)
-		}
+			tmpDir, err := ioutil.TempDir("", "unmount-mount-point-test")
+			if err != nil {
+				t.Fatalf("failed to create tmpdir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			if tt.prepare == nil {
+				t.Fatalf("prepare function required")
+			}
+
+			mountPoint, mountError, err := tt.prepare(tmpDir)
+			if err != nil {
+				t.Fatalf("failed to prepare test: %v", err)
+			}
+
+			fake := &FakeMounter{
+				MountPoints:      []MountPoint{mountPoint},
+				MountCheckErrors: map[string]error{mountPoint.Path: mountError},
+			}
+
+			err = doUnmountMountPoint(mountPoint.Path, fake, true, tt.corruptedMnt)
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("test %s failed, expected error, got none", name)
+				}
+				if err := validateDirExists(mountPoint.Path); err != nil {
+					t.Errorf("test %s failed, mount path doesn't exist: %v", name, err)
+				}
+			}
+			if !tt.expectErr {
+				if err != nil {
+					t.Errorf("test %s failed: %v", name, err)
+				}
+				if err := validateDirNotExists(mountPoint.Path); err != nil {
+					t.Errorf("test %s failed, mount path still exists: %v", name, err)
+				}
+			}
+		})
 	}
 }
