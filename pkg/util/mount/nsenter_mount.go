@@ -145,7 +145,7 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 }
 
 func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(m, dir)
+	return isNotMountPoint(m, dir)
 }
 
 func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
