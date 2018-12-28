@@ -347,6 +347,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
+		framework.Logf("failing near crap")
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = 100
 		config.Burst = 200
@@ -379,11 +380,13 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
+			framework.Logf("failing near client creation")
 			return nil, nil, nil, err
 		}
 		clients[i] = c
 		internalClient, err := internalclientset.NewForConfig(config)
 		if err != nil {
+			framework.Logf("failing near client creation1")
 			return nil, nil, nil, err
 		}
 		internalClients[i] = internalClient
@@ -398,6 +401,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		}
 		restClient, err := restclient.RESTClientFor(config)
 		if err != nil {
+			framework.Logf("failing near client creation2")
 			return nil, nil, nil, err
 		}
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
