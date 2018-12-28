@@ -462,7 +462,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't read temp file: %v", err)
 		}
 
-		newcfg, err := getConfig("v1.13.0", tempCertsDir, tmpEtcdDataDir)
+		newcfg, err := getConfig(constants.CurrentKubernetesVersion.String(), tempCertsDir, tmpEtcdDataDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
