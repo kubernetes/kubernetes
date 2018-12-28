@@ -155,7 +155,6 @@ go_test(
         "kubelet_pods_test.go",
         "kubelet_resources_test.go",
         "kubelet_test.go",
-        "kubelet_volumes_linux_test.go",
         "kubelet_volumes_test.go",
         "oom_watcher_test.go",
         "pod_container_deletor_test.go",
@@ -163,6 +162,9 @@ go_test(
         "reason_cache_test.go",
         "runonce_test.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "kubelet_volumes_linux_test.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows": [
             "kubelet_pods_windows_test.go",
         ],
