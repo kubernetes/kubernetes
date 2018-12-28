@@ -299,6 +299,7 @@ filegroup(
         "//vendor/github.com/libopenstorage/openstorage/pkg/parser:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/pkg/units:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/volume:all-srcs",
+        "//vendor/github.com/liggitt/tabwriter:all-srcs",
         "//vendor/github.com/magiconair/properties:all-srcs",
         "//vendor/github.com/mailru/easyjson/buffer:all-srcs",
         "//vendor/github.com/mailru/easyjson/jlexer:all-srcs",
