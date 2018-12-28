@@ -459,7 +459,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
 		kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind}
-		typer := newUnstructuredObjectTyper(parameterScheme)
+		typer := crdserverscheme.NewUnstructuredObjectTyper()
 		creator := unstructuredCreator{}
 
 		validationSchema, err := getSchemaForVersion(crd, v.Name)
@@ -552,7 +552,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 			Creater:         creator,
 			Convertor:       safeConverter,
-			Defaulter:       unstructuredDefaulter{parameterScheme},
+			Defaulter:       nopUnstructuredDefaulter{},
 			Typer:           typer,
 			UnsafeConvertor: unsafeConverter,
 
@@ -683,16 +683,10 @@ func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, 
 	return ret, nil
 }
 
-type unstructuredDefaulter struct {
-	delegate runtime.ObjectDefaulter
+type nopUnstructuredDefaulter struct {
 }
 
-func (d unstructuredDefaulter) Default(in runtime.Object) {
-	// Delegate for things other than Unstructured.
-	if _, ok := in.(runtime.Unstructured); !ok {
-		d.delegate.Default(in)
-	}
-}
+func (nopUnstructuredDefaulter) Default(in runtime.Object) {}
 
 type CRDRESTOptionsGetter struct {
 	StorageConfig           storagebackend.Config
@@ -755,7 +749,7 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 			c,
 			&unstructuredCreator{},
 			crdserverscheme.NewUnstructuredObjectTyper(),
-			&unstructuredDefaulter{delegate: Scheme},
+			&nopUnstructuredDefaulter{},
 			t.encoderVersion,
 			t.decoderVersion,
 			"crdRESTOptions",
