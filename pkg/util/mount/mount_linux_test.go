@@ -666,44 +666,6 @@ func TestSafeMakeDir(t *testing.T) {
 	}
 }
 
-func validateDirEmpty(dir string) error {
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-
-	if len(files) != 0 {
-		return fmt.Errorf("Directory %q is not empty", dir)
-	}
-	return nil
-}
-
-func validateDirExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func validateDirNotExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return fmt.Errorf("dir %q still exists", dir)
-}
-
-func validateFileExists(file string) error {
-	if _, err := os.Stat(file); err != nil {
-		return err
-	}
-	return nil
-}
-
 func TestRemoveEmptyDirs(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
 	tests := []struct {
