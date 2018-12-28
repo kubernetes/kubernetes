@@ -316,7 +316,7 @@ func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ig
 		internalCfg.NodeRegistration.CRISocket = defaultcfg.NodeRegistration.CRISocket
 	}
 
-	if defaultcfg.ControlPlane != nil {
+	if internalCfg.ControlPlane != nil {
 		if err := configutil.VerifyAPIServerBindAddress(internalCfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 			return nil, err
 		}
