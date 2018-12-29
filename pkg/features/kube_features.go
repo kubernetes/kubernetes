@@ -120,6 +120,7 @@ const (
 
 	// owner: @bsalamat
 	// alpha: v1.8
+	// beta: v1.11
 	//
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
