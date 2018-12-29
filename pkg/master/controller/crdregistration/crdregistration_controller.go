@@ -25,11 +25,13 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -118,14 +120,20 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	}
 
 	// process each item in the list once
-	if crds, err := c.crdLister.List(labels.Everything()); err != nil {
+	crds, err := c.crdLister.List(labels.Everything())
+	if err != nil {
 		utilruntime.HandleError(err)
-	} else {
-		for _, crd := range crds {
+	}
+	for _, crd := range crds {
+		if feature.DefaultFeatureGate.Enabled(features.CustomResourceWebhookConversion) {
 			for _, version := range crd.Spec.Versions {
 				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}); err != nil {
 					utilruntime.HandleError(err)
 				}
+			}
+		} else {
+			if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version}); err != nil {
+				utilruntime.HandleError(err)
 			}
 		}
 	}
@@ -186,8 +194,12 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 }
 
 func (c *crdRegistrationController) enqueueCRD(crd *apiextensions.CustomResourceDefinition) {
-	for _, version := range crd.Spec.Versions {
-		c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name})
+	if feature.DefaultFeatureGate.Enabled(features.CustomResourceWebhookConversion) {
+		for _, version := range crd.Spec.Versions {
+			c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name})
+		}
+	} else {
+		c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version})
 	}
 }
 
@@ -203,11 +215,27 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 		if crd.Spec.Group != groupVersion.Group {
 			continue
 		}
-		for _, version := range crd.Spec.Versions {
-			if version.Name != groupVersion.Version || !version.Served {
+		if feature.DefaultFeatureGate.Enabled(features.CustomResourceWebhookConversion) {
+			for _, version := range crd.Spec.Versions {
+				if version.Name != groupVersion.Version || !version.Served {
+					continue
+				}
+
+				c.apiServiceRegistration.AddAPIServiceToSync(&apiregistration.APIService{
+					ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
+					Spec: apiregistration.APIServiceSpec{
+						Group:                groupVersion.Group,
+						Version:              groupVersion.Version,
+						GroupPriorityMinimum: 1000, // CRDs should have relatively low priority
+						VersionPriority:      100,  // CRDs will be sorted by kube-like versions like any other APIService with the same VersionPriority
+					},
+				})
+				return nil
+			}
+		} else {
+			if crd.Spec.Version != groupVersion.Version {
 				continue
 			}
-
 			c.apiServiceRegistration.AddAPIServiceToSync(&apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
 				Spec: apiregistration.APIServiceSpec{
