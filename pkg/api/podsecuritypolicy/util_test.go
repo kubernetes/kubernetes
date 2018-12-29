@@ -17,8 +17,11 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -26,39 +29,81 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func TestDropAlphaProcMountType(t *testing.T) {
-	// PodSecurityPolicy with AllowedProcMountTypes set
-	psp := policy.PodSecurityPolicy{
-		Spec: policy.PodSecurityPolicySpec{
-			AllowedProcMountTypes: []api.ProcMountType{api.UnmaskedProcMount},
-		},
+func TestDropAllowedProcMountTypes(t *testing.T) {
+	allowedProcMountTypes := []api.ProcMountType{api.UnmaskedProcMount}
+	scWithoutAllowedProcMountTypes := func() *policy.PodSecurityPolicySpec {
+		return &policy.PodSecurityPolicySpec{}
 	}
-
-	// Enable alpha feature ProcMountType
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-
-	// now test dropping the fields - should not be dropped
-	DropDisabledFields(&psp.Spec, nil)
-
-	// check to make sure AllowedProcMountTypes is still present
-	// if featureset is set to true
-	if utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
-		if psp.Spec.AllowedProcMountTypes == nil {
-			t.Error("AllowedProcMountTypes in pvc.Spec should not have been dropped based on feature-gate")
+	scWithAllowedProcMountTypes := func() *policy.PodSecurityPolicySpec {
+		return &policy.PodSecurityPolicySpec{
+			AllowedProcMountTypes: allowedProcMountTypes,
 		}
 	}
 
-	// Disable alpha feature ProcMountType
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, false)()
+	scInfo := []struct {
+		description              string
+		hasAllowedProcMountTypes bool
+		sc                       func() *policy.PodSecurityPolicySpec
+	}{
+		{
+			description:              "PodSecurityPolicySpec Without AllowedProcMountTypes",
+			hasAllowedProcMountTypes: false,
+			sc:                       scWithoutAllowedProcMountTypes,
+		},
+		{
+			description:              "PodSecurityPolicySpec With AllowedProcMountTypes",
+			hasAllowedProcMountTypes: true,
+			sc:                       scWithAllowedProcMountTypes,
+		},
+		{
+			description:              "is nil",
+			hasAllowedProcMountTypes: false,
+			sc:                       func() *policy.PodSecurityPolicySpec { return nil },
+		},
+	}
 
-	// now test dropping the fields
-	DropDisabledFields(&psp.Spec, nil)
+	for _, enabled := range []bool{true, false} {
+		for _, oldPSPSpecInfo := range scInfo {
+			for _, newPSPSpecInfo := range scInfo {
+				oldPSPSpecHasAllowedProcMountTypes, oldPSPSpec := oldPSPSpecInfo.hasAllowedProcMountTypes, oldPSPSpecInfo.sc()
+				newPSPSpecHasAllowedProcMountTypes, newPSPSpec := newPSPSpecInfo.hasAllowedProcMountTypes, newPSPSpecInfo.sc()
+				if newPSPSpec == nil {
+					continue
+				}
 
-	// check to make sure AllowedProcMountTypes is nil
-	// if featureset is set to false
-	if utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
-		if psp.Spec.AllowedProcMountTypes != nil {
-			t.Error("DropDisabledFields AllowedProcMountTypes for psp.Spec failed")
+				t.Run(fmt.Sprintf("feature enabled=%v, old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", enabled, oldPSPSpecInfo.description, newPSPSpecInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)()
+
+					DropDisabledFields(newPSPSpec, oldPSPSpec)
+
+					// old PodSecurityPolicySpec should never be changed
+					if !reflect.DeepEqual(oldPSPSpec, oldPSPSpecInfo.sc()) {
+						t.Errorf("old PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(oldPSPSpec, oldPSPSpecInfo.sc()))
+					}
+
+					switch {
+					case enabled || oldPSPSpecHasAllowedProcMountTypes:
+						// new PodSecurityPolicySpec should not be changed if the feature is enabled, or if the old PodSecurityPolicySpec had AllowedProcMountTypes
+						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
+							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+						}
+					case newPSPSpecHasAllowedProcMountTypes:
+						// new PodSecurityPolicySpec should be changed
+						if reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
+							t.Errorf("new PodSecurityPolicySpec was not changed")
+						}
+						// new PodSecurityPolicySpec should not have AllowedProcMountTypes
+						if !reflect.DeepEqual(newPSPSpec, scWithoutAllowedProcMountTypes()) {
+							t.Errorf("new PodSecurityPolicySpec had PodSecurityPolicySpecAllowedProcMountTypes: %v", diff.ObjectReflectDiff(newPSPSpec, scWithoutAllowedProcMountTypes()))
+						}
+					default:
+						// new PodSecurityPolicySpec should not need to be changed
+						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
+							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+						}
+					}
+				})
+			}
 		}
 	}
 }
