@@ -58,7 +58,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 			Command:         getAPIServerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
 			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeAPIServer, int(cfg.LocalAPIEndpoint.BindPort), "/healthz", v1.URISchemeHTTPS),
-			Resources:       staticpodutil.ComponentResources("250m"),
+			Resources:       staticpodutil.ComponentResources("250m", "250Mi"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
@@ -68,7 +68,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 			Command:         getControllerManagerCommand(cfg, k8sVersion),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
 			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeControllerManager, 10252, "/healthz", v1.URISchemeHTTP),
-			Resources:       staticpodutil.ComponentResources("200m"),
+			Resources:       staticpodutil.ComponentResources("200m", "250Mi"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
@@ -78,7 +78,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 			Command:         getSchedulerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
 			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeScheduler, 10251, "/healthz", v1.URISchemeHTTP),
-			Resources:       staticpodutil.ComponentResources("100m"),
+			Resources:       staticpodutil.ComponentResources("100m", "250Mi"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}

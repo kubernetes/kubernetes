@@ -34,10 +34,10 @@ import (
 )
 
 func TestComponentResources(t *testing.T) {
-	a := ComponentResources("250m")
+	a := ComponentResources("250m", "250Mi")
 	if a.Requests == nil {
 		t.Errorf(
-			"failed componentResources, return value was nil",
+			"failed componentResources, returned requests value was nil",
 		)
 	}
 }
