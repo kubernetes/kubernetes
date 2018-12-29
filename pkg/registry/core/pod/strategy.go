@@ -382,6 +382,9 @@ func LogLocation(
 	if opts.LimitBytes != nil {
 		params.Add("limitBytes", strconv.FormatInt(*opts.LimitBytes, 10))
 	}
+	if opts.Preamble != "" {
+		params.Add("preamble", opts.Preamble)
+	}
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),

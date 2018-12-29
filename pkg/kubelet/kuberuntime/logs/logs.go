@@ -88,6 +88,7 @@ type LogOptions struct {
 	since     time.Time
 	follow    bool
 	timestamp bool
+	preamble  string
 }
 
 // NewLogOptions convert the v1.PodLogOptions to CRI internal LogOptions.
@@ -97,6 +98,7 @@ func NewLogOptions(apiOpts *v1.PodLogOptions, now time.Time) *LogOptions {
 		bytes:     -1, // -1 by default which means read all logs.
 		follow:    apiOpts.Follow,
 		timestamp: apiOpts.Timestamps,
+		preamble:  apiOpts.Preamble,
 	}
 	if apiOpts.TailLines != nil {
 		opts.tail = *apiOpts.TailLines
@@ -289,6 +291,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	var watcher *fsnotify.Watcher
 	var parse parseFunc
 	var stop bool
+	// write back the preamble if set
+	if opts.preamble != "" {
+		stdout.Write([]byte(opts.preamble + "\n"))
+	}
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	for {

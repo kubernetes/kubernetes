@@ -4348,6 +4348,9 @@ type PodLogOptions struct {
 	// slightly more or slightly less than the specified limit.
 	// +optional
 	LimitBytes *int64 `json:"limitBytes,omitempty" protobuf:"varint,8,opt,name=limitBytes"`
+	// The preamble string if set would be send back before any container logs.
+	// +optional
+	Preamble string `json:"preamble,omitempty" protobuf:"bytes,9,opt,name=preamble"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

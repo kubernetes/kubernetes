@@ -3869,6 +3869,8 @@ type PodLogOptions struct {
 	// log output. This may not display a complete final line of logging, and may return
 	// slightly more or slightly less than the specified limit.
 	LimitBytes *int64
+	// If non empty, the log string would yield preamble before sending out any log
+	Preamble string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
