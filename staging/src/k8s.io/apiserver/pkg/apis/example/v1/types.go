@@ -66,7 +66,7 @@ type PodStatus struct {
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// A brief CamelCase message indicating details about why the pod is in this state.
-	// e.g. 'OutOfDisk'
+	// e.g. 'DiskPressure'
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 
