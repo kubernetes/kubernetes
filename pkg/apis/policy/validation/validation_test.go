@@ -384,6 +384,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	nonEmptyFlexVolumes := validPSP()
 	nonEmptyFlexVolumes.Spec.AllowedFlexVolumes = []policy.AllowedFlexVolume{{Driver: "example/driver"}}
 
+	invalidProcMount := validPSP()
+	invalidProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.ProcMountType("bogus")}
+
 	type testCase struct {
 		psp         *policy.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -550,6 +553,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeRequired,
 			errorDetail: "must specify a driver",
 		},
+		"invalid allowedProcMountTypes": {
+			psp:         invalidProcMount,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: `supported values: "Default", "Unmasked"`,
+		},
 	}
 
 	for k, v := range errorCases {
@@ -643,6 +651,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	flexvolumeWhenAllVolumesAllowed.Spec.AllowedFlexVolumes = []policy.AllowedFlexVolume{
 		{Driver: "example/driver2"},
 	}
+
+	validProcMount := validPSP()
+	validProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.DefaultProcMount, api.UnmaskedProcMount}
+
 	successCases := map[string]struct {
 		psp *policy.PodSecurityPolicy
 	}{
@@ -681,6 +693,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"allow white-listed flexVolume when all volumes are allowed": {
 			psp: flexvolumeWhenAllVolumesAllowed,
+		},
+		"valid allowedProcMountTypes": {
+			psp: validProcMount,
 		},
 	}
 
