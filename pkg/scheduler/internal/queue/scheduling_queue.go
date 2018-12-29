@@ -230,7 +230,10 @@ func podTimestamp(pod *v1.Pod) *metav1.Time {
 	if condition == nil {
 		return &pod.CreationTimestamp
 	}
-	return &condition.LastTransitionTime
+	if condition.LastProbeTime.IsZero() {
+		return &condition.LastTransitionTime
+	}
+	return &condition.LastProbeTime
 }
 
 // activeQComp is the function used by the activeQ heap algorithm to sort pods.
