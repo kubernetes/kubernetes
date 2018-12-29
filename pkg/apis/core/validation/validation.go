@@ -5221,8 +5221,8 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 	}
 
 	if sc.ProcMount != nil {
-		if err := IsValidProcMount(*sc.ProcMount); err != nil {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("procMount"), *sc.ProcMount, []string{string(core.DefaultProcMount), string(core.UnmaskedProcMount)}))
+		if err := ValidateProcMountType(fldPath.Child("procMount"), *sc.ProcMount); err != nil {
+			allErrs = append(allErrs, err)
 		}
 	}
 
@@ -5323,13 +5323,12 @@ func IsDecremented(update, old *int32) bool {
 	return *update < *old
 }
 
-// IsValidProcMount tests that the argument is a valid ProcMountType.
-func IsValidProcMount(procMountType core.ProcMountType) error {
+// ValidateProcMountType tests that the argument is a valid ProcMountType.
+func ValidateProcMountType(fldPath *field.Path, procMountType core.ProcMountType) *field.Error {
 	switch procMountType {
-	case core.DefaultProcMount:
-	case core.UnmaskedProcMount:
+	case core.DefaultProcMount, core.UnmaskedProcMount:
+		return nil
 	default:
-		return fmt.Errorf("unsupported ProcMount type %s", procMountType)
+		return field.NotSupported(fldPath, procMountType, []string{string(core.DefaultProcMount), string(core.UnmaskedProcMount)})
 	}
-	return nil
 }
