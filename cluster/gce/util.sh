@@ -248,16 +248,21 @@ function set-preferred-region() {
 # Assumed vars:
 #   PROJECT
 #   SERVER_BINARY_TAR
+#   NODE_BINARY_TAR (optional)
 #   KUBE_MANIFESTS_TAR
 #   ZONE
 # Vars set:
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
+#   NODE_BINARY_TAR_URL
+#   NODE_BINARY_TAR_HASH
 #   KUBE_MANIFESTS_TAR_URL
 #   KUBE_MANIFESTS_TAR_HASH
-function upload-server-tars() {
+function upload-tars() {
   SERVER_BINARY_TAR_URL=
   SERVER_BINARY_TAR_HASH=
+  NODE_BINARY_TAR_URL=
+  NODE_BINARY_TAR_HASH=
   KUBE_MANIFESTS_TAR_URL=
   KUBE_MANIFESTS_TAR_HASH=
 
@@ -279,11 +284,16 @@ function upload-server-tars() {
   fi
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
+
+  if [[ -n "${NODE_BINARY_TAR:-}" ]]; then
+    NODE_BINARY_TAR_HASH=$(sha1sum-file "${NODE_BINARY_TAR}")
+  fi
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
     KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
   fi
 
   local server_binary_tar_urls=()
+  local node_binary_tar_urls=()
   local kube_manifest_tar_urls=()
 
   for region in "${PREFERRED_REGION[@]}"; do
@@ -301,12 +311,20 @@ function upload-server-tars() {
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
 
-    echo "+++ Staging server tars to Google Storage: ${staging_path}"
+    echo "+++ Staging tars to Google Storage: ${staging_path}"
     local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
     copy-to-staging "${staging_path}" "${server_binary_gs_url}" "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_HASH}"
 
+    if [[ -n "${NODE_BINARY_TAR:-}" ]]; then
+      local node_binary_gs_url="${staging_path}/${NODE_BINARY_TAR##*/}"
+      copy-to-staging "${staging_path}" "${node_binary_gs_url}" "${NODE_BINARY_TAR}" "${NODE_BINARY_TAR_HASH}"
+    fi
+
     # Convert from gs:// URL to an https:// URL
     server_binary_tar_urls+=("${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
+    if [[ -n "${NODE_BINARY_TAR:-}" ]]; then
+      node_binary_tar_urls+=("${node_binary_gs_url/gs:\/\//https://storage.googleapis.com/}")
+    fi
     if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
       local kube_manifests_gs_url="${staging_path}/${KUBE_MANIFESTS_TAR##*/}"
       copy-to-staging "${staging_path}" "${kube_manifests_gs_url}" "${KUBE_MANIFESTS_TAR}" "${KUBE_MANIFESTS_TAR_HASH}"
@@ -316,6 +334,9 @@ function upload-server-tars() {
   done
 
   SERVER_BINARY_TAR_URL=$(join_csv "${server_binary_tar_urls[@]}")
+  if [[ -n "${NODE_BINARY_TAR:-}" ]]; then
+    NODE_BINARY_TAR_URL=$(join_csv "${node_binary_tar_urls[@]}")
+  fi
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
     KUBE_MANIFESTS_TAR_URL=$(join_csv "${kube_manifests_tar_urls[@]}")
   fi
@@ -436,7 +457,7 @@ function tars_from_version() {
 
   if [[ -z "${KUBE_VERSION-}" ]]; then
     find-release-tars
-    upload-server-tars
+    upload-tars
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
@@ -1756,7 +1777,7 @@ function kube-up() {
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
-  upload-server-tars
+  upload-tars
 
   # ensure that environmental variables specifying number of migs to create
   set_num_migs

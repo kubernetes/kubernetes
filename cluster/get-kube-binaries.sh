@@ -161,6 +161,11 @@ DOWNLOAD_URL_PREFIX="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}"
 SERVER_PLATFORM="linux"
 SERVER_ARCH="${KUBERNETES_SERVER_ARCH:-amd64}"
 SERVER_TAR="kubernetes-server-${SERVER_PLATFORM}-${SERVER_ARCH}.tar.gz"
+if [[ -n "${KUBERNETES_NODE_PLATFORM-}" || -n "${KUBERNETES_NODE_ARCH-}" ]]; then
+  NODE_PLATFORM="${KUBERNETES_NODE_PLATFORM:${SERVER_PLATFORM}}"
+  NODE_ARCH="${KUBERNETES_NODE_ARCH:${SERVER_ARCH}}"
+  NODE_TAR="kubernetes-node-${NODE_PLATFORM}-${NODE_ARCH}.tar.gz"
+fi
 
 detect_client_info
 CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
@@ -184,6 +189,12 @@ DOWNLOAD_CLIENT_TAR=false
 if [[ ! -x "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}/kubectl" ]]; then
   DOWNLOAD_CLIENT_TAR=true
   echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
+fi
+
+DOWNLOAD_NODE_TAR=false
+if [[ -n "${NODE_TAR:-}" ]]; then
+  DOWNLOAD_NODE_TAR=true
+  echo "Will download and extract ${NODE_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
 
 TESTS_TAR="kubernetes-test.tar.gz"
@@ -211,6 +222,10 @@ fi
 
 if "${DOWNLOAD_SERVER_TAR}"; then
   download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
+fi
+
+if "${DOWNLOAD_NODE_TAR}"; then
+  download_tarball "${KUBE_ROOT}/node" "${NODE_TAR}"
 fi
 
 if "${DOWNLOAD_CLIENT_TAR}"; then
