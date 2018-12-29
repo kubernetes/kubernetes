@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,6 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -245,7 +245,8 @@ func TestProxyHandler(t *testing.T) {
 				Name:   "username",
 				Groups: []string{"one", "two"},
 			},
-			path: "/request/path",
+			path:            "/request/path",
+			serviceResolver: &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
