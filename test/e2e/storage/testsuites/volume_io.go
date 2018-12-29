@@ -74,87 +74,59 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
-}
+func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	var (
+		dInfo       = driver.GetDriverInfo()
+		config      *PerTestConfig
+		testCleanup func()
+		resource    *genericVolumeTestResource
+	)
 
-func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumeIOTestInput {
-	var fsGroup *int64
-	driver := resource.driver
-	dInfo := driver.GetDriverInfo()
-	f := dInfo.Config.Framework
-	fileSizes := createFileSizes(dInfo.MaxFileSize)
-	volSource := resource.volSource
+	// No preconditions to test. Normally they would be in a BeforeEach here.
 
-	if volSource == nil {
-		framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+	// This intentionally comes after checking the preconditions because it
+	// registers its own BeforeEach which creates the namespace. Beware that it
+	// also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
+	f := framework.NewDefaultFramework("volumeio")
+
+	init := func() {
+		// Now do the more expensive test initialization.
+		config, testCleanup = driver.PrepareTest(f)
+		resource = createGenericVolumeTestResource(driver, config, pattern)
+		if resource.volSource == nil {
+			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+		}
 	}
 
-	if dInfo.Capabilities[CapFsGroup] {
-		fsGroupVal := int64(1234)
-		fsGroup = &fsGroupVal
+	cleanup := func() {
+		if resource != nil {
+			resource.cleanupResource()
+			resource = nil
+		}
+
+		if testCleanup != nil {
+			testCleanup()
+			testCleanup = nil
+		}
 	}
 
-	return volumeIOTestInput{
-		f:         f,
-		name:      dInfo.Name,
-		config:    &dInfo.Config,
-		volSource: *volSource,
-		testFile:  fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name),
-		podSec: v1.PodSecurityContext{
-			FSGroup: fsGroup,
-		},
-		fileSizes: fileSizes,
-	}
-}
-
-func (t *volumeIOTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
-	Context(getTestNameStr(t, pattern), func() {
-		var (
-			resource     genericVolumeTestResource
-			input        volumeIOTestInput
-			needsCleanup bool
-		)
-
-		BeforeEach(func() {
-			needsCleanup = false
-			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
-			needsCleanup = true
-
-			// Setup test resource for driver and testpattern
-			resource = genericVolumeTestResource{}
-			resource.setupResource(driver, pattern)
-
-			// Create test input
-			input = createVolumeIOTestInput(pattern, resource)
-		})
-
-		AfterEach(func() {
-			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
-			}
-		})
-
-		execTestVolumeIO(&input)
-	})
-}
-
-type volumeIOTestInput struct {
-	f         *framework.Framework
-	name      string
-	config    *TestConfig
-	volSource v1.VolumeSource
-	testFile  string
-	podSec    v1.PodSecurityContext
-	fileSizes []int64
-}
-
-func execTestVolumeIO(input *volumeIOTestInput) {
 	It("should write files of various sizes, verify size, validate content [Slow]", func() {
-		f := input.f
-		cs := f.ClientSet
+		init()
+		defer cleanup()
 
-		err := testVolumeIO(f, cs, convertTestConfig(input.config), input.volSource, &input.podSec, input.testFile, input.fileSizes)
+		cs := f.ClientSet
+		fileSizes := createFileSizes(dInfo.MaxFileSize)
+		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
+		var fsGroup *int64
+		if dInfo.Capabilities[CapFsGroup] {
+			fsGroupVal := int64(1234)
+			fsGroup = &fsGroupVal
+		}
+		podSec := v1.PodSecurityContext{
+			FSGroup: fsGroup,
+		}
+		err := testVolumeIO(f, cs, convertTestConfig(config), *resource.volSource, &podSec, testFile, fileSizes)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }

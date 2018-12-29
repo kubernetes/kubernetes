@@ -82,7 +82,7 @@ var _ testsuites.PreprovisionedPVTestDriver = &nfsDriver{}
 var _ testsuites.DynamicPVTestDriver = &nfsDriver{}
 
 // InitNFSDriver returns nfsDriver that implements TestDriver interface
-func InitNFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitNFSDriver() testsuites.TestDriver {
 	return &nfsDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "nfs",
@@ -96,8 +96,6 @@ func InitNFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -133,10 +131,10 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volu
 	}, nil
 }
 
-func (n *nfsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (n *nfsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := n.externalPluginName
 	parameters := map[string]string{"mountOptions": "vers=4.1"}
-	ns := n.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", n.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -146,8 +144,7 @@ func (n *nfsDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (n *nfsDriver) CreateDriver() {
-	f := n.driverInfo.Config.Framework
+func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	cs := f.ClientSet
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
@@ -164,32 +161,32 @@ func (n *nfsDriver) CreateDriver() {
 
 	By("creating an external dynamic provisioner pod")
 	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
+
+	return &testsuites.PerTestConfig{
+			Driver:    n,
+			Prefix:    "nfs",
+			Framework: f,
+		}, func() {
+			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
+			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
+			cs.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
+		}
 }
 
-func (n *nfsDriver) CleanupDriver() {
-	f := n.driverInfo.Config.Framework
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
-	clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-	cs.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
-}
-
-func (n *nfsDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := n.driverInfo.Config.Framework
+func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	// NewNFSServer creates a pod for InlineVolume and PreprovisionedPV,
 	// and startExternalProvisioner creates a pods for DynamicPV.
-	// Therefore, we need a different CreateDriver logic for volType.
+	// Therefore, we need a different PrepareTest logic for volType.
 	switch volType {
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
-		config, serverPod, serverIP := framework.NewNFSServer(cs, ns.Name, []string{})
-		n.driverInfo.Config.ServerConfig = &config
+		c, serverPod, serverIP := framework.NewNFSServer(cs, ns.Name, []string{})
+		config.ServerConfig = &c
 		return &nfsVolume{
 			serverIP:  serverIP,
 			serverPod: serverPod,
@@ -224,7 +221,7 @@ var _ testsuites.InlineVolumeTestDriver = &glusterFSDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &glusterFSDriver{}
 
 // InitGlusterFSDriver returns glusterFSDriver that implements TestDriver interface
-func InitGlusterFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitGlusterFSDriver() testsuites.TestDriver {
 	return &glusterFSDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "gluster",
@@ -236,8 +233,6 @@ func InitGlusterFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -280,19 +275,21 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 	}, nil
 }
 
-func (g *glusterFSDriver) CreateDriver() {
+func (g *glusterFSDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    g,
+		Prefix:    "gluster",
+		Framework: f,
+	}, func() {}
 }
 
-func (g *glusterFSDriver) CleanupDriver() {
-}
-
-func (g *glusterFSDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := g.driverInfo.Config.Framework
+func (g *glusterFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	config, serverPod, _ := framework.NewGlusterfsServer(cs, ns.Name)
-	g.driverInfo.Config.ServerConfig = &config
+	c, serverPod, _ := framework.NewGlusterfsServer(cs, ns.Name)
+	config.ServerConfig = &c
 	return &glusterVolume{
 		prefix:    config.Prefix,
 		serverPod: serverPod,
@@ -339,7 +336,7 @@ var _ testsuites.InlineVolumeTestDriver = &iSCSIDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &iSCSIDriver{}
 
 // InitISCSIDriver returns iSCSIDriver that implements TestDriver interface
-func InitISCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitISCSIDriver() testsuites.TestDriver {
 	return &iSCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "iscsi",
@@ -358,8 +355,6 @@ func InitISCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -408,19 +403,21 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 	return &pvSource, nil
 }
 
-func (i *iSCSIDriver) CreateDriver() {
+func (i *iSCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    i,
+		Prefix:    "iscsi",
+		Framework: f,
+	}, func() {}
 }
 
-func (i *iSCSIDriver) CleanupDriver() {
-}
-
-func (i *iSCSIDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := i.driverInfo.Config.Framework
+func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	config, serverPod, serverIP := framework.NewISCSIServer(cs, ns.Name)
-	i.driverInfo.Config.ServerConfig = &config
+	c, serverPod, serverIP := framework.NewISCSIServer(cs, ns.Name)
+	config.ServerConfig = &c
 	return &iSCSIVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -450,7 +447,7 @@ var _ testsuites.InlineVolumeTestDriver = &rbdDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &rbdDriver{}
 
 // InitRbdDriver returns rbdDriver that implements TestDriver interface
-func InitRbdDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitRbdDriver() testsuites.TestDriver {
 	return &rbdDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "rbd",
@@ -469,8 +466,6 @@ func InitRbdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -505,11 +500,11 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 }
 
 func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	f := r.driverInfo.Config.Framework
-	ns := f.Namespace
-
 	rv, ok := volume.(*rbdVolume)
 	Expect(ok).To(BeTrue(), "Failed to cast test volume to RBD test volume")
+
+	f := rv.f
+	ns := f.Namespace
 
 	pvSource := v1.PersistentVolumeSource{
 		RBD: &v1.RBDPersistentVolumeSource{
@@ -530,19 +525,21 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volu
 	return &pvSource, nil
 }
 
-func (r *rbdDriver) CreateDriver() {
+func (r *rbdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    r,
+		Prefix:    "rbd",
+		Framework: f,
+	}, func() {}
 }
 
-func (r *rbdDriver) CleanupDriver() {
-}
-
-func (r *rbdDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := r.driverInfo.Config.Framework
+func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	config, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
-	r.driverInfo.Config.ServerConfig = &config
+	c, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
+	config.ServerConfig = &c
 	return &rbdVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -577,7 +574,7 @@ var _ testsuites.InlineVolumeTestDriver = &cephFSDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &cephFSDriver{}
 
 // InitCephFSDriver returns cephFSDriver that implements TestDriver interface
-func InitCephFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitCephFSDriver() testsuites.TestDriver {
 	return &cephFSDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "ceph",
@@ -590,8 +587,6 @@ func InitCephFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -620,11 +615,10 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 }
 
 func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	f := c.driverInfo.Config.Framework
-	ns := f.Namespace
-
 	cv, ok := volume.(*cephVolume)
 	Expect(ok).To(BeTrue(), "Failed to cast test volume to Ceph test volume")
+
+	ns := cv.f.Namespace
 
 	return &v1.PersistentVolumeSource{
 		CephFS: &v1.CephFSPersistentVolumeSource{
@@ -639,19 +633,21 @@ func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, v
 	}, nil
 }
 
-func (c *cephFSDriver) CreateDriver() {
+func (c *cephFSDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    c,
+		Prefix:    "cephfs",
+		Framework: f,
+	}, func() {}
 }
 
-func (c *cephFSDriver) CleanupDriver() {
-}
-
-func (c *cephFSDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := c.driverInfo.Config.Framework
+func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	config, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
-	c.driverInfo.Config.ServerConfig = &config
+	cfg, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
+	config.ServerConfig = &cfg
 	return &cephVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
@@ -676,7 +672,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ testsuites.InlineVolumeTestDriver = &hostPathDriver{}
 
 // InitHostPathDriver returns hostPathDriver that implements TestDriver interface
-func InitHostPathDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitHostPathDriver() testsuites.TestDriver {
 	return &hostPathDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "hostPath",
@@ -687,8 +683,6 @@ func InitHostPathDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -712,20 +706,22 @@ func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, volume te
 	}
 }
 
-func (h *hostPathDriver) CreateDriver() {
+func (h *hostPathDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    h,
+		Prefix:    "hostpath",
+		Framework: f,
+	}, func() {}
 }
 
-func (h *hostPathDriver) CleanupDriver() {
-}
-
-func (h *hostPathDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := h.driverInfo.Config.Framework
+func (h *hostPathDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
 	nodes := framework.GetReadySchedulableNodesOrDie(cs)
 	node := nodes.Items[rand.Intn(len(nodes.Items))]
-	h.driverInfo.Config.ClientNodeName = node.Name
+	config.ClientNodeName = node.Name
 	return nil
 }
 
@@ -748,7 +744,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &hostPathSymlinkDriver{}
 var _ testsuites.InlineVolumeTestDriver = &hostPathSymlinkDriver{}
 
 // InitHostPathSymlinkDriver returns hostPathSymlinkDriver that implements TestDriver interface
-func InitHostPathSymlinkDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitHostPathSymlinkDriver() testsuites.TestDriver {
 	return &hostPathSymlinkDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "hostPathSymlink",
@@ -759,8 +755,6 @@ func InitHostPathSymlinkDriver(config testsuites.TestConfig) testsuites.TestDriv
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -787,14 +781,16 @@ func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, vo
 	}
 }
 
-func (h *hostPathSymlinkDriver) CreateDriver() {
+func (h *hostPathSymlinkDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    h,
+		Prefix:    "hostpathsymlink",
+		Framework: f,
+	}, func() {}
 }
 
-func (h *hostPathSymlinkDriver) CleanupDriver() {
-}
-
-func (h *hostPathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := h.driverInfo.Config.Framework
+func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	cs := f.ClientSet
 
 	sourcePath := fmt.Sprintf("/tmp/%v", f.Namespace.Name)
@@ -804,7 +800,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) t
 	// pods should be scheduled on the node
 	nodes := framework.GetReadySchedulableNodesOrDie(cs)
 	node := nodes.Items[rand.Intn(len(nodes.Items))]
-	h.driverInfo.Config.ClientNodeName = node.Name
+	config.ClientNodeName = node.Name
 
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", sourcePath, sourcePath, targetPath)
 	privileged := true
@@ -888,7 +884,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &emptydirDriver{}
 var _ testsuites.InlineVolumeTestDriver = &emptydirDriver{}
 
 // InitEmptydirDriver returns emptydirDriver that implements TestDriver interface
-func InitEmptydirDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitEmptydirDriver() testsuites.TestDriver {
 	return &emptydirDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "emptydir",
@@ -899,8 +895,6 @@ func InitEmptydirDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapExec: true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -922,14 +916,16 @@ func (e *emptydirDriver) GetVolumeSource(readOnly bool, fsType string, volume te
 	}
 }
 
-func (e *emptydirDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
+func (e *emptydirDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	return nil
 }
 
-func (e *emptydirDriver) CreateDriver() {
-}
-
-func (e *emptydirDriver) CleanupDriver() {
+func (e *emptydirDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    e,
+		Prefix:    "emptydir",
+		Framework: f,
+	}, func() {}
 }
 
 // Cinder
@@ -953,7 +949,7 @@ var _ testsuites.PreprovisionedPVTestDriver = &cinderDriver{}
 var _ testsuites.DynamicPVTestDriver = &cinderDriver{}
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
-func InitCinderDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitCinderDriver() testsuites.TestDriver {
 	return &cinderDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "cinder",
@@ -967,8 +963,6 @@ func InitCinderDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -1013,13 +1007,13 @@ func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, v
 	return &pvSource, nil
 }
 
-func (c *cinderDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (c *cinderDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/cinder"
 	parameters := map[string]string{}
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := c.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", c.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -1029,14 +1023,16 @@ func (c *cinderDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (c *cinderDriver) CreateDriver() {
+func (c *cinderDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    c,
+		Prefix:    "cinder",
+		Framework: f,
+	}, func() {}
 }
 
-func (c *cinderDriver) CleanupDriver() {
-}
-
-func (c *cinderDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := c.driverInfo.Config.Framework
+func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	ns := f.Namespace
 
 	// We assume that namespace.Name is a random string
@@ -1109,7 +1105,7 @@ var _ testsuites.PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGceDriver returns gcePdDriver that implements TestDriver interface
-func InitGcePdDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitGcePdDriver() testsuites.TestDriver {
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "gcepd",
@@ -1128,8 +1124,6 @@ func InitGcePdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -1172,13 +1166,13 @@ func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 	return &pvSource, nil
 }
 
-func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/gce-pd"
 	parameters := map[string]string{}
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := g.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -1188,17 +1182,19 @@ func (h *gcePdDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (g *gcePdDriver) CreateDriver() {
+func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    g,
+		Prefix:    "gcepd",
+		Framework: f,
+	}, func() {}
 }
 
-func (g *gcePdDriver) CleanupDriver() {
-}
-
-func (g *gcePdDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
+func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
-		g.driverInfo.Config.ClientNodeSelector = map[string]string{
+		config.ClientNodeSelector = map[string]string{
 			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 		}
 	}
@@ -1231,7 +1227,7 @@ var _ testsuites.PreprovisionedPVTestDriver = &vSphereDriver{}
 var _ testsuites.DynamicPVTestDriver = &vSphereDriver{}
 
 // InitVSphereDriver returns vSphereDriver that implements TestDriver interface
-func InitVSphereDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitVSphereDriver() testsuites.TestDriver {
 	return &vSphereDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "vSphere",
@@ -1245,8 +1241,6 @@ func InitVSphereDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -1298,13 +1292,13 @@ func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, 
 	return &pvSource, nil
 }
 
-func (v *vSphereDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/vsphere-volume"
 	parameters := map[string]string{}
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := v.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", v.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -1314,14 +1308,16 @@ func (v *vSphereDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (v *vSphereDriver) CreateDriver() {
+func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    v,
+		Prefix:    "vsphere",
+		Framework: f,
+	}, func() {}
 }
 
-func (v *vSphereDriver) CleanupDriver() {
-}
-
-func (v *vSphereDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
-	f := v.driverInfo.Config.Framework
+func (v *vSphereDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	f := config.Framework
 	vspheretest.Bootstrap(f)
 	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
@@ -1352,7 +1348,7 @@ var _ testsuites.PreprovisionedPVTestDriver = &azureDriver{}
 var _ testsuites.DynamicPVTestDriver = &azureDriver{}
 
 // InitAzureDriver returns azureDriver that implements TestDriver interface
-func InitAzureDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitAzureDriver() testsuites.TestDriver {
 	return &azureDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "azure",
@@ -1367,8 +1363,6 @@ func InitAzureDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -1419,13 +1413,13 @@ func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 	return &pvSource, nil
 }
 
-func (a *azureDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (a *azureDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/azure-disk"
 	parameters := map[string]string{}
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := a.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -1435,13 +1429,15 @@ func (a *azureDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (a *azureDriver) CreateDriver() {
+func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    a,
+		Prefix:    "azure",
+		Framework: f,
+	}, func() {}
 }
 
-func (a *azureDriver) CleanupDriver() {
-}
-
-func (a *azureDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
+func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	By("creating a test azure disk volume")
 	volumeName, err := framework.CreatePDWithRetry()
 	Expect(err).NotTo(HaveOccurred())
@@ -1470,7 +1466,7 @@ var _ testsuites.TestDriver = &awsDriver{}
 var _ testsuites.DynamicPVTestDriver = &awsDriver{}
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
-func InitAwsDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitAwsDriver() testsuites.TestDriver {
 	return &awsDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "aws",
@@ -1486,8 +1482,6 @@ func InitAwsDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -1529,13 +1523,13 @@ func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volu
 }
 */
 
-func (a *awsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/aws-ebs"
 	parameters := map[string]string{}
 	if fsType != "" {
 		parameters["fsType"] = fsType
 	}
-	ns := a.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -1545,15 +1539,17 @@ func (a *awsDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (a *awsDriver) CreateDriver() {
-}
-
-func (a *awsDriver) CleanupDriver() {
+func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	return &testsuites.PerTestConfig{
+		Driver:    a,
+		Prefix:    "aws",
+		Framework: f,
+	}, func() {}
 }
 
 // TODO: Fix authorization error in attach operation and uncomment below
 /*
-func (a *awsDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
+func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	By("creating a test aws volume")
 	var err error
 	a.volumeName, err = framework.CreatePDWithRetry()
@@ -1617,7 +1613,7 @@ var _ testsuites.TestDriver = &localDriver{}
 var _ testsuites.PreprovisionedVolumeTestDriver = &localDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &localDriver{}
 
-func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func(config testsuites.TestConfig) testsuites.TestDriver {
+func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() testsuites.TestDriver {
 	maxFileSize := defaultLocalVolumeMaxFileSize
 	if maxFileSizeByVolType, ok := localVolumeMaxFileSizes[volumeType]; ok {
 		maxFileSize = maxFileSizeByVolType
@@ -1630,8 +1626,7 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func(config
 	if capabilitiesByType, ok := localVolumeCapabitilies[volumeType]; ok {
 		capabilities = capabilitiesByType
 	}
-	return func(config testsuites.TestConfig) testsuites.TestDriver {
-		hostExec := utils.NewHostExec(config.Framework)
+	return func() testsuites.TestDriver {
 		// custom tag to distinguish from tests of other volume types
 		featureTag := fmt.Sprintf("[LocalVolumeType: %s]", volumeType)
 		// For GCE Local SSD volumes, we must run serially
@@ -1645,11 +1640,8 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func(config
 				MaxFileSize:     maxFileSize,
 				SupportedFsType: supportedFsTypes,
 				Capabilities:    capabilities,
-				Config:          config,
 			},
-			hostExec:   hostExec,
 			volumeType: volumeType,
-			ltrMgr:     utils.NewLocalResourceManager("local-driver", hostExec, "/tmp"),
 		}
 	}
 }
@@ -1673,28 +1665,30 @@ func (l *localDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	}
 }
 
-func (l *localDriver) CreateDriver() {
+func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	// choose a randome node to test against
-	l.node = l.randomNode()
-}
-
-func (l *localDriver) CleanupDriver() {
-	l.hostExec.Cleanup()
-}
-
-func (l *localDriver) randomNode() *v1.Node {
-	f := l.driverInfo.Config.Framework
 	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	node := nodes.Items[rand.Intn(len(nodes.Items))]
-	return &node
+	l.node = &nodes.Items[rand.Intn(len(nodes.Items))]
+
+	l.hostExec = utils.NewHostExec(f)
+	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
+
+	return &testsuites.PerTestConfig{
+			Driver:         l,
+			Prefix:         "local",
+			Framework:      f,
+			ClientNodeName: l.node.Name,
+		}, func() {
+			l.hostExec.Cleanup()
+		}
 }
 
-func (l *localDriver) CreateVolume(volType testpatterns.TestVolType) testsuites.TestVolume {
+func (l *localDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	switch volType {
 	case testpatterns.PreprovisionedPV:
 		node := l.node
 		// assign this to schedule pod on this node
-		l.driverInfo.Config.ClientNodeName = node.Name
+		config.ClientNodeName = node.Name
 		return &localVolume{
 			ltrMgr: l.ltrMgr,
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
