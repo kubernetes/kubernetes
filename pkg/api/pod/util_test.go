@@ -911,3 +911,140 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 		}
 	}
 }
+
+func TestDropRunAsGroup(t *testing.T) {
+	group := func() *int64 {
+		testGroup := int64(1000)
+		return &testGroup
+	}
+	defaultProcMount := api.DefaultProcMount
+	defaultSecurityContext := func() *api.SecurityContext {
+		return &api.SecurityContext{ProcMount: &defaultProcMount}
+	}
+	securityContextWithRunAsGroup := func() *api.SecurityContext {
+		return &api.SecurityContext{ProcMount: &defaultProcMount, RunAsGroup: group()}
+	}
+	podWithoutRunAsGroup := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultSecurityContext()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultSecurityContext()}},
+			},
+		}
+	}
+	podWithRunAsGroupInPod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{RunAsGroup: group()},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultSecurityContext()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultSecurityContext()}},
+			},
+		}
+	}
+	podWithRunAsGroupInContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: securityContextWithRunAsGroup()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultSecurityContext()}},
+			},
+		}
+	}
+	podWithRunAsGroupInInitContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultSecurityContext()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: securityContextWithRunAsGroup()}},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description   string
+		hasRunAsGroup bool
+		pod           func() *api.Pod
+	}{
+		{
+			description:   "have RunAsGroup in Pod",
+			hasRunAsGroup: true,
+			pod:           podWithRunAsGroupInPod,
+		},
+		{
+			description:   "have RunAsGroup in Container",
+			hasRunAsGroup: true,
+			pod:           podWithRunAsGroupInContainers,
+		},
+		{
+			description:   "have RunAsGroup in InitContainer",
+			hasRunAsGroup: true,
+			pod:           podWithRunAsGroupInInitContainers,
+		},
+		{
+			description:   "does not have RunAsGroup",
+			hasRunAsGroup: false,
+			pod:           podWithoutRunAsGroup,
+		},
+		{
+			description:   "is nil",
+			hasRunAsGroup: false,
+			pod:           func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasRunAsGroup, oldPod := oldPodInfo.hasRunAsGroup, oldPodInfo.pod()
+				newPodHasRunAsGroup, newPod := newPodInfo.hasRunAsGroup, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RunAsGroup, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					DropDisabledFields(&newPod.Spec, oldPodSpec)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasRunAsGroup:
+						// new pod should not be changed if the feature is enabled, or if the old pod had RunAsGroup
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasRunAsGroup:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("%v", oldPod)
+							t.Errorf("%v", newPod)
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have RunAsGroup
+						if !reflect.DeepEqual(newPod, podWithoutRunAsGroup()) {
+							t.Errorf("new pod had RunAsGroup: %v", diff.ObjectReflectDiff(newPod, podWithoutRunAsGroup()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
