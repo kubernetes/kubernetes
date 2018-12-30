@@ -89,9 +89,8 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
 		newJob.Spec.TTLSecondsAfterFinished = nil
-		oldJob.Spec.TTLSecondsAfterFinished = nil
 	}
 
 	pod.DropDisabledFields(&newJob.Spec.Template.Spec, &oldJob.Spec.Template.Spec)
