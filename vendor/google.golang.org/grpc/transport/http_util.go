@@ -23,12 +23,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/http2"
@@ -46,12 +46,6 @@ const (
 	// http2IOBufSize specifies the buffer size for sending frames.
 	defaultWriteBufSize = 32 * 1024
 	defaultReadBufSize  = 32 * 1024
-	// baseContentType is the base content-type for gRPC.  This is a valid
-	// content-type on it's own, but can also include a content-subtype such as
-	// "proto" as a suffix after "+" or ";".  See
-	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-	// for more details.
-	baseContentType = "application/grpc"
 )
 
 var (
@@ -70,7 +64,7 @@ var (
 		http2.ErrCodeConnect:            codes.Internal,
 		http2.ErrCodeEnhanceYourCalm:    codes.ResourceExhausted,
 		http2.ErrCodeInadequateSecurity: codes.PermissionDenied,
-		http2.ErrCodeHTTP11Required:     codes.Internal,
+		http2.ErrCodeHTTP11Required:     codes.FailedPrecondition,
 	}
 	statusCodeConvTab = map[codes.Code]http2.ErrCode{
 		codes.Internal:          http2.ErrCodeInternal,
@@ -117,10 +111,9 @@ type decodeState struct {
 	timeout    time.Duration
 	method     string
 	// key-value metadata map from the peer.
-	mdata          map[string][]string
-	statsTags      []byte
-	statsTrace     []byte
-	contentSubtype string
+	mdata      map[string][]string
+	statsTags  []byte
+	statsTrace []byte
 }
 
 // isReservedHeader checks whether hdr belongs to HTTP2 headers
@@ -132,7 +125,6 @@ func isReservedHeader(hdr string) bool {
 	}
 	switch hdr {
 	case "content-type",
-		"user-agent",
 		"grpc-message-type",
 		"grpc-encoding",
 		"grpc-message",
@@ -146,55 +138,28 @@ func isReservedHeader(hdr string) bool {
 	}
 }
 
-// isWhitelistedHeader checks whether hdr should be propagated
-// into metadata visible to users.
-func isWhitelistedHeader(hdr string) bool {
+// isWhitelistedPseudoHeader checks whether hdr belongs to HTTP2 pseudoheaders
+// that should be propagated into metadata visible to users.
+func isWhitelistedPseudoHeader(hdr string) bool {
 	switch hdr {
-	case ":authority", "user-agent":
+	case ":authority":
 		return true
 	default:
 		return false
 	}
 }
 
-// contentSubtype returns the content-subtype for the given content-type.  The
-// given content-type must be a valid content-type that starts with
-// "application/grpc". A content-subtype will follow "application/grpc" after a
-// "+" or ";". See
-// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests for
-// more details.
-//
-// If contentType is not a valid content-type for gRPC, the boolean
-// will be false, otherwise true. If content-type == "application/grpc",
-// "application/grpc+", or "application/grpc;", the boolean will be true,
-// but no content-subtype will be returned.
-//
-// contentType is assumed to be lowercase already.
-func contentSubtype(contentType string) (string, bool) {
-	if contentType == baseContentType {
-		return "", true
+func validContentType(t string) bool {
+	e := "application/grpc"
+	if !strings.HasPrefix(t, e) {
+		return false
 	}
-	if !strings.HasPrefix(contentType, baseContentType) {
-		return "", false
+	// Support variations on the content-type
+	// (e.g. "application/grpc+blah", "application/grpc;blah").
+	if len(t) > len(e) && t[len(e)] != '+' && t[len(e)] != ';' {
+		return false
 	}
-	// guaranteed since != baseContentType and has baseContentType prefix
-	switch contentType[len(baseContentType)] {
-	case '+', ';':
-		// this will return true for "application/grpc+" or "application/grpc;"
-		// which the previous validContentType function tested to be valid, so we
-		// just say that no content-subtype is specified in this case
-		return contentType[len(baseContentType)+1:], true
-	default:
-		return "", false
-	}
-}
-
-// contentSubtype is assumed to be lowercase
-func contentType(contentSubtype string) string {
-	if contentSubtype == "" {
-		return baseContentType
-	}
-	return baseContentType + "+" + contentSubtype
+	return true
 }
 
 func (d *decodeState) status() *status.Status {
@@ -263,9 +228,9 @@ func (d *decodeState) decodeResponseHeader(frame *http2.MetaHeadersFrame) error 
 	// gRPC status doesn't exist and http status is OK.
 	// Set rawStatusCode to be unknown and return nil error.
 	// So that, if the stream has ended this Unknown status
-	// will be propagated to the user.
+	// will be propogated to the user.
 	// Otherwise, it will be ignored. In which case, status from
-	// a later trailer, that has StreamEnded flag set, is propagated.
+	// a later trailer, that has StreamEnded flag set, is propogated.
 	code := int(codes.Unknown)
 	d.rawStatusCode = &code
 	return nil
@@ -282,16 +247,9 @@ func (d *decodeState) addMetadata(k, v string) {
 func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 	switch f.Name {
 	case "content-type":
-		contentSubtype, validContentType := contentSubtype(f.Value)
-		if !validContentType {
-			return streamErrorf(codes.Internal, "transport: received the unexpected content-type %q", f.Value)
+		if !validContentType(f.Value) {
+			return streamErrorf(codes.FailedPrecondition, "transport: received the unexpected content-type %q", f.Value)
 		}
-		d.contentSubtype = contentSubtype
-		// TODO: do we want to propagate the whole content-type in the metadata,
-		// or come up with a way to just propagate the content-subtype if it was set?
-		// ie {"content-type": "application/grpc+proto"} or {"content-subtype": "proto"}
-		// in the metadata?
-		d.addMetadata(f.Name, f.Value)
 	case "grpc-encoding":
 		d.encoding = f.Value
 	case "grpc-status":
@@ -341,7 +299,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 		d.statsTrace = v
 		d.addMetadata(f.Name, string(v))
 	default:
-		if isReservedHeader(f.Name) && !isWhitelistedHeader(f.Name) {
+		if isReservedHeader(f.Name) && !isWhitelistedPseudoHeader(f.Name) {
 			break
 		}
 		v, err := decodeMetadataHeader(f.Name, f.Value)
@@ -349,7 +307,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 			errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
 			return nil
 		}
-		d.addMetadata(f.Name, v)
+		d.addMetadata(f.Name, string(v))
 	}
 	return nil
 }
@@ -438,17 +396,16 @@ func decodeTimeout(s string) (time.Duration, error) {
 
 const (
 	spaceByte   = ' '
-	tildeByte   = '~'
+	tildaByte   = '~'
 	percentByte = '%'
 )
 
 // encodeGrpcMessage is used to encode status code in header field
-// "grpc-message". It does percent encoding and also replaces invalid utf-8
-// characters with Unicode replacement character.
-//
-// It checks to see if each individual byte in msg is an allowable byte, and
-// then either percent encoding or passing it through. When percent encoding,
-// the byte is converted into hexadecimal notation with a '%' prepended.
+// "grpc-message".
+// It checks to see if each individual byte in msg is an
+// allowable byte, and then either percent encoding or passing it through.
+// When percent encoding, the byte is converted into hexadecimal notation
+// with a '%' prepended.
 func encodeGrpcMessage(msg string) string {
 	if msg == "" {
 		return ""
@@ -456,7 +413,7 @@ func encodeGrpcMessage(msg string) string {
 	lenMsg := len(msg)
 	for i := 0; i < lenMsg; i++ {
 		c := msg[i]
-		if !(c >= spaceByte && c <= tildeByte && c != percentByte) {
+		if !(c >= spaceByte && c < tildaByte && c != percentByte) {
 			return encodeGrpcMessageUnchecked(msg)
 		}
 	}
@@ -465,26 +422,14 @@ func encodeGrpcMessage(msg string) string {
 
 func encodeGrpcMessageUnchecked(msg string) string {
 	var buf bytes.Buffer
-	for len(msg) > 0 {
-		r, size := utf8.DecodeRuneInString(msg)
-		for _, b := range []byte(string(r)) {
-			if size > 1 {
-				// If size > 1, r is not ascii. Always do percent encoding.
-				buf.WriteString(fmt.Sprintf("%%%02X", b))
-				continue
-			}
-
-			// The for loop is necessary even if size == 1. r could be
-			// utf8.RuneError.
-			//
-			// fmt.Sprintf("%%%02X", utf8.RuneError) gives "%FFFD".
-			if b >= spaceByte && b <= tildeByte && b != percentByte {
-				buf.WriteByte(b)
-			} else {
-				buf.WriteString(fmt.Sprintf("%%%02X", b))
-			}
+	lenMsg := len(msg)
+	for i := 0; i < lenMsg; i++ {
+		c := msg[i]
+		if c >= spaceByte && c < tildaByte && c != percentByte {
+			buf.WriteByte(c)
+		} else {
+			buf.WriteString(fmt.Sprintf("%%%02X", c))
 		}
-		msg = msg[size:]
 	}
 	return buf.String()
 }
@@ -523,67 +468,19 @@ func decodeGrpcMessageUnchecked(msg string) string {
 	return buf.String()
 }
 
-type bufWriter struct {
-	buf       []byte
-	offset    int
-	batchSize int
-	conn      net.Conn
-	err       error
-
-	onFlush func()
-}
-
-func newBufWriter(conn net.Conn, batchSize int) *bufWriter {
-	return &bufWriter{
-		buf:       make([]byte, batchSize*2),
-		batchSize: batchSize,
-		conn:      conn,
-	}
-}
-
-func (w *bufWriter) Write(b []byte) (n int, err error) {
-	if w.err != nil {
-		return 0, w.err
-	}
-	for len(b) > 0 {
-		nn := copy(w.buf[w.offset:], b)
-		b = b[nn:]
-		w.offset += nn
-		n += nn
-		if w.offset >= w.batchSize {
-			err = w.Flush()
-		}
-	}
-	return n, err
-}
-
-func (w *bufWriter) Flush() error {
-	if w.err != nil {
-		return w.err
-	}
-	if w.offset == 0 {
-		return nil
-	}
-	if w.onFlush != nil {
-		w.onFlush()
-	}
-	_, w.err = w.conn.Write(w.buf[:w.offset])
-	w.offset = 0
-	return w.err
-}
-
 type framer struct {
-	writer *bufWriter
-	fr     *http2.Framer
+	numWriters int32
+	reader     io.Reader
+	writer     *bufio.Writer
+	fr         *http2.Framer
 }
 
 func newFramer(conn net.Conn, writeBufferSize, readBufferSize int) *framer {
-	r := bufio.NewReaderSize(conn, readBufferSize)
-	w := newBufWriter(conn, writeBufferSize)
 	f := &framer{
-		writer: w,
-		fr:     http2.NewFramer(w, r),
+		reader: bufio.NewReaderSize(conn, readBufferSize),
+		writer: bufio.NewWriterSize(conn, writeBufferSize),
 	}
+	f.fr = http2.NewFramer(f.writer, f.reader)
 	// Opt-in to Frame reuse API on framer to reduce garbage.
 	// Frames aren't safe to read from after a subsequent call to ReadFrame.
 	f.fr.SetReuseFrames()

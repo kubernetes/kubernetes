@@ -17,12 +17,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/google.golang.org/grpc/internal/backoff:all-srcs",
-        "//vendor/google.golang.org/grpc/internal/channelz:all-srcs",
-        "//vendor/google.golang.org/grpc/internal/grpcrand:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

@@ -15,22 +15,20 @@
  *
  */
 
-// Package internal contains gRPC-internal code, to avoid polluting
-// the godoc of the top-level grpc package.  It must not import any grpc
-// symbols to avoid circular dependencies.
+// Package internal contains gRPC-internal code for testing, to avoid polluting
+// the godoc of the top-level grpc package.
 package internal
 
-var (
+// TestingCloseConns closes all existing transports but keeps
+// grpcServer.lis accepting new connections.
+//
+// The provided grpcServer must be of type *grpc.Server. It is untyped
+// for circular dependency reasons.
+var TestingCloseConns func(grpcServer interface{})
 
-	// TestingUseHandlerImpl enables the http.Handler-based server implementation.
-	// It must be called before Serve and requires TLS credentials.
-	//
-	// The provided grpcServer must be of type *grpc.Server. It is untyped
-	// for circular dependency reasons.
-	TestingUseHandlerImpl func(grpcServer interface{})
-
-	// WithContextDialer is exported by clientconn.go
-	WithContextDialer interface{} // func(context.Context, string) (net.Conn, error) grpc.DialOption
-	// WithResolverBuilder is exported by clientconn.go
-	WithResolverBuilder interface{} // func (resolver.Builder) grpc.DialOption
-)
+// TestingUseHandlerImpl enables the http.Handler-based server implementation.
+// It must be called before Serve and requires TLS credentials.
+//
+// The provided grpcServer must be of type *grpc.Server. It is untyped
+// for circular dependency reasons.
+var TestingUseHandlerImpl func(grpcServer interface{})

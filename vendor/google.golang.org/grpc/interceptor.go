@@ -48,9 +48,7 @@ type UnaryServerInfo struct {
 }
 
 // UnaryHandler defines the handler invoked by UnaryServerInterceptor to complete the normal
-// execution of a unary RPC. If a UnaryHandler returns an error, it should be produced by the
-// status package, or else gRPC will use codes.Unknown as the status code and err.Error() as
-// the status message of the RPC.
+// execution of a unary RPC.
 type UnaryHandler func(ctx context.Context, req interface{}) (interface{}, error)
 
 // UnaryServerInterceptor provides a hook to intercept the execution of a unary RPC on the server. info

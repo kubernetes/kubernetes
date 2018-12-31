@@ -17,11 +17,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/google.golang.org/grpc/resolver/dns:all-srcs",
-        "//vendor/google.golang.org/grpc/resolver/passthrough:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

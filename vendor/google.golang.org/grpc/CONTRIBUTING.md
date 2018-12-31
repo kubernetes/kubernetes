@@ -7,7 +7,7 @@ If you are new to github, please start by reading [Pull Request howto](https://h
 ## Legal requirements
 
 In order to protect both you and ourselves, you will need to sign the
-[Contributor License Agreement](https://identity.linuxfoundation.org/projects/cncf).
+[Contributor License Agreement](https://cla.developers.google.com/clas).
 
 ## Guidelines for Pull Requests
 How to get your contributions merged smoothly and quickly.
@@ -27,10 +27,6 @@ How to get your contributions merged smoothly and quickly.
 - Keep your PR up to date with upstream/master (if there are merge conflicts, we can't really merge your change).
  
 - **All tests need to be passing** before your change can be merged. We recommend you **run tests locally** before creating your PR to catch breakages early on.
-  - `make all` to test everything, OR
-  - `make vet` to catch vet errors
-  - `make test` to run the tests
-  - `make testrace` to run tests in race mode
 
 - Exceptions to the rules can be made if there's a compelling reason for doing so.
  

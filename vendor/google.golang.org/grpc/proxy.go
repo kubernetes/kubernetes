@@ -82,7 +82,8 @@ func doHTTPConnectHandshake(ctx context.Context, conn net.Conn, addr string) (_ 
 		Header: map[string][]string{"User-Agent": {grpcUA}},
 	})
 
-	if err := sendHTTPRequest(ctx, req, conn); err != nil {
+	req = req.WithContext(ctx)
+	if err := req.Write(conn); err != nil {
 		return nil, fmt.Errorf("failed to write the HTTP request: %v", err)
 	}
 
