@@ -263,7 +263,9 @@ __custom_func() {
             return
             ;;
         kubectl_cordon | kubectl_uncordon | kubectl_drain | kubectl_top_node)
-            __kubectl_get_resource_node
+            if [[ ${#nouns[@]} -eq 0 ]]; then
+                __kubectl_get_resource_node
+            fi;
             return
             ;;
         kubectl_config_use-context | kubectl_config_rename-context)
