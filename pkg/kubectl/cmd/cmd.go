@@ -253,7 +253,9 @@ __custom_func() {
             return
             ;;
         kubectl_exec | kubectl_port-forward | kubectl_top_pod | kubectl_attach)
-            __kubectl_get_resource_pod
+            if [[ ${#nouns[@]} -eq 0 ]]; then
+                __kubectl_get_resource_pod
+            fi;
             return
             ;;
         kubectl_rolling-update)
