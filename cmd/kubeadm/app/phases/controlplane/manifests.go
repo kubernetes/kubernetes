@@ -246,7 +246,7 @@ func calcNodeCidrSize(podSubnet string) string {
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Version) []string {
 	defaultArguments := map[string]string{
-		"address":                          "127.0.0.1",
+		"bind-address":                     "127.0.0.1",
 		"leader-elect":                     "true",
 		"kubeconfig":                       filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		"root-ca-file":                     filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
@@ -290,7 +290,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *
 // getSchedulerCommand builds the right scheduler command from the given config object and version
 func getSchedulerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	defaultArguments := map[string]string{
-		"address":      "127.0.0.1",
+		"bind-address": "127.0.0.1",
 		"leader-elect": "true",
 		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
