@@ -120,6 +120,7 @@ const (
 
 	// owner: @bsalamat
 	// alpha: v1.8
+	// beta: v1.11
 	//
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
@@ -147,6 +148,7 @@ const (
 
 	// owner: @ConnorDoyle
 	// alpha: v1.8
+	// beta: v1.10
 	//
 	// Alternative container-level CPU affinity policies.
 	CPUManager utilfeature.Feature = "CPUManager"
