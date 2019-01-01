@@ -504,7 +504,12 @@ func buildGenericConfig(
 func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+			versionedInformer.Core().V1().Pods().Lister(),
+		)
 	}
 	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
 		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
