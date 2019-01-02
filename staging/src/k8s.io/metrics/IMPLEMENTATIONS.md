@@ -32,3 +32,5 @@ They are listed here for convenience.***
 - [Kube Metrics Adapter](https://github.com/zalando-incubator/kube-metrics-adapter). A general purpose metrics adapter for Kubernetes that can collect and serve custom and external metrics for Horizontal Pod Autoscaling.
   Provides the ability to scrape pods directly or from Prometheus through user defined queries.
   Also capable of serving external metrics from a number of sources including AWS' SQS and [ZMON monitoring](https://github.com/zalando/zmon).
+
+- [AWS CloudWatch Adapter](https://github.com/awslabs/k8s-cloudwatch-adapter). An implementation of the custom metrics API that retrieves metrics from AWS CloudWatch.
