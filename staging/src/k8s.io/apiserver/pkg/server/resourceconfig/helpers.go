@@ -94,13 +94,19 @@ func MergeAPIResourceConfigs(
 		}
 
 		tokens := strings.Split(key, "/")
-		if len(tokens) != 2 {
+		if len(tokens) < 2 {
 			continue
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
+		}
+
+		// individual resource enablement/disablement is only supported in the extensions/v1beta1 API group for legacy reasons.
+		// all other API groups are expected to contain coherent sets of resources that are enabled/disabled together.
+		if len(tokens) > 2 && (groupVersion != schema.GroupVersion{Group: "extensions", Version: "v1beta1"}) {
+			return nil, fmt.Errorf("invalid key %s, individual resource enablement/disablement is not supported in %s", key, groupVersion.String())
 		}
 
 		// Exclude group not registered into the registry.
@@ -117,9 +123,21 @@ func MergeAPIResourceConfigs(
 			return nil, err
 		}
 		if enabled {
+			// enable the groupVersion for "group/version=true" and "group/version/resource=true"
 			resourceConfig.EnableVersions(groupVersion)
-		} else {
+		} else if len(tokens) == 2 {
+			// disable the groupVersion only for "group/version=false", not "group/version/resource=false"
 			resourceConfig.DisableVersions(groupVersion)
+		}
+
+		if len(tokens) < 3 {
+			continue
+		}
+		groupVersionResource := groupVersion.WithResource(tokens[2])
+		if enabled {
+			resourceConfig.EnableResources(groupVersionResource)
+		} else {
+			resourceConfig.DisableResources(groupVersionResource)
 		}
 	}
 
