@@ -144,7 +144,6 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 
 // getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
 func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
-	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
 		return nil
 	}
@@ -156,8 +155,13 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	}
 	if q, exists := rl[v1.ResourceCPU]; exists {
 		// CPU is defined in milli-cores.
-		val := MilliCPUToShares(q.MilliValue())
-		rc.CpuShares = &val
+		cpuShares := MilliCPUToShares(q.MilliValue())
+		rc.CpuShares = &cpuShares
+
+		cpuQuotaPeriod := uint64(QuotaPeriod) // use default
+		cpuQuota := MilliCPUToQuota(q.MilliValue(), int64(cpuQuotaPeriod))
+		rc.CpuQuota = &cpuQuota
+		rc.CpuPeriod = &cpuQuotaPeriod
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
 		rc.HugePageLimit = HugePageLimits(rl)
