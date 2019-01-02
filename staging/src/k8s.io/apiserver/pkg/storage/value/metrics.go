@@ -46,7 +46,7 @@ var (
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "transformation_latencies_microseconds",
-			Help:      "Latencies in microseconds of value transformation operations.",
+			Help:      "(Deprecated) Latencies in microseconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
 			Buckets: prometheus.ExponentialBuckets(5, 2, 14),
@@ -86,7 +86,7 @@ var (
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "data_key_generation_latencies_microseconds",
-			Help:      "Latencies in microseconds of data encryption key(DEK) generation operations.",
+			Help:      "(Deprecated) Latencies in microseconds of data encryption key(DEK) generation operations.",
 			Buckets:   prometheus.ExponentialBuckets(5, 2, 14),
 		},
 	)

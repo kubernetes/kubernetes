@@ -40,22 +40,22 @@ var (
 			"because two concurrent threads can miss the cache and generate the same entry twice.",
 	}
 	cacheEntryCounter = prometheus.NewCounter(cacheEntryCounterOpts)
-	cacheGetLatency   = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	cacheGetLatency   = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Name: "etcd_request_cache_get_latency_seconds",
 			Help: "Latency in seconds of getting an object from etcd cache",
 		},
 	)
-	cacheAddLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	cacheAddLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Name: "etcd_request_cache_add_latency_seconds",
 			Help: "Latency in seconds of adding an object to etcd cache",
 		},
 	)
-	etcdRequestLatenciesSummary = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	etcdRequestLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Name: "etcd_request_latency_seconds",
-			Help: "Etcd request latency summary in seconds for each operation and object type.",
+			Help: "Etcd request latency in seconds for each operation and object type.",
 		},
 		[]string{"operation", "type"},
 	)
@@ -69,36 +69,36 @@ var (
 
 	deprecatedCacheHitCounterOpts = prometheus.CounterOpts{
 		Name: "etcd_helper_cache_hit_count",
-		Help: "Counter of etcd helper cache hits.",
+		Help: "(Deprecated) Counter of etcd helper cache hits.",
 	}
 	deprecatedCacheHitCounter      = prometheus.NewCounter(deprecatedCacheHitCounterOpts)
 	deprecatedCacheMissCounterOpts = prometheus.CounterOpts{
 		Name: "etcd_helper_cache_miss_count",
-		Help: "Counter of etcd helper cache miss.",
+		Help: "(Deprecated) Counter of etcd helper cache miss.",
 	}
 	deprecatedCacheMissCounter      = prometheus.NewCounter(deprecatedCacheMissCounterOpts)
 	deprecatedCacheEntryCounterOpts = prometheus.CounterOpts{
 		Name: "etcd_helper_cache_entry_count",
-		Help: "Counter of etcd helper cache entries. This can be different from etcd_helper_cache_miss_count " +
+		Help: "(Deprecated) Counter of etcd helper cache entries. This can be different from etcd_helper_cache_miss_count " +
 			"because two concurrent threads can miss the cache and generate the same entry twice.",
 	}
 	deprecatedCacheEntryCounter = prometheus.NewCounter(deprecatedCacheEntryCounterOpts)
 	deprecatedCacheGetLatency   = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Name: "etcd_request_cache_get_latencies_summary",
-			Help: "Latency in microseconds of getting an object from etcd cache",
+			Help: "(Deprecated) Latency in microseconds of getting an object from etcd cache",
 		},
 	)
 	deprecatedCacheAddLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Name: "etcd_request_cache_add_latencies_summary",
-			Help: "Latency in microseconds of adding an object to etcd cache",
+			Help: "(Deprecated) Latency in microseconds of adding an object to etcd cache",
 		},
 	)
 	deprecatedEtcdRequestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name: "etcd_request_latencies_summary",
-			Help: "Etcd request latency summary in microseconds for each operation and object type.",
+			Help: "(Deprecated) Etcd request latency summary in microseconds for each operation and object type.",
 		},
 		[]string{"operation", "type"},
 	)
@@ -115,7 +115,7 @@ func Register() {
 		prometheus.MustRegister(cacheEntryCounter)
 		prometheus.MustRegister(cacheAddLatency)
 		prometheus.MustRegister(cacheGetLatency)
-		prometheus.MustRegister(etcdRequestLatenciesSummary)
+		prometheus.MustRegister(etcdRequestLatency)
 		prometheus.MustRegister(objectCounts)
 
 		// TODO(danielqsj): Remove the following metrics, they are deprecated
@@ -133,7 +133,7 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 }
 
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
-	etcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
+	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
 	deprecatedEtcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(sinceInMicroseconds(startTime))
 }
 
@@ -168,7 +168,7 @@ func Reset() {
 	cacheEntryCounter = prometheus.NewCounter(cacheEntryCounterOpts)
 	// TODO: Reset cacheAddLatency.
 	// TODO: Reset cacheGetLatency.
-	etcdRequestLatenciesSummary.Reset()
+	etcdRequestLatency.Reset()
 
 	deprecatedCacheHitCounter = prometheus.NewCounter(deprecatedCacheHitCounterOpts)
 	deprecatedCacheMissCounter = prometheus.NewCounter(deprecatedCacheMissCounterOpts)
