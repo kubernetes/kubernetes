@@ -421,7 +421,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// TODO: scope this to the kube-system namespace
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
-
+				// extension-apiserver-authentication
+				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
 				// fundamental resources
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
