@@ -50,8 +50,8 @@ func TestRecordOperation(t *testing.T) {
 	}()
 
 	recordOperation("create_container", time.Now())
-	runtimeOperationsCounterExpected := "kubelet_runtime_operations{operation_type=\"create_container\"} 1"
-	runtimeOperationsLatencyExpected := "kubelet_runtime_operations_latency_microseconds_count{operation_type=\"create_container\"} 1"
+	runtimeOperationsCounterExpected := "kubelet_runtime_operations_total{operation_type=\"create_container\"} 1"
+	runtimeOperationsLatencyExpected := "kubelet_runtime_operations_latency_seconds_count{operation_type=\"create_container\"} 1"
 
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
