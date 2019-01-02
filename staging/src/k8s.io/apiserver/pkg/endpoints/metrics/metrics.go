@@ -110,7 +110,7 @@ var (
 	currentInflightRequests = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "apiserver_current_inflight_requests",
-			Help: "Maximal mumber of currently used inflight request limit of this apiserver per request kind in last second.",
+			Help: "Maximal number of currently used inflight request limit of this apiserver per request kind in last second.",
 		},
 		[]string{"requestKind"},
 	)
