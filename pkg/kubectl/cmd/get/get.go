@@ -537,6 +537,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
 			w.Flush()
+			w.SetRememberedWidths(nil)
 
 			// TODO: this doesn't belong here
 			// add linebreak between resource groups (if there is more than one)
@@ -654,10 +655,11 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		}
 	}
 
+	writer := utilprinters.GetNewTabWriter(o.Out)
+
 	// print the current object
 	if !o.WatchOnly {
 		var objsToPrint []runtime.Object
-		writer := utilprinters.GetNewTabWriter(o.Out)
 
 		if isList {
 			objsToPrint, _ = meta.ExtractList(obj)
@@ -702,9 +704,10 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
 				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
 			}
-			if err := printer.PrintObj(objToPrint, o.Out); err != nil {
+			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
 			}
+			writer.Flush()
 			return false, nil
 		})
 		return err

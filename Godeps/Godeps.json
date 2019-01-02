@@ -2446,6 +2446,10 @@
 			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
+			"ImportPath": "github.com/liggitt/tabwriter",
+			"Rev": "89fcab3d43de07060e4fd4c1547430ed57e87f24"
+		},
+		{
 			"ImportPath": "github.com/magiconair/properties",
 			"Comment": "v1.7.0-4-g61b492c03cf472",
 			"Rev": "61b492c03cf472e0c6419be5899b8e0dc28b1b88"
