@@ -4109,6 +4109,8 @@ message ServiceAccount {
   // can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
   // More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
   // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated LocalObjectReference imagePullSecrets = 3;
 
   // AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
