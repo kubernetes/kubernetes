@@ -323,7 +323,7 @@ func TestNodeTree_Next(t *testing.T) {
 	tests := []struct {
 		name           string
 		nodesToAdd     []*v1.Node
-		numRuns        int // number of times to run Next()
+		numRuns        int // number of times to run next()
 		expectedOutput []string
 	}{
 		{
@@ -358,7 +358,7 @@ func TestNodeTree_Next(t *testing.T) {
 
 			var output []string
 			for i := 0; i < test.numRuns; i++ {
-				output = append(output, nt.Next())
+				output = append(output, nt.next())
 			}
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
@@ -435,7 +435,7 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 						removeIndex++
 					}
 				case "next":
-					output = append(output, nt.Next())
+					output = append(output, nt.next())
 				default:
 					t.Errorf("unknow operation: %v", op)
 				}

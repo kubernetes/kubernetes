@@ -32,6 +32,7 @@ type NodeTree struct {
 	tree      map[string]*nodeArray // a map from zone (region-zone) to an array of nodes in the zone.
 	zones     []string              // a list of all the zones in the tree (keys)
 	zoneIndex int
+	allNodes  []string
 	numNodes  int
 	mu        sync.RWMutex
 }
@@ -92,6 +93,7 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 	}
 	klog.V(5).Infof("Added node %v in group %v to NodeTree", n.Name, zone)
 	nt.numNodes++
+	nt.recomputeAllNodes()
 }
 
 // RemoveNode removes a node from the NodeTree.
@@ -112,6 +114,7 @@ func (nt *NodeTree) removeNode(n *v1.Node) error {
 				}
 				klog.V(5).Infof("Removed node %v in group %v from NodeTree", n.Name, zone)
 				nt.numNodes--
+				nt.recomputeAllNodes()
 				return nil
 			}
 		}
@@ -147,6 +150,7 @@ func (nt *NodeTree) UpdateNode(old, new *v1.Node) {
 	defer nt.mu.Unlock()
 	nt.removeNode(old) // No error checking. We ignore whether the old node exists or not.
 	nt.addNode(new)
+	nt.recomputeAllNodes()
 }
 
 func (nt *NodeTree) resetExhausted() {
@@ -158,9 +162,7 @@ func (nt *NodeTree) resetExhausted() {
 
 // Next returns the name of the next node. NodeTree iterates over zones and in each zone iterates
 // over nodes in a round robin fashion.
-func (nt *NodeTree) Next() string {
-	nt.mu.Lock()
-	defer nt.mu.Unlock()
+func (nt *NodeTree) next() string {
 	if len(nt.zones) == 0 {
 		return ""
 	}
@@ -183,6 +185,22 @@ func (nt *NodeTree) Next() string {
 			return nodeName
 		}
 	}
+}
+
+func (nt *NodeTree) recomputeAllNodes() {
+	nt.allNodes = make([]string, 0, nt.numNodes)
+	nt.resetExhausted()
+	for i:=0; i< nt.numNodes; i++ {
+		nt.allNodes = append(nt.allNodes, nt.next())
+	}
+}
+
+// AllNodes returns the list of nodes as they would be iterated by
+// Next() method.
+func (nt *NodeTree) AllNodes() []string {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+	return nt.allNodes
 }
 
 // NumNodes returns the number of nodes.
