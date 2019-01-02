@@ -18,6 +18,7 @@ package preflight
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -658,33 +659,33 @@ func TestKubeletVersionCheck(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil },
-			},
-		}
-		fexec := &fakeexec.FakeExec{
-			CommandScript: []fakeexec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			},
-		}
+		t.Run(tc.kubeletVersion, func(t *testing.T) {
+			fcmd := fakeexec.FakeCmd{
+				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+					func() ([]byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil },
+				},
+			}
+			fexec := &fakeexec.FakeExec{
+				CommandScript: []fakeexec.FakeCommandAction{
+					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				},
+			}
 
-		check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec}
-		warnings, errors := check.Check()
+			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec}
+			warnings, errors := check.Check()
 
-		switch {
-		case warnings != nil && !tc.expectWarnings:
-			t.Errorf("KubeletVersionCheck: unexpected warnings for kubelet version %q and Kubernetes version %q. Warnings: %v", tc.kubeletVersion, tc.k8sVersion, warnings)
-		case warnings == nil && tc.expectWarnings:
-			t.Errorf("KubeletVersionCheck: expected warnings for kubelet version %q and Kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
-		case errors != nil && !tc.expectErrors:
-			t.Errorf("KubeletVersionCheck: unexpected errors for kubelet version %q and Kubernetes version %q. errors: %v", tc.kubeletVersion, tc.k8sVersion, errors)
-		case errors == nil && tc.expectErrors:
-			t.Errorf("KubeletVersionCheck: expected errors for kubelet version %q and Kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
-		}
-
+			switch {
+			case warnings != nil && !tc.expectWarnings:
+				t.Errorf("KubeletVersionCheck: unexpected warnings for kubelet version %q and Kubernetes version %q. Warnings: %v", tc.kubeletVersion, tc.k8sVersion, warnings)
+			case warnings == nil && tc.expectWarnings:
+				t.Errorf("KubeletVersionCheck: expected warnings for kubelet version %q and Kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+			case errors != nil && !tc.expectErrors:
+				t.Errorf("KubeletVersionCheck: unexpected errors for kubelet version %q and Kubernetes version %q. errors: %v", tc.kubeletVersion, tc.k8sVersion, errors)
+			case errors == nil && tc.expectErrors:
+				t.Errorf("KubeletVersionCheck: expected errors for kubelet version %q and Kubernetes version %q but got nothing", tc.kubeletVersion, tc.k8sVersion)
+			}
+		})
 	}
-
 }
 
 func TestSetHasItemOrAll(t *testing.T) {
@@ -702,15 +703,17 @@ func TestSetHasItemOrAll(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		result := setHasItemOrAll(rt.ignoreSet, rt.testString)
-		if result != rt.expectedResult {
-			t.Errorf(
-				"setHasItemOrAll: expected: %v actual: %v (arguments: %q, %q)",
-				rt.expectedResult, result,
-				rt.ignoreSet,
-				rt.testString,
-			)
-		}
+		t.Run(rt.testString, func(t *testing.T) {
+			result := setHasItemOrAll(rt.ignoreSet, rt.testString)
+			if result != rt.expectedResult {
+				t.Errorf(
+					"setHasItemOrAll: expected: %v actual: %v (arguments: %q, %q)",
+					rt.expectedResult, result,
+					rt.ignoreSet,
+					rt.testString,
+				)
+			}
+		})
 	}
 }
 
@@ -790,12 +793,14 @@ func TestNumCPUCheck(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		warnings, errors := NumCPUCheck{NumCPU: rt.numCPU}.Check()
-		if len(warnings) != rt.numWarnings {
-			t.Errorf("expected %d warning(s) but got %d: %q", rt.numWarnings, len(warnings), warnings)
-		}
-		if len(errors) != rt.numErrors {
-			t.Errorf("expected %d warning(s) but got %d: %q", rt.numErrors, len(errors), errors)
-		}
+		t.Run(fmt.Sprintf("number of CPUs: %d", rt.numCPU), func(t *testing.T) {
+			warnings, errors := NumCPUCheck{NumCPU: rt.numCPU}.Check()
+			if len(warnings) != rt.numWarnings {
+				t.Errorf("expected %d warning(s) but got %d: %q", rt.numWarnings, len(warnings), warnings)
+			}
+			if len(errors) != rt.numErrors {
+				t.Errorf("expected %d warning(s) but got %d: %q", rt.numErrors, len(errors), errors)
+			}
+		})
 	}
 }
