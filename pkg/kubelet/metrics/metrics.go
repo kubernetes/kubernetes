@@ -93,45 +93,45 @@ var (
 		},
 		[]string{NodeLabelKey},
 	)
-	ContainersPerPodCount = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	ContainersPerPodCount = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      "containers_per_pod_count",
 			Help:      "The number of containers per pod.",
 		},
 	)
-	PodWorkerLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	PodWorkerLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      PodWorkerLatencyKey,
 			Help:      "Latency in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
 		},
 		[]string{"operation_type"},
 	)
-	PodStartLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	PodStartLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      PodStartLatencyKey,
 			Help:      "Latency in seconds for a single pod to go from pending to running.",
 		},
 	)
-	CgroupManagerLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	CgroupManagerLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      CgroupManagerOperationsKey,
 			Help:      "Latency in seconds for cgroup manager operations. Broken down by method.",
 		},
 		[]string{"operation_type"},
 	)
-	PodWorkerStartLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	PodWorkerStartLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      PodWorkerStartLatencyKey,
 			Help:      "Latency in seconds from seeing a pod to starting a worker.",
 		},
 	)
-	PLEGRelistLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	PLEGRelistLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      PLEGRelistLatencyKey,
 			Help:      "Latency in seconds for relisting pods in PLEG.",
@@ -145,8 +145,8 @@ var (
 		},
 		[]string{},
 	)
-	PLEGRelistInterval = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	PLEGRelistInterval = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      PLEGRelistIntervalKey,
 			Help:      "Interval in seconds between relisting in PLEG.",
@@ -161,8 +161,8 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	RuntimeOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	RuntimeOperationsLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      RuntimeOperationsLatencyKey,
 			Help:      "Latency in seconds of runtime operations. Broken down by operation type.",
@@ -177,8 +177,8 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	EvictionStatsAge = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	EvictionStatsAge = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      EvictionStatsAgeKey,
 			Help:      "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
@@ -193,8 +193,8 @@ var (
 		},
 		[]string{"resource_name"},
 	)
-	DevicePluginAllocationLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	DevicePluginAllocationLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DevicePluginAllocationLatencyKey,
 			Help:      "Latency in seconds to serve a device plugin Allocation request. Broken down by resource name.",
