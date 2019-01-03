@@ -25,7 +25,7 @@ import (
 	"testing"
 )
 
-func TestDoUnmountMountPoint(t *testing.T) {
+func TestDoCleanupMountPoint(t *testing.T) {
 	const testMount = "test-mount"
 	const defaultPerm = 0750
 
@@ -92,7 +92,7 @@ func TestDoUnmountMountPoint(t *testing.T) {
 				MountCheckErrors: map[string]error{mountPoint.Path: mountError},
 			}
 
-			err = doUnmountMountPoint(mountPoint.Path, fake, true, tt.corruptedMnt)
+			err = doCleanupMountPoint(mountPoint.Path, fake, true, tt.corruptedMnt)
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("test %s failed, expected error, got none", name)

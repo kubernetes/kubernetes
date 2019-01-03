@@ -24,18 +24,12 @@ import (
 	"github.com/golang/glog"
 )
 
-// UnmountPath is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-func UnmountPath(mountPath string, mounter Interface) error {
-	return UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
-}
-
-// UnmountMountPoint is a common unmount routine that unmounts the given path and
+// CleanupMountPoint unmounts the given path and
 // deletes the remaining directory if successful.
 // if extensiveMountPointCheck is true
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-func UnmountMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
+// IsNotMountPoint is more expensive but properly handles bind mounts within the same fs.
+func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
 	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
 	// the path in the kubelet container, not on the host.
 	pathExists, pathErr := PathExists(mountPath)
@@ -47,16 +41,17 @@ func UnmountMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 	if pathErr != nil && !corruptedMnt {
 		return fmt.Errorf("Error checking path: %v", pathErr)
 	}
-	return doUnmountMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
+	return doCleanupMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
 }
 
-// doUnmountMountPoint is a common unmount routine that unmounts the given path and
+// doCleanupMountPoint unmounts the given path and
 // deletes the remaining directory if successful.
 // if extensiveMountPointCheck is true
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-// if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, Take it as an argument for convenience of testing
-func doUnmountMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
+// IsNotMountPoint is more expensive but properly handles bind mounts within the same fs.
+// if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, and the mount point check
+// will be skipped
+func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
 	if !corruptedMnt {
 		var notMnt bool
 		var err error

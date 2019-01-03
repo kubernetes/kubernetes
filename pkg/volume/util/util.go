@@ -127,9 +127,9 @@ func SetReady(dir string) {
 
 // UnmountPath is a common unmount routine that unmounts the given path and
 // deletes the remaining directory if successful.
-// TODO: Change callers to call mount pkg directly
+// TODO: Remove this function and change callers to call mount pkg directly
 func UnmountPath(mountPath string, mounter mount.Interface) error {
-	return mount.UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
+	return mount.CleanupMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
 }
 
 // UnmountMountPoint is a common unmount routine that unmounts the given path and
@@ -139,7 +139,7 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 // TODO: Change callers to call mount pkg directly
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	return mount.UnmountMountPoint(mountPath, mounter, extensiveMountPointCheck)
+	return mount.CleanupMountPoint(mountPath, mounter, extensiveMountPointCheck)
 }
 
 // PathExists returns true if the specified path exists.
