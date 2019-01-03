@@ -15,7 +15,6 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
