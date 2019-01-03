@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -236,6 +238,94 @@ func getPbmCompatibleDatastore(ctx context.Context, dc *vclib.Datacenter, storag
 	if err != nil {
 		klog.Errorf("Failed to get compatible datastores from datastores : %+v with storagePolicy: %s. err: %+v",
 			sharedDs, storagePolicyID, err)
+		return "", err
+	}
+	klog.V(9).Infof("compatibleDatastores : %+v", compatibleDatastores)
+	datastore, err := getMostFreeDatastoreName(ctx, dc.Client(), compatibleDatastores)
+	if err != nil {
+		klog.Errorf("Failed to get most free datastore from compatible datastores: %+v. err: %+v", compatibleDatastores, err)
+		return "", err
+	}
+	klog.V(4).Infof("Most free datastore : %+s", datastore)
+	return datastore, err
+}
+
+func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager *NodeManager, selectedZones []string) ([]*vclib.DatastoreInfo, error) {
+
+	var sharedDatastores []*vclib.DatastoreInfo
+
+	for _, zone := range selectedZones {
+		var sharedDatastoresPerZone []*vclib.DatastoreInfo
+		hosts, err := nodeManager.GetHostsInZone(ctx, zone)
+		if err != nil {
+			return nil, err
+		}
+		klog.V(4).Infof("Hosts in zone %s : %s", zone, hosts)
+
+		for _, host := range hosts {
+			var hostSystemMo mo.HostSystem
+			host.Properties(ctx, host.Reference(), []string{"datastore"}, &hostSystemMo)
+
+			klog.V(4).Infof("Datastores mounted on host %s : %s", host, hostSystemMo.Datastore)
+			var dsRefList []types.ManagedObjectReference
+			for _, dsRef := range hostSystemMo.Datastore {
+				dsRefList = append(dsRefList, dsRef)
+			}
+
+			var dsMoList []mo.Datastore
+			pc := property.DefaultCollector(host.Client())
+			properties := []string{DatastoreInfoProperty}
+			err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
+			if err != nil {
+				klog.Errorf("Failed to get Datastore managed objects from datastore objects."+
+					" dsObjList: %+v, properties: %+v, err: %v", dsRefList, properties, err)
+				return nil, err
+			}
+			klog.V(9).Infof("Datastore mo details: %+v", dsMoList)
+
+			var dsObjList []*vclib.DatastoreInfo
+			for _, dsMo := range dsMoList {
+				dsObjList = append(dsObjList,
+					&vclib.DatastoreInfo{
+						Datastore: &vclib.Datastore{Datastore: object.NewDatastore(host.Client(), dsMo.Reference()),
+							Datacenter: nil},
+						Info: dsMo.Info.GetDatastoreInfo()})
+			}
+
+			klog.V(9).Infof("DatastoreInfo details : %s", dsObjList)
+
+			if len(sharedDatastoresPerZone) == 0 {
+				sharedDatastoresPerZone = dsObjList
+			} else {
+				sharedDatastoresPerZone = intersect(sharedDatastoresPerZone, dsObjList)
+			}
+			klog.V(9).Infof("Shared datastore list after processing host %s : %s", host, sharedDatastoresPerZone)
+		}
+		klog.V(4).Infof("Shared datastore per zone %s is %s", zone, sharedDatastoresPerZone)
+		if len(sharedDatastores) == 0 {
+			sharedDatastores = sharedDatastoresPerZone
+		} else {
+			sharedDatastores = intersect(sharedDatastores, sharedDatastoresPerZone)
+		}
+	}
+	klog.V(1).Infof("Returning selected datastores : %s", sharedDatastores)
+	return sharedDatastores, nil
+}
+
+func getPbmCompatibleZonedDatastore(ctx context.Context, dc *vclib.Datacenter, storagePolicyName string, zonedDatastores []*vclib.DatastoreInfo) (string, error) {
+	pbmClient, err := vclib.NewPbmClient(ctx, dc.Client())
+	if err != nil {
+		return "", err
+	}
+	storagePolicyID, err := pbmClient.ProfileIDByName(ctx, storagePolicyName)
+	if err != nil {
+		klog.Errorf("Failed to get Profile ID by name: %s. err: %+v", storagePolicyName, err)
+		return "", err
+	}
+	compatibleDatastores, _, err := pbmClient.GetCompatibleDatastores(ctx, dc, storagePolicyID, zonedDatastores)
+	if err != nil {
+		klog.Errorf("Failed to get compatible datastores from datastores : %+v with storagePolicy: %s. err: %+v",
+			zonedDatastores, storagePolicyID, err)
 		return "", err
 	}
 	klog.V(9).Infof("compatibleDatastores : %+v", compatibleDatastores)
