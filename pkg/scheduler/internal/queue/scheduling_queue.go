@@ -189,10 +189,11 @@ func NominatedNodeName(pod *v1.Pod) string {
 
 // PriorityQueue implements a scheduling queue. It is an alternative to FIFO.
 // The head of PriorityQueue is the highest priority pending pod. This structure
-// has two sub queues. One sub-queue holds pods that are being considered for
+// has three sub queues. One sub-queue holds pods that are being considered for
 // scheduling. This is called activeQ and is a Heap. Another queue holds
 // pods that are already tried and are determined to be unschedulable. The latter
-// is called unschedulableQ.
+// is called unschedulableQ. The third queue holds pods that are moved from
+// unschedulable queues and will be moved to active queue when backoff are completed.
 type PriorityQueue struct {
 	stop  <-chan struct{}
 	clock util.Clock
@@ -301,7 +302,7 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 }
 
 // AddIfNotPresent adds a pod to the active queue if it is not present in any of
-// the two queues. If it is present in any, it doesn't do any thing.
+// the queues. If it is present in any, it doesn't do any thing.
 func (p *PriorityQueue) AddIfNotPresent(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -363,9 +364,11 @@ func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
 	}
 }
 
-// AddUnschedulableIfNotPresent does nothing if the pod is present in either
-// queue. Otherwise it adds the pod to the unschedulable queue if
-// p.receivedMoveRequest is false, and to the activeQ if p.receivedMoveRequest is true.
+// AddUnschedulableIfNotPresent does nothing if the pod is present in any
+// queue. If pod is unschedulable, it adds pod to unschedulable queue if
+// p.receivedMoveRequest is false or to backoff queue if p.receivedMoveRequest
+// is true but pod is subject to backoff. In other cases, it adds pod to active
+// queue.
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -474,9 +477,10 @@ func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 	return !reflect.DeepEqual(strip(oldPod), strip(newPod))
 }
 
-// Update updates a pod in the active queue if present. Otherwise, it removes
-// the item from the unschedulable queue and adds the updated one to the active
-// queue.
+// Update updates a pod in the active or backoff queue if present. Otherwise, it removes
+// the item from the unschedulable queue if pod is updated in a way that it may
+// become schedulable and adds the updated one to the active queue.
+// If pod is not present in any of the queues, it is added to the active queue.
 func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -518,7 +522,7 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 		p.unschedulableQ.addOrUpdate(newPod)
 		return nil
 	}
-	// If pod is not in any of the two queue, we put it in the active queue.
+	// If pod is not in any of the queues, we put it in the active queue.
 	err := p.activeQ.Add(newPod)
 	if err == nil {
 		p.nominatedPods.add(newPod, "")
