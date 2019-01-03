@@ -238,12 +238,23 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// If TaintNodesByCondition enabled, taint node with TaintNodeUnschedulable when initializing
+	notReadyTaint := v1.Taint{
+		Key:    schedulerapi.TaintNodeNotReady,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	// If TaintNodesByCondition enabled, taint node with TaintNodeUnschedulable and TaintNodeNotReady when initializing
 	// node to avoid race condition; refer to #63897 for more detail.
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		if node.Spec.Unschedulable &&
 			!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
 			nodeTaints = append(nodeTaints, unschedulableTaint)
+		}
+		// Add not-ready taint while initializing the node to avoid waiting for node controller to apply the taint.
+		// This taint can be removed by node lifecycle controller once node condition Type is `Ready` and Status is
+		// `True`
+		if !taintutil.TaintExists(nodeTaints, &notReadyTaint) {
+			nodeTaints = append(nodeTaints, notReadyTaint)
 		}
 	}
 
