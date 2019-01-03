@@ -3589,16 +3589,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	}
 
-	annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
-	var hcProtocol string
 	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
-		if annotationProtocol == "https" || annotationProtocol == "ssl" {
-			hcProtocol = "HTTPS"
-		} else {
-			hcProtocol = "HTTP"
-		}
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, healthCheckNodePort, path, annotations)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %q", loadBalancerName, healthCheckNodePort, err)
 		}
@@ -3613,6 +3606,8 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			tcpHealthCheckPort = int32(*listener.InstancePort)
 			break
 		}
+		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
+		var hcProtocol string
 		if annotationProtocol == "https" || annotationProtocol == "ssl" {
 			hcProtocol = "SSL"
 		} else {
