@@ -95,6 +95,25 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 	return lastEvent, nil
 }
 
+// Until wraps the watcherClient's watch function with RetryWatcher making sure that watcher gets restarted in case of errors.
+// The initialResourceVersion will be given to watch method when first called. It shall not be "" or "0"
+// given the underlying WATCH call issues (#74022). If you want the initial list ("", "0") done for you use ListWatchUntil instead.
+// Remaining behaviour is identical to function UntilWithoutRetry. (See above.)
+// Until can deal with API timeouts and lost connections.
+// It guarantees you to see all events and in the order they happened.
+// Due to this guarantee there is no way it can deal with 'Resource version too old error'. It will fail in this case.
+// (See `UntilWithSync` if you'd prefer to recover from all the errors including RV too old by re-listing
+//  those items. In normal code you should care about being level driven so you'd not care about not seeing all the edges.)
+// The most frequent usage for Until would be a test where you want to verify exact order of events ("edges").
+func Until(ctx context.Context, initialResourceVersion string, watcherClient cache.Watcher, conditions ...ConditionFunc) (*watch.Event, error) {
+	w, err := NewRetryWatcher(initialResourceVersion, watcherClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return UntilWithoutRetry(ctx, w, conditions...)
+}
+
 // UntilWithSync creates an informer from lw, optionally checks precondition when the store is synced,
 // and watches the output until each provided condition succeeds, in a way that is identical
 // to function UntilWithoutRetry. (See above.)
