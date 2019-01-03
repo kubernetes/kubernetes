@@ -17,10 +17,12 @@ limitations under the License.
 package framework
 
 import (
+	"flag"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -111,6 +113,13 @@ func (h *MasterHolder) SetMaster(m *master.Master) {
 func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	var m *master.Master
 	var s *httptest.Server
+
+	// Ensure we log at least level 4
+	v := flag.Lookup("v").Value
+	level, _ := strconv.Atoi(v.String())
+	if level < 4 {
+		v.Set("4")
+	}
 
 	if incomingServer != nil {
 		s = incomingServer
