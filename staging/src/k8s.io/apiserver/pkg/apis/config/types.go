@@ -123,4 +123,7 @@ type KMSConfiguration struct {
 	CacheSize int32
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string
+	// Timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
+	// +optional
+	Timeout *metav1.Duration
 }
