@@ -349,11 +349,11 @@ func NewProxier(ipt utiliptables.Interface,
 }
 
 type iptablesJumpChain struct {
-	table       utiliptables.Table
-	dstChain    utiliptables.Chain
-	sourceChain utiliptables.Chain
-	comment     string
-	extraArgs   []string
+	table     utiliptables.Table
+	dstChain  utiliptables.Chain
+	srcChain  utiliptables.Chain
+	comment   string
+	extraArgs []string
 }
 
 var iptablesJumpChains = []iptablesJumpChain{
@@ -381,7 +381,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 			"-m", "comment", "--comment", jump.comment,
 			"-j", string(jump.dstChain),
 		)
-		if err := ipt.DeleteRule(jump.table, jump.sourceChain, args...); err != nil {
+		if err := ipt.DeleteRule(jump.table, jump.srcChain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
 				encounteredError = true
@@ -651,8 +651,8 @@ func (proxier *Proxier) syncProxyRules() {
 			"-m", "comment", "--comment", jump.comment,
 			"-j", string(jump.dstChain),
 		)
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.sourceChain, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", jump.table, jump.sourceChain, jump.dstChain, err)
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", jump.table, jump.srcChain, jump.dstChain, err)
 			return
 		}
 	}
