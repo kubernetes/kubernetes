@@ -228,7 +228,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 }
 
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
-	_, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig)
+	_, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}
