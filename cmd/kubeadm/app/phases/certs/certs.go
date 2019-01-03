@@ -130,7 +130,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
 	certConfig, err := certSpec.GetConfig(cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve cert configuration: %v", err)
+		return nil, nil, errors.Wrap(err, "failed to retrieve cert configuration")
 	}
 
 	return pkiutil.NewCSRAndKey(certConfig)

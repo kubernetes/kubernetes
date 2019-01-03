@@ -22,10 +22,10 @@ import (
 	"os/exec"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/errors"
-
 	"github.com/blang/semver"
-	pkgerrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
+
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 )
 
@@ -46,7 +46,7 @@ func newPackageManager() (packageManager, error) {
 	if m, ok := newDPKG(); ok {
 		return m, nil
 	}
-	return nil, pkgerrors.New("failed to find package manager")
+	return nil, errors.New("failed to find package manager")
 }
 
 // dpkg implements packageManager. It uses "dpkg-query" to retrieve package
@@ -68,11 +68,11 @@ func newDPKG() (packageManager, bool) {
 func (dpkg) getPackageVersion(packageName string) (string, error) {
 	output, err := exec.Command("dpkg-query", "--show", "--showformat='${Version}'", packageName).Output()
 	if err != nil {
-		return "", pkgerrors.Wrap(err, "dpkg-query failed")
+		return "", errors.Wrap(err, "dpkg-query failed")
 	}
 	version := extractUpstreamVersion(string(output))
 	if version == "" {
-		return "", pkgerrors.New("no version information")
+		return "", errors.New("no version information")
 	}
 	return version, nil
 }
@@ -154,18 +154,18 @@ func (validator *packageValidator) validate(packageSpecs []PackageSpec, manager 
 		if versionRange(sv) {
 			validator.reporter.Report(nameWithVerRange, version, good)
 		} else {
-			errs = append(errs, pkgerrors.Errorf("package \"%s %s\" does not meet the spec \"%s (%s)\"", packageName, sv, packageName, spec.VersionRange))
+			errs = append(errs, errors.Errorf("package \"%s %s\" does not meet the spec \"%s (%s)\"", packageName, sv, packageName, spec.VersionRange))
 			validator.reporter.Report(nameWithVerRange, version, bad)
 		}
 	}
-	return nil, errors.NewAggregate(errs)
+	return nil, errorsutil.NewAggregate(errs)
 }
 
 // getKernelRelease returns the kernel release of the local machine.
 func getKernelRelease() (string, error) {
 	output, err := exec.Command("uname", "-r").Output()
 	if err != nil {
-		return "", pkgerrors.Wrap(err, "failed to get kernel release")
+		return "", errors.Wrap(err, "failed to get kernel release")
 	}
 	return strings.TrimSpace(string(output)), nil
 }
@@ -175,7 +175,7 @@ func getOSDistro() (string, error) {
 	f := "/etc/lsb-release"
 	b, err := ioutil.ReadFile(f)
 	if err != nil {
-		return "", pkgerrors.Wrapf(err, "failed to read %q", f)
+		return "", errors.Wrapf(err, "failed to read %q", f)
 	}
 	content := string(b)
 	switch {
@@ -186,7 +186,7 @@ func getOSDistro() (string, error) {
 	case strings.Contains(content, "CoreOS"):
 		return "coreos", nil
 	default:
-		return "", pkgerrors.Errorf("failed to get OS distro: %s", content)
+		return "", errors.Errorf("failed to get OS distro: %s", content)
 	}
 }
 
