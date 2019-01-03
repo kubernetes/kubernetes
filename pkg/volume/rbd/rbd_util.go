@@ -47,13 +47,13 @@ import (
 const (
 	imageWatcherStr = "watcher="
 	imageSizeStr    = "size "
-	sizeDivStr      = " MB in"
 	kubeLockMagic   = "kubelet_lock_magic_"
 	// The following three values are used for 30 seconds timeout
 	// while waiting for RBD Watcher to expire.
 	rbdImageWatcherInitDelay = 1 * time.Second
 	rbdImageWatcherFactor    = 1.4
 	rbdImageWatcherSteps     = 10
+	rbdImageSizeUnitMiB      = 1024 * 1024
 )
 
 func getDevFromImageAndPool(pool, image string) (string, bool) {
@@ -672,8 +672,7 @@ func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 // rbdInfo runs `rbd info` command to get the current image size in MB.
 func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	var err error
-	var output string
-	var cmd []byte
+	var output []byte
 
 	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
 	id := b.adminId
@@ -702,9 +701,8 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	// rbd: error opening image 1234: (2) No such file or directory
 	//
 	klog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
-	cmd, err = b.exec.Run("rbd",
-		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret)
-	output = string(cmd)
+	output, err = b.exec.Run("rbd",
+		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "--format=json")
 
 	if err, ok := err.(*exec.Error); ok {
 		if err.Err == exec.ErrNotFound {
@@ -720,22 +718,20 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	}
 
 	if len(output) == 0 {
-		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
+		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, string(output))
 	}
 
-	// Get the size value string, just between `size ` and ` MB in`, such as `size 1024 MB in 256 objects`.
-	sizeIndex := strings.Index(output, imageSizeStr)
-	divIndex := strings.Index(output, sizeDivStr)
-	if sizeIndex == -1 || divIndex == -1 || divIndex <= sizeIndex+5 {
-		return 0, fmt.Errorf("can not get image size info %s: %s", b.Image, output)
-	}
-	rbdSizeStr := output[sizeIndex+5 : divIndex]
-	rbdSize, err := strconv.Atoi(rbdSizeStr)
-	if err != nil {
-		return 0, fmt.Errorf("can not convert size str: %s to int", rbdSizeStr)
-	}
+	return getRbdImageSize(output)
+}
 
-	return rbdSize, nil
+func getRbdImageSize(output []byte) (int, error) {
+	info := struct {
+		Size int64 `json:"size"`
+	}{}
+	if err := json.Unmarshal(output, &info); err != nil {
+		return 0, fmt.Errorf("parse rbd info output failed: %s, %v", string(output), err)
+	}
+	return int(info.Size / rbdImageSizeUnitMiB), nil
 }
 
 // rbdStatus runs `rbd status` command to check if there is watcher on the image.
