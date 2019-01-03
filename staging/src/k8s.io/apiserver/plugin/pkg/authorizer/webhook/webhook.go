@@ -200,7 +200,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 		if r.Status.Allowed {
 			w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
 		} else {
-			if len(key) <= maxUnauthorizedCachedKeySize {
+			if callerControlledAttributeSize(attr) < maxUnauthorizedCachedKeySize {
 				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
 			}
 		}
@@ -267,4 +267,15 @@ func (t *subjectAccessReviewClient) Create(subjectAccessReview *authorization.Su
 	result := &authorization.SubjectAccessReview{}
 	err := t.w.RestClient.Post().Body(subjectAccessReview).Do().Into(result)
 	return result, err
+}
+
+func callerControlledAttributeSize(attr authorizer.Attributes) int64 {
+	return int64(len(attr.GetNamespace())) +
+		int64(len(attr.GetVerb())) +
+		int64(len(attr.GetAPIGroup())) +
+		int64(len(attr.GetAPIVersion())) +
+		int64(len(attr.GetResource())) +
+		int64(len(attr.GetSubresource())) +
+		int64(len(attr.GetName())) +
+		int64(len(attr.GetPath()))
 }
