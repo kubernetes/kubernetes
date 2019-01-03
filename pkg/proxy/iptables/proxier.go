@@ -374,12 +374,7 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
 }
 
-var iptablesCleanupOnlyChains = []iptablesJumpChain{
-	// Present in kube 1.6 - 1.9. Removed by #56164 in favor of kubeExternalServicesChain
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", nil},
-	// Present in kube <= 1.9. Removed by #60306 in favor of rule with extraArgs
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
-}
+var iptablesCleanupOnlyChains = []iptablesJumpChain{}
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
