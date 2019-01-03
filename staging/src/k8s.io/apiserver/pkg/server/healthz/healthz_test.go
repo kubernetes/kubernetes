@@ -40,6 +40,10 @@ func TestInstallHandler(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
 	}
+	c := w.Header().Get("Content-Type")
+	if c != "text/plain; charset=utf-8" {
+		t.Errorf("expected %v, got %v", "text/plain", c)
+	}
 	if w.Body.String() != "ok" {
 		t.Errorf("expected %v, got %v", "ok", w.Body.String())
 	}
@@ -58,6 +62,10 @@ func TestInstallPathHandler(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
 	}
+	c := w.Header().Get("Content-Type")
+	if c != "text/plain; charset=utf-8" {
+		t.Errorf("expected %v, got %v", "text/plain", c)
+	}
 	if w.Body.String() != "ok" {
 		t.Errorf("expected %v, got %v", "ok", w.Body.String())
 	}
@@ -70,6 +78,10 @@ func TestInstallPathHandler(t *testing.T) {
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	c = w.Header().Get("Content-Type")
+	if c != "text/plain; charset=utf-8" {
+		t.Errorf("expected %v, got %v", "text/plain", c)
 	}
 	if w.Body.String() != "ok" {
 		t.Errorf("expected %v, got %v", "ok", w.Body.String())
@@ -119,6 +131,10 @@ func testMultipleChecks(path string, t *testing.T) {
 		mux.ServeHTTP(w, req)
 		if w.Code != test.expectedStatus {
 			t.Errorf("case[%d] Expected: %v, got: %v", i, test.expectedStatus, w.Code)
+		}
+		c := w.Header().Get("Content-Type")
+		if c != "text/plain; charset=utf-8" {
+			t.Errorf("case[%d] Expected: %v, got: %v", i, "text/plain", c)
 		}
 		if w.Body.String() != test.expectedResponse {
 			t.Errorf("case[%d] Expected:\n%v\ngot:\n%v\n", i, test.expectedResponse, w.Body.String())

@@ -185,6 +185,8 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 			return
 		}
 
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if _, found := r.URL.Query()["verbose"]; !found {
 			fmt.Fprint(w, "ok")
 			return
