@@ -273,6 +273,8 @@ func (h *debugHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "text/vnd.graphviz")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Write(data)
 	w.WriteHeader(http.StatusOK)
 }

@@ -118,6 +118,7 @@ func write(w http.ResponseWriter) error {
 		return fmt.Errorf("error marshaling json: %v", err)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, err = w.Write(b)
 	return err
 }
