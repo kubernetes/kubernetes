@@ -373,14 +373,13 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 	}
 
 	var updateErrs []error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
+	if err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
 		if err := nim.tryUpdateCSINodeInfo(csiKubeClient, driverName, driverNodeID, topology); err != nil {
 			updateErrs = append(updateErrs, err)
 			return false, nil
 		}
 		return true, nil
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("error updating CSINodeInfo: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
 	}
 	return nil
@@ -570,19 +569,6 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINodeInfo(
 	if !hasModified {
 		// No changes, don't update
 		return nil
-		err = validateCSINodeInfo(nodeInfo)
-		if err != nil {
-			return err
-		}
-		_, updateErr := nodeInfoClient.Update(nodeInfo)
-		if updateErr != nil {
-			return updateErr // do not wrap error
-		}
-		_, updateErr = nodeInfoClient.UpdateStatus(nodeInfo)
-		return updateErr // do not wrap error
-	})
-	if retryErr != nil {
-		return fmt.Errorf("CSINodeInfo update failed: %v", retryErr)
 	}
 
 	err = validateCSINodeInfo(nodeInfo)

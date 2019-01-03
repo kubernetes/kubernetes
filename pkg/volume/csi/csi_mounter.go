@@ -239,9 +239,8 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		return nil, errors.New("CSIDriver lister does not exist")
 	}
 
-	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
 	// Driver name may be uppercase but object must be lowercase
-	csiDriver, err := c.plugin.csiDriverLister.Get(strings.ToLower(c.driverName))
+	csiDriver, err := c.plugin.csiDriverLister.Get(strings.ToLower(string(c.driverName)))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
