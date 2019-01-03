@@ -72,6 +72,7 @@ type VolumeSpec struct {
 	Fstype            string
 	StoragePolicyID   string
 	StoragePolicyName string
+	Labels            map[string]string
 }
 
 func verifyDevicePath(path string) (string, error) {
@@ -148,12 +149,17 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 	if err != nil {
 		return nil, err
 	}
+	labels, err := cloud.GetVolumeLabels(vmDiskPath)
+	if err != nil {
+		return nil, err
+	}
 	volSpec = &VolumeSpec{
 		Path:              vmDiskPath,
 		Size:              volSizeKiB,
 		Fstype:            fstype,
 		StoragePolicyName: volumeOptions.StoragePolicyName,
 		StoragePolicyID:   volumeOptions.StoragePolicyID,
+		Labels:            labels,
 	}
 	klog.V(2).Infof("Successfully created vsphere volume %s", name)
 	return volSpec, nil

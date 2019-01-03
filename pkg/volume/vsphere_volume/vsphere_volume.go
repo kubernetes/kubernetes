@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -409,6 +410,34 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	}
 	if len(v.options.PVC.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = v.plugin.GetAccessModes()
+	}
+
+	labels := volSpec.Labels
+	requirements := make([]v1.NodeSelectorRequirement, 0)
+	if len(labels) != 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			pv.Labels[k] = v
+			var values []string
+			if k == v1.LabelZoneFailureDomain {
+				values, err = volumehelpers.LabelZonesToList(v)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)
+				}
+			} else {
+				values = []string{v}
+			}
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
+		}
+	}
+
+	if len(requirements) > 0 {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
 	}
 
 	return pv, nil
