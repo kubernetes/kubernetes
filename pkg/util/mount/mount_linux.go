@@ -964,11 +964,11 @@ func doCleanSubPath(mounter Interface, fullContainerDirPath, subPathIndex string
 	glog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
 	fullSubPath := filepath.Join(fullContainerDirPath, subPathIndex)
 
-	if err := UnmountMountPoint(fullSubPath, mounter, true); err != nil {
-		return fmt.Errorf("error unmounting %s: %s", fullSubPath, err)
+	if err := CleanupMountPoint(fullSubPath, mounter, true); err != nil {
+		return fmt.Errorf("error cleaning subpath mount %s: %s", fullSubPath, err)
 	}
 
-	glog.V(5).Infof("Removed %s", fullSubPath)
+	glog.V(4).Infof("Successfully cleaned subpath directory %s", fullSubPath)
 	return nil
 }
 
