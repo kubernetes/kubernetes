@@ -7597,6 +7597,68 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
+		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be signal value if the operator is Gt or Lt": {
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.matchExpressions.matchExpressions[0].values: Required value: must be specified single value when `operator` is 'Lt' or 'Gt'",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key",
+												Operator: metav1.LabelSelectorOpGt,
+												Values:   []string{"2", "3"},
+											},
+										},
+									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, value should be interger if the operator is Gt or Lt": {
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.matchExpressions.matchExpressions[0].values: Invalid value: []string{\"value\"}: must be a number when `operator` is 'Lt' or 'Gt'",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key",
+												Operator: metav1.LabelSelectorOpGt,
+												Values:   []string{"value"},
+											},
+										},
+									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v.spec); len(errs) == 0 {

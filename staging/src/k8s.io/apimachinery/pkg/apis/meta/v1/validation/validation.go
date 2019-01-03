@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"strconv"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -46,6 +48,16 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPat
 		if len(sr.Values) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
 		}
+	case metav1.LabelSelectorOpGt, metav1.LabelSelectorOpLt:
+		if len(sr.Values) != 1 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'"))
+		} else {
+			if _, err := strconv.ParseInt(sr.Values[0], 10, 64); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("values"), sr.Values,
+					"must be a number when `operator` is 'Lt' or 'Gt'"))
+			}
+		}
+
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
 	}

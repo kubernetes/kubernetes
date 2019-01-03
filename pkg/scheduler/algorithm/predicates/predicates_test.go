@@ -2888,6 +2888,164 @@ func TestInterPodAffinity(t *testing.T) {
 			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
 			name:                 "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "usage",
+												Operator: metav1.LabelSelectorOpGt,
+												Values:   []string{"30"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"usage": "40"}}}},
+			node: &node1,
+			fits: true,
+			name: "satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using Gt operator that matches the existing pod",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "usage",
+												Operator: metav1.LabelSelectorOpLt,
+												Values:   []string{"30"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"usage": "20"}}}},
+			node: &node1,
+			fits: true,
+			name: "satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using Lt operator that matches the existing pod",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "usage",
+												Operator: metav1.LabelSelectorOpGt,
+												Values:   []string{"30"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods:                 []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"usage": "20"}}}},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			name:                 "not satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using Gt operator that matches the existing pod",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "usage",
+												Operator: metav1.LabelSelectorOpLt,
+												Values:   []string{"30"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods:                 []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"usage": "40"}}}},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			name:                 "not satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using Lt operator that matches the existing pod",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "usage",
+												Operator: metav1.LabelSelectorOpLt,
+												Values:   []string{"not-integer"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods:                 []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"usage": "20"}}}},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			name:                 "not satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using Lt operator that matches the existing pod for the value is not integer when operator` is 'Lt' or 'Gt'",
+		},
 	}
 
 	for _, test := range tests {
