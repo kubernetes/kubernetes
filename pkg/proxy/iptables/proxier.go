@@ -350,7 +350,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 type iptablesJumpChain struct {
 	table       utiliptables.Table
-	chain       utiliptables.Chain
+	dstChain    utiliptables.Chain
 	sourceChain utiliptables.Chain
 	comment     string
 	extraArgs   []string
@@ -379,7 +379,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	for _, chain := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
 		args := append(chain.extraArgs,
 			"-m", "comment", "--comment", chain.comment,
-			"-j", string(chain.chain),
+			"-j", string(chain.dstChain),
 		)
 		if err := ipt.DeleteRule(chain.table, chain.sourceChain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
@@ -643,16 +643,17 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Create and link the kube chains.
 	for _, chain := range iptablesJumpChains {
-		if _, err := proxier.iptables.EnsureChain(chain.table, chain.chain); err != nil {
+
+		if _, err := proxier.iptables.EnsureChain(chain.table, chain.dstChain); err != nil {
 			glog.Errorf("Failed to ensure that %s chain %s exists: %v", chain.table, kubeServicesChain, err)
 			return
 		}
 		args := append(chain.extraArgs,
 			"-m", "comment", "--comment", chain.comment,
-			"-j", string(chain.chain),
+			"-j", string(chain.dstChain),
 		)
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, chain.table, chain.sourceChain, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", chain.table, chain.sourceChain, chain.chain, err)
+			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", chain.table, chain.sourceChain, chain.dstChain, err)
 			return
 		}
 	}
