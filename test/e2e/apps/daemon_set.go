@@ -62,7 +62,7 @@ var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-select
 // happen.  In the future, running in parallel may work if we have an eviction
 // model which lets the DS controller kick out other pods to make room.
 // See http://issues.k8s.io/21767 for more details
-var _ = SIGDescribe("Daemon set [Serial]", func() {
+var _ = SIGDescribe("Daemon set", func() {
 	var f *framework.Framework
 
 	AfterEach(func() {
