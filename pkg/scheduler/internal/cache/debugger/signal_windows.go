@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -16,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package factory
+package debugger
 
-import "syscall"
+import "os"
 
-// compareSignal is the signal to trigger cache compare. For non-windows
-// environment it's SIGUSR2.
-var compareSignal = syscall.SIGUSR2
+// compareSignal is the signal to trigger cache compare. For windows,
+// it's SIGINT.
+var compareSignal = os.Interrupt
