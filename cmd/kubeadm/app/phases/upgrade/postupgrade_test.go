@@ -150,35 +150,37 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 			expected:       true,
 		},
 	} {
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-		cfg.CertificatesDir = tmpdir
+		t.Run(desc, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+			cfg.CertificatesDir = tmpdir
 
-		caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg)
-		if err != nil {
-			t.Fatalf("failed creation of ca cert and key: %v", err)
-		}
-		caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
-
-		err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, caCert, caKey)
-		if err != nil {
-			t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
-		}
-
-		certAndKey := []string{filepath.Join(tmpdir, constants.APIServerCertName), filepath.Join(tmpdir, constants.APIServerKeyName)}
-		for _, path := range certAndKey {
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				t.Fatalf("Test %s: %s not exist: %v", desc, path, err)
+			caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg)
+			if err != nil {
+				t.Fatalf("failed creation of ca cert and key: %v", err)
 			}
-		}
+			caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
 
-		shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir)
-		if err != nil {
-			t.Fatalf("Test %s: failed to check shouldBackupAPIServerCertAndKey: %v", desc, err)
-		}
+			err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, caCert, caKey)
+			if err != nil {
+				t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
+			}
 
-		if shouldBackup != test.expected {
-			t.Fatalf("Test %s: shouldBackupAPIServerCertAndKey expected %v, got %v", desc, test.expected, shouldBackup)
-		}
+			certAndKey := []string{filepath.Join(tmpdir, constants.APIServerCertName), filepath.Join(tmpdir, constants.APIServerKeyName)}
+			for _, path := range certAndKey {
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Fatalf("Test %s: %s not exist: %v", desc, path, err)
+				}
+			}
+
+			shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir)
+			if err != nil {
+				t.Fatalf("Test %s: failed to check shouldBackupAPIServerCertAndKey: %v", desc, err)
+			}
+
+			if shouldBackup != test.expected {
+				t.Fatalf("Test %s: shouldBackupAPIServerCertAndKey expected %v, got %v", desc, test.expected, shouldBackup)
+			}
+		})
 	}
 }

@@ -781,18 +781,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 
 func TestKubeletUpgrade(t *testing.T) {
 	tests := []struct {
+		name     string
 		before   map[string]uint16
 		after    string
 		expected bool
 	}{
-		{ // upgrade available
+		{
+			name: "upgrade from v1.10.1 to v1.10.3 is available",
 			before: map[string]uint16{
 				"v1.10.1": 1,
 			},
 			after:    "v1.10.3",
 			expected: true,
 		},
-		{ // upgrade available
+		{
+			name: "upgrade from v1.10.1 and v1.10.3/100 to v1.10.3 is available",
 			before: map[string]uint16{
 				"v1.10.1": 1,
 				"v1.10.3": 100,
@@ -800,21 +803,24 @@ func TestKubeletUpgrade(t *testing.T) {
 			after:    "v1.10.3",
 			expected: true,
 		},
-		{ // upgrade not available
+		{
+			name: "upgrade from v1.10.3 to v1.10.3 is not available",
 			before: map[string]uint16{
 				"v1.10.3": 1,
 			},
 			after:    "v1.10.3",
 			expected: false,
 		},
-		{ // upgrade not available
+		{
+			name: "upgrade from v1.10.3/100 to v1.10.3 is not available",
 			before: map[string]uint16{
 				"v1.10.3": 100,
 			},
 			after:    "v1.10.3",
 			expected: false,
 		},
-		{ // upgrade not available if we don't know anything about the earlier state
+		{
+			name:     "upgrade is not available if we don't know anything about the earlier state",
 			before:   map[string]uint16{},
 			after:    "v1.10.3",
 			expected: false,
@@ -822,19 +828,20 @@ func TestKubeletUpgrade(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-
-		upgrade := Upgrade{
-			Before: ClusterState{
-				KubeletVersions: rt.before,
-			},
-			After: ClusterState{
-				KubeVersion: rt.after,
-			},
-		}
-		actual := upgrade.CanUpgradeKubelets()
-		if actual != rt.expected {
-			t.Errorf("failed TestKubeletUpgrade\n\texpected: %t\n\tgot: %t\n\ttest object: %v", rt.expected, actual, upgrade)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			upgrade := Upgrade{
+				Before: ClusterState{
+					KubeletVersions: rt.before,
+				},
+				After: ClusterState{
+					KubeVersion: rt.after,
+				},
+			}
+			actual := upgrade.CanUpgradeKubelets()
+			if actual != rt.expected {
+				t.Errorf("failed TestKubeletUpgrade\n\texpected: %t\n\tgot: %t\n\ttest object: %v", rt.expected, actual, upgrade)
+			}
+		})
 	}
 }
 
@@ -883,10 +890,11 @@ func TestGetBranchFromVersion(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		v := getBranchFromVersion(tc.version)
-		if v != tc.expectedVersion {
-			t.Errorf("expected version %s, got %s", tc.expectedVersion, v)
-		}
+		t.Run(tc.version, func(t *testing.T) {
+			v := getBranchFromVersion(tc.version)
+			if v != tc.expectedVersion {
+				t.Errorf("expected version %s, got %s", tc.expectedVersion, v)
+			}
+		})
 	}
-
 }
