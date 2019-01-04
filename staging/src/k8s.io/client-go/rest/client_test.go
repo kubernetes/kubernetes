@@ -115,8 +115,8 @@ func TestDoRequestFailed(t *testing.T) {
 		t.Errorf("unexpected error type %v", err)
 	}
 	actual := ss.Status()
-	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+	if !reflect.DeepEqual(status, actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, actual))
 	}
 }
 
@@ -155,8 +155,8 @@ func TestDoRawRequestFailed(t *testing.T) {
 		t.Errorf("unexpected error type %v", err)
 	}
 	actual := ss.Status()
-	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+	if !reflect.DeepEqual(status, actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, actual))
 	}
 }
 

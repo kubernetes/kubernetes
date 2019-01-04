@@ -103,7 +103,7 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 		if !ok {
 			return false, apierrors.NewInternalError(err)
 		}
-		return false, &apierrors.StatusError{status.Status()}
+		return false, &apierrors.StatusError{ErrStatus: *status.Status()}
 	}
 	if err != nil {
 		return false, apierrors.NewInternalError(err)

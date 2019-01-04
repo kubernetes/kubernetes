@@ -604,7 +604,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 	client := http.Client{}
 	resp, err := client.Do(req)
 	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
-	watcher.Error(&errStatus)
+	watcher.Error(errStatus)
 	watcher.Stop()
 
 	// Make sure we can actually watch an endpoint
@@ -666,7 +666,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 	}
 
 	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
-	watcher.Error(&errStatus)
+	watcher.Error(errStatus)
 	watcher.Stop()
 
 	got := <-w.ResultChan()
