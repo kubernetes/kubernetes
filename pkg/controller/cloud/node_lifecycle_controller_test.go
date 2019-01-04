@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -164,7 +165,9 @@ func Test_NodesDeleted(t *testing.T) {
 			fakeCloud: &fakecloud.FakeCloud{
 				ExistsByProviderID: false,
 			},
-			deleteNodes: []*v1.Node{},
+			deleteNodes: []*v1.Node{
+				testutil.NewNode("node0"),
+			},
 		},
 		{
 			name: "node ready condition is unknown, node exists",
@@ -191,7 +194,11 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.FakeCloud{
+				NodeShutdown:       false,
 				ExistsByProviderID: true,
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "foo://12345",
+				},
 			},
 			deleteNodes: []*v1.Node{},
 		},

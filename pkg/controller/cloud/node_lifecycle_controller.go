@@ -146,18 +146,6 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			continue
 		}
 
-		// node condition is unknown so we should not try to update it
-		if status == v1.ConditionUnknown {
-			continue
-		}
-
-		// status for NodeReady should be false at this point, this check
-		// is here as a fail safe in the case a new node condition is added
-		// without consideration of this controller
-		if status != v1.ConditionFalse {
-			continue
-		}
-
 		// we need to check this first to get taint working in similar in all cloudproviders
 		// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
 		// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
