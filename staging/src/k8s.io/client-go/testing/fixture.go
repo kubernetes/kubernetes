@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/evanphx/json-patch"
@@ -381,6 +382,15 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		}
 		if oldMeta.GetNamespace() == newMeta.GetNamespace() && oldMeta.GetName() == newMeta.GetName() {
 			if replaceExisting {
+				// To mimic the real apiserver's behavior, skip sending
+				// Modified event to fake watch channels if the object doesn't
+				// change. Note that unlike the byte comparison applied in the
+				// real apiserver, the tracker applies reflect.DeepEqual, which
+				// regards non-nil empty slices and maps as NOT equal to the
+				// nil ones.
+				if reflect.DeepEqual(obj, existingObj) {
+					return nil
+				}
 				for _, w := range t.getWatches(gvr, ns) {
 					w.Modify(obj)
 				}

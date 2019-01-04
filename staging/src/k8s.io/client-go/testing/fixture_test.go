@@ -106,6 +106,7 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	assert.Equal(t, testObj, out.Object, "watched created object mismatch")
 	assert.Equal(t, testObj, outAll.Object, "watched created object mismatch")
 	go func() {
+		testObj.Object["newdata"] = "bar"
 		err := o.Update(testResource, testObj, ns)
 		assert.NoError(t, err, "test resource updating failed")
 	}()
