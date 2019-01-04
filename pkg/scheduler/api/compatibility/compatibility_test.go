@@ -398,7 +398,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					Weight:           1,
 					BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
 					EnableHTTPS:      true,
-					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
 					HTTPTimeout:      1,
 					NodeCacheCapable: true,
 				}},
@@ -490,7 +490,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					Weight:           1,
 					BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
 					EnableHTTPS:      true,
-					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
 					HTTPTimeout:      1,
 					NodeCacheCapable: true,
 				}},
@@ -584,7 +584,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					Weight:           1,
 					BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
 					EnableHTTPS:      true,
-					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
 					HTTPTimeout:      1,
 					NodeCacheCapable: true,
 				}},
@@ -683,7 +683,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					Weight:           1,
 					BindVerb:         "bind", // 1.10 was case-insensitive and tolerated "bindVerb"
 					EnableHTTPS:      true,
-					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
 					HTTPTimeout:      1,
 					NodeCacheCapable: true,
 					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
@@ -805,7 +805,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					Weight:           1,
 					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 					EnableHTTPS:      true,
-					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
 					HTTPTimeout:      1,
 					NodeCacheCapable: true,
 					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
@@ -929,7 +929,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					Weight:           1,
 					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 					EnableHTTPS:      true,
-					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
 					HTTPTimeout:      1,
 					NodeCacheCapable: true,
 					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},

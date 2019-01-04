@@ -55,7 +55,14 @@ type HTTPExtender struct {
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
 	var cfg restclient.Config
 	if config.TLSConfig != nil {
-		cfg.TLSClientConfig = *config.TLSConfig
+		cfg.TLSClientConfig.Insecure = config.TLSConfig.Insecure
+		cfg.TLSClientConfig.ServerName = config.TLSConfig.ServerName
+		cfg.TLSClientConfig.CertFile = config.TLSConfig.CertFile
+		cfg.TLSClientConfig.KeyFile = config.TLSConfig.KeyFile
+		cfg.TLSClientConfig.CAFile = config.TLSConfig.CAFile
+		cfg.TLSClientConfig.CertData = config.TLSConfig.CertData
+		cfg.TLSClientConfig.KeyData = config.TLSConfig.KeyData
+		cfg.TLSClientConfig.CAData = config.TLSConfig.CAData
 	}
 	if config.EnableHTTPS {
 		hasCA := len(cfg.CAFile) > 0 || len(cfg.CAData) > 0
