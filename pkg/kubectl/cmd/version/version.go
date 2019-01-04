@@ -114,6 +114,9 @@ func (o *VersionOptions) Run() error {
 		// Always request fresh data from the server
 		o.discoveryClient.Invalidate()
 		serverVersion, serverErr = o.discoveryClient.ServerVersion()
+		if serverErr != nil {
+			return fmt.Errorf("Error retrieving server version: %s \n\nUse --client option to retrieving client version only", serverErr)
+		}
 		versionInfo.ServerVersion = serverVersion
 	}
 
