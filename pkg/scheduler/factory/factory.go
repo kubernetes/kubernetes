@@ -20,8 +20,6 @@ package factory
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 	"reflect"
 	"time"
 
@@ -393,20 +391,11 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		c.podQueue,
 	)
 
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, compareSignal)
+	debugger.WaitForNotify(c.StopEverything)
 
 	go func() {
-		for {
-			select {
-			case <-c.StopEverything:
-				c.podQueue.Close()
-				return
-			case <-ch:
-				debugger.Comparer.Compare()
-				debugger.Dumper.DumpAll()
-			}
-		}
+		<-c.StopEverything
+		c.podQueue.Close()
 	}()
 
 	return c
