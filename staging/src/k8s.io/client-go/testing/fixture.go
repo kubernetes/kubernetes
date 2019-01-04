@@ -18,7 +18,6 @@ package testing
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"sync"
 
@@ -183,7 +182,7 @@ type tracker struct {
 	scheme    ObjectScheme
 	decoder   runtime.Decoder
 	lock      sync.RWMutex
-	versioner objectVersioner
+	versioner ObjectVersioner
 	objects   map[schema.GroupVersionResource][]runtime.Object
 	// The value type of watchers is a map of which the key is either a namespace or
 	// all/non namespace aka "" and its value is list of fake watchers.
@@ -198,10 +197,17 @@ var _ ObjectTracker = &tracker{}
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+	return NewObjectTrackerWithVersioner(scheme, decoder, nil)
+}
+
+// NewObjectTrackerWithVersioner returns an ObjectTracker that can be used to
+// keep track of objects for the fake clientset. It accepts an ObjectVersioner
+// to handle object versioning.
+func NewObjectTrackerWithVersioner(scheme ObjectScheme, decoder runtime.Decoder, versioner ObjectVersioner) ObjectTracker {
 	return &tracker{
 		scheme:    scheme,
 		decoder:   decoder,
-		versioner: objectVersioner{},
+		versioner: versioner,
 		objects:   make(map[schema.GroupVersionResource][]runtime.Object),
 		watchers:  make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 	}
@@ -385,15 +391,14 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		}
 		if oldMeta.GetNamespace() == newMeta.GetNamespace() && oldMeta.GetName() == newMeta.GetName() {
 			if replaceExisting {
-				if reflect.DeepEqual(obj, existingObj) {
-					return nil
-				}
-				if t.versioner.CompareResourceVersion(obj, existingObj) != 0 {
-					return errors.NewConflict(gr, newMeta.GetName(), fmt.Errorf("Version conflicts, request %q != existing %q", newMeta.GetResourceVersion(), oldMeta.GetResourceVersion()))
-				}
-				err = t.versioner.IncreaseResourceVersion(obj)
-				if err != nil {
-					return err
+				if _, ok := t.versioner.(ObjectVersioner); ok {
+					if t.versioner.CompareResourceVersion(obj, existingObj) != 0 {
+						return errors.NewConflict(gr, newMeta.GetName(), fmt.Errorf("Version conflicts, request %q != existing %q", newMeta.GetResourceVersion(), oldMeta.GetResourceVersion()))
+					}
+					err = t.versioner.IncreaseResourceVersion(obj)
+					if err != nil {
+						return err
+					}
 				}
 				for _, w := range t.getWatches(gvr, ns) {
 					w.Modify(obj)
@@ -410,9 +415,11 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		return errors.NewNotFound(gr, newMeta.GetName())
 	}
 
-	err = t.versioner.IncreaseResourceVersion(obj)
-	if err != nil {
-		return err
+	if _, ok := t.versioner.(ObjectVersioner); ok {
+		err = t.versioner.IncreaseResourceVersion(obj)
+		if err != nil {
+			return err
+		}
 	}
 
 	t.objects[gvr] = append(t.objects[gvr], obj)
@@ -422,6 +429,17 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	}
 
 	return nil
+}
+
+// ObjectVersioner abstracts object versioning behavior.
+type ObjectVersioner interface {
+	// CompareResourceVersion compares versions of two objects. It returns:
+	//  -1 if version(lhs) <  version(rhs)
+	//  0  if version(lhs) == version(rhs)
+	//  1  if version(lhs) >  version(rhs)
+	CompareResourceVersion(lhs, rhs runtime.Object) int
+	// IncreaseResourceVersion increases version of given object.
+	IncreaseResourceVersion(obj runtime.Object) error
 }
 
 type objectVersioner struct{}
@@ -438,7 +456,6 @@ func (a objectVersioner) objectResourceVersion(obj runtime.Object) (uint64, erro
 	return strconv.ParseUint(version, 10, 64)
 }
 
-// CompareResourceVersion compares resource versions.
 func (a objectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
 	lhsVersion, err := a.objectResourceVersion(lhs)
 	if err != nil {
@@ -461,7 +478,6 @@ func (a objectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
 	return 1
 }
 
-// IncreaseResourceVersion increases resource version.
 func (a objectVersioner) IncreaseResourceVersion(obj runtime.Object) error {
 	oldVersion, err := a.objectResourceVersion(obj)
 	if err != nil {
