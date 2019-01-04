@@ -19,7 +19,6 @@ package config
 import (
 	"crypto/x509"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -40,9 +39,9 @@ import (
 )
 
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
-func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func FetchConfigFromFileOrCluster(client clientset.Interface, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// Load the configuration from a file or the cluster
-	initcfg, err := loadConfiguration(client, w, logPrefix, cfgPath, newControlPlane)
+	initcfg, err := loadConfiguration(client, logPrefix, cfgPath, newControlPlane)
 	if err != nil {
 		return nil, err
 	}
@@ -55,15 +54,15 @@ func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPr
 }
 
 // loadConfiguration loads the configuration byte slice from either a file or the cluster ConfigMap
-func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func loadConfiguration(client clientset.Interface, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// The config file has the highest priority
 	if cfgPath != "" {
-		fmt.Fprintf(w, "[%s] Reading configuration options from a file: %s\n", logPrefix, cfgPath)
+		fmt.Printf("[%s] Reading configuration options from a file: %s\n", logPrefix, cfgPath)
 		return loadInitConfigurationFromFile(cfgPath)
 	}
 
-	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	fmt.Printf("[%s] Reading configuration from the cluster...\n", logPrefix)
+	fmt.Printf("[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	return getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
 }
 
