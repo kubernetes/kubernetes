@@ -885,21 +885,21 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 
 		// Add desired groups to actual groups if it is not already so, in order to remove old security rules also
 		// from the desired groups
-		for _, desiredGroupId := range desiredGroupIds {
+		for _, desiredGroupID := range desiredGroupIds {
 
-			founded := false
+			found := false
 			for _, actualGroup := range actualGroups {
-				actualGroupId := aws.StringValue(actualGroup.GroupId)
-				if desiredGroupId == actualGroupId {
-					founded = true
+				actualGroupID := aws.StringValue(actualGroup.GroupId)
+				if desiredGroupID == actualGroupID {
+					found = true
 					break
 				}
 			}
 
-			if !founded {
-				missingGroup, err := c.findSecurityGroup(desiredGroupId)
+			if !found {
+				missingGroup, err := c.findSecurityGroup(desiredGroupID)
 				if err != nil {
-					return fmt.Errorf("error finding security group with id %s: %q", desiredGroupId, err)
+					return fmt.Errorf("error finding security group with id %s: %q", desiredGroupID, err)
 				}
 				actualGroups = append(actualGroups, missingGroup)
 			}
