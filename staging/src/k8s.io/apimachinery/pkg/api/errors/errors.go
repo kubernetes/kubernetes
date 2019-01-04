@@ -35,19 +35,17 @@ const (
 	StatusTooManyRequests = 429
 )
 
-// StatusError is an error intended for consumption by a REST API server; it can also be
-// reconstructed by clients from a REST response. Public to allow easy type switches.
-type StatusError struct {
-	ErrStatus metav1.Status
-}
-
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
 	Status() metav1.Status
 }
 
-var _ error = &StatusError{}
+// StatusError is an error intended for consumption by a REST API server; it can also be
+// reconstructed by clients from a REST response. Public to allow easy type switches.
+type StatusError struct {
+	ErrStatus metav1.Status
+}
 
 // Error implements the Error interface.
 func (e *StatusError) Error() string {
@@ -67,6 +65,9 @@ func (e *StatusError) DebugError() (string, []interface{}) {
 	}
 	return "server response object: %#v", []interface{}{e.ErrStatus}
 }
+
+var _ error = &StatusError{}
+var _ APIStatus = &StatusError{}
 
 // UnexpectedObjectError can be returned by FromObject if it's passed a non-status object.
 type UnexpectedObjectError struct {

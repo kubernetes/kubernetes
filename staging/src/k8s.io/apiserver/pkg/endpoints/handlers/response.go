@@ -130,6 +130,9 @@ func (e errNotAcceptable) Status() metav1.Status {
 	}
 }
 
+var _ error = &errNotAcceptable{}
+var _ errors.APIStatus = &errNotAcceptable{}
+
 func asV1Beta1Table(ctx context.Context, result runtime.Object, opts *metav1beta1.TableOptions, scope RequestScope) (runtime.Object, error) {
 	trace := scope.Trace
 

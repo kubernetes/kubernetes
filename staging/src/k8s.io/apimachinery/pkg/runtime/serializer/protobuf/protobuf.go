@@ -25,6 +25,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -60,6 +61,9 @@ func (e errNotMarshalable) Status() metav1.Status {
 		Message: e.Error(),
 	}
 }
+
+var _ error = &errNotMarshalable{}
+var _ apierrors.APIStatus = &errNotMarshalable{}
 
 func IsNotMarshalable(err error) bool {
 	_, ok := err.(errNotMarshalable)

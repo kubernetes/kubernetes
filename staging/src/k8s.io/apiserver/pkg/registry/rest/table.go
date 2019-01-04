@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -97,3 +98,6 @@ func (e errNotAcceptable) Status() metav1.Status {
 		Message: e.Error(),
 	}
 }
+
+var _ error = &errNotAcceptable{}
+var _ apierrors.APIStatus = &errNotAcceptable{}

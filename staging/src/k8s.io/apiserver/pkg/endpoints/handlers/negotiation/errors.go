@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,6 +47,9 @@ func (e errNotAcceptable) Status() metav1.Status {
 	}
 }
 
+var _ error = &errNotAcceptable{}
+var _ apierrors.APIStatus = &errNotAcceptable{}
+
 // errUnsupportedMediaType indicates Content-Type is not recognized
 type errUnsupportedMediaType struct {
 	accepted []string
@@ -67,3 +71,6 @@ func (e errUnsupportedMediaType) Status() metav1.Status {
 		Message: e.Error(),
 	}
 }
+
+var _ error = &errUnsupportedMediaType{}
+var _ apierrors.APIStatus = &errUnsupportedMediaType{}
