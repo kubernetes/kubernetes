@@ -25,17 +25,6 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 )
 
-func badHTTPResponse() httplog.StacktracePred {
-	return func(status int) bool {
-		// http status code should not be zero
-		if status == 0 {
-			klog.Errorf("Bad HTTP Response - status is zero")
-			return true
-		}
-		return false
-	}
-}
-
 // WithPanicRecovery wraps an http Handler to recover and log panics.
 func WithPanicRecovery(handler http.Handler) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
@@ -50,7 +39,7 @@ func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWrit
 			crashHandler(w, req, err)
 		})
 
-		logger := httplog.NewLogged(req, &w).StacktraceWhen(badHTTPResponse())
+		logger := httplog.NewLogged(req, &w)
 		defer logger.Log()
 
 		// Dispatch to the internal handler
