@@ -151,7 +151,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 
 	// Immediate claims should be bound
 	if len(unboundClaimsImmediate) > 0 {
-		return false, false, fmt.Errorf("pod has unbound PersistentVolumeClaims")
+		return false, false, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
 	}
 
 	// Check PV node affinity on bound volumes
