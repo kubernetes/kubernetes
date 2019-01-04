@@ -2889,7 +2889,7 @@ func TestCleanLegacyService(t *testing.T) {
 	for v := range currentServices {
 		proxier.ipvs.AddVirtualServer(currentServices[v])
 	}
-	proxier.cleanLegacyService(activeServices, currentServices)
+	proxier.cleanLegacyService(activeServices, currentServices, make(map[string]bool))
 	// ipvs4 and ipvs5 should have been cleaned.
 	remainingVirtualServers, _ := proxier.ipvs.GetVirtualServers()
 	if len(remainingVirtualServers) != 4 {
