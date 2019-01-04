@@ -20,20 +20,16 @@ import (
 	"fmt"
 	"net/http"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/storage"
 )
 
-// statusError is an object that can be converted into an metav1.Status
-type statusError interface {
-	Status() metav1.Status
-}
-
 // ErrorToAPIStatus converts an error to an metav1.Status object.
 func ErrorToAPIStatus(err error) *metav1.Status {
 	switch t := err.(type) {
-	case statusError:
+	case apierrors.APIStatus:
 		status := t.Status()
 		if len(status.Status) == 0 {
 			status.Status = metav1.StatusFailure

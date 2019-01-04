@@ -21,14 +21,10 @@ import (
 	"net/url"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
-
-// statusError is an object that can be converted into an metav1.Status
-type statusError interface {
-	Status() metav1.Status
-}
 
 type fakeNegotiater struct {
 	serializer, streamSerializer runtime.Serializer
@@ -243,9 +239,9 @@ func TestNegotiate(t *testing.T) {
 			if !test.errFn(err) {
 				t.Errorf("%d: failed: %v", i, err)
 			}
-			status, ok := err.(statusError)
+			status, ok := err.(apierrors.APIStatus)
 			if !ok {
-				t.Errorf("%d: failed, error should be statusError: %v", i, err)
+				t.Errorf("%d: failed, error should be apierrors.APIStatus: %v", i, err)
 				continue
 			}
 			if status.Status().Status != metav1.StatusFailure || status.Status().Code != http.StatusNotAcceptable {
