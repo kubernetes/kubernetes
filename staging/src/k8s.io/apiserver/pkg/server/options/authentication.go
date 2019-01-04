@@ -260,7 +260,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 		// ignore, authConfigMap is nil now
 	case errors.IsForbidden(err):
 		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
+			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
 		return err
 	case err != nil:
