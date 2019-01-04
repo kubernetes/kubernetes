@@ -22,6 +22,7 @@ import (
 	"syscall"
 
 	"k8s.io/klog"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 // CleanupMountPoint unmounts the given path and
@@ -32,8 +33,8 @@ import (
 func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
 	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
 	// the path in the kubelet container, not on the host.
-	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists {
+	pathExists, pathErr := utilfile.FileExists(mountPath)
+	if !pathExists && pathErr == nil {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
 	}
@@ -86,21 +87,6 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 		return os.Remove(mountPath)
 	}
 	return fmt.Errorf("Failed to unmount path %v", mountPath)
-}
-
-// TODO: clean this up to use pkg/util/file/FileExists
-// PathExists returns true if the specified path exists.
-func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else if IsCorruptedMnt(err) {
-		return true, err
-	} else {
-		return false, err
-	}
 }
 
 // IsCorruptedMnt return true if err is about corrupted mount point

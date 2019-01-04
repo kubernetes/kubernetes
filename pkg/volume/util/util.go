@@ -37,6 +37,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -145,7 +146,7 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 // PathExists returns true if the specified path exists.
 // TODO: Change callers to call mount pkg directly
 func PathExists(path string) (bool, error) {
-	return mount.PathExists(path)
+	return utilfile.FileExists(path)
 }
 
 // IsCorruptedMnt return true if err is about corrupted mount point
