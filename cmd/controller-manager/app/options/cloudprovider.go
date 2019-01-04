@@ -36,10 +36,10 @@ func (s *CloudProviderOptions) Validate() []error {
 
 // AddFlags adds flags related to cloudprovider for controller manager to the specified FlagSet.
 func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&s.Name, "cloud-provider", s.Name,
+	fs.StringVar(&s.Name, ControllerManagerCloudProvider, s.Name,
 		"The provider for cloud services. Empty string for no provider.")
 
-	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile,
+	fs.StringVar(&s.CloudConfigFile, ControllerManagerCloudConfig, s.CloudConfigFile,
 		"The path to the cloud provider configuration file. Empty string for no configuration file.")
 }
 

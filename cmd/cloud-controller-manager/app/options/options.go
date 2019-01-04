@@ -49,13 +49,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 )
 
-const (
-	// CloudControllerManagerUserAgent is the userAgent name when starting cloud-controller managers.
-	CloudControllerManagerUserAgent = "cloud-controller-manager"
-	// DefaultInsecureCloudControllerManagerPort is the default insecure cloud-controller manager port.
-	DefaultInsecureCloudControllerManagerPort = 0
-)
-
 // CloudControllerManagerOptions is the main context object for the controller manager.
 type CloudControllerManagerOptions struct {
 	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
@@ -92,7 +85,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.Generic.Address),
 			BindPort:    int(componentConfig.Generic.Port),
-			BindNetwork: "tcp",
+			BindNetwork: CloudControllerManagerInsecureServingNetworkProtocol,
 		}).WithLoopback(),
 		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:             apiserveroptions.NewDelegatingAuthorizationOptions(),
@@ -129,21 +122,21 @@ func (o *CloudControllerManagerOptions) Flags() apiserverflag.NamedFlagSets {
 	fss := apiserverflag.NamedFlagSets{}
 	o.Generic.AddFlags(&fss, []string{}, []string{})
 	// TODO: Implement the --controllers flag fully for the ccm
-	fss.FlagSet("generic").MarkHidden("controllers")
-	o.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
+	fss.FlagSet(cmoptions.CloudControllerManagerGeneric).MarkHidden(cmoptions.CloudControllerManagerHiddenMark)
+	o.KubeCloudShared.AddFlags(fss.FlagSet(cmoptions.CloudControllerManagerGeneric))
+	o.ServiceController.AddFlags(fss.FlagSet(CloudControllerManagerServiceController))
 
-	o.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	o.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving"))
-	o.Authentication.AddFlags(fss.FlagSet("authentication"))
-	o.Authorization.AddFlags(fss.FlagSet("authorization"))
+	o.SecureServing.AddFlags(fss.FlagSet(CloudControllerManagerSecureServing))
+	o.InsecureServing.AddUnqualifiedFlags(fss.FlagSet(CloudControllerManagerInsecureServing))
+	o.Authentication.AddFlags(fss.FlagSet(CloudControllerManagerAuthentication))
+	o.Authorization.AddFlags(fss.FlagSet(CloudControllerManagerAuthorization))
 
-	fs := fss.FlagSet("misc")
-	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
-	fs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
+	fs := fss.FlagSet(CloudControllerManagerMisc)
+	fs.StringVar(&o.Master, CloudControllerManagerMaster, o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
+	fs.StringVar(&o.Kubeconfig, CloudControllerManagerKubeConfig, o.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, CloudControllerManagerNodeStatusUpdateFrequency, o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
 
-	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
+	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet(cmoptions.CloudControllerManagerGeneric))
 
 	return fss
 }
@@ -256,7 +249,7 @@ func (o *CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config,
 	}
 
 	c := &cloudcontrollerconfig.Config{}
-	if err := o.ApplyTo(c, CloudControllerManagerUserAgent); err != nil {
+	if err := o.ApplyTo(c, cloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}
 

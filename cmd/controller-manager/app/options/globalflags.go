@@ -31,5 +31,5 @@ import (
 func AddCustomGlobalFlags(fs *pflag.FlagSet) {
 	// lookup flags in global flag set and re-register the values with our flagset
 	// adds flags from k8s.io/kubernetes/pkg/cloudprovider/providers
-	globalflag.Register(fs, "cloud-provider-gce-lb-src-cidrs")
+	globalflag.Register(fs, ControllerManagerCloudProviderGceLbSrcCidrs)
 }

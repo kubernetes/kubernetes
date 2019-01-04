@@ -64,23 +64,23 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	o.CloudProvider.AddFlags(fs)
-	fs.StringVar(&o.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
-	fs.BoolVar(&o.UseServiceAccountCredentials, "use-service-account-credentials", o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
-	fs.BoolVar(&o.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
-	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
-	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
-	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
+	fs.StringVar(&o.ExternalCloudVolumePlugin, ControllerManagerExternalCloudVolumeProvider, o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
+	fs.BoolVar(&o.UseServiceAccountCredentials, ControllerManagerUseServiceAccountCredentials, o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
+	fs.BoolVar(&o.AllowUntaggedCloud, ControllerManagerAllowUntaggedCloud, false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
+	fs.MarkDeprecated(ControllerManagerAllowUntaggedCloud, "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
+	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, ControllerManagerRouteReconciliationPeriod, o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
+	fs.DurationVar(&o.NodeMonitorPeriod.Duration, ControllerManagerNodeMonitorPeriod, o.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeController.")
-	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "The instance prefix for the cluster.")
-	fs.StringVar(&o.ClusterCIDR, "cluster-cidr", o.ClusterCIDR, "CIDR Range for Pods in cluster. Requires --allocate-node-cidrs to be true")
-	fs.BoolVar(&o.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
-	fs.StringVar(&o.CIDRAllocatorType, "cidr-allocator-type", "RangeAllocator", "Type of CIDR allocator to use")
-	fs.BoolVar(&o.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
+	fs.StringVar(&o.ClusterName, ControllerManagerClusterName, o.ClusterName, "The instance prefix for the cluster.")
+	fs.StringVar(&o.ClusterCIDR, ControllerManagerClusterCidr, o.ClusterCIDR, "CIDR Range for Pods in cluster. Requires --allocate-node-cidrs to be true")
+	fs.BoolVar(&o.AllocateNodeCIDRs, ControllerManagerAllocateNodeCidrs, false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
+	fs.StringVar(&o.CIDRAllocatorType, ControllerManagerCidrAllocatorType, ControllerManagerRangeAllocatorType, "Type of CIDR allocator to use")
+	fs.BoolVar(&o.ConfigureCloudRoutes, ControllerManagerConfigureCloudRoutes, true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 
-	fs.DurationVar(&o.NodeSyncPeriod.Duration, "node-sync-period", 0, ""+
+	fs.DurationVar(&o.NodeSyncPeriod.Duration, ControllerManagerNodeSyncPeriod, 0, ""+
 		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+
 		"route-reconciliation-period for cloud provider's route configuration settings.")
-	fs.MarkDeprecated("node-sync-period", "This flag is currently no-op and will be deleted.")
+	fs.MarkDeprecated(ControllerManagerNodeSyncPeriod, "This flag is currently no-op and will be deleted.")
 }
 
 // ApplyTo fills up KubeCloudShared config with options.

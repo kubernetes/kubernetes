@@ -65,15 +65,15 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverfl
 		return
 	}
 
-	o.Debugging.AddFlags(fss.FlagSet("debugging"))
-	genericfs := fss.FlagSet("generic")
-	genericfs.DurationVar(&o.MinResyncPeriod.Duration, "min-resync-period", o.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
-	genericfs.StringVar(&o.ClientConnection.ContentType, "kube-api-content-type", o.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
-	genericfs.Float32Var(&o.ClientConnection.QPS, "kube-api-qps", o.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver.")
-	genericfs.Int32Var(&o.ClientConnection.Burst, "kube-api-burst", o.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
-	genericfs.DurationVar(&o.ControllerStartInterval.Duration, "controller-start-interval", o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+	o.Debugging.AddFlags(fss.FlagSet(ControllerManagerDebugging))
+	genericfs := fss.FlagSet(ControllerManagerGeneric)
+	genericfs.DurationVar(&o.MinResyncPeriod.Duration, ControllerManagerMinimumResyncPeriod, o.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
+	genericfs.StringVar(&o.ClientConnection.ContentType, ControllerManagerKubeApiContentType, o.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
+	genericfs.Float32Var(&o.ClientConnection.QPS, ControllerManagerKubeApiQps, o.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver.")
+	genericfs.Int32Var(&o.ClientConnection.Burst, ControllerManagerKubeApiBurst, o.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
+	genericfs.DurationVar(&o.ControllerStartInterval.Duration, ControllerManagerControllerStartInterval, o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 	// TODO: complete the work of the cloud-controller-manager (and possibly other consumers of this code) respecting the --controllers flag
-	genericfs.StringSliceVar(&o.Controllers, "controllers", o.Controllers, fmt.Sprintf(""+
+	genericfs.StringSliceVar(&o.Controllers, ControllerManagerHiddenMark, o.Controllers, fmt.Sprintf(""+
 		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
 		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))

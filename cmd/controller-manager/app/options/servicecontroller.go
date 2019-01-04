@@ -33,7 +33,7 @@ func (o *ServiceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.ConcurrentServiceSyncs, "concurrent-service-syncs", o.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+	fs.Int32Var(&o.ConcurrentServiceSyncs, ControllerManagerConcurrentServiceSyncs, o.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 }
 
 // ApplyTo fills up ServiceController config with options.

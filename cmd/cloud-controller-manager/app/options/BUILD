@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["options.go"],
+    srcs = [
+        "options.go",
+        "constant.go"
+    ],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     deps = [
         "//cmd/cloud-controller-manager/app/apis/config:go_default_library",

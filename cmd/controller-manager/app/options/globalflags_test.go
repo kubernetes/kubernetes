@@ -34,7 +34,7 @@ func TestAddCustomGlobalFlags(t *testing.T) {
 	// Note that we will register all flags (including klog flags) into the same
 	// flag set. This allows us to test against all global flags from
 	// flags.CommandLine.
-	nfs := namedFlagSets.FlagSet("generic")
+	nfs := namedFlagSets.FlagSet(ControllerManagerGeneric)
 	globalflag.AddGlobalFlags(nfs, "test-cmd")
 	AddCustomGlobalFlags(nfs)
 

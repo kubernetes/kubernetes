@@ -34,9 +34,9 @@ func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
+	fs.BoolVar(&o.EnableProfiling, ControllerManagerProfiling, o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
+	fs.BoolVar(&o.EnableContentionProfiling, ControllerManagerContentionProfiling, o.EnableContentionProfiling,
 		"Enable lock contention profiling, if profiling is enabled")
 }
 
