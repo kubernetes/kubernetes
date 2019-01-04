@@ -38,21 +38,17 @@ func NewResourceConfig() *ResourceConfig {
 	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{}}
 }
 
+// DisableAll disables all group/versions. It does not modify individual resource enablement/disablement.
 func (o *ResourceConfig) DisableAll() {
 	for k := range o.GroupVersionConfigs {
 		o.GroupVersionConfigs[k] = false
 	}
-	for k := range o.ResourceConfigs {
-		o.ResourceConfigs[k] = false
-	}
 }
 
+// EnableAll enables all group/versions. It does not modify individual resource enablement/disablement.
 func (o *ResourceConfig) EnableAll() {
 	for k := range o.GroupVersionConfigs {
 		o.GroupVersionConfigs[k] = true
-	}
-	for k := range o.ResourceConfigs {
-		o.ResourceConfigs[k] = true
 	}
 }
 
