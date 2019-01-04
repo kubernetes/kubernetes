@@ -394,8 +394,13 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	debugger.WaitForNotify(c.StopEverything)
 
 	go func() {
-		<-c.StopEverything
-		c.podQueue.Close()
+		for {
+			select {
+			case <-c.StopEverything:
+				c.podQueue.Close()
+				return
+			}
+		}
 	}()
 
 	return c
