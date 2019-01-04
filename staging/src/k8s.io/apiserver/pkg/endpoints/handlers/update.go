@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/klog"
 )
 
 // UpdateResource returns a function that will handle a resource update
@@ -128,8 +127,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				if obj, err := scope.FieldManager.Update(liveObj, newObj, "update"); err == nil {
 					return obj, nil
 				} else {
-					klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
-					return newObj, nil
+					return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 				}
 			})
 		}

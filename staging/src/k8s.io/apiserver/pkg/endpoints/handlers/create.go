@@ -143,10 +143,8 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 				if tmpObj, err := scope.FieldManager.Update(liveObj, obj, "create"); err == nil {
 					obj = tmpObj
 				} else {
-					// Just log an error rather than fail, since we
-					// don't want to prevent updates because of
-					// field managers.
-					klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
+					scope.err(fmt.Errorf("failed to update object managed fields: %v", err), w, req)
+					return
 				}
 			}
 		}
