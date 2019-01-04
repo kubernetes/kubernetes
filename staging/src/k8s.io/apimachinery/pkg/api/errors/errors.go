@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/structured-merge-diff/merge"
 )
 
 const (
@@ -181,6 +182,30 @@ func NewConflict(qualifiedResource schema.GroupResource, name string, err error)
 			Name:  name,
 		},
 		Message: fmt.Sprintf("Operation cannot be fulfilled on %s %q: %v", qualifiedResource.String(), name, err),
+	}}
+}
+
+// NewApplyConflict returns an error including details on the requests apply conflicts
+func NewApplyConflict(conflicts merge.Conflicts, err error) *StatusError {
+	causes := make([]metav1.StatusCause, 0, len(conflicts))
+	for i := range conflicts {
+		err := conflicts[i]
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseType("conflict"),
+			Message: err.Error(),
+			Field:   err.Path.String(),
+		})
+	}
+
+	return &StatusError{ErrStatus: metav1.Status{
+		Status: metav1.StatusFailure,
+		Code:   http.StatusConflict,
+		Reason: metav1.StatusReasonConflict,
+		Details: &metav1.StatusDetails{
+			// TODO: Get obj details here?
+			Causes: causes,
+		},
+		Message: fmt.Sprintf("Apply failed with %d conflicts: %v", len(conflicts), err),
 	}}
 }
 

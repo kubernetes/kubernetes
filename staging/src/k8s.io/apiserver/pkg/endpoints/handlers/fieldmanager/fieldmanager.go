@@ -19,6 +19,7 @@ package fieldmanager
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
@@ -136,6 +137,9 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, applyManager, force)
 	if err != nil {
+		if conflicts, ok := err.(merge.Conflicts); ok {
+			return nil, errors.NewApplyConflict(conflicts, err)
+		}
 		return nil, err
 	}
 
