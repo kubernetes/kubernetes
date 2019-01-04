@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -81,11 +80,9 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	}
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: e.enqueueService,
-		UpdateFunc: func(old, cur interface{}) {
-			e.enqueueService(cur)
-		},
-		DeleteFunc: e.enqueueService,
+		AddFunc:    e.addService,
+		UpdateFunc: e.updateService,
+		DeleteFunc: e.deleteService,
 	})
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
@@ -100,6 +97,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
+
+	e.cache = newEndpointsControllerCache()
 
 	return e
 }
@@ -138,6 +137,10 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// cache managing a local copy of pods and services to be used as a single source of truth in this
+	// controller.
+	cache *endpointsControllerCache
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -153,6 +156,17 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 		return
 	}
 
+	// Initialize cache and start workers. The order is crucial here - workers cannot be started until
+	// the cache has been initialized, as in the other case it may result in creating wrong Endpoints
+	// objects. Starting workers before the state is fully propagated may result in computing
+	// endpoints from a partial state thus leading to an Endpoints object just having a partial
+	// content. Initializing makes sure that the cache has a consistent state of all services and pods
+	// at some point of time. The state will be kept up-to-date via the event handlers.
+	if err := e.cache.Initialize(e.serviceLister, e.podLister); err != nil {
+		klog.Errorf("unable to initialize endpoints controller cache: %v", err)
+		return
+	}
+
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.worker, e.workerLoopPeriod, stopCh)
 	}
@@ -165,35 +179,12 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String, error) {
-	set := sets.String{}
-	services, err := e.serviceLister.GetPodServices(pod)
-	if err != nil {
-		// don't log this error because this function makes pointless
-		// errors when no services match.
-		return set, nil
-	}
-	for i := range services {
-		key, err := controller.KeyFunc(services[i])
-		if err != nil {
-			return nil, err
-		}
-		set.Insert(key)
-	}
-	return set, nil
-}
-
 // When a pod is added, figure out what services it will be a member of and
 // enqueue them. obj must have *v1.Pod type.
 func (e *EndpointController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := e.getPodServiceMemberships(pod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
-		return
-	}
-	for key := range services {
-		e.queue.Add(key)
+	for _, service := range e.cache.AddPod(pod) {
+		e.queue.Add(service)
 	}
 }
 
@@ -238,19 +229,6 @@ func podChanged(oldPod, newPod *v1.Pod) bool {
 	return true
 }
 
-func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
-	if podChanged {
-		// if the labels and pod changed, all services need to be updated
-		services = services.Union(oldServices)
-	} else {
-		// if only the labels changed, services not common to
-		// both the new and old service set (i.e the disjunctive union)
-		// need to be updated
-		services = services.Difference(oldServices).Union(oldServices.Difference(services))
-	}
-	return services
-}
-
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
@@ -262,6 +240,9 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
+
+	// Update the pod state in the cache, get the list of affected services.
+	services := e.cache.UpdatePod(oldPod, newPod)
 
 	podChangedFlag := podChanged(oldPod, newPod)
 
@@ -278,23 +259,8 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	services, err := e.getPodServiceMemberships(newPod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err))
-		return
-	}
-
-	if labelsChanged {
-		oldServices, err := e.getPodServiceMemberships(oldPod)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
-			return
-		}
-		services = determineNeededServiceUpdates(oldServices, services, podChangedFlag)
-	}
-
-	for key := range services {
-		e.queue.Add(key)
+	for _, service := range services {
+		e.queue.Add(service)
 	}
 }
 
@@ -306,11 +272,10 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 // When a pod is deleted, enqueue the services the pod used to be a member of.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (e *EndpointController) deletePod(obj interface{}) {
-	if _, ok := obj.(*v1.Pod); ok {
-		// Enqueue all the services that the pod used to be a member
-		// of. This happens to be exactly the same thing we do when a
-		// pod is added.
-		e.addPod(obj)
+	if pod, ok := obj.(*v1.Pod); ok {
+		for _, service := range e.cache.DeletePod(pod) {
+			e.queue.Add(service)
+		}
 		return
 	}
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
@@ -325,7 +290,58 @@ func (e *EndpointController) deletePod(obj interface{}) {
 		return
 	}
 	klog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
-	e.addPod(pod)
+	for _, service := range e.cache.DeletePod(pod) {
+		e.queue.Add(service)
+	}
+}
+
+func (e *EndpointController) addService(obj interface{}) {
+	service := obj.(*v1.Service)
+	key, err := e.cache.AddService(service)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	e.queue.Add(key)
+}
+
+func (e *EndpointController) updateService(before, after interface{}) {
+	beforeService, afterService := before.(*v1.Service), after.(*v1.Service)
+	key, err := e.cache.UpdateService(beforeService, afterService)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", after, err))
+		return
+	}
+	e.queue.Add(key)
+}
+
+func (e *EndpointController) deleteService(obj interface{}) {
+	if service, ok := obj.(*v1.Service); ok {
+		e.doDeleteService(service)
+		return
+	}
+	// If we reached here it means the service was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		return
+	}
+	service, ok := tombstone.Obj.(*v1.Service)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Service: %#v", service))
+		return
+	}
+	klog.V(4).Infof("Deleting service %s/%s having final state unrecorded", service.Namespace, service.Name)
+	e.doDeleteService(service)
+}
+
+func (e *EndpointController) doDeleteService(service *v1.Service) {
+	key, err := e.cache.DeleteService(service)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for service %+v: %v", service, err))
+		return
+	}
+	e.queue.Add(key)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
@@ -335,7 +351,6 @@ func (e *EndpointController) enqueueService(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-
 	e.queue.Add(key)
 }
 
@@ -388,8 +403,8 @@ func (e *EndpointController) syncService(key string) error {
 	if err != nil {
 		return err
 	}
-	service, err := e.serviceLister.Services(namespace).Get(name)
-	if err != nil {
+	service, pods := e.cache.GetServiceAndPods(namespace, name)
+	if service == nil {
 		// Delete the corresponding endpoint, as the service has been deleted.
 		// TODO: Please note that this will delete an endpoint when a
 		// service is deleted. However, if we're down at the time when
@@ -409,12 +424,6 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	klog.V(5).Infof("About to update endpoints for service %q", key)
-	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
-	if err != nil {
-		// Since we're getting stuff from a local cache, it is
-		// basically impossible to get this error.
-		return err
-	}
 
 	// If the user specified the older (deprecated) annotation, we have to respect it.
 	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses

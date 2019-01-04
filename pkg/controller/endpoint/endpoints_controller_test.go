@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -130,6 +129,13 @@ type endpointController struct {
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
+}
+
+func (e *endpointController) syncService(key string) {
+	// Internal cache needs to be initialized before the syncService is called. Normally this is done
+	// in the EndpointController.Run() func.
+	e.cache.Initialize(e.serviceLister, e.podLister)
+	e.EndpointController.syncService(key)
 }
 
 func newController(url string) *endpointController {
@@ -1110,68 +1116,4 @@ func TestPodChanged(t *testing.T) {
 		t.Errorf("Expected pod to be changed with DeletionTimestamp change")
 	}
 	newPod.ObjectMeta.DeletionTimestamp = oldPod.ObjectMeta.DeletionTimestamp.DeepCopy()
-}
-
-func TestDetermineNeededServiceUpdates(t *testing.T) {
-	testCases := []struct {
-		name  string
-		a     sets.String
-		b     sets.String
-		union sets.String
-		xor   sets.String
-	}{
-		{
-			name:  "no services changed",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("a", "b", "c"),
-			xor:   sets.NewString(),
-			union: sets.NewString("a", "b", "c"),
-		},
-		{
-			name:  "all old services removed, new services added",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("d", "e", "f"),
-			xor:   sets.NewString("a", "b", "c", "d", "e", "f"),
-			union: sets.NewString("a", "b", "c", "d", "e", "f"),
-		},
-		{
-			name:  "all old services removed, no new services added",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString(),
-			xor:   sets.NewString("a", "b", "c"),
-			union: sets.NewString("a", "b", "c"),
-		},
-		{
-			name:  "no old services, but new services added",
-			a:     sets.NewString(),
-			b:     sets.NewString("a", "b", "c"),
-			xor:   sets.NewString("a", "b", "c"),
-			union: sets.NewString("a", "b", "c"),
-		},
-		{
-			name:  "one service removed, one service added, two unchanged",
-			a:     sets.NewString("a", "b", "c"),
-			b:     sets.NewString("b", "c", "d"),
-			xor:   sets.NewString("a", "d"),
-			union: sets.NewString("a", "b", "c", "d"),
-		},
-		{
-			name:  "no services",
-			a:     sets.NewString(),
-			b:     sets.NewString(),
-			xor:   sets.NewString(),
-			union: sets.NewString(),
-		},
-	}
-	for _, testCase := range testCases {
-		retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
-		if !retval.Equal(testCase.xor) {
-			t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
-		}
-
-		retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
-		if !retval.Equal(testCase.union) {
-			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
-		}
-	}
 }

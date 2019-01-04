@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "doc.go",
         "endpoints_controller.go",
+        "endpoints_controller_cache.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     deps = [
@@ -39,7 +40,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["endpoints_controller_test.go"],
+    srcs = [
+        "endpoints_controller_cache_test.go",
+        "endpoints_controller_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",
@@ -48,13 +52,14 @@ go_test(
         "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
