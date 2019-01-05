@@ -10,7 +10,7 @@ https://git.k8s.io/community/contributors/devel/release.md#issue-kind-label
 -->
 
 **What type of PR is this?**
-> Uncomment only one, leave it on its own line:
+> Uncomment only one " /kind <>" line, hit enter to put that in a new line, and remove leading whitespaces from that line:
 >
 > /kind api-change
 > /kind bug
