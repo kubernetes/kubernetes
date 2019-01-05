@@ -168,6 +168,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 			// For UDP, ActiveConn is always 0
 			// For TCP, InactiveConn are connections not in ESTABLISHED state
 			if rs.ActiveConn+rs.InactiveConn != 0 {
+				klog.Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
 				return false, nil
 			}
 			klog.Infof("Deleting rs: %s", rsToDelete.String())
