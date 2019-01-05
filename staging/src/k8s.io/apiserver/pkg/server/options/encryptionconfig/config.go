@@ -175,8 +175,8 @@ func GetPrefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]val
 
 			timeout := kmsPluginConnectionTimeout
 			if provider.KMS.Timeout != nil {
-				if provider.KMS.Timeout.Duration < 0 {
-					return nil, fmt.Errorf("could not configure KMS plugin %q, timeout should be positive value", provider.KMS.Name)
+				if provider.KMS.Timeout.Duration <= 0 {
+					return nil, fmt.Errorf("could not configure KMS plugin %q, timeout should be a positive value", provider.KMS.Name)
 				}
 				timeout = provider.KMS.Timeout.Duration
 			}

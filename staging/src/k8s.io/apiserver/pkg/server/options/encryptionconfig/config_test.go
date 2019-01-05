@@ -443,7 +443,7 @@ resources:
 			want: 15 * time.Second,
 		},
 		{
-			desc: "duration explicitly provided as 0",
+			desc: "duration explicitly provided as 0 which is an invalid value, error should be returned",
 			config: `kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -453,9 +453,9 @@ resources:
     - kms:
         name: foo
         endpoint: unix:///tmp/testprovider.sock
-        timeout:   0
+        timeout:   0s
 `,
-			want: 0,
+			wantErr: "timeout should be a positive value",
 		},
 		{
 			desc: "duration is not provided, default will be supplied",
@@ -485,7 +485,7 @@ resources:
         timeout:   -15s
 
 `,
-			wantErr: "timeout should be positive value",
+			wantErr: "timeout should be a positive value",
 		},
 	}
 
