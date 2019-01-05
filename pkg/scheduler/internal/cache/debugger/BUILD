@@ -6,6 +6,8 @@ go_library(
         "comparer.go",
         "debugger.go",
         "dumper.go",
+        "signal.go",
+        "signal_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger",
     visibility = ["//pkg/scheduler:__subpackages__"],
