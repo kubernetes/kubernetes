@@ -199,6 +199,8 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
 					klog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
 						volumeSpecMap[spec], spec.Name(), nodeName)
+				} else {
+					actualStateOfWorld.AddVolumeToReportAsAttached(volumeSpecMap[spec], nodeName)
 				}
 			}
 		}

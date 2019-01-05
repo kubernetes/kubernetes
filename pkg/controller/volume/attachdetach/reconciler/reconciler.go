@@ -132,6 +132,11 @@ func (rc *reconciler) updateSyncTime() {
 func (rc *reconciler) syncStates() {
 	volumesPerNode := rc.actualStateOfWorld.GetAttachedVolumesPerNode()
 	rc.attacherDetacher.VerifyVolumesAreAttached(volumesPerNode, rc.actualStateOfWorld)
+	// Update Node Status
+	err := rc.nodeStatusUpdater.UpdateNodeStatuses()
+	if err != nil {
+		klog.Warningf("UpdateNodeStatuses failed with: %v", err)
+	}
 }
 
 // isMultiAttachForbidden checks if attaching this volume to multiple nodes is definitely not allowed/possible.
