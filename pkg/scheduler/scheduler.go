@@ -324,33 +324,44 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 		// and the time the scheduler receives a Pod Update for the nominated pod.
 		sched.config.SchedulingQueue.UpdateNominatedPodForNode(preemptor, nodeName)
 
-		// Make a call to update nominated node name of the pod on the API server.
-		err = sched.config.PodPreemptor.SetNominatedNodeName(preemptor, nodeName)
-		if err != nil {
-			klog.Errorf("Error in preemption process. Cannot update pod %v/%v annotations: %v", preemptor.Namespace, preemptor.Name, err)
-			sched.config.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)
-			return "", err
-		}
-
-		for _, victim := range victims {
-			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
-				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
-				return "", err
+		// Set nominated node name and delete victims asynchronously.
+		go func() {
+			// Make a call to update nominated node name of the pod on the API server.
+			err = sched.config.PodPreemptor.SetNominatedNodeName(preemptor, nodeName)
+			if err != nil {
+				klog.Errorf("Error in preemption process. Cannot update pod %v/%v annotations: %v", preemptor.Namespace, preemptor.Name, err)
+				sched.config.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)
+				return
 			}
-			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
-		}
+
+			for _, victim := range victims {
+				if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
+					klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+					return
+				}
+				sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
+			}
+		}()
 		metrics.PreemptionVictims.Set(float64(len(victims)))
 	}
 	// Clearing nominated pods should happen outside of "if node != nil". Node could
 	// be nil when a pod with nominated node name is eligible to preempt again,
 	// but preemption logic does not find any node for it. In that case Preempt()
 	// function of generic_scheduler.go returns the pod itself for removal of the annotation.
-	for _, p := range nominatedPodsToClear {
-		rErr := sched.config.PodPreemptor.RemoveNominatedNodeName(p)
-		if rErr != nil {
-			klog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
-			// We do not return as this error is not critical.
+	if len(nominatedPodsToClear) > 0 {
+		for _, p := range nominatedPodsToClear {
+			sched.config.SchedulingQueue.DeleteNominatedPodIfExists(p)
 		}
+
+		go func() {
+			for _, p := range nominatedPodsToClear {
+				rErr := sched.config.PodPreemptor.RemoveNominatedNodeName(p)
+				if rErr != nil {
+					klog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
+					// We do not return as this error is not critical.
+				}
+			}
+		}()
 	}
 	return nodeName, err
 }
@@ -481,8 +492,7 @@ func (sched *Scheduler) scheduleOne() {
 		// into the resources that were preempted, but this is harmless.
 		if fitError, ok := err.(*core.FitError); ok {
 			if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
-				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
-					" No preemption is performed.")
+				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration. No preemption is performed.")
 			} else {
 				preemptionStartTime := time.Now()
 				sched.preempt(pod, fitError)

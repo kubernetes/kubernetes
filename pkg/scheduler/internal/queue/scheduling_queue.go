@@ -493,7 +493,7 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 			return err
 		}
 
-		// If the pod is in the backoff queue, update it there.
+		// If the pod is in the backoff queue, move the updated version to the activeQ.
 		if _, exists, _ := p.podBackoffQ.Get(oldPod); exists {
 			p.nominatedPods.update(oldPod, newPod)
 			p.podBackoffQ.Delete(newPod)
