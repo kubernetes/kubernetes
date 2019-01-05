@@ -106,6 +106,8 @@ func startEtcd() (func(), error) {
 		GetEtcdURL(),
 		"--listen-peer-urls",
 		"http://127.0.0.1:0",
+		"--log-package-levels",
+		"*=DEBUG",
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
