@@ -35,6 +35,13 @@ export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 retry go get github.com/jstemmer/go-junit-report
 
+# Apply patch in https://github.com/jstemmer/go-junit-report/pull/83 to better
+# capture test output in junit xml.
+pushd ${GOPATH}/src/github.com/jstemmer/go-junit-report
+(curl https://patch-diff.githubusercontent.com/raw/jstemmer/go-junit-report/pull/83.patch | patch -p1 --forward --batch) || true
+go install .
+popd
+
 # Enable the Go race detector.
 export KUBE_RACE=-race
 # Disable coverage report

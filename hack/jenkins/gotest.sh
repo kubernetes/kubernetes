@@ -34,6 +34,13 @@ export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:$PATH
 command -v etcd &>/dev/null || ./hack/install-etcd.sh
 go get -u github.com/jstemmer/go-junit-report
 
+# Apply patch in https://github.com/jstemmer/go-junit-report/pull/83 to better
+# capture test output in junit xml.
+pushd ${GOPATH}/src/github.com/jstemmer/go-junit-report
+(curl https://patch-diff.githubusercontent.com/raw/jstemmer/go-junit-report/pull/83.patch | patch -p1 --forward --batch) || true
+go install .
+popd
+
 # Enable the Go race detector.
 export KUBE_RACE=-race
 # Set artifacts directory
