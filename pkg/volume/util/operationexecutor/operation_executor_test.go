@@ -389,14 +389,14 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 	}
 }
 
-func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
-	}, nil
+	}
 }
 func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
