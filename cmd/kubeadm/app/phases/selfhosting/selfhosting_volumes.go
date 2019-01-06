@@ -89,6 +89,23 @@ func apiServerCertificatesVolumeSource() v1.VolumeSource {
 				{
 					Secret: &v1.SecretProjection{
 						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.APIServerEtcdClientCertName,
+							},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.APIServerEtcdClientKeyName,
+							},
+						},
+					},
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
 							Name: kubeadmconstants.ServiceAccountKeyBaseName,
 						},
 						Items: []v1.KeyToPath{
@@ -313,6 +330,11 @@ func getTLSKeyPairs() []*tlsKeyPair {
 			name: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
 			cert: kubeadmconstants.APIServerKubeletClientCertName,
 			key:  kubeadmconstants.APIServerKubeletClientKeyName,
+		},
+		{
+			name: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
+			cert: kubeadmconstants.APIServerEtcdClientCertName,
+			key:  kubeadmconstants.APIServerEtcdClientKeyName,
 		},
 		{
 			name: kubeadmconstants.ServiceAccountKeyBaseName,
