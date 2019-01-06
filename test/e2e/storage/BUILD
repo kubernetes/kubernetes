@@ -82,7 +82,6 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
-        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
