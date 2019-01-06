@@ -50,6 +50,13 @@
   - k8s.io/kube-openapi
   - k8s.io/klog
 
+- baseImportPath: "./vendor/k8s.io/component-base/"
+  allowedImports:
+  - k8s.io/apimachinery
+  - k8s.io/component-base
+  - k8s.io/klog
+  - k8s.io/utils
+
 - baseImportPath: "./vendor/k8s.io/client-go/"
   allowedImports:
   - k8s.io/api
@@ -142,23 +149,29 @@
 - baseImportPath: "./vendor/k8s.io/kube-controller-manager/"
   allowedImports:
   - k8s.io/apimachinery
-  - k8s.io/apiserver
+  - k8s.io/component-base
+  - k8s.io/klog
   - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-proxy/"
   allowedImports:
   - k8s.io/apimachinery
+  - k8s.io/component-base
+  - k8s.io/klog
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-scheduler/"
   allowedImports:
   - k8s.io/apimachinery
-  - k8s.io/apiserver
+  - k8s.io/component-base
+  - k8s.io/klog
   - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kubelet/"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
   allowedImports:

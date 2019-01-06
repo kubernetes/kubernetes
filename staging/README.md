@@ -15,6 +15,7 @@ Repositories currently staged here:
 - [`k8s.io/cloud-provider`](https://github.com/kubernetes/cloud-provider)
 - [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
+- [`k8s.io/component-base`](https://github.com/kubernetes/component-base)
 - [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
