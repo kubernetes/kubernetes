@@ -3,12 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/config/validation",
-    importpath = "k8s.io/apiserver/pkg/apis/config/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/config/validation",
+    importpath = "k8s.io/component-base/config/validation",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
     ],
 )
 
@@ -19,7 +19,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
     ],
 )
 

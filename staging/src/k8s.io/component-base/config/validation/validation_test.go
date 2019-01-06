@@ -17,12 +17,56 @@ limitations under the License.
 package validation
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/apis/config"
 	"testing"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/config"
 )
+
+func TestValidateClientConnectionConfiguration(t *testing.T) {
+	validConfig := &config.ClientConnectionConfiguration{
+		AcceptContentTypes: "application/json",
+		ContentType:        "application/json",
+		QPS:                10,
+		Burst:              10,
+	}
+
+	qpsLessThanZero := validConfig.DeepCopy()
+	qpsLessThanZero.QPS = -1
+
+	burstLessThanZero := validConfig.DeepCopy()
+	burstLessThanZero.Burst = -1
+
+	scenarios := map[string]struct {
+		expectedToFail bool
+		config         *config.ClientConnectionConfiguration
+	}{
+		"good": {
+			expectedToFail: false,
+			config:         validConfig,
+		},
+		"good-qps-less-than-zero": {
+			expectedToFail: false,
+			config:         qpsLessThanZero,
+		},
+		"bad-burst-less-then-zero": {
+			expectedToFail: true,
+			config:         burstLessThanZero,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidateClientConnectionConfiguration(scenario.config, field.NewPath("clientConnectionConfiguration"))
+		if len(errs) == 0 && scenario.expectedToFail {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.expectedToFail {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
 
 func TestValidateLeaderElectionConfiguration(t *testing.T) {
 	validConfig := &config.LeaderElectionConfiguration{
