@@ -26,9 +26,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	componentbaseconfig "k8s.io/component-base/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -289,7 +289,7 @@ nodePortAddresses:
 		}
 		expected := &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: expBindAddr,
-			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+			ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 				AcceptContentTypes: "abc",
 				Burst:              100,
 				ContentType:        "content-type",
