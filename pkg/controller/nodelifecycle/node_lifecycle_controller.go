@@ -544,6 +544,10 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 		if t.Key == schedulerapi.TaintNodeUnschedulable {
 			return true
 		}
+		// Find not-ready taint with unschedulable effect.
+		if t.Key == schedulerapi.TaintNodeNotReady {
+			return true
+		}
 		// Find node condition taints of node.
 		_, found := taintKeyToNodeConditionMap[t.Key]
 		return found
@@ -959,7 +963,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 				status:                   &node.Status,
 				probeTimestamp:           nc.nodeHealthMap[node.Name].probeTimestamp,
 				readyTransitionTimestamp: nc.now(),
-				lease:                    observedLease,
+				lease: observedLease,
 			}
 			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 		}

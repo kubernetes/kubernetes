@@ -2819,6 +2819,34 @@ func TestTaintsNodeByCondition(t *testing.T) {
 			},
 			ExpectedTaints: []*v1.Taint{unreachableTaint},
 		},
+		{
+			Name: "Node is ready",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints:        []v1.Taint{*notReadyTaint, *unreachableTaint, *networkUnavailableTaint},
+					Unschedulable: false,
+				},
+			},
+			ExpectedTaints: nil,
+		},
 	}
 
 	for _, test := range tests {
