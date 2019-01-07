@@ -30,7 +30,6 @@ import (
 )
 
 var (
-	events  = []auditv1.Event{}
 	encoder runtime.Encoder
 	decoder runtime.Decoder
 )
