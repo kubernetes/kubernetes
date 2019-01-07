@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -41,8 +40,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/kustomize/k8sdeps"
 	"sigs.k8s.io/kustomize/pkg/commands/build"
-	"sigs.k8s.io/kustomize/pkg/constants"
 	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/pkg/loader"
+	"sigs.k8s.io/kustomize/pkg/target"
 )
 
 const (
@@ -457,10 +457,6 @@ func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, ext
 		if err != nil {
 			return err
 		}
-		if isKustomizationDir(path) {
-			visitors = append(visitors, NewKustomizationVisitor(mapper, path, schema))
-			return filepath.SkipDir
-		}
 		if fi.IsDir() {
 			if path != paths && !recursive {
 				return filepath.SkipDir
@@ -471,7 +467,7 @@ func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, ext
 		if path != paths && ignoreFile(path, extensions) {
 			return nil
 		}
-		if filepath.Base(path) == constants.KustomizationFileName {
+		if path == paths && isKustomizationFile(path) {
 			visitors = append(visitors, NewKustomizationVisitor(mapper, filepath.Dir(path), schema))
 			return nil
 		}
@@ -490,11 +486,21 @@ func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, ext
 	return visitors, nil
 }
 
-func isKustomizationDir(path string) bool {
-	if _, err := os.Stat(filepath.Join(path, constants.KustomizationFileName)); err == nil {
-		return true
+func isKustomizationFile(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
 	}
-	return false
+	mode := fi.Mode()
+	if !mode.IsRegular() {
+		return false
+	}
+	fSys := fs.MakeRealFS()
+	ldr, err := loader.NewLoader(filepath.Dir(path), fSys)
+	if err != nil {
+		return false
+	}
+	return target.IsKustomizationFile(ldr, filepath.Base(path))
 }
 
 // FileVisitor is wrapping around a StreamVisitor, to handle open/close files
@@ -536,12 +542,8 @@ func (v *KustomizationVisitor) Visit(fn VisitorFunc) error {
 	fSys := fs.MakeRealFS()
 	f := k8sdeps.NewFactory()
 	var out bytes.Buffer
-	cmd := build.NewCmdBuild(&out, fSys, f.ResmapF, f.TransformerF)
-	cmd.SetArgs([]string{v.Path})
-	// we want to silence usage, error output, and any future output from cobra
-	// we will get error output as a golang error from execute
-	cmd.SetOutput(ioutil.Discard)
-	_, err := cmd.ExecuteC()
+	o := build.NewBuildOptions(v.Path, "", false)
+	err := o.RunBuild(&out, fSys, f.ResmapF, f.TransformerF)
 	if err != nil {
 		return err
 	}
