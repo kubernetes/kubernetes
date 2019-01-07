@@ -56,7 +56,7 @@ import (
 // KEEP THE SPACE SHUTTLE FLYING.
 // ==================================================================
 //
-// This controller is intentionally written in a very verbose style.  You will
+// This controller is intentionally written in a very verbose style. You will
 // notice:
 //
 // 1. Every 'if' statement has a matching 'else' (exception: simple error
@@ -119,8 +119,8 @@ import (
 // annotation does not matter.
 const annBindCompleted = "pv.kubernetes.io/bind-completed"
 
-// annBoundByController annotation applies to PVs and PVCs.  It indicates that
-// the binding (PV->PVC or PVC->PV) was installed by the controller.  The
+// annBoundByController annotation applies to PVs and PVCs. It indicates that
+// the binding (PV->PVC or PVC->PV) was installed by the controller. The
 // absence of this annotation means the binding was done by the user (i.e.
 // pre-bound). Value of this annotation does not matter.
 // External PV binders must bind PV the same way as PV controller, otherwise PV
