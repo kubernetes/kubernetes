@@ -753,18 +753,18 @@ binary | sha256 hash
 This is the first release tracked via the use of the [kubernetes/features](https://github.com/kubernetes/features) issues repo.  Each Feature issue is owned by a Special Interest Group from [kubernetes/community](https://github.com/kubernetes/community)
 
 - **API Machinery**
-  - [alpha] Generate audit logs for every request user performs against secured API server endpoint. ([docs](http://kubernetes.io/docs/admin/audit/)) ([kubernetes/features#22](https://github.com/kubernetes/features/issues/22))
-  - [beta] `kube-apiserver` now publishes a swagger 2.0 spec in addition to a swagger 1.2 spec ([kubernetes/features#53](https://github.com/kubernetes/features/issues/53))
+  - [alpha] Generate audit logs for every request user performs against secured API server endpoint. ([docs](http://kubernetes.io/docs/admin/audit/)) ([kubernetes/features#22](https://github.com/kubernetes/enhancements/issues/22))
+  - [beta] `kube-apiserver` now publishes a swagger 2.0 spec in addition to a swagger 1.2 spec ([kubernetes/features#53](https://github.com/kubernetes/enhancements/issues/53))
   - [beta] Server-side garbage collection is enabled by default. See [user-guide](http://kubernetes.io/docs/user-guide/garbage-collection/)
 - **Apps**
-  - [alpha] Introducing 'ScheduledJobs', which allow running time based Jobs, namely once at a specified time or repeatedly at specified point in time. ([docs](http://kubernetes.io/docs/user-guide/scheduled-jobs/)) ([kubernetes/features#19](https://github.com/kubernetes/features/issues/19))
+  - [alpha] Introducing 'ScheduledJobs', which allow running time based Jobs, namely once at a specified time or repeatedly at specified point in time. ([docs](http://kubernetes.io/docs/user-guide/scheduled-jobs/)) ([kubernetes/features#19](https://github.com/kubernetes/enhancements/issues/19))
 - **Auth**
-  - [alpha] Container Image Policy allows an access controller to determine whether a pod may be scheduled based on a policy ([docs](http://kubernetes.io/docs/admin/admission-controllers/#imagepolicywebhook)) ([kubernetes/features#59](https://github.com/kubernetes/features/issues/59))
-  - [alpha] Access Review APIs expose authorization engine to external inquiries for delegation, inspection, and debugging ([docs](http://kubernetes.io/docs/admin/authorization/)) ([kubernetes/features#37](https://github.com/kubernetes/features/issues/37))
+  - [alpha] Container Image Policy allows an access controller to determine whether a pod may be scheduled based on a policy ([docs](http://kubernetes.io/docs/admin/admission-controllers/#imagepolicywebhook)) ([kubernetes/features#59](https://github.com/kubernetes/enhancements/issues/59))
+  - [alpha] Access Review APIs expose authorization engine to external inquiries for delegation, inspection, and debugging ([docs](http://kubernetes.io/docs/admin/authorization/)) ([kubernetes/features#37](https://github.com/kubernetes/enhancements/issues/37))
 - **Cluster Lifecycle**
-  - [alpha] Ensure critical cluster infrastructure pods (Heapster, DNS, etc.) can schedule by evicting regular pods when necessary to make the critical pods schedule. ([docs](http://kubernetes.io/docs/admin/rescheduler/#guaranteed-scheduling-of-critical-add-on-pods)) ([kubernetes/features#62](https://github.com/kubernetes/features/issues/62))
-  - [alpha] Simplifies bootstrapping of TLS secured communication between the API server and kubelet. ([docs](http://kubernetes.io/docs/admin/master-node-communication/#kubelet-tls-bootstrap)) ([kubernetes/features#43](https://github.com/kubernetes/features/issues/43))
-  - [alpha] The `kubeadm` tool makes it much easier to bootstrap Kubernetes. ([docs](http://kubernetes.io/docs/getting-started-guides/kubeadm/)) ([kubernetes/features#11](https://github.com/kubernetes/features/issues/11))
+  - [alpha] Ensure critical cluster infrastructure pods (Heapster, DNS, etc.) can schedule by evicting regular pods when necessary to make the critical pods schedule. ([docs](http://kubernetes.io/docs/admin/rescheduler/#guaranteed-scheduling-of-critical-add-on-pods)) ([kubernetes/features#62](https://github.com/kubernetes/enhancements/issues/62))
+  - [alpha] Simplifies bootstrapping of TLS secured communication between the API server and kubelet. ([docs](http://kubernetes.io/docs/admin/master-node-communication/#kubelet-tls-bootstrap)) ([kubernetes/features#43](https://github.com/kubernetes/enhancements/issues/43))
+  - [alpha] The `kubeadm` tool makes it much easier to bootstrap Kubernetes. ([docs](http://kubernetes.io/docs/getting-started-guides/kubeadm/)) ([kubernetes/features#11](https://github.com/kubernetes/enhancements/issues/11))
 - **Federation**
   - [alpha] Creating a `Federated Ingress` is as simple as submitting
     an `Ingress` creation request to the Federation API Server. The
@@ -774,41 +774,41 @@ This is the first release tracked via the use of the [kubernetes/features](https
     GCE L7 LoadBalancer is the first supported implementation, and
 	is available in this release.
 	([docs](http://kubernetes.io/docs/user-guide/federation/federated-ingress.md))
-	([kubernetes/features#82](https://github.com/kubernetes/features/issues/82))
+	([kubernetes/features#82](https://github.com/kubernetes/enhancements/issues/82))
   - [beta] `Federated Replica Sets` create and maintain matching
     `Replica Set`s in some or all clusters in a federation, with the
     desired replica count distributed equally or according to
     specified per-cluster weights.
 	([docs](http://kubernetes.io/docs/user-guide/federation/federated-replicasets.md))
-	([kubernetes/features#46](https://github.com/kubernetes/features/issues/46))
+	([kubernetes/features#46](https://github.com/kubernetes/enhancements/issues/46))
   - [beta] `Federated Secrets` are created and kept consistent across all clusters in a federation.
     ([docs](http://kubernetes.io/docs/user-guide/federation/federated-secrets.md))
-    ([kubernetes/features#68](https://github.com/kubernetes/features/issues/68))
+    ([kubernetes/features#68](https://github.com/kubernetes/enhancements/issues/68))
   - [beta] Federation API server gained support for events and many
     federation controllers now report important events.
     ([docs](http://kubernetes.io/docs/user-guide/federation/events))
-    ([kubernetes/features#70](https://github.com/kubernetes/features/issues/70))
+    ([kubernetes/features#70](https://github.com/kubernetes/enhancements/issues/70))
   - [alpha] Creating a `Federated Namespace` causes matching
-    `Namespace`s to be created and maintained in all the clusters registered with that federation. ([docs](http://kubernetes.io/docs/user-guide/federation/federated-namespaces.md)) ([kubernetes/features#69](https://github.com/kubernetes/features/issues/69))
-  - [alpha] ingress has alpha support for a single master multi zone cluster ([docs](http://kubernetes.io/docs/user-guide/ingress.md#failing-across-availability-zones)) ([kubernetes/features#52](https://github.com/kubernetes/features/issues/52))
+    `Namespace`s to be created and maintained in all the clusters registered with that federation. ([docs](http://kubernetes.io/docs/user-guide/federation/federated-namespaces.md)) ([kubernetes/features#69](https://github.com/kubernetes/enhancements/issues/69))
+  - [alpha] ingress has alpha support for a single master multi zone cluster ([docs](http://kubernetes.io/docs/user-guide/ingress.md#failing-across-availability-zones)) ([kubernetes/features#52](https://github.com/kubernetes/enhancements/issues/52))
 - **Network**
-  - [alpha] Service LB now has alpha support for preserving client source IP ([docs](http://kubernetes.io/docs/user-guide/load-balancer/)) ([kubernetes/features#27](https://github.com/kubernetes/features/issues/27))
+  - [alpha] Service LB now has alpha support for preserving client source IP ([docs](http://kubernetes.io/docs/user-guide/load-balancer/)) ([kubernetes/features#27](https://github.com/kubernetes/enhancements/issues/27))
 - **Node**
-  - [alpha] Publish node performance dashboard at http://node-perf-dash.k8s.io/#/builds ([docs](https://github.com/kubernetes/contrib/blob/master/node-perf-dash/README.md)) ([kubernetes/features#83](https://github.com/kubernetes/features/issues/83))
-  - [alpha] Pods now have alpha support for setting whitelisted, safe sysctls. Unsafe sysctls can be whitelisted on the kubelet. ([docs](http://kubernetes.io/docs/admin/sysctls/)) ([kubernetes/features#34](https://github.com/kubernetes/features/issues/34))
-  - [beta] AppArmor profiles can be specified & applied to pod containers ([docs](http://kubernetes.io/docs/admin/apparmor/)) ([kubernetes/features#24](https://github.com/kubernetes/features/issues/24))
-  - [beta] Cluster policy to control access and defaults of security related features ([docs](http://kubernetes.io/docs/user-guide/pod-security-policy/)) ([kubernetes/features#5](https://github.com/kubernetes/features/issues/5))
-  - [stable] kubelet is able to evict pods when it observes disk pressure ([docs](http://kubernetes.io/docs/admin/out-of-resource/)) ([kubernetes/features#39](https://github.com/kubernetes/features/issues/39))
-  - [stable] Automated docker validation results posted to https://k8s-testgrid.appspot.com/docker [kubernetes/features#57](https://github.com/kubernetes/features/issues/57)
+  - [alpha] Publish node performance dashboard at http://node-perf-dash.k8s.io/#/builds ([docs](https://github.com/kubernetes/contrib/blob/master/node-perf-dash/README.md)) ([kubernetes/features#83](https://github.com/kubernetes/enhancements/issues/83))
+  - [alpha] Pods now have alpha support for setting whitelisted, safe sysctls. Unsafe sysctls can be whitelisted on the kubelet. ([docs](http://kubernetes.io/docs/admin/sysctls/)) ([kubernetes/features#34](https://github.com/kubernetes/enhancements/issues/34))
+  - [beta] AppArmor profiles can be specified & applied to pod containers ([docs](http://kubernetes.io/docs/admin/apparmor/)) ([kubernetes/features#24](https://github.com/kubernetes/enhancements/issues/24))
+  - [beta] Cluster policy to control access and defaults of security related features ([docs](http://kubernetes.io/docs/user-guide/pod-security-policy/)) ([kubernetes/features#5](https://github.com/kubernetes/enhancements/issues/5))
+  - [stable] kubelet is able to evict pods when it observes disk pressure ([docs](http://kubernetes.io/docs/admin/out-of-resource/)) ([kubernetes/features#39](https://github.com/kubernetes/enhancements/issues/39))
+  - [stable] Automated docker validation results posted to https://k8s-testgrid.appspot.com/docker [kubernetes/features#57](https://github.com/kubernetes/enhancements/issues/57)
 - **Scheduling**
-  - [alpha] Allows pods to require or prohibit (or prefer or prefer not) co-scheduling on the same node (or zone or other topology domain) as another set of pods. ([docs](http://kubernetes.io/docs/user-guide/node-selection/) ([kubernetes/features#51](https://github.com/kubernetes/features/issues/51))
+  - [alpha] Allows pods to require or prohibit (or prefer or prefer not) co-scheduling on the same node (or zone or other topology domain) as another set of pods. ([docs](http://kubernetes.io/docs/user-guide/node-selection/) ([kubernetes/features#51](https://github.com/kubernetes/enhancements/issues/51))
 - **Storage**
-  - [beta] Persistent Volume provisioning now supports multiple provisioners using StorageClass configuration. ([docs](http://kubernetes.io/docs/user-guide/persistent-volumes/)) ([kubernetes/features#36](https://github.com/kubernetes/features/issues/36))
-  - [stable] New volume plugin for the Quobyte Distributed File System ([docs](http://kubernetes.io/docs/user-guide/volumes/#quobyte)) ([kubernetes/features#80](https://github.com/kubernetes/features/issues/80))
-  - [stable] New volume plugin for Azure Data Disk ([docs](http://kubernetes.io/docs/user-guide/volumes/#azurediskvolume)) ([kubernetes/features#79](https://github.com/kubernetes/features/issues/79))
+  - [beta] Persistent Volume provisioning now supports multiple provisioners using StorageClass configuration. ([docs](http://kubernetes.io/docs/user-guide/persistent-volumes/)) ([kubernetes/features#36](https://github.com/kubernetes/enhancements/issues/36))
+  - [stable] New volume plugin for the Quobyte Distributed File System ([docs](http://kubernetes.io/docs/user-guide/volumes/#quobyte)) ([kubernetes/features#80](https://github.com/kubernetes/enhancements/issues/80))
+  - [stable] New volume plugin for Azure Data Disk ([docs](http://kubernetes.io/docs/user-guide/volumes/#azurediskvolume)) ([kubernetes/features#79](https://github.com/kubernetes/enhancements/issues/79))
 - **UI**
   - [stable] Kubernetes Dashboard UI - a great looking Kubernetes Dashboard UI with 90% CLI parity for at-a-glance management. [docs](https://github.com/kubernetes/dashboard)
-  - [stable] `kubectl` no longer applies defaults before sending objects to the server in create and update requests, allowing the server to apply the defaults. ([kubernetes/features#55](https://github.com/kubernetes/features/issues/55))
+  - [stable] `kubectl` no longer applies defaults before sending objects to the server in create and update requests, allowing the server to apply the defaults. ([kubernetes/features#55](https://github.com/kubernetes/enhancements/issues/55))
 
 ## Known Issues
 

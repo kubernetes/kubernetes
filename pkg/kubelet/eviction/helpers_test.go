@@ -1019,23 +1019,17 @@ func (f *fakeSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) 
 
 // newPodStats returns a pod stat where each container is using the specified working set
 // each pod must have a Name, UID, Namespace
-func newPodStats(pod *v1.Pod, containerWorkingSetBytes int64) statsapi.PodStats {
-	result := statsapi.PodStats{
+func newPodStats(pod *v1.Pod, podWorkingSetBytes uint64) statsapi.PodStats {
+	return statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 			UID:       string(pod.UID),
 		},
+		Memory: &statsapi.MemoryStats{
+			WorkingSetBytes: &podWorkingSetBytes,
+		},
 	}
-	val := uint64(containerWorkingSetBytes)
-	for range pod.Spec.Containers {
-		result.Containers = append(result.Containers, statsapi.ContainerStats{
-			Memory: &statsapi.MemoryStats{
-				WorkingSetBytes: &val,
-			},
-		})
-	}
-	return result
 }
 
 func TestMakeSignalObservations(t *testing.T) {
@@ -1100,9 +1094,9 @@ func TestMakeSignalObservations(t *testing.T) {
 		podMaker("pod1", "ns2", "uuid2", 1),
 		podMaker("pod3", "ns3", "uuid3", 1),
 	}
-	containerWorkingSetBytes := int64(1024 * 1024 * 1024)
+	podWorkingSetBytes := uint64(1024 * 1024 * 1024)
 	for _, pod := range pods {
-		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, containerWorkingSetBytes))
+		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, podWorkingSetBytes))
 	}
 	res := quantityMustParse("5Gi")
 	// Allocatable thresholds are always 100%.  Verify that Threshold == Capacity.
@@ -1175,11 +1169,8 @@ func TestMakeSignalObservations(t *testing.T) {
 		if !found {
 			t.Errorf("Pod stats were not found for pod %v", pod.UID)
 		}
-		for _, container := range podStats.Containers {
-			actual := int64(*container.Memory.WorkingSetBytes)
-			if containerWorkingSetBytes != actual {
-				t.Errorf("Container working set expected %v, actual: %v", containerWorkingSetBytes, actual)
-			}
+		if *podStats.Memory.WorkingSetBytes != podWorkingSetBytes {
+			t.Errorf("Pod working set expected %v, actual: %v", podWorkingSetBytes, *podStats.Memory.WorkingSetBytes)
 		}
 	}
 }
@@ -1855,20 +1846,15 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 }
 
 func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodStats {
-	result := statsapi.PodStats{
+	workingSetBytes := uint64(workingSet.Value())
+	return statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
 		},
+		Memory: &statsapi.MemoryStats{
+			WorkingSetBytes: &workingSetBytes,
+		},
 	}
-	for range pod.Spec.Containers {
-		workingSetBytes := uint64(workingSet.Value())
-		result.Containers = append(result.Containers, statsapi.ContainerStats{
-			Memory: &statsapi.MemoryStats{
-				WorkingSetBytes: &workingSetBytes,
-			},
-		})
-	}
-	return result
 }
 
 func newResourceList(cpu, memory, disk string) v1.ResourceList {

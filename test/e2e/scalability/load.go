@@ -541,7 +541,7 @@ func GenerateConfigsForGroup(
 			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
 			Namespace:      namespace,
-			Timeout:        10 * time.Minute,
+			Timeout:        UnreadyNodeToleration,
 			Image:          image,
 			Command:        command,
 			Replicas:       size,
@@ -551,6 +551,19 @@ func GenerateConfigsForGroup(
 			ConfigMapNames: configMapNames,
 			// Define a label to group every 2 RCs into one service.
 			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
+			Tolerations: []v1.Toleration{
+				{
+					Key:               "node.kubernetes.io/not-ready",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				}, {
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				},
+			},
 		}
 
 		if kind == randomKind {

@@ -130,6 +130,9 @@ func SetObjectDefaults_Job(in *v1.Job) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			corev1.SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -171,6 +174,9 @@ func SetObjectDefaults_Job(in *v1.Job) {
 					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			corev1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }

@@ -84,3 +84,18 @@ const CSROnly = "csr-only"
 
 // CSRDir flag sets the location for CSRs and flags to be output
 const CSRDir = "csr-dir"
+
+// TokenStr flag sets the token
+const TokenStr = "token"
+
+// TokenTTL flag sets the time to live for token
+const TokenTTL = "token-ttl"
+
+// TokenUsages flag sets the usages of the token
+const TokenUsages = "usages"
+
+// TokenGroups flag sets the authentication groups of the token
+const TokenGroups = "groups"
+
+// TokenDescription flag sets the description of the token
+const TokenDescription = "description"

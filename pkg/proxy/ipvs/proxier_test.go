@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,7 +125,7 @@ func (fakeSysctl *FakeSysctl) SetSysctl(sysctl string, newVal int) error {
 	return nil
 }
 
-func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []string) *Proxier {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
@@ -151,7 +150,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		serviceChanges:    proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
 		endpointsMap:      make(proxy.EndpointsMap),
 		endpointsChanges:  proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil),
-		excludeCIDRs:      make([]string, 0),
+		excludeCIDRs:      excludeCIDRs,
 		iptables:          ipt,
 		ipvs:              ipvs,
 		ipset:             ipset,
@@ -228,7 +227,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -418,7 +417,7 @@ func TestNodePortUDP(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil)
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -495,7 +494,7 @@ func TestNodePort(t *testing.T) {
 	nodeIPv4 := net.ParseIP("100.101.102.103")
 	nodeIPv6 := net.ParseIP("2001:db8::1:1")
 	nodeIPs := sets.NewString(nodeIPv4.String(), nodeIPv6.String())
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIPv4, nodeIPv6})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIPv4, nodeIPv6}, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -573,7 +572,7 @@ func TestNodePortNoEndpoint(t *testing.T) {
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -628,7 +627,7 @@ func TestClusterIPNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -672,7 +671,7 @@ func TestClusterIP(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 	svcIPv4 := "10.20.30.41"
 	svcPortV4 := 80
@@ -779,7 +778,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -834,7 +833,7 @@ func TestExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
@@ -1267,18 +1266,32 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
+	epIP1 := "10.180.1.1"
+	thisHostname := testHostname
+	otherHostname := "other-hostname"
+
 	makeEndpointsMap(fp,
 		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
-			ept.Subsets = []v1.EndpointSubset{{
-				Addresses: []v1.EndpointAddress{{
-					IP:       epIP,
-					NodeName: nil,
-				}},
-				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
-				}},
-			}}
+			ept.Subsets = []v1.EndpointSubset{
+				{ // **local** endpoint address, should be added as RS
+					Addresses: []v1.EndpointAddress{{
+						IP:       epIP,
+						NodeName: &thisHostname,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: svcPortName.Port,
+						Port: int32(svcPort),
+					}}},
+				{ // **remote** endpoint address, should not be added as RS
+					Addresses: []v1.EndpointAddress{{
+						IP:       epIP1,
+						NodeName: &otherHostname,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: svcPortName.Port,
+						Port: int32(svcPort),
+					}},
+				}}
 		}),
 	)
 
@@ -1338,7 +1351,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 	services := []*v1.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
@@ -1448,7 +1461,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *v1.Service) {
@@ -1487,7 +1500,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *v1.Service) {
@@ -1515,7 +1528,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -1599,7 +1612,7 @@ func TestSessionAffinity(t *testing.T) {
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -2462,7 +2475,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 		fp.hostname = nodeName
 
 		// First check that after adding all previous versions of endpoints,
@@ -2706,7 +2719,7 @@ func Test_syncService(t *testing.T) {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		proxier := NewFakeProxier(ipt, ipvs, ipset, nil)
+		proxier := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 		proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 		if testCases[i].oldVirtualServer != nil {
@@ -2736,7 +2749,7 @@ func buildFakeProxier() (*iptablestest.FakeIPTables, *Proxier) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	return ipt, NewFakeProxier(ipt, ipvs, ipset, nil)
+	return ipt, NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 }
 
 func hasJump(rules []iptablestest.Rule, destChain, ipSet string) bool {
@@ -2806,33 +2819,10 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 }
 
 func TestCleanLegacyService(t *testing.T) {
-	execer := exec.New()
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	excludeCIDRs := []string{"3.3.3.0/24", "4.4.4.0/24"}
-	proxier, err := NewProxier(
-		ipt,
-		ipvs,
-		ipset,
-		NewFakeSysctl(),
-		execer,
-		250*time.Millisecond,
-		100*time.Millisecond,
-		excludeCIDRs,
-		false,
-		0,
-		"10.0.0.0/24",
-		testHostname,
-		net.ParseIP("127.0.0.1"),
-		nil,
-		nil,
-		DefaultScheduler,
-		make([]string, 0),
-	)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, []string{"3.3.3.0/24", "4.4.4.0/24"})
 
 	// All ipvs services that were processed in the latest sync loop.
 	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
@@ -2888,15 +2878,23 @@ func TestCleanLegacyService(t *testing.T) {
 		},
 	}
 	for v := range currentServices {
-		proxier.ipvs.AddVirtualServer(currentServices[v])
+		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
-	proxier.cleanLegacyService(activeServices, currentServices)
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	activeBindAddrs := map[string]bool{"1.1.1.1": true, "2.2.2.2": true, "3.3.3.3": true, "4.4.4.4": true}
+	// This is ipv4-only so ipv6 addresses should be ignored
+	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5", "6.6.6.6", "fd80::1:2:3", "fd80::1:2:4"}
+	for i := range currentBindAddrs {
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+	}
+
+	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5.5.5.5": true, "6.6.6.6": true})
 	// ipvs4 and ipvs5 should have been cleaned.
-	remainingVirtualServers, _ := proxier.ipvs.GetVirtualServers()
+	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
 	if len(remainingVirtualServers) != 4 {
 		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 4, len(remainingVirtualServers))
 	}
-
 	for _, vs := range remainingVirtualServers {
 		// Checking that ipvs4 and ipvs5 were removed.
 		if vs.Port == 57 {
@@ -2906,47 +2904,138 @@ func TestCleanLegacyService(t *testing.T) {
 			t.Errorf("Expected ipvs5 to be removed after cleanup. It still remains")
 		}
 	}
-}
 
-func TestCleanLegacyBindAddr(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
-
-	// All ipvs service addresses that were bound to ipvs0 in the latest sync loop.
-	activeBindAddrs := map[string]bool{"1.2.3.4": true, "1002:ab8::2:1": true}
-	// All service addresses that were bound to ipvs0 in system
-	currentBindAddrs := []string{"1.2.3.4", "1.2.3.5", "1.2.3.6", "1002:ab8::2:1", "1002:ab8::2:2"}
-
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
-
-	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
-	}
-	fp.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
-
+	// Addresses 5.5.5.5 and 6.6.6.6 should not be bound any more, but the ipv6 addresses should remain
 	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
-	// should only remain "1.2.3.4" and "1002:ab8::2:1"
-	if len(remainingAddrs) != 2 {
-		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 2, len(remainingAddrs))
+	if len(remainingAddrs) != 6 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
 	}
-
-	// check that address "1.2.3.4" and "1002:ab8::2:1" remain
+	// check that address "1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4" are bound, ignore ipv6 addresses
 	remainingAddrsMap := make(map[string]bool)
-	for i := range remainingAddrs {
-		remainingAddrsMap[remainingAddrs[i]] = true
+	for _, a := range remainingAddrs {
+		if net.ParseIP(a).To4() == nil {
+			continue
+		}
+		remainingAddrsMap[a] = true
 	}
 	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
 		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
 	}
+
+}
+
+func TestCleanLegacyService6(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, []string{"3000::/64", "4000::/64"})
+	fp.nodeIP = net.ParseIP("::1")
+
+	// All ipvs services that were processed in the latest sync loop.
+	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
+	// All ipvs services in the system.
+	currentServices := map[string]*utilipvs.VirtualServer{
+		// Created by kube-proxy.
+		"ipvs0": {
+			Address:   net.ParseIP("1000::1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by kube-proxy.
+		"ipvs1": {
+			Address:   net.ParseIP("1000::2"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs2": {
+			Address:   net.ParseIP("3000::1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      55,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs3": {
+			Address:   net.ParseIP("4000::1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      56,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs4": {
+			Address:   net.ParseIP("5000::1"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      57,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by kube-proxy, but now stale.
+		"ipvs5": {
+			Address:   net.ParseIP("1000::6"),
+			Protocol:  string(v1.ProtocolUDP),
+			Port:      58,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+	}
+	for v := range currentServices {
+		fp.ipvs.AddVirtualServer(currentServices[v])
+	}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	activeBindAddrs := map[string]bool{"1000::1": true, "1000::2": true, "3000::1": true, "4000::1": true}
+	// This is ipv6-only so ipv4 addresses should be ignored
+	currentBindAddrs := []string{"1000::1", "1000::2", "3000::1", "4000::1", "5000::1", "1000::6", "1.1.1.1", "2.2.2.2"}
+	for i := range currentBindAddrs {
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+	}
+
+	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5000::1": true, "1000::6": true})
+	// ipvs4 and ipvs5 should have been cleaned.
+	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
+	if len(remainingVirtualServers) != 4 {
+		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 4, len(remainingVirtualServers))
+	}
+	for _, vs := range remainingVirtualServers {
+		// Checking that ipvs4 and ipvs5 were removed.
+		if vs.Port == 57 {
+			t.Errorf("Expected ipvs4 to be removed after cleanup. It still remains")
+		}
+		if vs.Port == 58 {
+			t.Errorf("Expected ipvs5 to be removed after cleanup. It still remains")
+		}
+	}
+
+	// Addresses 5000::1 and 1000::6 should not be bound any more, but the ipv4 addresses should remain
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	if len(remainingAddrs) != 6 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
+	}
+	// check that address "1000::1", "1000::2", "3000::1", "4000::1" are still bound, ignore ipv4 addresses
+	remainingAddrsMap := make(map[string]bool)
+	for _, a := range remainingAddrs {
+		if net.ParseIP(a).To4() != nil {
+			continue
+		}
+		remainingAddrsMap[a] = true
+	}
+	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
+		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
+	}
+
 }
 
 func TestMultiPortServiceBindAddr(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil)
 
 	service1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP

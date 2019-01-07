@@ -95,7 +95,7 @@ func ParseHostPort(hostport string) (string, string, error) {
 	// if port is defined, parse and validate it
 	if port != "" {
 		if _, err := ParsePort(port); err != nil {
-			return "", "", errors.New("port must be a valid number between 1 and 65535, inclusive")
+			return "", "", errors.Errorf("hostport %s: port %s must be a valid number between 1 and 65535, inclusive", hostport, port)
 		}
 	}
 
@@ -109,7 +109,7 @@ func ParseHostPort(hostport string) (string, string, error) {
 		return host, port, nil
 	}
 
-	return "", "", errors.New("host must be a valid IP address or a valid RFC-1123 DNS subdomain")
+	return "", "", errors.Errorf("hostport %s: host '%s' must be a valid IP address or a valid RFC-1123 DNS subdomain", hostport, host)
 }
 
 // ParsePort parses a string representing a TCP port.

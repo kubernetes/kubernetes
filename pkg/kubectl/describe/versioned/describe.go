@@ -881,8 +881,8 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 				"    ConfigMapOptional:\t%v\n",
 				source.ConfigMap.Name, source.ConfigMap.Optional)
 		} else if source.ServiceAccountToken != nil {
-			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
-				source.ServiceAccountToken.ExpirationSeconds)
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
+				*source.ServiceAccountToken.ExpirationSeconds)
 		}
 	}
 }
@@ -1041,18 +1041,18 @@ func printCinderVolumeSource(cinder *corev1.CinderVolumeSource, w PrefixWriter) 
 	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		"    SecretRef:\t%v\n"+
-			cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
+		"    ReadOnly:\t%v\n"+
+		"    SecretRef:\t%v\n",
+		cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
 func printCinderPersistentVolumeSource(cinder *corev1.CinderPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
 		"    VolumeID:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		"    SecretRef:\t%v\n"+
-			cinder.VolumeID, cinder.SecretRef, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
+		"    ReadOnly:\t%v\n"+
+		"    SecretRef:\t%v\n",
+		cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
 func printScaleIOVolumeSource(sio *corev1.ScaleIOVolumeSource, w PrefixWriter) {
@@ -2073,6 +2073,16 @@ func describeCronJob(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (s
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", cronJob.Spec.SuccessfulJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Successful Job History Limit:\t<unset>\n")
+		}
+		if cronJob.Spec.FailedJobsHistoryLimit != nil {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t%d\n", *cronJob.Spec.FailedJobsHistoryLimit)
+		} else {
+			w.Write(LEVEL_0, "Failed Job History Limit:\t<unset>\n")
+		}
 		if cronJob.Spec.StartingDeadlineSeconds != nil {
 			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
 		} else {

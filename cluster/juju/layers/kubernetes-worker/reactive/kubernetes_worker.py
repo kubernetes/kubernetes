@@ -926,7 +926,7 @@ def launch_default_ingress_controller():
     if get_version('kubelet') < (1, 9):
         context['daemonset_api_version'] = 'extensions/v1beta1'
     else:
-        context['daemonset_api_version'] = 'apps/v1beta2'
+        context['daemonset_api_version'] = 'apps/v1'
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)

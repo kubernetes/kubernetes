@@ -456,10 +456,8 @@ kube::util::ensure_godep_version() {
 
   # Otherwise, install forked godep
   kube::log::status "Installing godep version ${godep_target_version}"
-  # Run in hermetic GOPATH
-  kube::golang::setup_env
-  go install k8s.io/kubernetes/third_party/forked/godep
-  export KUBE_GODEP="${KUBE_GOPATH}/bin/godep"
+  GOBIN="${KUBE_OUTPUT_BINPATH}" go install k8s.io/kubernetes/third_party/forked/godep
+  export KUBE_GODEP="${KUBE_OUTPUT_BINPATH}/godep"
   kube::log::status "Installed ${KUBE_GODEP}"
 
   # Verify that the installed godep from fork is what we expect

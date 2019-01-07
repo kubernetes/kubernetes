@@ -106,13 +106,12 @@ func TestDropDisabledFields(t *testing.T) {
 			oldSpec:       specWithMode(nil),
 			expectOldSpec: specWithMode(nil),
 		},
-		// TODO: consider changing this case to preserve
-		"disabled block clears old and new on update when old pv did use block": {
+		"disabled block does not clear new on update when old pv did use block": {
 			blockEnabled:  false,
 			newSpec:       specWithMode(&modeBlock),
-			expectNewSpec: specWithMode(nil),
+			expectNewSpec: specWithMode(&modeBlock),
 			oldSpec:       specWithMode(&modeBlock),
-			expectOldSpec: specWithMode(nil),
+			expectOldSpec: specWithMode(&modeBlock),
 		},
 
 		"enabled block preserves new": {

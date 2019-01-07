@@ -156,7 +156,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 
 	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
 	fmt.Printf("[reset] unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
-	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s /proc/mounts | xargs -r umount", kubeadmconstants.KubeletRunDirectory)
+	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", kubeadmconstants.KubeletRunDirectory)
 
 	klog.V(1).Infof("[reset] executing command %q", umountDirsCmd)
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
@@ -225,7 +225,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 		}
 	}
 	if dataDir == "" {
-		return dataDir, fmt.Errorf("invalid etcd pod manifest")
+		return dataDir, errors.New("invalid etcd pod manifest")
 	}
 	return dataDir, nil
 }
@@ -239,10 +239,7 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := containerRuntime.RemoveContainers(containers); err != nil {
-		return err
-	}
-	return nil
+	return containerRuntime.RemoveContainers(containers)
 }
 
 // cleanDir removes everything in a directory, but not the directory itself

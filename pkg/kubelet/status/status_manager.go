@@ -131,7 +131,7 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	for _, c := range status.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
-			if oc == nil || oc.Status != c.Status {
+			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
 				return false
 			}
 		}

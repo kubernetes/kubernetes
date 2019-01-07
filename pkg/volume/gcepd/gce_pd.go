@@ -551,7 +551,7 @@ func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedT
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) && len(requirements) > 0 {
+	if len(requirements) > 0 {
 		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
 		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
 		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)

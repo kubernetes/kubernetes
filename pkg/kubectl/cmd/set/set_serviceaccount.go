@@ -56,7 +56,7 @@ var (
 	`))
 )
 
-// serviceAccountConfig encapsulates the data required to perform the operation.
+// SetServiceAccountOptions encapsulates the data required to perform the operation.
 type SetServiceAccountOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
@@ -77,6 +77,7 @@ type SetServiceAccountOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewSetServiceAccountOptions returns an initialized SetServiceAccountOptions instance
 func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
@@ -193,7 +194,7 @@ func (o *SetServiceAccountOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
 		if o.local || o.dryRun {

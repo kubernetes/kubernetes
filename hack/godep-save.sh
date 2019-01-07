@@ -63,6 +63,7 @@ REQUIRED_BINS=(
   "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
   "github.com/kubernetes/repo-infra/kazel"
   "k8s.io/kube-openapi/cmd/openapi-gen"
+  "golang.org/x/lint/golint"
   "./..."
 )
 

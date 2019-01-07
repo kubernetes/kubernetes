@@ -103,15 +103,16 @@
         "github.com/cloudflare/cfssl/signer",
         "github.com/cloudflare/cfssl/signer/local",
         "github.com/davecgh/go-spew/spew",
+        "github.com/docker/distribution/reference",
         "github.com/evanphx/json-patch",
         "github.com/golang/groupcache/lru",
+        "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud",
+        "github.com/google/gofuzz",
         "github.com/prometheus/client_golang/prometheus",
         "github.com/robfig/cron",
         "github.com/spf13/pflag",
         "github.com/stretchr/testify/assert",
-        "github.com/stretchr/testify/require",
-        "github.com/docker/distribution/reference",
-        "github.com/google/gofuzz"
+        "github.com/stretchr/testify/require"
       ]
     },
     {
@@ -278,7 +279,7 @@
         "k8s.io/kubernetes/pkg/registry/core/secret",
         "k8s.io/kubernetes/pkg/scheduler/algorithm",
         "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
-        "k8s.io/kubernetes/pkg/scheduler/cache",
+        "k8s.io/kubernetes/pkg/scheduler/nodeinfo",
         "k8s.io/kubernetes/pkg/securitycontext",
         "k8s.io/kubernetes/pkg/serviceaccount",
         "k8s.io/kubernetes/pkg/util/goroutinemap",

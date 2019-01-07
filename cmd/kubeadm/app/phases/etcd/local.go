@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -48,6 +49,12 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.In
 	}
 	// gets etcd StaticPodSpec
 	emptyInitialCluster := []etcdutil.Member{}
+
+	// creates target folder if not already exists
+	if err := os.MkdirAll(cfg.Etcd.Local.DataDir, 0700); err != nil {
+		return errors.Wrapf(err, "failed to create etcd directory %q", cfg.Etcd.Local.DataDir)
+	}
+
 	spec := GetEtcdPodSpec(cfg, emptyInitialCluster)
 	// writes etcd StaticPod to disk
 	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
@@ -99,6 +106,11 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	}
 	fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
 	klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
+
+	// creates target folder if not already exists
+	if err := os.MkdirAll(cfg.Etcd.Local.DataDir, 0700); err != nil {
+		return errors.Wrapf(err, "failed to create etcd directory %q", cfg.Etcd.Local.DataDir)
+	}
 
 	klog.V(1).Info("Creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec, actualized for the current InitConfiguration and the new list of etcd members

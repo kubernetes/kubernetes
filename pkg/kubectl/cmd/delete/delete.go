@@ -33,13 +33,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	kubectlwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
+	cmdwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
-	delete_long = templates.LongDesc(i18n.T(`
+	deleteLong = templates.LongDesc(i18n.T(`
 		Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 		JSON and YAML formats are accepted. Only one type of the arguments may be specified: filenames,
@@ -67,7 +67,7 @@ var (
 		update to a resource right when you submit a delete, their update will be lost along with the
 		rest of the resource.`))
 
-	delete_example = templates.Examples(i18n.T(`
+	deleteExample = templates.Examples(i18n.T(`
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 
@@ -121,8 +121,8 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
-		Long:                  delete_long,
-		Example:               delete_example,
+		Long:                  deleteLong,
+		Example:               deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
@@ -196,7 +196,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 
 func (o *DeleteOptions) Validate() error {
 	if o.Output != "" && o.Output != "name" {
-		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'.", o.Output)
+		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'", o.Output)
 	}
 
 	if o.DeleteAll && len(o.LabelSelector) > 0 {
@@ -225,7 +225,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
 	deletedInfos := []*resource.Info{}
-	uidMap := kubectlwait.UIDMap{}
+	uidMap := cmdwait.UIDMap{}
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -247,7 +247,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if err != nil {
 			return err
 		}
-		resourceLocation := kubectlwait.ResourceLocation{
+		resourceLocation := cmdwait.ResourceLocation{
 			GroupResource: info.Mapping.Resource.GroupResource(),
 			Namespace:     info.Namespace,
 			Name:          info.Name,
@@ -287,14 +287,14 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		// if we requested to wait forever, set it to a week.
 		effectiveTimeout = 168 * time.Hour
 	}
-	waitOptions := kubectlwait.WaitOptions{
+	waitOptions := cmdwait.WaitOptions{
 		ResourceFinder: genericclioptions.ResourceFinderForResult(resource.InfoListVisitor(deletedInfos)),
 		UIDMap:         uidMap,
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
 		Printer:     printers.NewDiscardingPrinter(),
-		ConditionFn: kubectlwait.IsDeleted,
+		ConditionFn: cmdwait.IsDeleted,
 		IOStreams:   o.IOStreams,
 	}
 	err = waitOptions.RunWait()
@@ -317,7 +317,7 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	return deleteResponse, nil
 }
 
-// deletion printing is special because we do not have an object to print.
+// PrintObj for deleted objects is special because we do not have an object to print.
 // This mirrors name printer behavior
 func (o *DeleteOptions) PrintObj(info *resource.Info) {
 	operation := "deleted"

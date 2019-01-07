@@ -41,11 +41,7 @@ func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 		return err
 	}
 
-	if err := SetJoinControlPlaneDefaults(cfg.ControlPlane); err != nil {
-		return err
-	}
-
-	return nil
+	return SetJoinControlPlaneDefaults(cfg.ControlPlane)
 }
 
 // SetJoinControlPlaneDefaults checks and sets configuration values for the JoinControlPlane object

@@ -20,6 +20,7 @@ go_library(
         "//pkg/apis/core/helper/qos:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/kubelet/client:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

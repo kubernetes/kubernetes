@@ -339,8 +339,10 @@ func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watc
 		if w := t.watchers[gvr][ns]; w != nil {
 			watches = append(watches, w...)
 		}
-		if w := t.watchers[gvr][""]; w != nil {
-			watches = append(watches, w...)
+		if ns != metav1.NamespaceAll {
+			if w := t.watchers[gvr][metav1.NamespaceAll]; w != nil {
+				watches = append(watches, w...)
+			}
 		}
 	}
 	return watches

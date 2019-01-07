@@ -40,6 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
+const (
+	unknownVolumePlugin string = "UnknownVolumePlugin"
+)
+
 var _ OperationGenerator = &operationGenerator{}
 
 type operationGenerator struct {
@@ -82,7 +86,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
 type OperationGenerator interface {
 	// Generates the MountVolume function needed to perform the mount of a volume plugin
-	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (volumetypes.GeneratedOperations, error)
+	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error)
@@ -436,61 +440,61 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	isRemount bool) (volumetypes.GeneratedOperations, error) {
+	isRemount bool) volumetypes.GeneratedOperations {
 	// Get mounter plugin
+	volumePluginName := unknownVolumePlugin
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
-	if err != nil || volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MountVolume.FindPluginBySpec failed", err)
-	}
-
-	affinityErr := checkNodeAffinity(og, volumeToMount, volumePlugin)
-	if affinityErr != nil {
-		eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NodeAffinity check failed", affinityErr)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
-		return volumetypes.GeneratedOperations{}, detailedErr
-	}
-
-	volumeMounter, newMounterErr := volumePlugin.NewMounter(
-		volumeToMount.VolumeSpec,
-		volumeToMount.Pod,
-		volume.VolumeOptions{})
-	if newMounterErr != nil {
-		eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
-		return volumetypes.GeneratedOperations{}, detailedErr
-	}
-
-	mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)
-
-	if mountCheckError != nil {
-		eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountOptionSupport check failed", mountCheckError)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.UnsupportedMountOption, eventErr.Error())
-		return volumetypes.GeneratedOperations{}, detailedErr
-	}
-
-	// Get attacher, if possible
-	attachableVolumePlugin, _ :=
-		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
-	var volumeAttacher volume.Attacher
-	if attachableVolumePlugin != nil {
-		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
-	}
-
-	// get deviceMounter, if possible
-	deviceMountableVolumePlugin, _ := og.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeToMount.VolumeSpec)
-	var volumeDeviceMounter volume.DeviceMounter
-	if deviceMountableVolumePlugin != nil {
-		volumeDeviceMounter, _ = deviceMountableVolumePlugin.NewDeviceMounter()
-	}
-
-	var fsGroup *int64
-	if volumeToMount.Pod.Spec.SecurityContext != nil &&
-		volumeToMount.Pod.Spec.SecurityContext.FSGroup != nil {
-		fsGroup = volumeToMount.Pod.Spec.SecurityContext.FSGroup
+	if err == nil && volumePlugin != nil {
+		volumePluginName = volumePlugin.GetPluginName()
 	}
 
 	mountVolumeFunc := func() (error, error) {
+		if err != nil || volumePlugin == nil {
+			return volumeToMount.GenerateError("MountVolume.FindPluginBySpec failed", err)
+		}
+
+		affinityErr := checkNodeAffinity(og, volumeToMount, volumePlugin)
+		if affinityErr != nil {
+			return volumeToMount.GenerateError("MountVolume.NodeAffinity check failed", affinityErr)
+		}
+
+		volumeMounter, newMounterErr := volumePlugin.NewMounter(
+			volumeToMount.VolumeSpec,
+			volumeToMount.Pod,
+			volume.VolumeOptions{})
+		if newMounterErr != nil {
+			return volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
+
+		}
+
+		mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)
+
+		if mountCheckError != nil {
+			return volumeToMount.GenerateError("MountVolume.MountOptionSupport check failed", mountCheckError)
+		}
+
+		// Get attacher, if possible
+		attachableVolumePlugin, _ :=
+			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+		var volumeAttacher volume.Attacher
+		if attachableVolumePlugin != nil {
+			volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
+		}
+
+		// get deviceMounter, if possible
+		deviceMountableVolumePlugin, _ := og.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeToMount.VolumeSpec)
+		var volumeDeviceMounter volume.DeviceMounter
+		if deviceMountableVolumePlugin != nil {
+			volumeDeviceMounter, _ = deviceMountableVolumePlugin.NewDeviceMounter()
+		}
+
+		var fsGroup *int64
+		if volumeToMount.Pod.Spec.SecurityContext != nil &&
+			volumeToMount.Pod.Spec.SecurityContext.FSGroup != nil {
+			fsGroup = volumeToMount.Pod.Spec.SecurityContext.FSGroup
+		}
+
 		devicePath := volumeToMount.DevicePath
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
@@ -536,7 +540,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// resizeFileSystem will resize the file system if user has requested a resize of
 			// underlying persistent volume and is allowed to do so.
-			resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, devicePath, deviceMountPath, volumePlugin.GetPluginName())
+			resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, devicePath, deviceMountPath, volumePluginName)
 
 			if resizeSimpleError != nil || resizeDetailedError != nil {
 				return resizeSimpleError, resizeDetailedError
@@ -593,8 +597,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     mountVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "volume_mount"),
-	}, nil
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "volume_mount"),
+	}
 }
 
 func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devicePath, deviceMountPath, pluginName string) (simpleErr, detailedErr error) {

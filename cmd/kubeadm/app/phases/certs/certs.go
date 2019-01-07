@@ -59,11 +59,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	fmt.Printf("[certs] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
-	if err := CreateServiceAccountKeyAndPublicKeyFiles(cfg); err != nil {
-		return err
-	}
-
-	return nil
+	return CreateServiceAccountKeyAndPublicKeyFiles(cfg)
 }
 
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
@@ -134,7 +130,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
 	certConfig, err := certSpec.GetConfig(cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve cert configuration: %v", err)
+		return nil, nil, errors.Wrap(err, "failed to retrieve cert configuration")
 	}
 
 	return pkiutil.NewCSRAndKey(certConfig)

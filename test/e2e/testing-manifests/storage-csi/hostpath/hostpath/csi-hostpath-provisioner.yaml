@@ -30,7 +30,7 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          image: gcr.io/gke-release/csi-provisioner:v1.0.0-gke.0
+          image: quay.io/k8scsi/csi-provisioner:v1.0.1
           args:
             - "--provisioner=csi-hostpath"
             - "--csi-address=$(ADDRESS)"

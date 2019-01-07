@@ -154,7 +154,7 @@ limitations under the License.
 // deployed in the cluster. If this object is not provided or provided only partially, kubeadm applies defaults.
 //
 // See https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/ or https://godoc.org/k8s.io/kubelet/config/v1beta1#KubeletConfiguration
-// for kube proxy official documentation.
+// for kubelet official documentation.
 //
 // Here is a fully populated example of a single YAML file containing multiple
 // configuration types to be used during a `kubeadm init` run.

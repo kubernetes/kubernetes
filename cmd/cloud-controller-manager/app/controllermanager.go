@@ -226,11 +226,22 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		c.SharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
-		c.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		c.ComponentConfig.NodeStatusUpdateFrequency.Duration)
 
-	nodeController.Run(stop)
+	go nodeController.Run(stop)
 	time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	cloudNodeLifecycleController, err := cloudcontrollers.NewCloudNodeLifecycleController(
+		c.SharedInformers.Core().V1().Nodes(),
+		client("cloud-node-lifecycle-controller"), cloud,
+		c.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+	)
+	if err != nil {
+		klog.Errorf("failed to start cloud node lifecycle controller: %s", err)
+	} else {
+		go cloudNodeLifecycleController.Run(stop)
+		time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
+	}
 
 	// Start the PersistentVolumeLabelController
 	pvlController := cloudcontrollers.NewPersistentVolumeLabelController(client("pvl-controller"), cloud)

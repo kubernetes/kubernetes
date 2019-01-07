@@ -66,6 +66,7 @@ var (
 		kubectl auth reconcile -f my-rbac-rules.yaml`)
 )
 
+// NewReconcileOptions returns a new ReconcileOptions instance
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
@@ -74,6 +75,7 @@ func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOption
 	}
 }
 
+// NewCmdReconcile holds the options for 'auth reconcile' sub command
 func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewReconcileOptions(streams)
 
@@ -101,6 +103,7 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
@@ -149,6 +152,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	return nil
 }
 
+// Validate makes sure provided values for ReconcileOptions are valid
 func (o *ReconcileOptions) Validate() error {
 	if o.Visitor == nil {
 		return errors.New("ReconcileOptions.Visitor must be set")
@@ -171,6 +175,7 @@ func (o *ReconcileOptions) Validate() error {
 	return nil
 }
 
+// RunReconcile performs the execution
 func (o *ReconcileOptions) RunReconcile() error {
 	return o.Visitor.Visit(func(info *resource.Info, err error) error {
 		if err != nil {

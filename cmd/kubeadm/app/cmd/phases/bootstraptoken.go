@@ -18,7 +18,6 @@ package phases
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 
@@ -26,7 +25,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -51,7 +49,7 @@ var (
 type bootstrapTokenData interface {
 	Cfg() *kubeadmapi.InitConfiguration
 	Client() (clientset.Interface, error)
-	KubeConfigDir() string
+	KubeConfigPath() string
 	SkipTokenPrint() bool
 	Tokens() []string
 }
@@ -66,7 +64,7 @@ func NewBootstrapTokenPhase() workflow.Phase {
 		Long:    bootstrapTokenLongDesc,
 		InheritFlags: []string{
 			options.CfgPath,
-			options.KubeconfigDir,
+			options.KubeconfigPath,
 			options.SkipTokenPrint,
 		},
 		Run: runBoostrapToken,
@@ -113,8 +111,7 @@ func runBoostrapToken(c workflow.RunData) error {
 	}
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules
-	adminKubeConfigPath := filepath.Join(data.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
-	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
+	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, data.KubeConfigPath()); err != nil {
 		return errors.Wrap(err, "error creating bootstrap ConfigMap")
 	}
 	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {

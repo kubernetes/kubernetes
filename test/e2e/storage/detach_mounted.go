@@ -64,7 +64,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 	})
 
 	It("should not work when mount is in progress", func() {
-		driver := "attachable-with-long-format"
+		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
 
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))

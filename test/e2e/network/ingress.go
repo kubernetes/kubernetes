@@ -562,11 +562,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("should sync endpoints to NEG", func() {
 			name := "hostname"
 			scaleAndValidateNEG := func(num int) {
-				scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				if scale.Spec.Replicas != int32(num) {
 					scale.Spec.Replicas = int32(num)
-					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 					Expect(err).NotTo(HaveOccurred())
 				}
 				wait.Poll(10*time.Second, ingress.NEGUpdateTimeout, func() (bool, error) {
@@ -611,10 +611,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			Expect(usingNEG).To(BeTrue())
 
 			By(fmt.Sprintf("Scale backend replicas to %d", replicas))
-			scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+			scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			scale.Spec.Replicas = int32(replicas)
-			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 			Expect(err).NotTo(HaveOccurred())
 			wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
@@ -625,17 +625,17 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			})
 
 			By("Trigger rolling update and observe service disruption")
-			deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+			deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			// trigger by changing graceful termination period to 60 seconds
 			gracePeriod := int64(60)
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
-			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).Update(deploy)
+			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(deploy)
 			Expect(err).NotTo(HaveOccurred())
 			wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				Expect(err).NotTo(HaveOccurred())
-				deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
@@ -657,11 +657,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			expectedKeys := []int32{80, 443}
 
 			scaleAndValidateExposedNEG := func(num int) {
-				scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				if scale.Spec.Replicas != int32(num) {
 					scale.Spec.Replicas = int32(num)
-					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 					Expect(err).NotTo(HaveOccurred())
 				}
 				wait.Poll(10*time.Second, ingress.NEGUpdateTimeout, func() (bool, error) {

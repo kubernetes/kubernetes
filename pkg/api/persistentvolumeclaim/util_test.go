@@ -17,8 +17,11 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -28,33 +31,89 @@ import (
 func TestDropAlphaPVCVolumeMode(t *testing.T) {
 	vmode := core.PersistentVolumeFilesystem
 
-	// PersistentVolume with VolumeMode set
-	pvc := core.PersistentVolumeClaim{
-		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
-			VolumeMode:  &vmode,
+	pvcWithoutVolumeMode := func() *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				VolumeMode: nil,
+			},
+		}
+	}
+	pvcWithVolumeMode := func() *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				VolumeMode: &vmode,
+			},
+		}
+	}
+
+	pvcInfo := []struct {
+		description   string
+		hasVolumeMode bool
+		pvc           func() *core.PersistentVolumeClaim
+	}{
+		{
+			description:   "pvc without VolumeMode",
+			hasVolumeMode: false,
+			pvc:           pvcWithoutVolumeMode,
+		},
+		{
+			description:   "pvc with Filesystem VolumeMode",
+			hasVolumeMode: true,
+			pvc:           pvcWithVolumeMode,
+		},
+		{
+			description:   "is nil",
+			hasVolumeMode: false,
+			pvc:           func() *core.PersistentVolumeClaim { return nil },
 		},
 	}
 
-	// Enable alpha feature BlockVolume
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-	// now test dropping the fields - should not be dropped
-	DropDisabledAlphaFields(&pvc.Spec)
+	for _, enabled := range []bool{true, false} {
+		for _, oldpvcInfo := range pvcInfo {
+			for _, newpvcInfo := range pvcInfo {
+				oldpvcHasVolumeMode, oldpvc := oldpvcInfo.hasVolumeMode, oldpvcInfo.pvc()
+				newpvcHasVolumeMode, newpvc := newpvcInfo.hasVolumeMode, newpvcInfo.pvc()
+				if newpvc == nil {
+					continue
+				}
 
-	// check to make sure VolumeDevices is still present
-	// if featureset is set to true
-	if pvc.Spec.VolumeMode == nil {
-		t.Error("VolumeMode in pvc.Spec should not have been dropped based on feature-gate")
-	}
+				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldpvcInfo.description, newpvcInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, enabled)()
 
-	// Disable alpha feature BlockVolume
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
-	// now test dropping the fields
-	DropDisabledAlphaFields(&pvc.Spec)
+					var oldpvcSpec *core.PersistentVolumeClaimSpec
+					if oldpvc != nil {
+						oldpvcSpec = &oldpvc.Spec
+					}
+					DropDisabledFields(&newpvc.Spec, oldpvcSpec)
 
-	// check to make sure VolumeDevices is nil
-	// if featureset is set to false
-	if pvc.Spec.VolumeMode != nil {
-		t.Error("DropDisabledAlphaFields VolumeMode for pvc.Spec failed")
+					// old pvc should never be changed
+					if !reflect.DeepEqual(oldpvc, oldpvcInfo.pvc()) {
+						t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldpvc, oldpvcInfo.pvc()))
+					}
+
+					switch {
+					case enabled || oldpvcHasVolumeMode:
+						// new pvc should not be changed if the feature is enabled, or if the old pvc had BlockVolume
+						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
+							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+						}
+					case newpvcHasVolumeMode:
+						// new pvc should be changed
+						if reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
+							t.Errorf("new pvc was not changed")
+						}
+						// new pvc should not have BlockVolume
+						if !reflect.DeepEqual(newpvc, pvcWithoutVolumeMode()) {
+							t.Errorf("new pvc had pvcBlockVolume: %v", diff.ObjectReflectDiff(newpvc, pvcWithoutVolumeMode()))
+						}
+					default:
+						// new pvc should not need to be changed
+						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
+							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+						}
+					}
+				})
+			}
+		}
 	}
 }

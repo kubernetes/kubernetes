@@ -64,7 +64,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		By("Checking that PVC Protection finalizer is set")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PVC status")
-		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue())
+		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue(), "PVC Protection finalizer(%v) is not set in %v", volumeutil.PVCProtectionFinalizer, pvc.ObjectMeta.Finalizers)
 	})
 
 	AfterEach(func() {

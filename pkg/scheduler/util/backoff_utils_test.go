@@ -31,7 +31,7 @@ func (f *fakeClock) Now() time.Time {
 	return f.t
 }
 
-func TestBackoff(t *testing.T) {
+func TestBackoffPod(t *testing.T) {
 	clock := fakeClock{}
 	backoff := CreatePodBackoffWithClock(1*time.Second, 60*time.Second, &clock)
 	tests := []struct {
@@ -64,23 +64,75 @@ func TestBackoff(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		duration := backoff.GetEntry(test.podID).getBackoff(backoff.maxDuration)
+		duration := backoff.BackoffPod(test.podID)
 		if duration != test.expectedDuration {
-			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
+			t.Errorf("expected: %s, got %s for pod %s", test.expectedDuration.String(), duration.String(), test.podID)
+		}
+		if boTime, _ := backoff.GetBackoffTime(test.podID); boTime != clock.Now().Add(test.expectedDuration) {
+			t.Errorf("expected GetBackoffTime %s, got %s for pod %s", test.expectedDuration.String(), boTime.String(), test.podID)
 		}
 		clock.t = clock.t.Add(test.advanceClock)
 		backoff.Gc()
 	}
 	fooID := ktypes.NamespacedName{Namespace: "default", Name: "foo"}
-	backoff.perPodBackoff[fooID].backoff = 60 * time.Second
-	duration := backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
+	be := backoff.getEntry(fooID)
+	be.backoff = 60 * time.Second
+	duration := backoff.BackoffPod(fooID)
 	if duration != 60*time.Second {
 		t.Errorf("expected: 60, got %s", duration.String())
 	}
 	// Verify that we split on namespaces correctly, same name, different namespace
 	fooID.Namespace = "other"
-	duration = backoff.GetEntry(fooID).getBackoff(backoff.maxDuration)
+	duration = backoff.BackoffPod(fooID)
 	if duration != 1*time.Second {
 		t.Errorf("expected: 1, got %s", duration.String())
+	}
+}
+
+func TestClearPodBackoff(t *testing.T) {
+	clock := fakeClock{}
+	backoff := CreatePodBackoffWithClock(1*time.Second, 60*time.Second, &clock)
+
+	if backoff.ClearPodBackoff(ktypes.NamespacedName{Namespace: "ns", Name: "nonexist"}) {
+		t.Error("Expected ClearPodBackoff failure for unknown pod, got success.")
+	}
+
+	podID := ktypes.NamespacedName{Namespace: "ns", Name: "foo"}
+	if dur := backoff.BackoffPod(podID); dur != 1*time.Second {
+		t.Errorf("Expected backoff of 1s for pod %s, got %s", podID, dur.String())
+	}
+
+	if !backoff.ClearPodBackoff(podID) {
+		t.Errorf("Failed to clear backoff for pod %v", podID)
+	}
+
+	expectBoTime := clock.Now()
+	if boTime, _ := backoff.GetBackoffTime(podID); boTime != expectBoTime {
+		t.Errorf("Expected backoff time for pod %s of %s, got %s", podID, expectBoTime, boTime)
+	}
+}
+
+func TestTryBackoffAndWait(t *testing.T) {
+	clock := fakeClock{}
+	backoff := CreatePodBackoffWithClock(1*time.Second, 60*time.Second, &clock)
+
+	stopCh := make(chan struct{})
+	podID := ktypes.NamespacedName{Namespace: "ns", Name: "pod"}
+	if !backoff.TryBackoffAndWait(podID, stopCh) {
+		t.Error("Expected TryBackoffAndWait success for new pod, got failure.")
+	}
+
+	be := backoff.getEntry(podID)
+	if !be.tryLock() {
+		t.Error("Failed to acquire lock for backoffentry")
+	}
+
+	if backoff.TryBackoffAndWait(podID, stopCh) {
+		t.Error("Expected TryBackoffAndWait failure with lock acquired, got success.")
+	}
+
+	close(stopCh)
+	if backoff.TryBackoffAndWait(podID, stopCh) {
+		t.Error("Expected TryBackoffAndWait failure with closed stopCh, got success.")
 	}
 }
