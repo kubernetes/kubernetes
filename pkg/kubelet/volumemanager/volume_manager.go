@@ -163,6 +163,7 @@ func NewVolumeManager(
 		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
 		operationExecutor: operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
+			nil,
 			volumePluginMgr,
 			recorder,
 			checkNodeCapabilitiesBeforeMount,

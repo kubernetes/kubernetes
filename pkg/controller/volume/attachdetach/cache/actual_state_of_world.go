@@ -77,7 +77,7 @@ type ActualStateOfWorld interface {
 	// object needs to be updated by the node updater again.
 	// If the specified node does not exist in the nodesToUpdateStatusFor list,
 	// log the error and return
-	SetNodeStatusUpdateNeeded(nodeName types.NodeName)
+	//SetNodeStatusUpdateNeeded(nodeName types.NodeName)
 
 	// ResetDetachRequestTime resets the detachRequestTime to 0 which indicates there is no detach
 	// request any more for the volume
@@ -456,7 +456,7 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	// In case the volume/node entry is no longer in attachedVolume list, skip the rest
 	if _, _, err := asw.getNodeAndVolume(volumeName, nodeName); err != nil {
-		klog.V(4).Infof("Volume %q is no longer attached to node %q", volumeName, nodeName)
+		klog.V(4).Infof("Volume %q is no longer attached to node %q, cannot add volume back to VolumeAttached list", volumeName, nodeName)
 		return
 	}
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
@@ -618,9 +618,34 @@ func (asw *actualStateOfWorld) GetNodesForAttachedVolume(volumeName v1.UniqueVol
 	return nodes
 }
 
+func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(nodeName types.NodeName) []v1.AttachedVolume {
+	asw.Lock()
+	defer asw.Unlock()
+
+	nodeToUpdate := asw.nodesToUpdateStatusFor[nodeName]
+	attachedVolumes := make(
+		[]v1.AttachedVolume,
+		len(nodeToUpdate.volumesToReportAsAttached) /* len */)
+	i := 0
+	for _, volume := range nodeToUpdate.volumesToReportAsAttached {
+		attachedVolumes[i] = v1.AttachedVolume{
+			Name:       volume,
+			DevicePath: asw.attachedVolumes[volume].devicePath,
+		}
+		i++
+	}
+	// When GetVolumesToReportAttached is called by node status updater, the current status
+	// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
+	// the current status is already updated.
+	if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
+		klog.Errorf("Failed to update statusUpdateNeeded field when getting volumes: %v", err)
+	}
+	return attachedVolumes
+}
+
 func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][]v1.AttachedVolume {
-	asw.RLock()
-	defer asw.RUnlock()
+	asw.Lock()
+	defer asw.Unlock()
 
 	volumesToReportAttached := make(map[types.NodeName][]v1.AttachedVolume)
 	for nodeName, nodeToUpdateObj := range asw.nodesToUpdateStatusFor {

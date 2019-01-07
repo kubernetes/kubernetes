@@ -68,6 +68,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -112,6 +113,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -189,6 +191,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -267,6 +270,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -356,6 +360,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -446,6 +451,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -530,6 +536,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -615,6 +622,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -710,6 +718,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -814,6 +823,7 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
+				nil,
 				volumePluginMgr,
 				nil,   /* fakeRecorder */
 				false, /* checkNodeCapabilitiesBeforeMount */
@@ -868,6 +878,7 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
+				nil,
 				volumePluginMgr,
 				nil,   /* fakeRecorder */
 				false, /* checkNodeCapabilitiesBeforeMount */
@@ -914,6 +925,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
+				nil,
 				volumePluginMgr,
 				nil,   /* fakeRecorder */
 				false, /* checkNodeCapabilitiesBeforeMount */
@@ -988,6 +1000,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -1118,6 +1131,19 @@ func createTestClient() *fake.Clientset {
 					}},
 			}, nil
 		})
+		fakeClient.AddReactor("patch", "nodes",
+			func(action core.Action) (bool, runtime.Object, error) {
+				return true, &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
+					Status: v1.NodeStatus{
+						VolumesAttached: []v1.AttachedVolume{
+							{
+								Name:       "fake-plugin/fake-device1",
+								DevicePath: "/fake/path",
+							},
+						}},
+				}, nil
+			})
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
@@ -1166,6 +1192,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */

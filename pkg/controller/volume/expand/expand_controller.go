@@ -127,6 +127,7 @@ func NewExpandController(
 
 	expc.operationGenerator = operationexecutor.NewOperationGenerator(
 		kubeClient,
+		nil, /*nodeLister*/
 		&expc.volumePluginMgr,
 		expc.recorder,
 		false,

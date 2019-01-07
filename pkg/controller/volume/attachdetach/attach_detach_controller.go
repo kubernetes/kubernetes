@@ -168,6 +168,7 @@ func NewAttachDetachController(
 	adc.attacherDetacher =
 		operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
+			nodeInformer.Lister(),
 			&adc.volumePluginMgr,
 			recorder,
 			false, // flag for experimental binary check for volume mount

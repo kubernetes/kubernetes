@@ -352,6 +352,14 @@ func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.Un
 	return nil
 }
 
+func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(nodeName types.NodeName) []v1.AttachedVolume {
+	return nil
+}
+
+func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName) {
+
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	return asw.DeletePodFromVolume(podName, volumeName)

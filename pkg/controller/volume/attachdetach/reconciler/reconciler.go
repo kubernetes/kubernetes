@@ -201,24 +201,6 @@ func (rc *reconciler) reconcile() {
 				continue
 			}
 
-			// Before triggering volume detach, mark volume as detached and update the node status
-			// If it fails to update node status, skip detach volume
-			err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
-			if err != nil {
-				klog.V(5).Infof("RemoveVolumeFromReportAsAttached failed while removing volume %q from node %q with: %v",
-					attachedVolume.VolumeName,
-					attachedVolume.NodeName,
-					err)
-			}
-
-			// Update Node Status to indicate volume is no longer safe to mount.
-			err = rc.nodeStatusUpdater.UpdateNodeStatuses()
-			if err != nil {
-				// Skip detaching this volume if unable to update node status
-				klog.Errorf(attachedVolume.GenerateErrorDetailed("UpdateNodeStatuses failed while attempting to report volume as attached", err).Error())
-				continue
-			}
-
 			// Trigger detach volume which requires verifing safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
 			klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))

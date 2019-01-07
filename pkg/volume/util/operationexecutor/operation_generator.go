@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	csilib "k8s.io/csi-translation-lib"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -56,6 +58,8 @@ type operationGenerator struct {
 	// VerifyControllerAttachedVolume operation.
 	kubeClient clientset.Interface
 
+	// nodeLister can list/get nodes from the shared informer's store
+	nodeLister corelisters.NodeLister
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -74,6 +78,7 @@ type operationGenerator struct {
 
 // NewOperationGenerator is returns instance of operationGenerator
 func NewOperationGenerator(kubeClient clientset.Interface,
+	nodeLister corelisters.NodeLister,
 	volumePluginMgr *volume.VolumePluginMgr,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
@@ -81,6 +86,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 
 	return &operationGenerator{
 		kubeClient:                       kubeClient,
+		nodeLister:						  nodeLister,
 		volumePluginMgr:                  volumePluginMgr,
 		recorder:                         recorder,
 		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
@@ -516,12 +522,13 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	getVolumePluginMgrFunc := func() (error, error) {
 		var err error
-		if verifySafeToDetach {
-			err = og.verifyVolumeIsSafeToDetach(volumeToDetach)
+		err = og.verifyVolumeIsSafeToDetachAndUpdateNodeStatus(volumeToDetach, actualStateOfWorld, verifySafeToDetach)
+		if err != nil {
+			return volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
 		}
-		if err == nil {
-			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
-		}
+
+		err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
 			actualStateOfWorld.AddVolumeToReportAsAttached(
@@ -1423,7 +1430,14 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		}
 
 		// Fetch current node object
-		node, fetchErr := og.kubeClient.CoreV1().Nodes().Get(string(nodeName), metav1.GetOptions{})
+		var fetchErr error
+		var node *v1.Node
+		if og.nodeLister != nil {
+			node, fetchErr = og.nodeLister.Get(string(nodeName))
+		} else {
+			node, fetchErr = og.kubeClient.CoreV1().Nodes().Get(string(nodeName), metav1.GetOptions{})
+		}
+
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("VerifyControllerAttachedVolume failed fetching node from API server", fetchErr)
@@ -1462,18 +1476,15 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 }
 
-func (og *operationGenerator) verifyVolumeIsSafeToDetach(
-	volumeToDetach AttachedVolume) error {
+func (og *operationGenerator) verifyVolumeIsSafeToDetachAndUpdateNodeStatus(
+	volumeToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater, needVerify bool) error {
 	// Fetch current node object
-	node, fetchErr := og.kubeClient.CoreV1().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
-	if fetchErr != nil {
-		if errors.IsNotFound(fetchErr) {
-			klog.Warningf(volumeToDetach.GenerateMsgDetailed("Node not found on API server. DetachVolume will skip safe to detach check", ""))
-			return nil
-		}
-
-		// On failure, return error. Caller will log and retry.
-		return volumeToDetach.GenerateErrorDetailed("DetachVolume failed fetching node from API server", fetchErr)
+	var fetchErr error
+	var node *v1.Node
+	if og.nodeLister != nil {
+		node, fetchErr = og.nodeLister.Get(string(volumeToDetach.NodeName))
+	} else {
+		node, fetchErr = og.kubeClient.CoreV1().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
 	}
 
 	if node == nil {
@@ -1482,17 +1493,50 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 			"DetachVolume failed fetching node from API server",
 			fmt.Errorf("node object retrieved from API server is nil"))
 	}
-
-	for _, inUseVolume := range node.Status.VolumesInUse {
-		if inUseVolume == volumeToDetach.VolumeName {
-			return volumeToDetach.GenerateErrorDetailed(
-				"DetachVolume failed",
-				fmt.Errorf("volume is still in use by node, according to Node status"))
+	if fetchErr != nil {
+		if errors.IsNotFound(fetchErr) {
+			klog.Warningf(volumeToDetach.GenerateMsgDetailed("Node not found on API server. DetachVolume will skip safe to detach check", ""))
+		} else {
+			// On failure, return error. Caller will log and retry.
+			return volumeToDetach.GenerateErrorDetailed("DetachVolume failed fetching node from API server", fetchErr)
 		}
 	}
 
-	// Volume is not marked as in use by node
-	klog.Infof(volumeToDetach.GenerateMsgDetailed("Verified volume is safe to detach", ""))
+	if needVerify {
+		for _, inUseVolume := range node.Status.VolumesInUse {
+			if inUseVolume == volumeToDetach.VolumeName {
+				return volumeToDetach.GenerateErrorDetailed(
+					"DetachVolume failed",
+					fmt.Errorf("volume is still in use by node, according to Node status"))
+			}
+		}
+		// Volume is not marked as in use by node
+		klog.Infof(volumeToDetach.GenerateMsgDetailed("Verified volume is safe to detach", ""))
+	}
+
+	// Update node status to remove the volume from the attached list
+	err := actualStateOfWorld.RemoveVolumeFromReportAsAttached(
+		volumeToDetach.VolumeName, volumeToDetach.NodeName)
+	if err != nil {
+		klog.Warning(volumeToDetach.GenerateError("DetachVolume.Detach failed to remove volume from report as attached", err))
+	}
+	attachedVolumes := actualStateOfWorld.GetVolumesToReportAttachedForNode(volumeToDetach.NodeName)
+	nodeCopy := node.DeepCopy()
+	nodeCopy.Status.VolumesAttached = attachedVolumes
+	_, patchBytes, err := nodeutil.PatchNodeStatus(og.kubeClient.CoreV1(), volumeToDetach.NodeName, node, nodeCopy)
+	if err != nil {
+		actualStateOfWorld.SetNodeStatusUpdateNeeded(volumeToDetach.NodeName)
+
+		klog.V(2).Infof(
+			"Could not update node status for %q; re-marking for update. %v",
+			volumeToDetach.NodeName,
+			err)
+		return volumeToDetach.GenerateErrorDetailed("DetachVolume.Detach failed by updating node status", err)
+
+	}
+
+	klog.V(4).Infof("Updating status %q for node %q succeeded", patchBytes, volumeToDetach.NodeName)
+
 	return nil
 }
 

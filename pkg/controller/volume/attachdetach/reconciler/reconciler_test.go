@@ -52,13 +52,14 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		informerFactory.Core().V1().Nodes().Lister(),
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewNodeStatusUpdater(
 		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
 	reconciler := NewReconciler(
@@ -88,8 +89,10 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		informerFactory.Core().V1().Nodes().Lister(),
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -142,6 +145,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -215,6 +219,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -288,6 +293,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -364,6 +370,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -457,6 +464,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -548,6 +556,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -615,6 +624,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
+		nil,
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
@@ -721,6 +731,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 		fakeHandler := volumetesting.NewBlockVolumePathHandler()
 		ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			fakeKubeClient,
+			nil,
 			volumePluginMgr,
 			fakeRecorder,
 			false, /* checkNodeCapabilitiesBeforeMount */
