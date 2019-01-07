@@ -46,6 +46,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
 )
 
@@ -406,7 +407,7 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 			// addresses during development.
 			//
 			// TODO: optionally enforce? Or enforce at the time we receive
-			// a new request, and verify the the ServerName matches the :authority?
+			// a new request, and verify the ServerName matches the :authority?
 			// But that precludes proxy situations, perhaps.
 			//
 			// So for now, do nothing here again.
@@ -1486,6 +1487,12 @@ func (sc *serverConn) processSettings(f *SettingsFrame) error {
 		}
 		return nil
 	}
+	if f.NumSettings() > 100 || f.HasDuplicates() {
+		// This isn't actually in the spec, but hang up on
+		// suspiciously large settings frames or those with
+		// duplicate entries.
+		return ConnectionError(ErrCodeProtocol)
+	}
 	if err := f.ForeachSetting(sc.processSetting); err != nil {
 		return err
 	}
@@ -1574,6 +1581,12 @@ func (sc *serverConn) processData(f *DataFrame) error {
 		// type PROTOCOL_ERROR."
 		return ConnectionError(ErrCodeProtocol)
 	}
+	// RFC 7540, sec 6.1: If a DATA frame is received whose stream is not in
+	// "open" or "half-closed (local)" state, the recipient MUST respond with a
+	// stream error (Section 5.4.2) of type STREAM_CLOSED.
+	if state == stateClosed {
+		return streamError(id, ErrCodeStreamClosed)
+	}
 	if st == nil || state != stateOpen || st.gotTrailerHeader || st.resetQueued {
 		// This includes sending a RST_STREAM if the stream is
 		// in stateHalfClosedLocal (which currently means that
@@ -1607,7 +1620,10 @@ func (sc *serverConn) processData(f *DataFrame) error {
 	// Sender sending more than they'd declared?
 	if st.declBodyBytes != -1 && st.bodyBytes+int64(len(data)) > st.declBodyBytes {
 		st.body.CloseWithError(fmt.Errorf("sender tried to send more than declared Content-Length of %d bytes", st.declBodyBytes))
-		return streamError(id, ErrCodeStreamClosed)
+		// RFC 7540, sec 8.1.2.6: A request or response is also malformed if the
+		// value of a content-length header field does not equal the sum of the
+		// DATA frame payload lengths that form the body.
+		return streamError(id, ErrCodeProtocol)
 	}
 	if f.Length > 0 {
 		// Check whether the client has flow control quota.
@@ -1717,6 +1733,13 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 			// processing this frame.
 			return nil
 		}
+		// RFC 7540, sec 5.1: If an endpoint receives additional frames, other than
+		// WINDOW_UPDATE, PRIORITY, or RST_STREAM, for a stream that is in
+		// this state, it MUST respond with a stream error (Section 5.4.2) of
+		// type STREAM_CLOSED.
+		if st.state == stateHalfClosedRemote {
+			return streamError(id, ErrCodeStreamClosed)
+		}
 		return st.processTrailerHeaders(f)
 	}
 
@@ -1817,7 +1840,7 @@ func (st *stream) processTrailerHeaders(f *MetaHeadersFrame) error {
 	if st.trailer != nil {
 		for _, hf := range f.RegularFields() {
 			key := sc.canonicalHeader(hf.Name)
-			if !ValidTrailerHeader(key) {
+			if !httpguts.ValidTrailerHeader(key) {
 				// TODO: send more details to the peer somehow. But http2 has
 				// no way to send debug data at a stream level. Discuss with
 				// HTTP folk.
@@ -2284,8 +2307,8 @@ func (rws *responseWriterState) hasTrailers() bool { return len(rws.trailers) !=
 // written in the trailers at the end of the response.
 func (rws *responseWriterState) declareTrailer(k string) {
 	k = http.CanonicalHeaderKey(k)
-	if !ValidTrailerHeader(k) {
-		// Forbidden by RFC 2616 14.40.
+	if !httpguts.ValidTrailerHeader(k) {
+		// Forbidden by RFC 7230, section 4.1.2.
 		rws.conn.logf("ignoring invalid trailer %q", k)
 		return
 	}
@@ -2333,6 +2356,19 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 
 		for _, v := range rws.snapHeader["Trailer"] {
 			foreachHeaderElement(v, rws.declareTrailer)
+		}
+
+		// "Connection" headers aren't allowed in HTTP/2 (RFC 7540, 8.1.2.2),
+		// but respect "Connection" == "close" to mean sending a GOAWAY and tearing
+		// down the TCP connection when idle, like we do for HTTP/1.
+		// TODO: remove more Connection-specific header fields here, in addition
+		// to "Connection".
+		if _, ok := rws.snapHeader["Connection"]; ok {
+			v := rws.snapHeader.Get("Connection")
+			delete(rws.snapHeader, "Connection")
+			if v == "close" {
+				rws.conn.startGracefulShutdown()
+			}
 		}
 
 		endStream := (rws.handlerDone && !rws.hasTrailers() && len(p) == 0) || isHeadResp
@@ -2406,7 +2442,7 @@ const TrailerPrefix = "Trailer:"
 // after the header has already been flushed. Because the Go
 // ResponseWriter interface has no way to set Trailers (only the
 // Header), and because we didn't want to expand the ResponseWriter
-// interface, and because nobody used trailers, and because RFC 2616
+// interface, and because nobody used trailers, and because RFC 7230
 // says you SHOULD (but not must) predeclare any trailers in the
 // header, the official ResponseWriter rules said trailers in Go must
 // be predeclared, and then we reuse the same ResponseWriter.Header()
@@ -2790,7 +2826,7 @@ func (sc *serverConn) startPush(msg *startPushRequest) {
 }
 
 // foreachHeaderElement splits v according to the "#rule" construction
-// in RFC 2616 section 2.1 and calls fn for each non-empty element.
+// in RFC 7230 section 7 and calls fn for each non-empty element.
 func foreachHeaderElement(v string, fn func(string)) {
 	v = textproto.TrimString(v)
 	if v == "" {
@@ -2836,41 +2872,6 @@ func new400Handler(err error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-}
-
-// ValidTrailerHeader reports whether name is a valid header field name to appear
-// in trailers.
-// See: http://tools.ietf.org/html/rfc7230#section-4.1.2
-func ValidTrailerHeader(name string) bool {
-	name = http.CanonicalHeaderKey(name)
-	if strings.HasPrefix(name, "If-") || badTrailer[name] {
-		return false
-	}
-	return true
-}
-
-var badTrailer = map[string]bool{
-	"Authorization":       true,
-	"Cache-Control":       true,
-	"Connection":          true,
-	"Content-Encoding":    true,
-	"Content-Length":      true,
-	"Content-Range":       true,
-	"Content-Type":        true,
-	"Expect":              true,
-	"Host":                true,
-	"Keep-Alive":          true,
-	"Max-Forwards":        true,
-	"Pragma":              true,
-	"Proxy-Authenticate":  true,
-	"Proxy-Authorization": true,
-	"Proxy-Connection":    true,
-	"Range":               true,
-	"Realm":               true,
-	"Te":                  true,
-	"Trailer":             true,
-	"Transfer-Encoding":   true,
-	"Www-Authenticate":    true,
 }
 
 // h1ServerKeepAlivesDisabled reports whether hs has its keep-alives
