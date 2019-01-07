@@ -69,7 +69,6 @@ var (
 func init() {
 	cmdSave.Flag.BoolVar(&saveR, "r", false, "rewrite import paths")
 	cmdSave.Flag.BoolVar(&saveT, "t", false, "save test files")
-
 }
 
 func runSave(cmd *Command, args []string) {
