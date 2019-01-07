@@ -15,9 +15,7 @@ limitations under the License.
 */
 
 // Package main provides a tool that scans kubernetes e2e test source code
-// looking for conformance test declarations, which it emits on stdout.  It
-// also looks for legacy, manually added "[Conformance]" tags and reports an
-// error if it finds any.
+// looking for conformance test declarations, which it emits on stdout.
 //
 // This approach is not air tight, but it will serve our purpose as a
 // pre-submit check.
@@ -38,9 +36,9 @@ import (
 )
 
 var (
-	baseURL                                           = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
-	confDoc                                           = flag.Bool("conformance", false, "write a conformance document")
-	totalConfTests, totalLegacyTests, missingComments int
+	baseURL                         = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
+	confDoc                         = flag.Bool("conformance", false, "write a conformance document")
+	totalConfTests, missingComments int
 )
 
 const regexDescribe = "Describe|KubeDescribe|SIGDescribe"
@@ -122,34 +120,6 @@ func (v *visitor) isConformanceCall(call *ast.CallExpr) bool {
 			return fun.Sel.Name == "ConformanceIt"
 		}
 	}
-	return false
-}
-
-func (v *visitor) isLegacyItCall(call *ast.CallExpr) bool {
-	switch fun := call.Fun.(type) {
-	case *ast.Ident:
-		if fun.Name != "It" {
-			return false
-		}
-		if len(call.Args) < 1 {
-			v.failf(call, "Not enough arguments to It()")
-		}
-	default:
-		return false
-	}
-
-	switch arg := call.Args[0].(type) {
-	case *ast.BasicLit:
-		if arg.Kind != token.STRING {
-			v.failf(arg, "Unexpected non-string argument to It()")
-		}
-		if strings.Contains(arg.Value, "[Conformance]") {
-			return true
-		}
-	default:
-		// non-literal argument to It()... we just ignore these even though they could be a way to "sneak in" a conformance test
-	}
-
 	return false
 }
 
@@ -277,9 +247,7 @@ func (v *visitor) matchFuncName(n *ast.CallExpr, pattern string) string {
 }
 
 // Visit visits each node looking for either calls to framework.ConformanceIt,
-// which it will emit in its list of conformance tests, or legacy calls to
-// It() with a manually embedded [Conformance] tag, which it will complain
-// about.
+// which it will emit in its list of conformance tests.
 func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 	switch t := node.(type) {
 	case *ast.CallExpr:
@@ -290,10 +258,6 @@ func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 		} else if v.isConformanceCall(t) {
 			totalConfTests++
 			v.emit(t.Args[0])
-			return nil
-		} else if v.isLegacyItCall(t) {
-			totalLegacyTests++
-			v.failf(t, "Using It() with manual [Conformance] tag is no longer allowed.  Use framework.ConformanceIt() instead.")
 			return nil
 		}
 	}
@@ -342,7 +306,6 @@ func main() {
 	}
 
 	totalConfTests = 0
-	totalLegacyTests = 0
 	missingComments = 0
 	for _, arg := range flag.Args() {
 		filepath.Walk(arg, func(path string, info os.FileInfo, err error) error {
@@ -364,6 +327,6 @@ func main() {
 	}
 	if *confDoc {
 		fmt.Println("\n## **Summary**")
-		fmt.Printf("\nTotal Conformance Tests: %d, total legacy tests that need conversion: %d, while total tests that need comment sections: %d\n\n", totalConfTests, totalLegacyTests, missingComments)
+		fmt.Printf("\nTotal Conformance Tests: %d, while total tests that need comment sections: %d\n\n", totalConfTests, missingComments)
 	}
 }
