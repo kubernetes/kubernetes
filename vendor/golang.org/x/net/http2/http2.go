@@ -29,7 +29,7 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/net/lex/httplex"
+	"golang.org/x/net/http/httpguts"
 )
 
 var (
@@ -179,7 +179,7 @@ var (
 )
 
 // validWireHeaderFieldName reports whether v is a valid header field
-// name (key). See httplex.ValidHeaderName for the base rules.
+// name (key). See httpguts.ValidHeaderName for the base rules.
 //
 // Further, http2 says:
 //   "Just as in HTTP/1.x, header field names are strings of ASCII
@@ -191,7 +191,7 @@ func validWireHeaderFieldName(v string) bool {
 		return false
 	}
 	for _, r := range v {
-		if !httplex.IsTokenRune(r) {
+		if !httpguts.IsTokenRune(r) {
 			return false
 		}
 		if 'A' <= r && r <= 'Z' {
@@ -312,7 +312,7 @@ func mustUint31(v int32) uint32 {
 }
 
 // bodyAllowedForStatus reports whether a given response status code
-// permits a body. See RFC 2616, section 4.4.
+// permits a body. See RFC 7230, section 3.3.
 func bodyAllowedForStatus(status int) bool {
 	switch {
 	case status >= 100 && status <= 199:
