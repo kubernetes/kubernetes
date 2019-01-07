@@ -920,10 +920,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		if hasEndpoints {
-			fwChain := svcInfo.serviceFirewallChainName
-			for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
-				if ingress.IP != "" {
+		fwChain := svcInfo.serviceFirewallChainName
+		for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
+			if ingress.IP != "" {
+				if hasEndpoints {
 					// create service firewall chain
 					if chain, ok := existingNATChains[fwChain]; ok {
 						writeBytesLine(proxier.natChains, chain)
@@ -984,10 +984,21 @@ func (proxier *Proxier) syncProxyRules() {
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
 					// It means the packet cannot go thru the firewall, then mark it for DROP
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkDropChain))...)
+				} else {
+					// Add a reject rule so the behavior is the same for clients going via the load balancer
+					// (immediate reject instead of connection timeout). This also avoids a stale entry in the
+					// contrack table.
+					writeLine(proxier.filterRules,
+						"-A", string(kubeForwardChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP has no endpoints"`, svcNameString),
+						"-m", protocol, "-p", protocol,
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
+						"--dport", strconv.Itoa(svcInfo.Port),
+						"-j", "REJECT",
+					)
 				}
 			}
 		}
-		// FIXME: do we need REJECT rules for load-balancer ingress if !hasEndpoints?
 
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
