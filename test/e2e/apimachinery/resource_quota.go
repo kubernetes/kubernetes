@@ -172,7 +172,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceCPU] = resource.MustParse("500m")
 		requests[v1.ResourceMemory] = resource.MustParse("252Mi")
 		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
-		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
+		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "un.hand.led"}}}
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		// because no one is handling the initializer, server will return a 504 timeout
 		if err != nil && !errors.IsTimeout(err) {
@@ -237,7 +237,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		podName = "too-large-pod"
 		pod = newTestPodForQuota(f, podName, requests, v1.ResourceList{})
-		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
+		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "un.hand.led"}}}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		// because no one is handling the initializer, server will return a 504 timeout
 		if err != nil && !errors.IsTimeout(err) {
