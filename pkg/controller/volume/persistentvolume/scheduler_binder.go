@@ -518,7 +518,15 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		if pvc.Spec.VolumeName != "" {
 			pv, err := b.pvCache.GetAPIPV(pvc.Spec.VolumeName)
 			if err != nil {
-				return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
+				if _, ok := err.(*errNotFound); ok {
+					// We tolerate NotFound error here, because PV is possibly
+					// not found because of API delay, we can check next time.
+					// And if PV does not exist because it's deleted, PVC will
+					// be unbound eventually.
+					return false, nil
+				} else {
+					return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
+				}
 			}
 			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
 				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
