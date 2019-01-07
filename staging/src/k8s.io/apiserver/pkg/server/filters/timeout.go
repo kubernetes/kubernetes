@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog"
 )
 
 var errConnKilled = fmt.Errorf("killing connection/stream because serving request timed out and response had been started")
@@ -45,6 +46,7 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apir
 
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
+			klog.Infof(">>>> RequestInfoFrom not ok")
 			// if this happens, the handler chain isn't setup correctly because there is no request info
 			return req, time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
 		}
@@ -57,9 +59,11 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apir
 		req = req.WithContext(ctx)
 
 		postTimeoutFn := func() {
+			klog.Infof(">>>> in postTimeoutFn")
 			cancel()
 			metrics.Record(req, requestInfo, metrics.APIServerComponent, "", http.StatusGatewayTimeout, 0, 0)
 		}
+		klog.Infof(">>>> request did not complete within %s", timeout)
 		return req, time.After(timeout), postTimeoutFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
@@ -88,6 +92,7 @@ type timeoutHandler struct {
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r, after, postTimeoutFn, err := t.timeout(r)
 	if after == nil {
+		klog.Errorf(">>>> after is nil")
 		t.handler.ServeHTTP(w, r)
 		return
 	}
@@ -102,6 +107,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				buf := make([]byte, size)
 				buf = buf[:runtime.Stack(buf, false)]
 				err = fmt.Sprintf("%v\n%s", err, buf)
+				klog.Errorf(">>>> collecting traces : %s", err)
 			}
 			errCh <- err
 		}()
@@ -110,10 +116,12 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	select {
 	case err := <-errCh:
 		if err != nil {
+			klog.Infof(">>>> panic in ServeHTTP")
 			panic(err)
 		}
 		return
 	case <-after:
+		klog.Infof(">>>> timed out in ServeHTTP")
 		postTimeoutFn()
 		tw.timeout(err)
 	}
@@ -159,6 +167,8 @@ func (tw *baseTimeoutWriter) Header() http.Header {
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
+		klog.Infof(">>> did not call delegated Header : %d",
+			tw.timedOut)
 		return http.Header{}
 	}
 
@@ -170,9 +180,13 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
+		klog.Infof(">>> did not call delegated Write for time out : %d",
+			tw.timedOut)
 		return 0, http.ErrHandlerTimeout
 	}
 	if tw.hijacked {
+		klog.Infof(">>> did not call delegated Write for hijack : %d",
+			tw.timedOut)
 		return 0, http.ErrHijacked
 	}
 
@@ -185,6 +199,8 @@ func (tw *baseTimeoutWriter) Flush() {
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
+		klog.Infof(">>> did not call delegated Flush : %d / %d / %d",
+			tw.timedOut, tw.wroteHeader, tw.hijacked)
 		return
 	}
 
@@ -198,6 +214,8 @@ func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	defer tw.mu.Unlock()
 
 	if tw.timedOut || tw.wroteHeader || tw.hijacked {
+		klog.Infof(">>> did not call delegated WriteHeader : %d / %d / %d",
+			tw.timedOut, tw.wroteHeader, tw.hijacked)
 		return
 	}
 
@@ -210,15 +228,18 @@ func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 	defer tw.mu.Unlock()
 
 	tw.timedOut = true
+	klog.Infof(">>> baseTimeoutWriter timeout called")
 
 	// The timeout writer has not been used by the inner handler.
 	// We can safely timeout the HTTP request by sending by a timeout
 	// handler
 	if !tw.wroteHeader && !tw.hijacked {
+		klog.Infof(">>> timeout called with : %d / %d", tw.wroteHeader, tw.hijacked)
 		tw.w.WriteHeader(http.StatusGatewayTimeout)
 		enc := json.NewEncoder(tw.w)
 		enc.Encode(&err.ErrStatus)
 	} else {
+		klog.Info(">>> calling panic")
 		// The timeout writer has been used by the inner handler. There is
 		// no way to timeout the HTTP request at the point. We have to shutdown
 		// the connection for HTTP1 or reset stream for HTTP2.
@@ -240,6 +261,8 @@ func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
+		klog.Infof(">>> timedOut in closeNotify : %d",
+			tw.timedOut)
 		done := make(chan bool)
 		close(done)
 		return done
@@ -253,6 +276,8 @@ func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
 	defer tw.mu.Unlock()
 
 	if tw.timedOut {
+		klog.Infof(">>> did not call delegated hijack : %d",
+			tw.timedOut)
 		return nil, nil, http.ErrHandlerTimeout
 	}
 	conn, rw, err := tw.w.(http.Hijacker).Hijack()
