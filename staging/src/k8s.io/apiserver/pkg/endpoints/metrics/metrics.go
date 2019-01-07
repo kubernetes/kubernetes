@@ -328,6 +328,10 @@ func (r *ResponseWriterDelegator) ContentLength() int {
 	return int(r.written)
 }
 
+func (r *ResponseWriterDelegator) WroteHeader() bool {
+	return r.wroteHeader
+}
+
 type fancyResponseWriterDelegator struct {
 	*ResponseWriterDelegator
 }

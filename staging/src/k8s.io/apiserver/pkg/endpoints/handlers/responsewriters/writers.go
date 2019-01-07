@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	"k8s.io/klog"
 )
 
 // httpResponseWriterWithInit wraps http.ResponseWriter, and implements the io.Writer interface to be used
@@ -125,6 +126,18 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, innerW http.Resp
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 // The context is optional and can be nil.
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	d, ok := w.(*metrics.ResponseWriterDelegator)
+	if !ok {
+		d = &metrics.ResponseWriterDelegator{ResponseWriter: w}
+		w = d
+	}
+	defer func() {
+		switch {
+		case !d.WroteHeader() && d.ContentLength() == 0:
+			klog.Errorf("WriteObjectNegotiated completed with no write/writeHeader calls:\n%#v\n%#v\n%d\n%#v", s, gv, statusCode, object)
+		}
+	}()
+
 	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
