@@ -3348,11 +3348,6 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 		if !strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
 			continue
 		}
-		// TODO: this belongs to admission, not general pod validation:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "AppArmor is disabled by feature-gate"))
-			continue
-		}
 		containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
 		if !podSpecHasContainer(spec, containerName) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), containerName, "container not found"))

@@ -17,10 +17,13 @@ limitations under the License.
 package pod
 
 import (
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -282,6 +285,14 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
+		for k := range podAnnotations {
+			if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+				delete(podAnnotations, k)
+			}
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) && !podPriorityInUse(oldPodSpec) {
 		// Set to nil pod's priority fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
@@ -428,6 +439,16 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+// appArmorInUse returns true if the pod has apparmor related information
+func appArmorInUse(podAnnotations map[string]string) bool {
+	for k := range podAnnotations {
+		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+			return true
 		}
 	}
 	return false
