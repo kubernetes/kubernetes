@@ -375,7 +375,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -469,7 +469,7 @@ func TestDropSubPath(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -558,7 +558,7 @@ func TestDropRuntimeClass(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -652,7 +652,7 @@ func TestDropProcMount(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -768,7 +768,7 @@ func TestDropPodPriority(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -878,7 +878,7 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -1013,7 +1013,7 @@ func TestDropRunAsGroup(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {

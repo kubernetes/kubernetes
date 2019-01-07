@@ -232,9 +232,56 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	return !isEqual
 }
 
-// DropDisabledFields removes disabled fields from the pod spec.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
-func DropDisabledFields(podSpec, oldPodSpec *api.PodSpec) {
+// DropDisabledTemplateFields removes disabled fields from the pod template metadata and spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a PodTemplateSpec
+func DropDisabledTemplateFields(podTemplate, oldPodTemplate *api.PodTemplateSpec) {
+	var (
+		podSpec           *api.PodSpec
+		podAnnotations    map[string]string
+		oldPodSpec        *api.PodSpec
+		oldPodAnnotations map[string]string
+	)
+	if podTemplate != nil {
+		podSpec = &podTemplate.Spec
+		podAnnotations = podTemplate.Annotations
+	}
+	if oldPodTemplate != nil {
+		oldPodSpec = &oldPodTemplate.Spec
+		oldPodAnnotations = oldPodTemplate.Annotations
+	}
+	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
+}
+
+// DropDisabledPodFields removes disabled fields from the pod metadata and spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a Pod
+func DropDisabledPodFields(pod, oldPod *api.Pod) {
+	var (
+		podSpec           *api.PodSpec
+		podAnnotations    map[string]string
+		oldPodSpec        *api.PodSpec
+		oldPodAnnotations map[string]string
+	)
+	if pod != nil {
+		podSpec = &pod.Spec
+		podAnnotations = pod.Annotations
+	}
+	if oldPod != nil {
+		oldPodSpec = &oldPod.Spec
+		oldPodAnnotations = oldPod.Annotations
+	}
+	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
+}
+
+// dropDisabledFields removes disabled fields from the pod metadata and spec.
+func dropDisabledFields(
+	podSpec *api.PodSpec, podAnnotations map[string]string,
+	oldPodSpec *api.PodSpec, oldPodAnnotations map[string]string,
+) {
+	// the new spec must always be non-nil
+	if podSpec == nil {
+		podSpec = &api.PodSpec{}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) && !podPriorityInUse(oldPodSpec) {
 		// Set to nil pod's priority fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
