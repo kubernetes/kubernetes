@@ -126,6 +126,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 		OldDriverName:            h.driverInfo.Name,
 		NewDriverName:            testsuites.GetUniqueDriverName(h),
 		DriverContainerName:      "hostpath",
+		DriverContainerArguments: []string{"--drivername=csi-hostpath-" + f.UniqueName},
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 nodeName,
 	}
@@ -143,6 +144,98 @@ func (h *hostpathCSIDriver) CleanupDriver() {
 	if h.cleanup != nil {
 		By(fmt.Sprintf("uninstalling %s driver", h.driverInfo.Name))
 		h.cleanup()
+	}
+}
+
+// mockCSI
+type mockCSIDriver struct {
+	cleanup    func()
+	driverInfo testsuites.DriverInfo
+}
+
+var _ testsuites.TestDriver = &mockCSIDriver{}
+var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
+
+// InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
+func InitMockCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
+	return &mockCSIDriver{
+		driverInfo: testsuites.DriverInfo{
+			Name:        "csi-mock",
+			FeatureTag:  "",
+			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedFsType: sets.NewString(
+				"", // Default fsType
+			),
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapPersistence: false,
+				testsuites.CapFsGroup:     false,
+				testsuites.CapExec:        false,
+			},
+			Config: config,
+		},
+	}
+}
+
+func (m *mockCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
+	return &m.driverInfo
+}
+
+func (m *mockCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+}
+
+func (m *mockCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+	provisioner := testsuites.GetUniqueDriverName(m)
+	parameters := map[string]string{}
+	ns := m.driverInfo.Config.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-sc", provisioner)
+
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (m *mockCSIDriver) GetClaimSize() string {
+	return "5Gi"
+}
+
+func (m *mockCSIDriver) CreateDriver() {
+	By("deploying csi mock driver")
+	f := m.driverInfo.Config.Framework
+	cs := f.ClientSet
+
+	// pods should be scheduled on the node
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	node := nodes.Items[rand.Intn(len(nodes.Items))]
+	m.driverInfo.Config.ClientNodeName = node.Name
+
+	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
+	// settings are ignored for this test. We could patch the image definitions.
+	o := utils.PatchCSIOptions{
+		OldDriverName:            "csi-mock",
+		NewDriverName:            "csi-mock-" + f.UniqueName,
+		DriverContainerName:      "mock",
+		DriverContainerArguments: []string{"--name=csi-mock-" + f.UniqueName},
+		ProvisionerContainerName: "csi-provisioner",
+		NodeName:                 m.driverInfo.Config.ClientNodeName,
+	}
+	cleanup, err := f.CreateFromManifests(func(item interface{}) error {
+		return utils.PatchCSIDeployment(f, o, item)
+	},
+		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
+		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml",
+	)
+	m.cleanup = cleanup
+	if err != nil {
+		framework.Failf("deploying csi mock driver: %v", err)
+	}
+}
+
+func (m *mockCSIDriver) CleanupDriver() {
+	if m.cleanup != nil {
+		By("uninstalling csi mock driver")
+		m.cleanup()
 	}
 }
 
