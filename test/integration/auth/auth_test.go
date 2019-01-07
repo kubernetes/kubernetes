@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -413,7 +414,21 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	ns := framework.CreateTestingNamespace("auth-always-allow", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	transport := http.DefaultTransport
+	// Copied from http.DefaultTransport and tweaked number of connections
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          1,
+		MaxConnsPerHost:       1,
+		MaxIdleConnsPerHost:   1,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 	previousResourceVersion := make(map[string]float64)
 
 	for _, r := range getTestRequests(ns.Name) {
