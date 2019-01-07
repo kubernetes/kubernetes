@@ -305,5 +305,5 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 }
 
 func (detacher *photonPersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }

@@ -162,7 +162,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	// Unmount for deviceMountPath(=globalPDPath)
-	err = volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	err = mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 	if err != nil {
 		return fmt.Errorf("fc: failed to unmount: %s\nError: %v", deviceMountPath, err)
 	}
