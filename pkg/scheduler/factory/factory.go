@@ -1105,7 +1105,6 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 				Namespace: pod.Namespace,
 				Name:      pod.Name,
 			}
-			origPod := pod
 
 			// When pod priority is enabled, we would like to place an unschedulable
 			// pod in the unschedulable queue. This ensures that if the pod is nominated
@@ -1124,21 +1123,11 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
 						podQueue.AddUnschedulableIfNotPresent(pod)
-					} else {
-						if c.volumeBinder != nil {
-							// Volume binder only wants to keep unassigned pods
-							c.volumeBinder.DeletePodBindings(pod)
-						}
 					}
 					break
 				}
 				if errors.IsNotFound(err) {
 					klog.Warningf("A pod %v no longer exists", podID)
-
-					if c.volumeBinder != nil {
-						// Volume binder only wants to keep unassigned pods
-						c.volumeBinder.DeletePodBindings(origPod)
-					}
 					return
 				}
 				klog.Errorf("Error getting pod %v for retry: %v; retrying...", podID, err)

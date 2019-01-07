@@ -383,10 +383,6 @@ func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 			klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
 		}
 
-		// Volumes may be bound by PV controller asynchronously, we must clear
-		// stale pod binding cache.
-		sched.config.VolumeBinder.DeletePodBindings(assumed)
-
 		sched.recordSchedulingFailure(assumed, err, "VolumeBindingFailed", err.Error())
 		return err
 	}
