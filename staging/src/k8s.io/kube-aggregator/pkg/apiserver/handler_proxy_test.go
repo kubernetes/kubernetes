@@ -245,8 +245,7 @@ func TestProxyHandler(t *testing.T) {
 				Name:   "username",
 				Groups: []string{"one", "two"},
 			},
-			path:            "/request/path",
-			serviceResolver: &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
+			path: "/request/path",
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
