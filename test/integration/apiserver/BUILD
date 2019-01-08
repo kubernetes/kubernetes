@@ -20,8 +20,6 @@ go_test(
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/printers:go_default_library",

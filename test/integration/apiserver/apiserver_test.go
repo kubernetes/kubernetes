@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"reflect"
 	"testing"
 
@@ -39,8 +40,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -82,10 +81,6 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 	}
 }
 
-func path(resource, namespace, name string) string {
-	return testapi.Extensions.ResourcePath(resource, namespace, name)
-}
-
 func newRS(namespace string) *apps.ReplicaSet {
 	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
@@ -118,7 +113,7 @@ func newRS(namespace string) *apps.ReplicaSet {
 var cascDel = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "orphanDependents": false
 }
 `
@@ -139,7 +134,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), "", 200)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
 
 	// 2. Create the resource with a finalizer so that the resource is not immediately deleted and then delete it without setting DeleteOptions.
 	// Verify that the apiserver still returns 200 since DeleteOptions.OrphanDependents is not set.
@@ -149,7 +144,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), "", 200)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
 
 	// 3. Create the resource and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server still returns 200 since the resource is immediately deleted.
@@ -158,7 +153,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), cascDel, 200)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 200)
 
 	// 4. Create the resource with a finalizer so that the resource is not immediately deleted and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server returns 202 in this case.
@@ -168,7 +163,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), cascDel, 202)
+	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
 }
 
 func TestAPIListChunking(t *testing.T) {
