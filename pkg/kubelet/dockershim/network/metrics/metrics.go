@@ -54,7 +54,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DeprecatedNetworkPluginOperationsLatencyKey,
-			Help:      "Latency in microseconds of network plugin operations. Broken down by operation type.",
+			Help:      "(Deprecated) Latency in microseconds of network plugin operations. Broken down by operation type.",
 		},
 		[]string{"operation_type"},
 	)

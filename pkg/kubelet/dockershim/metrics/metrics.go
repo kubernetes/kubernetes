@@ -93,7 +93,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DeprecatedDockerOperationsLatencyKey,
-			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
+			Help:      "(Deprecated) Latency in microseconds of Docker operations. Broken down by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -102,7 +102,7 @@ var (
 		prometheus.CounterOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DeprecatedDockerOperationsKey,
-			Help:      "Cumulative number of Docker operations by operation type.",
+			Help:      "(Deprecated) Cumulative number of Docker operations by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -112,7 +112,7 @@ var (
 		prometheus.CounterOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DeprecatedDockerOperationsErrorsKey,
-			Help:      "Cumulative number of Docker operation errors by operation type.",
+			Help:      "(Deprecated) Cumulative number of Docker operation errors by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -121,7 +121,7 @@ var (
 		prometheus.CounterOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DeprecatedDockerOperationsTimeoutKey,
-			Help:      "Cumulative number of Docker operation timeout by operation type.",
+			Help:      "(Deprecated) Cumulative number of Docker operation timeout by operation type.",
 		},
 		[]string{"operation_type"},
 	)
