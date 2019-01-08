@@ -160,7 +160,7 @@ func TestResourceConfigForPod(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits)
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, 1.0)
 		if !reflect.DeepEqual(actual.CpuPeriod, testCase.expected.CpuPeriod) {
 			t.Errorf("unexpected result, test: %v, cpu period not as expected", testName)
 		}

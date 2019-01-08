@@ -19,7 +19,10 @@ package util
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 
+	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,4 +47,28 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	} else {
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
+}
+
+const (
+	CPUOvercommitRatioAnnotation = "k8s.qiniu.com/cpu-overcommit-ratio"
+	CPUOvercommitRatioMin        = 0.1
+	CPUOvercommitRatioMax        = 10
+)
+
+// GetCPUOvercommitRatio returns CPU over-commmit ratio of node.
+func GetCPUOvercommitRatio(node *v1.Node) float64 {
+	if ratio, ok := node.Annotations[CPUOvercommitRatioAnnotation]; ok {
+		ratio_f, err := strconv.ParseFloat(ratio, 64)
+		if err != nil {
+			glog.Errorf("failed to parse ratio data: %s", ratio)
+			return 1.0
+		}
+		if ratio_f < CPUOvercommitRatioMin {
+			ratio_f = CPUOvercommitRatioMin
+		} else if ratio_f > CPUOvercommitRatioMax {
+			ratio_f = CPUOvercommitRatioMax
+		}
+		return ratio_f
+	}
+	return 1.0
 }

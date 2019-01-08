@@ -50,7 +50,8 @@ type podContainerManagerImpl struct {
 	// Maximum number of pids in a pod
 	podPidsLimit int64
 	// enforceCPULimits controls whether cfs quota is enforced or not
-	enforceCPULimits bool
+	enforceCPULimits         bool
+	cpuOvercommitRatioGetter func() float64
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -81,7 +82,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		// Create the pod container
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits),
+			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuOvercommitRatioGetter()),
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PodPidsLimit = &m.podPidsLimit
@@ -96,6 +97,30 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	// Because maintaining the desired state is difficult without checkpointing.
 	if err := m.applyLimits(pod); err != nil {
 		return fmt.Errorf("failed to apply resource limits on container for %v : %v", podContainerName, err)
+	}
+	return nil
+}
+
+func (m *podContainerManagerImpl) Update(pod *v1.Pod) error {
+	glog.V(4).Infof("[k8s.qiniu.com/cpu-overcommit-ratio]: update cgroup configs for pod %s/%s", pod.Namespace, pod.Name)
+	podContainerName, _ := m.GetPodContainerName(pod)
+	// Create the pod container
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuOvercommitRatioGetter()),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && m.podPidsLimit > 0 {
+		containerConfig.ResourceParameters.PodPidsLimit = &m.podPidsLimit
+	}
+	alreadyExists := m.Exists(pod)
+	if !alreadyExists {
+		if err := m.cgroupManager.Create(containerConfig); err != nil {
+			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
+		}
+	} else {
+		if err := m.cgroupManager.Update(containerConfig); err != nil {
+			return fmt.Errorf("failed to update container for %v : %v", podContainerName, err)
+		}
 	}
 	return nil
 }
@@ -277,4 +302,8 @@ func (m *podContainerManagerNoop) ReduceCPULimits(_ CgroupName) error {
 
 func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil
+}
+
+func (m *podContainerManagerNoop) Update(_ *v1.Pod) error {
+	return nil
 }
