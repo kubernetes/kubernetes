@@ -1643,7 +1643,7 @@ message Lifecycle {
   // Other management of the container blocks until the hook completes.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler preStop = 2;
+  optional PreStopHandler preStop = 2;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -3313,6 +3313,19 @@ message PortworxVolumeSource {
   optional bool readOnly = 3;
 }
 
+// PreStopHandler defines the action that can be taken before a Pod is shut down.
+message PreStopHandler {
+  // All handler operations are valid during pre-stop
+  optional Handler handler = 1;
+
+  // Sleep specifies a wait time that will be executed in the kubelet only.
+  // Using sleep is useful during pod shutdown to delay the SIGTERM and thus
+  // giving DNS and API clients time to drain the pod before the application
+  // enters its shutdown.
+  // +optional
+  optional SleepAction sleep = 2;
+}
+
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 // +k8s:openapi-gen=false
 message Preconditions {
@@ -4369,6 +4382,12 @@ message SessionAffinityConfig {
   // clientIP contains the configurations of Client IP based session affinity.
   // +optional
   optional ClientIPConfig clientIP = 1;
+}
+
+// SleepAction describes a sleep action.
+message SleepAction {
+  // The sleep duration in seconds, with 0 < seconds <= 60.
+  optional int32 seconds = 1;
 }
 
 // Represents a StorageOS persistent volume resource.

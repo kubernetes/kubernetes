@@ -71,7 +71,7 @@ type annotatedContainerInfo struct {
 	PodTerminationGracePeriod *int64
 	TerminationMessagePath    string
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
-	PreStopHandler            *v1.Handler
+	PreStopHandler            *v1.PreStopHandler
 	ContainerPorts            []v1.ContainerPort
 }
 
@@ -215,7 +215,7 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 		klog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
 	}
 
-	preStopHandler := &v1.Handler{}
+	preStopHandler := &v1.PreStopHandler{}
 	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
 		klog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
 	} else if found {

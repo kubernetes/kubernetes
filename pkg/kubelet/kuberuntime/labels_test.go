@@ -34,18 +34,20 @@ func TestContainerLabels(t *testing.T) {
 	terminationGracePeriod := int64(10)
 	lifecycle := &v1.Lifecycle{
 		// Left PostStart as nil
-		PreStop: &v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"action1", "action2"},
-			},
-			HTTPGet: &v1.HTTPGetAction{
-				Path:   "path",
-				Host:   "host",
-				Port:   intstr.FromInt(8080),
-				Scheme: "scheme",
-			},
-			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromString("80"),
+		PreStop: &v1.PreStopHandler{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"action1", "action2"},
+				},
+				HTTPGet: &v1.HTTPGetAction{
+					Path:   "path",
+					Host:   "host",
+					Port:   intstr.FromInt(8080),
+					Scheme: "scheme",
+				},
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromString("80"),
+				},
 			},
 		},
 	}
@@ -166,18 +168,20 @@ func TestContainerAnnotations(t *testing.T) {
 	}
 	lifecycle := &v1.Lifecycle{
 		// Left PostStart as nil
-		PreStop: &v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"action1", "action2"},
-			},
-			HTTPGet: &v1.HTTPGetAction{
-				Path:   "path",
-				Host:   "host",
-				Port:   intstr.FromInt(8080),
-				Scheme: "scheme",
-			},
-			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromString("80"),
+		PreStop: &v1.PreStopHandler{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"action1", "action2"},
+				},
+				HTTPGet: &v1.HTTPGetAction{
+					Path:   "path",
+					Host:   "host",
+					Port:   intstr.FromInt(8080),
+					Scheme: "scheme",
+				},
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromString("80"),
+				},
 			},
 		},
 	}

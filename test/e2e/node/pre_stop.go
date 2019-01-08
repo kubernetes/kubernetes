@@ -83,10 +83,12 @@ func testPreStop(c clientset.Interface, ns string) {
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sleep", "600"},
 					Lifecycle: &v1.Lifecycle{
-						PreStop: &v1.Handler{
-							Exec: &v1.ExecAction{
-								Command: []string{
-									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
+						PreStop: &v1.PreStopHandler{
+							Handler: v1.Handler{
+								Exec: &v1.ExecAction{
+									Command: []string{
+										"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
+									},
 								},
 							},
 						},

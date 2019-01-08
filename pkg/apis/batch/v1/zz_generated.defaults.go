@@ -125,8 +125,8 @@ func SetObjectDefaults_Job(in *v1.Job) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -170,8 +170,8 @@ func SetObjectDefaults_Job(in *v1.Job) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}

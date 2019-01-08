@@ -1951,6 +1951,12 @@ type ExecAction struct {
 	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
 }
 
+// SleepAction describes a sleep action.
+type SleepAction struct {
+	// The sleep duration in seconds, with 0 < seconds <= 60.
+	Seconds int32 `json:"seconds,omitempty" protobuf:"bytes,1,name=seconds"`
+}
+
 // Probe describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.
 type Probe struct {
@@ -2206,6 +2212,18 @@ type Handler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
 
+// PreStopHandler defines the action that can be taken before a Pod is shut down.
+type PreStopHandler struct {
+	// All handler operations are valid during pre-stop
+	Handler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
+	// Sleep specifies a wait time that will be executed in the kubelet only.
+	// Using sleep is useful during pod shutdown to delay the SIGTERM and thus
+	// giving DNS and API clients time to drain the pod before the application
+	// enters its shutdown.
+	// +optional
+	Sleep *SleepAction `json:"sleep,omitempty" ,protobuf:"bytes,2,opt,name=sleep" protobuf:"bytes,2,opt,name=sleep"`
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2223,7 +2241,7 @@ type Lifecycle struct {
 	// Other management of the container blocks until the hook completes.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
-	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	PreStop *PreStopHandler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
 }
 
 type ConditionStatus string

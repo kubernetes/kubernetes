@@ -1617,6 +1617,15 @@ func (PortworxVolumeSource) SwaggerDoc() map[string]string {
 	return map_PortworxVolumeSource
 }
 
+var map_PreStopHandler = map[string]string{
+	"":      "PreStopHandler defines the action that can be taken before a Pod is shut down.",
+	"sleep": "Sleep specifies a wait time that will be executed in the kubelet only. Using sleep is useful during pod shutdown to delay the SIGTERM and thus giving DNS and API clients time to drain the pod before the application enters its shutdown.",
+}
+
+func (PreStopHandler) SwaggerDoc() map[string]string {
+	return map_PreStopHandler
+}
+
 var map_Preconditions = map[string]string{
 	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
 	"uid": "Specifies the target UID.",
@@ -2130,6 +2139,15 @@ var map_SessionAffinityConfig = map[string]string{
 
 func (SessionAffinityConfig) SwaggerDoc() map[string]string {
 	return map_SessionAffinityConfig
+}
+
+var map_SleepAction = map[string]string{
+	"":        "SleepAction describes a sleep action.",
+	"seconds": "The sleep duration in seconds, with 0 < seconds <= 60.",
+}
+
+func (SleepAction) SwaggerDoc() map[string]string {
+	return map_SleepAction
 }
 
 var map_StorageOSPersistentVolumeSource = map[string]string{

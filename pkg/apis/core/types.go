@@ -1853,6 +1853,12 @@ type ExecAction struct {
 	Command []string
 }
 
+// SleepAction describes a sleep action.
+type SleepAction struct {
+	// The sleep duration in seconds, with 0 < seconds <= 60.
+	Seconds int32
+}
+
 // Probe describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.
 type Probe struct {
@@ -2015,6 +2021,18 @@ type Handler struct {
 	TCPSocket *TCPSocketAction
 }
 
+// PreStopHandler defines the action that can be taken before a Pod is shut down.
+type PreStopHandler struct {
+	// All handler operations are valid during pre-stop
+	Handler
+	// Sleep specifies a wait time that will be executed in the kubelet only.
+	// Using sleep is useful during pod shutdown to delay the SIGTERM and thus
+	// giving DNS and API clients time to drain the pod before the application
+	// enters its shutdown.
+	// +optional
+	Sleep *SleepAction
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2026,7 +2044,7 @@ type Lifecycle struct {
 	// PreStop is called immediately before a container is terminated.  The reason for termination is
 	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
 	// +optional
-	PreStop *Handler
+	PreStop *PreStopHandler
 }
 
 // The below types are used by kube_client and api_server.

@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,6 +76,14 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		klog.Errorf(msg)
 		return msg, err
 	}
+}
+
+func (hr *HandlerRunner) RunPreStop(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.PreStopHandler) (string, error) {
+	if handler.Sleep != nil {
+			time.Sleep(time.Duration(int64(handler.Sleep.Seconds) * int64(time.Second)))
+			return "", nil
+	}
+	return hr.Run(containerID, pod, container, &handler.Handler)
 }
 
 // resolvePort attempts to turn an IntOrString port reference into a concrete port number.

@@ -9327,7 +9327,7 @@
       "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
      },
      "preStop": {
-      "$ref": "v1.Handler",
+      "$ref": "v1.PreStopHandler",
       "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
      }
     }
@@ -9347,6 +9347,39 @@
      "tcpSocket": {
       "$ref": "v1.TCPSocketAction",
       "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
+     }
+    }
+   },
+   "v1.PreStopHandler": {
+    "id": "v1.PreStopHandler",
+    "description": "PreStopHandler defines the action that can be taken before a Pod is shut down.",
+    "properties": {
+     "exec": {
+      "$ref": "v1.ExecAction",
+      "description": "One and only one of the following should be specified. Exec specifies the action to take."
+     },
+     "httpGet": {
+      "$ref": "v1.HTTPGetAction",
+      "description": "HTTPGet specifies the http request to perform."
+     },
+     "tcpSocket": {
+      "$ref": "v1.TCPSocketAction",
+      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
+     },
+     "sleep": {
+      "$ref": "v1.SleepAction",
+      "description": "Sleep specifies a wait time that will be executed in the kubelet only. Using sleep is useful during pod shutdown to delay the SIGTERM and thus giving DNS and API clients time to drain the pod before the application enters its shutdown."
+     }
+    }
+   },
+   "v1.SleepAction": {
+    "id": "v1.SleepAction",
+    "description": "SleepAction describes a sleep action.",
+    "properties": {
+     "seconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The sleep duration in seconds, with 0 \u003c seconds \u003c= 60."
      }
     }
    },

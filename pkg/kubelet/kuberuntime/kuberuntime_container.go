@@ -469,7 +469,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 	go func() {
 		defer close(done)
 		defer utilruntime.HandleCrash()
-		if msg, err := m.runner.Run(containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
+		if msg, err := m.runner.RunPreStop(containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
 			klog.Errorf("preStop hook for container %q failed: %v", containerSpec.Name, err)
 			m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook, msg)
 		}

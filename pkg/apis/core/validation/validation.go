@@ -2463,6 +2463,19 @@ func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) fie
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
 
+// The maximum time a sleep action can pause, in seconds.
+const maxSleepHandlerSeconds int32 = 60
+
+func validateSleepAction(sleep *core.SleepAction, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if sleep.Seconds <= 1 || sleep.Seconds > maxSleepHandlerSeconds {
+		allErrs = append(allErrs, field.Invalid(fldPath, sleep.Seconds, validation.InclusiveRangeError(1, int(maxSleepHandlerSeconds))))
+	}
+
+	return allErrs
+}
+
 func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
@@ -2496,13 +2509,54 @@ func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList
 	return allErrors
 }
 
+func validatePreStopHandler(handler *core.PreStopHandler, fldPath *field.Path) field.ErrorList {
+	numHandlers := 0
+	allErrors := field.ErrorList{}
+	if handler.Exec != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
+		}
+	}
+	if handler.HTTPGet != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("httpGet"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet, fldPath.Child("httpGet"))...)
+		}
+	}
+	if handler.TCPSocket != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("tcpSocket"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket, fldPath.Child("tcpSocket"))...)
+		}
+	}
+	if handler.Sleep != nil {
+		if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("sleep"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateSleepAction(handler.Sleep, fldPath.Child("sleep"))...)
+		}
+	}
+	if numHandlers == 0 {
+		allErrors = append(allErrors, field.Required(fldPath, "must specify a handler type"))
+	}
+	return allErrors
+}
+
 func validateLifecycle(lifecycle *core.Lifecycle, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if lifecycle.PostStart != nil {
 		allErrs = append(allErrs, validateHandler(lifecycle.PostStart, fldPath.Child("postStart"))...)
 	}
 	if lifecycle.PreStop != nil {
-		allErrs = append(allErrs, validateHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
+		allErrs = append(allErrs, validatePreStopHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
 	}
 	return allErrs
 }

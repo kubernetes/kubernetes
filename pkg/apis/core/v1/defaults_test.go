@@ -580,9 +580,11 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 												Host: "localhost",
 											},
 										},
-										PreStop: &v1.Handler{
-											HTTPGet: &v1.HTTPGetAction{
-												Host: "localhost",
+										PreStop: &v1.PreStopHandler{
+											Handler: v1.Handler{
+												HTTPGet: &v1.HTTPGetAction{
+													Host: "localhost",
+												},
 											},
 										},
 									},
@@ -601,10 +603,12 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 								Scheme: v1.URISchemeHTTP,
 							},
 						},
-						PreStop: &v1.Handler{
-							HTTPGet: &v1.HTTPGetAction{
-								Path:   "/",
-								Scheme: v1.URISchemeHTTP,
+						PreStop: &v1.PreStopHandler{
+							Handler: v1.Handler{
+								HTTPGet: &v1.HTTPGetAction{
+									Path:   "/",
+									Scheme: v1.URISchemeHTTP,
+								},
 							},
 						},
 					},
