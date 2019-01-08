@@ -167,6 +167,10 @@ func InitMockCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "csi-mock",
 			FeatureTag:  "",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min: "1Gi",
+				Max: "10Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -196,8 +200,8 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (m *mockCSIDriver) GetClaimSize() string {
-	return "5Gi"
+func (m *mockCSIDriver) GetClaimSizeRange() string {
+	return m.driverInfo.SupportedSizeRange
 }
 
 func (m *mockCSIDriver) CreateDriver() {
