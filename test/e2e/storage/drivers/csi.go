@@ -200,7 +200,7 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (m *mockCSIDriver) GetClaimSizeRange() string {
+func (m *mockCSIDriver) GetClaimSizeRange() framework.SizeRange {
 	return m.driverInfo.SupportedSizeRange
 }
 
