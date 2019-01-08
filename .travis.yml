@@ -9,6 +9,6 @@ script:
   - travis_wait 120 ./hack/travis.sh
 jobs:
   include:
+  - env: TARGET=verify
   - env: TARGET=cross
   - env: TARGET=test
-  # - env: TARGET=test-integration
