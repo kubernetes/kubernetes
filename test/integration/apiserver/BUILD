@@ -10,7 +10,6 @@ go_test(
     size = "large",
     srcs = [
         "apiserver_test.go",
-        "apply_test.go",
         "main_test.go",
         "patch_test.go",
         "print_test.go",
@@ -68,6 +67,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/integration/apiserver/apply:all-srcs",
+    ],
     tags = ["automanaged"],
 )
