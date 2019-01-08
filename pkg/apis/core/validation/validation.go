@@ -1714,9 +1714,6 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("local"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("local"), "Local volumes are disabled by feature-gate"))
-			}
 			allErrs = append(allErrs, validateLocalVolumeSource(pv.Spec.Local, specPath.Child("local"))...)
 
 			// NodeAffinity is required
