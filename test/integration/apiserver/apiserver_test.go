@@ -45,10 +45,15 @@ import (
 )
 
 func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	return setupWithResources(t, groupVersions, nil)
+}
+
+func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	if len(groupVersions) > 0 {
+	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := master.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
+		resourceConfig.EnableResources(resources...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
