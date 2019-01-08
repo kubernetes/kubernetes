@@ -79,12 +79,6 @@ type PortsForObjectFunc func(object runtime.Object) ([]string, error)
 // PortsForObjectFn gives a way to easily override the function for unit testing if needed
 var PortsForObjectFn PortsForObjectFunc = portsForObject
 
-// CanBeAutoscaledFunc checks whether the kind of resources could be autoscaled
-type CanBeAutoscaledFunc func(kind schema.GroupKind) error
-
-// CanBeAutoscaledFn gives a way to easily override the function for unit testing if needed
-var CanBeAutoscaledFn CanBeAutoscaledFunc = canBeAutoscaled
-
 // CanBeExposedFunc is a function type that can tell you whether a given GroupKind is capable of being exposed
 type CanBeExposedFunc func(kind schema.GroupKind) error
 
