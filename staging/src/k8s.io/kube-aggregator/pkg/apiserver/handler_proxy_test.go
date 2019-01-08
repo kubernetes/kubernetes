@@ -261,38 +261,6 @@ func TestProxyHandler(t *testing.T) {
 			},
 			expectedStatusCode: http.StatusServiceUnavailable,
 		},
-		"change aggregator http request host": {
-			user: &user.DefaultInfo{
-				Name:   "username",
-				Groups: []string{"one", "two"},
-			},
-			path: "/request/path",
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
-				Spec: apiregistration.APIServiceSpec{
-					Service:               &apiregistration.ServiceReference{},
-					Group:                 "foo",
-					Version:               "v1",
-					InsecureSkipTLSVerify: true,
-				},
-				Status: apiregistration.APIServiceStatus{
-					Conditions: []apiregistration.APIServiceCondition{
-						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
-					},
-				},
-			},
-			expectedStatusCode: http.StatusOK,
-			expectedCalled:     true,
-			expectedHeaders: map[string][]string{
-				"X-Forwarded-Proto": {"https"},
-				"X-Forwarded-Uri":   {"/request/path"},
-				"X-Forwarded-For":   {"127.0.0.1"},
-				"X-Remote-User":     {"username"},
-				"User-Agent":        {"Go-http-client/1.1"},
-				"Accept-Encoding":   {"gzip"},
-				"X-Remote-Group":    {"one", "two"},
-			},
-		},
 	}
 
 	for name, tc := range tests {
