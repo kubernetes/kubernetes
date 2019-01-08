@@ -172,7 +172,7 @@ while true; do sleep 1; done
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
 					phase:   v1.PodFailed,
-					message: Equal("DONE\n"),
+					message: Equal("DONE"),
 				},
 
 				{
