@@ -7,7 +7,9 @@
 
 1. Run only sig-windows tests:
 
-    ```./e2e.test --provider=local --ginkgo.noColor --ginkgo.focus=.*sig-windows*```
+    ```bash
+    ./e2e.test --provider=local --ginkgo.noColor --ginkgo.focus=.*sig-windows*
+    ```
 
 
 # e2e_node/density_test diff 
