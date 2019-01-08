@@ -17,8 +17,9 @@ limitations under the License.
 package phases
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -149,9 +150,6 @@ func runControlPlaneSubPhase(component string) func(c workflow.RunData) error {
 		cfg := data.Cfg()
 
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
-		if err := controlplane.CreateStaticPodFiles(data.ManifestDir(), cfg, component); err != nil {
-			return err
-		}
-		return nil
+		return controlplane.CreateStaticPodFiles(data.ManifestDir(), cfg, component)
 	}
 }

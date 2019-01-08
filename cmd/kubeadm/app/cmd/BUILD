@@ -80,6 +80,7 @@ go_test(
     srcs = [
         "completion_test.go",
         "config_test.go",
+        "init_test.go",
         "join_test.go",
         "reset_test.go",
         "token_test.go",
@@ -91,8 +92,10 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/componentconfigs:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",

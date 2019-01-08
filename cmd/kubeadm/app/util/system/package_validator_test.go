@@ -17,6 +17,7 @@ limitations under the License.
 package system
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -49,10 +50,12 @@ func TestExtractUpstreamVersion(t *testing.T) {
 			expected: "1.0.6",
 		},
 	} {
-		got := extractUpstreamVersion(test.input)
-		if test.expected != got {
-			t.Errorf("extractUpstreamVersion(%q) = %q, want %q", test.input, got, test.expected)
-		}
+		t.Run(fmt.Sprintf("input:%s,expected:%s", test.input, test.expected), func(t *testing.T) {
+			got := extractUpstreamVersion(test.input)
+			if test.expected != got {
+				t.Errorf("extractUpstreamVersion(%q) = %q, want %q", test.input, got, test.expected)
+			}
+		})
 	}
 }
 
@@ -106,10 +109,12 @@ func TestToSemVer(t *testing.T) {
 			expected: "8.0.95",
 		},
 	} {
-		got := toSemVer(test.input)
-		if test.expected != got {
-			t.Errorf("toSemVer(%q) = %q, want %q", test.input, got, test.expected)
-		}
+		t.Run(fmt.Sprintf("input:%s,expected:%s", test.input, test.expected), func(t *testing.T) {
+			got := toSemVer(test.input)
+			if test.expected != got {
+				t.Errorf("toSemVer(%q) = %q, want %q", test.input, got, test.expected)
+			}
+		})
 	}
 }
 
@@ -143,10 +148,12 @@ func TestToSemVerRange(t *testing.T) {
 			expected: ">1.x || >3.1.0 !4.2.x",
 		},
 	} {
-		got := toSemVerRange(test.input)
-		if test.expected != got {
-			t.Errorf("toSemVerRange(%q) = %q, want %q", test.input, got, test.expected)
-		}
+		t.Run(fmt.Sprintf("input:%s,expected:%s", test.input, test.expected), func(t *testing.T) {
+			got := toSemVerRange(test.input)
+			if test.expected != got {
+				t.Errorf("toSemVerRange(%q) = %q, want %q", test.input, got, test.expected)
+			}
+		})
 	}
 }
 
@@ -209,32 +216,37 @@ func TestValidatePackageVersion(t *testing.T) {
 			},
 		},
 	} {
-		_, err := v.validate(test.specs, manager)
-		if test.err == nil && err != nil {
-			t.Errorf("%s: v.validate(): err = %s", test.desc, err)
-		}
-		if test.err != nil {
-			if err == nil {
-				t.Errorf("%s: v.validate() is expected to fail.", test.desc)
-			} else if test.err.Error() != err.Error() {
-				t.Errorf("%s: v.validate(): err = %q, want = %q", test.desc, err, test.err)
+		t.Run(test.desc, func(t *testing.T) {
+			_, err := v.validate(test.specs, manager)
+			if test.err == nil && err != nil {
+				t.Errorf("%s: v.validate(): err = %s", test.desc, err)
 			}
-		}
+			if test.err != nil {
+				if err == nil {
+					t.Errorf("%s: v.validate() is expected to fail.", test.desc)
+				} else if test.err.Error() != err.Error() {
+					t.Errorf("%s: v.validate(): err = %q, want = %q", test.desc, err, test.err)
+				}
+			}
+		})
 	}
 }
 
 func TestApplyPackageOverride(t *testing.T) {
 	for _, test := range []struct {
+		name      string
 		overrides []PackageSpecOverride
 		osDistro  string
 		specs     []PackageSpec
 		expected  []PackageSpec
 	}{
 		{
+			name:     "foo>=1.0",
 			specs:    []PackageSpec{{Name: "foo", VersionRange: ">=1.0"}},
 			expected: []PackageSpec{{Name: "foo", VersionRange: ">=1.0"}},
 		},
 		{
+			name:     "ubuntu:foo>=1.0/bar>=2.0",
 			osDistro: "ubuntu",
 			overrides: []PackageSpecOverride{
 				{
@@ -247,6 +259,7 @@ func TestApplyPackageOverride(t *testing.T) {
 			expected: []PackageSpec{{Name: "bar", VersionRange: ">=2.0"}},
 		},
 		{
+			name:     "ubuntu:foo>=1.0/debian:foo",
 			osDistro: "ubuntu",
 			overrides: []PackageSpecOverride{
 				{
@@ -258,9 +271,11 @@ func TestApplyPackageOverride(t *testing.T) {
 			expected: []PackageSpec{{Name: "foo", VersionRange: ">=1.0"}},
 		},
 	} {
-		got := applyPackageSpecOverride(test.specs, test.overrides, test.osDistro)
-		if !reflect.DeepEqual(test.expected, got) {
-			t.Errorf("applyPackageSpecOverride(%+v, %+v, %s) = %+v, want = %+v", test.specs, test.overrides, test.osDistro, got, test.expected)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			got := applyPackageSpecOverride(test.specs, test.overrides, test.osDistro)
+			if !reflect.DeepEqual(test.expected, got) {
+				t.Errorf("applyPackageSpecOverride(%+v, %+v, %s) = %+v, want = %+v", test.specs, test.overrides, test.osDistro, got, test.expected)
+			}
+		})
 	}
 }

@@ -67,9 +67,9 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	node := obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		node.Spec.ConfigSource = nil
+		node.Status.Config = nil
 	}
 }
 
@@ -79,10 +79,20 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) {
 		newNode.Spec.ConfigSource = nil
-		oldNode.Spec.ConfigSource = nil
 	}
+}
+
+// nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
+func nodeConfigSourceInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Spec.ConfigSource != nil {
+		return true
+	}
+	return false
 }
 
 // Validate validates a new node.
@@ -127,24 +137,25 @@ type nodeStatusStrategy struct {
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
 
-func (nodeStatusStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	node := obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set on create.
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		node.Status.Config = nil
-	}
-}
-
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeStatusConfigInUse(oldNode) {
 		newNode.Status.Config = nil
-		oldNode.Status.Config = nil
 	}
+}
+
+// nodeStatusConfigInUse returns true if node's Status Config is set(used)
+func nodeStatusConfigInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Status.Config != nil {
+		return true
+	}
+	return false
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

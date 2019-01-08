@@ -104,7 +104,7 @@ func (f *FitError) Error() string {
 // onto machines.
 // TODO: Rename this type.
 type ScheduleAlgorithm interface {
-	Schedule(*v1.Pod, algorithm.NodeLister) (selectedMachine string, err error)
+	Schedule(*v1.Pod, algorithm.NodeLister) (scheduleResult ScheduleResult, err error)
 	// Preempt receives scheduling errors for a pod and tries to create room for
 	// the pod by preempting lower priority pods if possible.
 	// It returns the node where preemption happened, a list of preempted pods, a
@@ -116,6 +116,17 @@ type ScheduleAlgorithm interface {
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
 	Prioritizers() []algorithm.PriorityConfig
+}
+
+// ScheduleResult represents the result of one pod scheduled. It will contain
+// the final selected Node, along with the selected intermediate information.
+type ScheduleResult struct {
+	// Name of the scheduler suggest host
+	SuggestedHost string
+	// Number of nodes scheduler evaluated on one pod scheduled
+	EvaluatedNodes int
+	// Number of feasible nodes on one pod scheduled
+	FeasibleNodes int
 }
 
 type genericScheduler struct {
@@ -147,36 +158,35 @@ func (g *genericScheduler) snapshot() error {
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
+func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (result ScheduleResult, err error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
 
 	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
-		return "", err
+		return result, err
 	}
 
 	nodes, err := nodeLister.List()
 	if err != nil {
-		return "", err
+		return result, err
 	}
 	if len(nodes) == 0 {
-		return "", ErrNoNodesAvailable
+		return result, ErrNoNodesAvailable
 	}
 
-	err = g.snapshot()
-	if err != nil {
-		return "", err
+	if err := g.snapshot(); err != nil {
+		return result, err
 	}
 
 	trace.Step("Computing predicates")
 	startPredicateEvalTime := time.Now()
 	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pod, nodes)
 	if err != nil {
-		return "", err
+		return result, err
 	}
 
 	if len(filteredNodes) == 0 {
-		return "", &FitError{
+		return result, &FitError{
 			Pod:              pod,
 			NumAllNodes:      len(nodes),
 			FailedPredicates: failedPredicateMap,
@@ -190,19 +200,29 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	// When only one node after predicate, just use it.
 	if len(filteredNodes) == 1 {
 		metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
-		return filteredNodes[0].Name, nil
+		return ScheduleResult{
+			SuggestedHost:  filteredNodes[0].Name,
+			EvaluatedNodes: 1 + len(failedPredicateMap),
+			FeasibleNodes:  1,
+		}, nil
 	}
 
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
 	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
-		return "", err
+		return result, err
 	}
 	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 
 	trace.Step("Selecting host")
-	return g.selectHost(priorityList)
+
+	host, err := g.selectHost(priorityList)
+	return ScheduleResult{
+		SuggestedHost:  host,
+		EvaluatedNodes: len(filteredNodes) + len(failedPredicateMap),
+		FeasibleNodes:  len(filteredNodes),
+	}, err
 }
 
 // Prioritizers returns a slice containing all the scheduler's priority
@@ -362,7 +382,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
 func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName string) []*v1.Pod {
-	pods := g.schedulingQueue.WaitingPodsForNode(nodeName)
+	pods := g.schedulingQueue.NominatedPodsForNode(nodeName)
 
 	if len(pods) == 0 {
 		return nil
@@ -509,7 +529,7 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 		// This may happen only in tests.
 		return false, meta, nodeInfo
 	}
-	nominatedPods := queue.WaitingPodsForNode(nodeInfo.Node().Name)
+	nominatedPods := queue.NominatedPodsForNode(nodeInfo.Node().Name)
 	if nominatedPods == nil || len(nominatedPods) == 0 {
 		return false, meta, nodeInfo
 	}
@@ -1031,7 +1051,7 @@ func selectVictimsOnNode(
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
-			klog.V(5).Infof("Pod %v is a potential preemption victim on node %v.", p.Name, nodeInfo.Node().Name)
+			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", p.Namespace, p.Name, nodeInfo.Node().Name)
 		}
 		return fits
 	}

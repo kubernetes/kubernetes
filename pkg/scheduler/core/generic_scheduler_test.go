@@ -482,13 +482,13 @@ func TestGenericScheduler(t *testing.T) {
 				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
-			machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
+			result, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
 			if !reflect.DeepEqual(err, test.wErr) {
 				t.Errorf("Unexpected error: %v, expected: %v", err, test.wErr)
 			}
-			if test.expectedHosts != nil && !test.expectedHosts.Has(machine) {
-				t.Errorf("Expected: %s, got: %s", test.expectedHosts, machine)
+			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
+				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
 			}
 		})
 	}

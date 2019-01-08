@@ -97,7 +97,6 @@ type testPVC struct {
 }
 
 func TestVolumeBinding(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling-", 2, 0, 0)
 	defer config.teardown()
@@ -268,7 +267,6 @@ func TestVolumeBinding(t *testing.T) {
 
 // TestVolumeBindingRescheduling tests scheduler will retry scheduling when needed.
 func TestVolumeBindingRescheduling(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling-", 2, 0, 0)
 	defer config.teardown()
@@ -412,7 +410,6 @@ func TestVolumeBindingDynamicStressSlow(t *testing.T) {
 }
 
 func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, dynamic bool, provisionDelaySeconds int) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-binding-stress-", 1, schedulerResyncPeriod, provisionDelaySeconds)
 	defer config.teardown()
@@ -502,7 +499,6 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 }
 
 func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, numPVsFirstNode int) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-pod-affinity-", numNodes, 0, 0)
 	defer config.teardown()
@@ -629,7 +625,6 @@ func TestVolumeBindingWithAffinity(t *testing.T) {
 }
 
 func TestPVAffinityConflict(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling-", 3, 0, 0)
 	defer config.teardown()
@@ -690,7 +685,6 @@ func TestPVAffinityConflict(t *testing.T) {
 }
 
 func TestVolumeProvision(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
@@ -830,7 +824,6 @@ func TestVolumeProvision(t *testing.T) {
 // on provision failure.
 func TestRescheduleProvisioning(t *testing.T) {
 	// Set feature gates
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 	controllerCh := make(chan struct{})
 
 	context := initTestMaster(t, "reschedule-volume-provision", nil)

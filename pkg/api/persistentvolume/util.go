@@ -25,13 +25,8 @@ import (
 // DropDisabledFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		// TODO(liggitt): change this to only drop pvSpec.VolumeMode if (oldPVSpec == nil || oldPVSpec.VolumeMode == nil)
-		// Requires more coordinated changes to validation
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeModeInUse(oldPVSpec) {
 		pvSpec.VolumeMode = nil
-		if oldPVSpec != nil {
-			oldPVSpec.VolumeMode = nil
-		}
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
@@ -40,4 +35,14 @@ func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Persist
 			pvSpec.PersistentVolumeSource.CSI = nil
 		}
 	}
+}
+
+func volumeModeInUse(oldPVSpec *api.PersistentVolumeSpec) bool {
+	if oldPVSpec == nil {
+		return false
+	}
+	if oldPVSpec.VolumeMode != nil {
+		return true
+	}
+	return false
 }

@@ -137,6 +137,14 @@ type testMetricsProvider struct {
 	unfinished testMetric
 	longest    testMetric
 	retries    testMetric
+	// deprecated metrics
+	deprecatedDepth      testMetric
+	deprecatedAdds       testMetric
+	deprecatedLatency    testMetric
+	deprecatedDuration   testMetric
+	deprecatedUnfinished testMetric
+	deprecatedLongest    testMetric
+	deprecatedRetries    testMetric
 }
 
 func (m *testMetricsProvider) NewDepthMetric(name string) GaugeMetric {
@@ -147,11 +155,11 @@ func (m *testMetricsProvider) NewAddsMetric(name string) CounterMetric {
 	return &m.adds
 }
 
-func (m *testMetricsProvider) NewLatencyMetric(name string) SummaryMetric {
+func (m *testMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
 	return &m.latency
 }
 
-func (m *testMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
+func (m *testMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
 	return &m.duration
 }
 
@@ -159,12 +167,40 @@ func (m *testMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) Settab
 	return &m.unfinished
 }
 
-func (m *testMetricsProvider) NewLongestRunningProcessorMicrosecondsMetric(name string) SettableGaugeMetric {
+func (m *testMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
 	return &m.longest
 }
 
 func (m *testMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return &m.retries
+}
+
+func (m *testMetricsProvider) NewDeprecatedDepthMetric(name string) GaugeMetric {
+	return &m.deprecatedDepth
+}
+
+func (m *testMetricsProvider) NewDeprecatedAddsMetric(name string) CounterMetric {
+	return &m.deprecatedAdds
+}
+
+func (m *testMetricsProvider) NewDeprecatedLatencyMetric(name string) SummaryMetric {
+	return &m.deprecatedLatency
+}
+
+func (m *testMetricsProvider) NewDeprecatedWorkDurationMetric(name string) SummaryMetric {
+	return &m.deprecatedDuration
+}
+
+func (m *testMetricsProvider) NewDeprecatedUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
+	return &m.deprecatedUnfinished
+}
+
+func (m *testMetricsProvider) NewDeprecatedLongestRunningProcessorMicrosecondsMetric(name string) SettableGaugeMetric {
+	return &m.deprecatedLongest
+}
+
+func (m *testMetricsProvider) NewDeprecatedRetriesMetric(name string) CounterMetric {
+	return &m.deprecatedRetries
 }
 
 func TestSinceInMicroseconds(t *testing.T) {
@@ -201,7 +237,15 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	if e, a := 1.0, mp.deprecatedAdds.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
 	if e, a := 1.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	if e, a := 1.0, mp.deprecatedDepth.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -213,13 +257,22 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("Expected %v, got %v", "foo", i)
 	}
 
-	if e, a := 50.0, mp.latency.observationValue(); e != a {
+	if e, a := 5e-05, mp.latency.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 1, mp.latency.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := 50.0, mp.deprecatedLatency.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1, mp.deprecatedLatency.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	if e, a := 0.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 0.0, mp.deprecatedDepth.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -233,8 +286,14 @@ func TestMetrics(t *testing.T) {
 	if e, a := 2.0, mp.adds.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := 2.0, mp.deprecatedAdds.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	// One thing remains in the queue
 	if e, a := 1.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1.0, mp.deprecatedDepth.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -243,15 +302,24 @@ func TestMetrics(t *testing.T) {
 	// Finish it up
 	q.Done(i)
 
-	if e, a := 25.0, mp.duration.observationValue(); e != a {
+	if e, a := 2.5e-05, mp.duration.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 1, mp.duration.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := 25.0, mp.deprecatedDuration.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1, mp.deprecatedDuration.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
 	// One thing remains in the queue
 	if e, a := 1.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1.0, mp.deprecatedDepth.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -261,10 +329,16 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("Expected %v, got %v", "foo", i)
 	}
 
-	if e, a := 25.0, mp.latency.observationValue(); e != a {
+	if e, a := 2.5e-05, mp.latency.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, mp.latency.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 25.0, mp.deprecatedLatency.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 2, mp.deprecatedLatency.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -272,22 +346,37 @@ func TestMetrics(t *testing.T) {
 	// been set.
 	ch := make(chan struct{}, 1)
 	mp.unfinished.notifyCh = ch
+	mp.deprecatedUnfinished.notifyCh = ch
 	c.Step(time.Millisecond)
 	<-ch
+	<-ch
 	mp.unfinished.notifyCh = nil
+	mp.deprecatedUnfinished.notifyCh = nil
 	if e, a := .001, mp.unfinished.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 1000.0, mp.longest.gaugeValue(); e != a {
+	if e, a := .001, mp.deprecatedUnfinished.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := .001, mp.longest.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1000.0, mp.deprecatedLongest.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
 	// Finish that one up
 	q.Done(i)
-	if e, a := 1000.0, mp.duration.observationValue(); e != a {
+	if e, a := .001, mp.duration.observationValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, mp.duration.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1000.0, mp.deprecatedDuration.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 2, mp.deprecatedDuration.observationCount(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }

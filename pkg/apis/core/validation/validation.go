@@ -412,14 +412,8 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 	allErrs := field.ErrorList{}
 	if source.EmptyDir != nil {
 		numVolumes++
-		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) != 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field disabled by feature-gate for EmptyDir volumes"))
-			}
-		} else {
-			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
-			}
+		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == core.StorageMediumHugePages {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
@@ -1763,9 +1757,7 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("storageClassName"), pv.Spec.StorageClassName, msg))
 		}
 	}
-	if pv.Spec.VolumeMode != nil && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, field.Forbidden(specPath.Child("volumeMode"), "PersistentVolume volumeMode is disabled by feature-gate"))
-	} else if pv.Spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*pv.Spec.VolumeMode)) {
+	if pv.Spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*pv.Spec.VolumeMode)) {
 		allErrs = append(allErrs, field.NotSupported(specPath.Child("volumeMode"), *pv.Spec.VolumeMode, supportedVolumeModes.List()))
 	}
 	return allErrs
@@ -1781,18 +1773,13 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
 	}
-
 	newPv.Status = oldPv.Status
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
-	}
+	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Allow setting NodeAffinity if oldPv NodeAffinity was not set
-		if oldPv.Spec.NodeAffinity != nil {
-			allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
-		}
+	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
+	if oldPv.Spec.NodeAffinity != nil {
+		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
 	return allErrs
@@ -1843,9 +1830,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
 		}
 	}
-	if spec.VolumeMode != nil && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeMode"), "PersistentVolumeClaim volumeMode is disabled by feature-gate"))
-	} else if spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*spec.VolumeMode)) {
+	if spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*spec.VolumeMode)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *spec.VolumeMode, supportedVolumeModes.List()))
 	}
 
@@ -1920,9 +1905,8 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
-	}
+	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+
 	return allErrs
 }
 
@@ -2127,8 +2111,6 @@ func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expr
 		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
 	} else if !expressions.Has(fs.Resource) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("resource"), fs.Resource, expressions.List()))
-	} else if fsResourceIsEphemeralStorage(fs.Resource) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "Containers' ephemeral storage requests/limits disabled by feature-gate for Downward API"))
 	}
 	allErrs = append(allErrs, validateContainerResourceDivisor(fs.Resource, fs.Divisor, fldPath)...)
 	return allErrs
@@ -2314,10 +2296,6 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	devicepath := sets.NewString()
 	devicename := sets.NewString()
 
-	if devices != nil && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeDevices"), "Container volumeDevices is disabled by feature-gate"))
-		return allErrs
-	}
 	if devices != nil {
 		for i, dev := range devices {
 			idxPath := fldPath.Index(i)
@@ -3046,10 +3024,8 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.PriorityClassName) > 0 {
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-			for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
-			}
+		for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
 		}
 	}
 
@@ -3178,22 +3154,17 @@ func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field
 	exprMap := make(map[string]sets.String)
 	exprPath := fldPath.Child("matchLabelExpressions")
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
+	// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
+	for i, req := range term.MatchLabelExpressions {
+		idxPath := exprPath.Index(i)
+		valueSet, exprErrs := validateTopologySelectorLabelRequirement(req, idxPath)
+		allErrs = append(allErrs, exprErrs...)
 
-		for i, req := range term.MatchLabelExpressions {
-			idxPath := exprPath.Index(i)
-			valueSet, exprErrs := validateTopologySelectorLabelRequirement(req, idxPath)
-			allErrs = append(allErrs, exprErrs...)
-
-			// Validate no duplicate keys exist.
-			if _, exists := exprMap[req.Key]; exists {
-				allErrs = append(allErrs, field.Duplicate(idxPath.Child("key"), req.Key))
-			}
-			exprMap[req.Key] = valueSet
+		// Validate no duplicate keys exist.
+		if _, exists := exprMap[req.Key]; exists {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("key"), req.Key))
 		}
-	} else if len(term.MatchLabelExpressions) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
+		exprMap[req.Key] = valueSet
 	}
 
 	return exprMap, allErrs
@@ -3375,11 +3346,6 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 	allErrs := field.ErrorList{}
 	for k, p := range annotations {
 		if !strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
-			continue
-		}
-		// TODO: this belongs to admission, not general pod validation:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "AppArmor is disabled by feature-gate"))
 			continue
 		}
 		containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
@@ -4176,16 +4142,6 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	// That said, if specified, we need to ensure they are valid.
 	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
-	// Only allow Spec.ConfigSource and Status.Config to be set if the DynamicKubeletConfig feature gate is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		if node.Spec.ConfigSource != nil {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "configSource"), "configSource may only be set if the DynamicKubeletConfig feature gate is enabled)"))
-		}
-		if node.Status.Config != nil {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("status", "config"), "config may only be set if the DynamicKubeletConfig feature gate is enabled)"))
-		}
-	}
-
 	if len(node.Spec.PodCIDR) != 0 {
 		_, err := ValidateCIDR(node.Spec.PodCIDR)
 		if err != nil {
@@ -4268,17 +4224,14 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 		}
 	}
 
-	// Allow and validate updates to Node.Spec.ConfigSource and Node.Status.Config if DynamicKubeletConfig feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		if node.Spec.ConfigSource != nil {
-			allErrs = append(allErrs, validateNodeConfigSourceSpec(node.Spec.ConfigSource, field.NewPath("spec", "configSource"))...)
-		}
-		oldNode.Spec.ConfigSource = node.Spec.ConfigSource
-		if node.Status.Config != nil {
-			allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, field.NewPath("status", "config"))...)
-		}
-		oldNode.Status.Config = node.Status.Config
+	if node.Spec.ConfigSource != nil {
+		allErrs = append(allErrs, validateNodeConfigSourceSpec(node.Spec.ConfigSource, field.NewPath("spec", "configSource"))...)
 	}
+	oldNode.Spec.ConfigSource = node.Spec.ConfigSource
+	if node.Status.Config != nil {
+		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, field.NewPath("status", "config"))...)
+	}
+	oldNode.Status.Config = node.Status.Config
 
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested
@@ -4461,9 +4414,7 @@ func isLocalStorageResource(name string) bool {
 // Refer to docs/design/resources.md for more details.
 func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
-	if isLocalStorageResource(value) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceQuota"))
-	}
+
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardQuotaResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
@@ -4494,10 +4445,6 @@ func validateLimitRangeTypeName(value string, fldPath *field.Path) field.ErrorLi
 // Validate limit range resource name
 // limit types (other than Pod/Container) could contain storage not just cpu or memory
 func validateLimitRangeResourceName(limitType core.LimitType, value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value == string(core.ResourceEphemeralStorage) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for Resource LimitRange"))
-	}
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
 		return validateContainerResourceName(value, fldPath)
@@ -4812,9 +4759,6 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
-		if resourceName == core.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
-		}
 		if helper.IsHugePageResourceName(resourceName) {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
 				allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
@@ -4956,9 +4900,6 @@ func validateScopeSelector(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field
 	allErrs := field.ErrorList{}
 	if resourceQuotaSpec.ScopeSelector == nil {
 		return allErrs
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceQuotaScopeSelectors) && resourceQuotaSpec.ScopeSelector != nil {
-		allErrs = append(allErrs, field.Forbidden(fld.Child("scopeSelector"), "ResourceQuotaScopeSelectors feature-gate is disabled"))
 	}
 	allErrs = append(allErrs, validateScopedResourceSelectorRequirement(resourceQuotaSpec, fld.Child("scopeSelector"))...)
 	return allErrs
@@ -5272,8 +5213,8 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 	}
 
 	if sc.ProcMount != nil {
-		if err := IsValidProcMount(*sc.ProcMount); err != nil {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("procMount"), *sc.ProcMount, []string{string(core.DefaultProcMount), string(core.UnmaskedProcMount)}))
+		if err := ValidateProcMountType(fldPath.Child("procMount"), *sc.ProcMount); err != nil {
+			allErrs = append(allErrs, err)
 		}
 	}
 
@@ -5346,10 +5287,6 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 		return false, allErrs
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "Volume node affinity is disabled by feature-gate"))
-	}
-
 	if nodeAffinity.Required != nil {
 		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, fldPath.Child("required"))...)
 	} else {
@@ -5378,13 +5315,12 @@ func IsDecremented(update, old *int32) bool {
 	return *update < *old
 }
 
-// IsValidProcMount tests that the argument is a valid ProcMountType.
-func IsValidProcMount(procMountType core.ProcMountType) error {
+// ValidateProcMountType tests that the argument is a valid ProcMountType.
+func ValidateProcMountType(fldPath *field.Path, procMountType core.ProcMountType) *field.Error {
 	switch procMountType {
-	case core.DefaultProcMount:
-	case core.UnmaskedProcMount:
+	case core.DefaultProcMount, core.UnmaskedProcMount:
+		return nil
 	default:
-		return fmt.Errorf("unsupported ProcMount type %s", procMountType)
+		return field.NotSupported(fldPath, procMountType, []string{string(core.DefaultProcMount), string(core.UnmaskedProcMount)})
 	}
-	return nil
 }

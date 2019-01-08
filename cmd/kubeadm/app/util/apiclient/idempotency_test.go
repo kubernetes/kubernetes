@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiclient_test
+package apiclient
 
 import (
 	"testing"
@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -68,8 +67,10 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}
-			conditionFunction := apiclient.PatchNodeOnce(client, tc.lookupName, func(node *v1.Node) {
-				node.Name = "testNewNode"
+			conditionFunction := PatchNodeOnce(client, tc.lookupName, func(node *v1.Node) {
+				node.Annotations = map[string]string{
+					"updatedBy": "test",
+				}
 			})
 			success, err := conditionFunction()
 			if err != nil {

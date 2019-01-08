@@ -225,7 +225,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 		}
 	}
 	if dataDir == "" {
-		return dataDir, fmt.Errorf("invalid etcd pod manifest")
+		return dataDir, errors.New("invalid etcd pod manifest")
 	}
 	return dataDir, nil
 }
@@ -239,10 +239,7 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := containerRuntime.RemoveContainers(containers); err != nil {
-		return err
-	}
-	return nil
+	return containerRuntime.RemoveContainers(containers)
 }
 
 // cleanDir removes everything in a directory, but not the directory itself

@@ -141,12 +141,14 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
-				Type:                  "etcd3",
-				ServerList:            nil,
+				Type: "etcd3",
+				Transport: storagebackend.TransportConfig{
+					ServerList: nil,
+					KeyFile:    "/var/run/kubernetes/etcd.key",
+					CAFile:     "/var/run/kubernetes/etcdca.crt",
+					CertFile:   "/var/run/kubernetes/etcdce.crt",
+				},
 				Prefix:                "/registry",
-				KeyFile:               "/var/run/kubernetes/etcd.key",
-				CAFile:                "/var/run/kubernetes/etcdca.crt",
-				CertFile:              "/var/run/kubernetes/etcdce.crt",
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,
 			},

@@ -32,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	corelister "k8s.io/client-go/listers/core/v1"
@@ -41,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/api"
@@ -145,12 +142,12 @@ func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeI
 }
 
 type mockScheduler struct {
-	machine string
-	err     error
+	result core.ScheduleResult
+	err    error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (string, error) {
-	return es.machine, es.err
+func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (core.ScheduleResult, error) {
+	return es.result, es.err
 }
 
 func (es mockScheduler) Predicates() map[string]predicates.FitPredicate {
@@ -222,7 +219,7 @@ func TestScheduler(t *testing.T) {
 		{
 			name:             "bind assumed pod scheduled",
 			sendPod:          podWithID("foo", ""),
-			algo:             mockScheduler{testNode.Name, nil},
+			algo:             mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			eventReason:      "Scheduled",
@@ -230,7 +227,7 @@ func TestScheduler(t *testing.T) {
 		{
 			name:           "error pod failed scheduling",
 			sendPod:        podWithID("foo", ""),
-			algo:           mockScheduler{testNode.Name, errS},
+			algo:           mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, errS},
 			expectError:    errS,
 			expectErrorPod: podWithID("foo", ""),
 			eventReason:    "FailedScheduling",
@@ -238,7 +235,7 @@ func TestScheduler(t *testing.T) {
 		{
 			name:             "error bind forget pod failed scheduling",
 			sendPod:          podWithID("foo", ""),
-			algo:             mockScheduler{testNode.Name, nil},
+			algo:             mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
@@ -248,7 +245,7 @@ func TestScheduler(t *testing.T) {
 			eventReason:      "FailedScheduling",
 		}, {
 			sendPod:     deletingPod("foo"),
-			algo:        mockScheduler{"", nil},
+			algo:        mockScheduler{core.ScheduleResult{}, nil},
 			eventReason: "FailedScheduling",
 		},
 	}
@@ -778,8 +775,6 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 
 	// This can be small because we wait for pod to finish scheduling first
 	chanTimeout := 2 * time.Second
-
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeScheduling, true)()
 
 	table := []struct {
 		name               string

@@ -40,7 +40,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter:all-srcs",
-        "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/gen:all-srcs",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta:all-srcs",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock:all-srcs",
     ],

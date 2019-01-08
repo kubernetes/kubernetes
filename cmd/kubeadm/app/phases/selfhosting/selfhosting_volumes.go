@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,6 +129,40 @@ func apiServerCertificatesVolumeSource() v1.VolumeSource {
 						},
 					},
 				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: strings.Replace(kubeadmconstants.EtcdCACertAndKeyBaseName, "/", "-", -1),
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.EtcdCACertName,
+							},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.EtcdCAKeyName,
+							},
+						},
+					},
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.APIServerEtcdClientCertName,
+							},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.APIServerEtcdClientKeyName,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -175,7 +210,7 @@ func controllerManagerCertificatesVolumeSource() v1.VolumeSource {
 func kubeConfigVolumeSource(kubeconfigSecretName string) v1.VolumeSource {
 	return v1.VolumeSource{
 		Secret: &v1.SecretVolumeSource{
-			SecretName: kubeconfigSecretName,
+			SecretName: strings.Replace(kubeconfigSecretName, "/", "-", -1),
 		},
 	}
 }
@@ -293,6 +328,16 @@ func getTLSKeyPairs() []*tlsKeyPair {
 			name: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
 			cert: kubeadmconstants.FrontProxyClientCertName,
 			key:  kubeadmconstants.FrontProxyClientKeyName,
+		},
+		{
+			name: strings.Replace(kubeadmconstants.EtcdCACertAndKeyBaseName, "/", "-", -1),
+			cert: kubeadmconstants.EtcdCACertName,
+			key:  kubeadmconstants.EtcdCAKeyName,
+		},
+		{
+			name: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
+			cert: kubeadmconstants.APIServerEtcdClientCertName,
+			key:  kubeadmconstants.APIServerEtcdClientKeyName,
 		},
 	}
 }

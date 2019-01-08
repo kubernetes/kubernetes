@@ -137,7 +137,7 @@ type StreamingRuntime interface {
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error)
+	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(image ImageSpec) (string, error)

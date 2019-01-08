@@ -20,14 +20,10 @@ package factory
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 	"reflect"
 	"time"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
@@ -50,8 +45,8 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -378,39 +373,27 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		},
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	// Setup volume binder
+	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
-		args.StorageClassInformer.Informer().AddEventHandler(
-			cache.ResourceEventHandlerFuncs{
-				AddFunc: c.onStorageClassAdd,
-			},
-		)
-	}
+	args.StorageClassInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: c.onStorageClassAdd,
+		},
+	)
 
-	// Setup cache comparer
+	// Setup cache debugger
 	debugger := cachedebugger.New(
 		args.NodeInformer.Lister(),
 		args.PodInformer.Lister(),
 		c.schedulerCache,
 		c.podQueue,
 	)
-
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, compareSignal)
+	debugger.ListenForSignal(c.StopEverything)
 
 	go func() {
-		for {
-			select {
-			case <-c.StopEverything:
-				c.podQueue.Close()
-				return
-			case <-ch:
-				debugger.Comparer.Compare()
-				debugger.Dumper.DumpAll()
-			}
-		}
+		<-c.StopEverything
+		c.podQueue.Close()
 	}()
 
 	return c
@@ -491,9 +474,6 @@ func (c *configFactory) onPvcAdd(obj interface{}) {
 }
 
 func (c *configFactory) onPvcUpdate(old, new interface{}) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		return
-	}
 	c.podQueue.MoveAllToActiveQueue()
 }
 
@@ -1204,7 +1184,7 @@ type podConditionUpdater struct {
 }
 
 func (p *podConditionUpdater) Update(pod *v1.Pod, condition *v1.PodCondition) error {
-	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s)", pod.Namespace, pod.Name, condition.Type, condition.Status)
+	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s, Reason=%s)", pod.Namespace, pod.Name, condition.Type, condition.Status, condition.Reason)
 	if podutil.UpdatePodCondition(&pod.Status, condition) {
 		_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 		return err

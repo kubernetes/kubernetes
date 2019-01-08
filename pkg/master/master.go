@@ -474,8 +474,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.EnableVersions(
 		admissionregistrationv1beta1.SchemeGroupVersion,
 		apiv1.SchemeGroupVersion,
-		appsv1beta1.SchemeGroupVersion,
-		appsv1beta2.SchemeGroupVersion,
 		appsv1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
@@ -498,6 +496,24 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1beta1.SchemeGroupVersion,
+	)
+	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+	)
+	// enable deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
+	ret.EnableResources(
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicationcontrollers"),
+	)
+	// enable deprecated beta versions explicitly so we have a full list of what's possible to serve
+	ret.EnableVersions(
+		appsv1beta1.SchemeGroupVersion,
+		appsv1beta2.SchemeGroupVersion,
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(

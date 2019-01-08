@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
@@ -34,9 +33,9 @@ type GenericControllerManagerConfigurationOptions struct {
 	Port                    int32
 	Address                 string
 	MinResyncPeriod         metav1.Duration
-	ClientConnection        apimachineryconfig.ClientConnectionConfiguration
+	ClientConnection        componentbaseconfig.ClientConnectionConfiguration
 	ControllerStartInterval metav1.Duration
-	LeaderElection          apiserverconfig.LeaderElectionConfiguration
+	LeaderElection          componentbaseconfig.LeaderElectionConfiguration
 	Debugging               *DebuggingOptions
 	Controllers             []string
 }

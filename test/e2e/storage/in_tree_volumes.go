@@ -69,20 +69,23 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver(config)
+		curConfig := curDriver.GetDriverInfo().Config
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			driver := curDriver
-
 			BeforeEach(func() {
+				// Reset config. The driver might have modified its copy
+				// in a previous test.
+				curDriver.GetDriverInfo().Config = curConfig
+
 				// setupDriver
-				driver.CreateDriver()
+				curDriver.CreateDriver()
 			})
 
 			AfterEach(func() {
 				// Cleanup driver
-				driver.CleanupDriver()
+				curDriver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, driver, testSuites, intreeTunePattern)
+			testsuites.RunTestSuite(f, curDriver, testSuites, intreeTunePattern)
 		})
 	}
 })

@@ -62,7 +62,7 @@ func (r *BucketRateLimiter) NumRequeues(item interface{}) int {
 func (r *BucketRateLimiter) Forget(item interface{}) {
 }
 
-// ItemExponentialFailureRateLimiter does a simple baseDelay*10^<num-failures> limit
+// ItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
 // dealing with max failures and expiration are up to the caller
 type ItemExponentialFailureRateLimiter struct {
 	failuresLock sync.Mutex

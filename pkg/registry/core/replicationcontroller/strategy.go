@@ -80,9 +80,7 @@ func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	controller.Generation = 1
 
-	if controller.Spec.Template != nil {
-		pod.DropDisabledFields(&controller.Spec.Template.Spec, nil)
-	}
+	pod.DropDisabledTemplateFields(controller.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -92,16 +90,7 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// update is not allowed to set status
 	newController.Status = oldController.Status
 
-	var newSpec, oldSpec *api.PodSpec
-	if oldController.Spec.Template != nil {
-		oldSpec = &oldController.Spec.Template.Spec
-	}
-	if newController.Spec.Template != nil {
-		newSpec = &newController.Spec.Template.Spec
-	} else {
-		newSpec = &api.PodSpec{}
-	}
-	pod.DropDisabledFields(newSpec, oldSpec)
+	pod.DropDisabledTemplateFields(newController.Spec.Template, oldController.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

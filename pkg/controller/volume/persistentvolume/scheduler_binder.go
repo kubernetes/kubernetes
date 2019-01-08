@@ -21,15 +21,14 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -99,8 +98,9 @@ type SchedulerVolumeBinder interface {
 type volumeBinder struct {
 	ctrl *PersistentVolumeController
 
-	pvcCache PVCAssumeCache
-	pvCache  PVAssumeCache
+	nodeInformer coreinformers.NodeInformer
+	pvcCache     PVCAssumeCache
+	pvCache      PVAssumeCache
 
 	// Stores binding decisions that were made in FindPodVolumes for use in AssumePodVolumes.
 	// AssumePodVolumes modifies the bindings again for use in BindPodVolumes.
@@ -113,6 +113,7 @@ type volumeBinder struct {
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
+	nodeInformer coreinformers.NodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
@@ -126,6 +127,7 @@ func NewVolumeBinder(
 
 	b := &volumeBinder{
 		ctrl:            ctrl,
+		nodeInformer:    nodeInformer,
 		pvcCache:        NewPVCAssumeCache(pvcInformer.Informer()),
 		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
 		podBindingCache: NewPodBindingCache(),
@@ -139,7 +141,9 @@ func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 	return b.podBindingCache
 }
 
-// FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache
+// FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache.
+// This method intentionally takes in a *v1.Node object instead of using volumebinder.nodeInformer.
+// That's necessary because some operations will need to pass in to the predicate fake node objects.
 func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatisfied bool, err error) {
 	podName := getPodName(pod)
 
@@ -382,6 +386,11 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		return false, fmt.Errorf("failed to get cached claims to provision for pod %q", podName)
 	}
 
+	node, err := b.nodeInformer.Lister().Get(pod.Spec.NodeName)
+	if err != nil {
+		return false, fmt.Errorf("failed to get node %q: %v", pod.Spec.NodeName, err)
+	}
+
 	for _, binding := range bindings {
 		// Check for any conditions that might require scheduling retry
 
@@ -389,6 +398,11 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		pv, err := b.pvCache.GetPV(binding.pv.Name)
 		if err != nil || pv == nil {
 			return false, fmt.Errorf("failed to check pv binding: %v", err)
+		}
+
+		// Check PV's node affinity (the node might not have the proper label)
+		if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
 		}
 
 		// Check if pv.ClaimRef got dropped by unbindVolume()
@@ -418,6 +432,17 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		selectedNode := pvc.Annotations[annSelectedNode]
 		if selectedNode != pod.Spec.NodeName {
 			return false, fmt.Errorf("selectedNode annotation value %q not set to scheduled node %q", selectedNode, pod.Spec.NodeName)
+		}
+
+		// If the PVC is bound to a PV, check its node affinity
+		if pvc.Spec.VolumeName != "" {
+			pv, err := b.pvCache.GetPV(pvc.Spec.VolumeName)
+			if err != nil {
+				return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
+			}
+			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
+			}
 		}
 
 		if !bound {
