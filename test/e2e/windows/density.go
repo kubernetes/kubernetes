@@ -26,11 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/apimachinery/pkg/util/uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -75,7 +75,6 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 		}
 	})
 
-
 })
 
 type densityTest struct {
@@ -99,7 +98,7 @@ type densityTest struct {
 // runDensityBatchTest runs the density batch pod creation test
 func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Duration, []framework.PodLatencyData) {
 	const (
-		podType               = "density_test_pod"
+		podType = "density_test_pod"
 	)
 	var (
 		mutex      = &sync.Mutex{}
@@ -222,7 +221,6 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	return controller
 }
 
-
 // newTestPods creates a list of pods (specification) for test.
 func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
 	var pods []*v1.Pod
@@ -303,4 +301,3 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	wg.Wait()
 	return
 }
-
