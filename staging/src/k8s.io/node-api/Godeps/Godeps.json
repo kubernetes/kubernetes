@@ -48,7 +48,7 @@
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
-			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
+			"Rev": "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 		},
 		{
 			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
@@ -556,7 +556,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "0317810137be915b9cf888946c6e115c1bfac693"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

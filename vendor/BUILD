@@ -473,13 +473,6 @@ filegroup(
         "//vendor/k8s.io/utils/clock:all-srcs",
         "//vendor/k8s.io/utils/exec:all-srcs",
         "//vendor/k8s.io/utils/pointer:all-srcs",
-<<<<<<< HEAD
-        "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:all-srcs",
-        "//vendor/sigs.k8s.io/structured-merge-diff/merge:all-srcs",
-        "//vendor/sigs.k8s.io/structured-merge-diff/schema:all-srcs",
-        "//vendor/sigs.k8s.io/structured-merge-diff/typed:all-srcs",
-        "//vendor/sigs.k8s.io/structured-merge-diff/value:all-srcs",
-=======
         "//vendor/sigs.k8s.io/kustomize/pkg/commands/build:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/constants:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/expansion:all-srcs",
@@ -496,7 +489,11 @@ filegroup(
         "//vendor/sigs.k8s.io/kustomize/pkg/target:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/transformers:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/types:all-srcs",
->>>>>>> upstream/master
+        "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:all-srcs",
+        "//vendor/sigs.k8s.io/structured-merge-diff/merge:all-srcs",
+        "//vendor/sigs.k8s.io/structured-merge-diff/schema:all-srcs",
+        "//vendor/sigs.k8s.io/structured-merge-diff/typed:all-srcs",
+        "//vendor/sigs.k8s.io/structured-merge-diff/value:all-srcs",
         "//vendor/sigs.k8s.io/yaml:all-srcs",
         "//vendor/vbom.ml/util/sortorder:all-srcs",
     ],
