@@ -64,6 +64,8 @@ type SchedulingQueue interface {
 	UpdateNominatedPodForNode(pod *v1.Pod, nodeName string)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache
 	DeleteNominatedPodIfExists(pod *v1.Pod)
+	// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
+	NumUnschedulablePods() int
 }
 
 // NewSchedulingQueue initializes a new scheduling queue. If pod priority is
@@ -155,6 +157,11 @@ func (f *FIFO) DeleteNominatedPodIfExists(pod *v1.Pod) {}
 
 // UpdateNominatedPodForNode does nothing in FIFO.
 func (f *FIFO) UpdateNominatedPodForNode(pod *v1.Pod, nodeName string) {}
+
+// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
+func (f *FIFO) NumUnschedulablePods() int {
+	return 0
+}
 
 // NewFIFO creates a FIFO object.
 func NewFIFO() *FIFO {
@@ -490,6 +497,13 @@ func (p *PriorityQueue) UpdateNominatedPodForNode(pod *v1.Pod, nodeName string) 
 	p.lock.Lock()
 	p.nominatedPods.add(pod, nodeName)
 	p.lock.Unlock()
+}
+
+// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
+func (p *PriorityQueue) NumUnschedulablePods() int {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	return len(p.unschedulableQ.pods)
 }
 
 // UnschedulablePodsMap holds pods that cannot be scheduled. This data structure
