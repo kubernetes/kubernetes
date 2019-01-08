@@ -372,7 +372,7 @@ func getSizeRangesIntersection(first framework.SizeRange, second framework.SizeR
 	}
 
 	// the minimum of the intersection shall be returned as the claim size
-	var intersectionMin resource.Quanity
+	var intersectionMin resource.Quantity
 
 	if firstMin.Cmp(secondMin) > 0 {
 		intersectionMin = firstMin
