@@ -809,6 +809,8 @@ func newNominatedPodMap() *nominatedPodMap {
 	}
 }
 
+// MakeNextPodFunc returns a function to retrieve the next pod from a given
+// scheduling queue
 func MakeNextPodFunc(queue SchedulingQueue) func() *v1.Pod {
 	return func() *v1.Pod {
 		pod, err := queue.Pop()
