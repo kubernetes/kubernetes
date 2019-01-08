@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "constant.go",
         "globalflags.go",
         "options.go",
         "validation.go",

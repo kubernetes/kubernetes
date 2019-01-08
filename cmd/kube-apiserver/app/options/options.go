@@ -78,17 +78,17 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
 		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
-		SecureServing:           kubeoptions.NewSecureServingOptions(),
-		InsecureServing:         kubeoptions.NewInsecureServingOptions(),
-		Audit:                   genericoptions.NewAuditOptions(),
-		Features:                genericoptions.NewFeatureOptions(),
-		Admission:               kubeoptions.NewAdmissionOptions(),
-		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
-		CloudProvider:           kubeoptions.NewCloudProviderOptions(),
-		StorageSerialization:    kubeoptions.NewStorageSerializationOptions(),
-		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
+		Etcd:                 genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
+		SecureServing:        kubeoptions.NewSecureServingOptions(),
+		InsecureServing:      kubeoptions.NewInsecureServingOptions(),
+		Audit:                genericoptions.NewAuditOptions(),
+		Features:             genericoptions.NewFeatureOptions(),
+		Admission:            kubeoptions.NewAdmissionOptions(),
+		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
+		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
+		APIEnablement:        genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
@@ -125,99 +125,99 @@ func NewServerRunOptions() *ServerRunOptions {
 // Flags returns flags for a specific APIServer by section name
 func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	// Add the generic flags.
-	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
-	s.Etcd.AddFlags(fss.FlagSet("etcd"))
-	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	s.InsecureServing.AddFlags(fss.FlagSet("insecure serving"))
-	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving")) // TODO: remove it until kops stops using `--address`
-	s.Audit.AddFlags(fss.FlagSet("auditing"))
-	s.Features.AddFlags(fss.FlagSet("features"))
-	s.Authentication.AddFlags(fss.FlagSet("authentication"))
-	s.Authorization.AddFlags(fss.FlagSet("authorization"))
-	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
-	s.StorageSerialization.AddFlags(fss.FlagSet("storage"))
-	s.APIEnablement.AddFlags(fss.FlagSet("api enablement"))
-	s.Admission.AddFlags(fss.FlagSet("admission"))
+	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet(KubeApiServerGeneric))
+	s.Etcd.AddFlags(fss.FlagSet(KubeApiServerEtcd))
+	s.SecureServing.AddFlags(fss.FlagSet(KubeApiServerSecureServing))
+	s.InsecureServing.AddFlags(fss.FlagSet(KubeApiServerInsecureServing))
+	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet(KubeApiServerInsecureServing)) // TODO: remove it until kops stops using `--address`
+	s.Audit.AddFlags(fss.FlagSet(KubeApiServerAuditing))
+	s.Features.AddFlags(fss.FlagSet(KubeApiServerFeatures))
+	s.Authentication.AddFlags(fss.FlagSet(KubeApiServerAuthentication))
+	s.Authorization.AddFlags(fss.FlagSet(KubeApiServerAuthorization))
+	s.CloudProvider.AddFlags(fss.FlagSet(KubeApiServerCloudProvider))
+	s.StorageSerialization.AddFlags(fss.FlagSet(KubeApiServerStorage))
+	s.APIEnablement.AddFlags(fss.FlagSet(KubeApiServerApiEnablement))
+	s.Admission.AddFlags(fss.FlagSet(KubeApiServerAdmission))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	fs := fss.FlagSet("misc")
-	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
+	fs := fss.FlagSet(KubeApiServerMisc)
+	fs.DurationVar(&s.EventTTL, KubeApiServerEventTtl, s.EventTTL,
 		"Amount of time to retain events.")
 
-	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
+	fs.BoolVar(&s.AllowPrivileged, KubeApiServerAllowPrivileged, s.AllowPrivileged,
 		"If true, allow privileged containers. [default=false]")
 
-	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
+	fs.BoolVar(&s.EnableLogsHandler, KubeApiServerEnableLogsHandler, s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
 
 	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,
+	fs.StringVar(&s.SSHUser, KubeApiServerSshUser, s.SSHUser,
 		"If non-empty, use secure SSH proxy to the nodes, using this user name")
-	fs.MarkDeprecated("ssh-user", "This flag will be removed in a future version.")
+	fs.MarkDeprecated(KubeApiServerSshUser, "This flag will be removed in a future version.")
 
 	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
+	fs.StringVar(&s.SSHKeyfile, KubeApiServerSshKeyFile, s.SSHKeyfile,
 		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
-	fs.MarkDeprecated("ssh-keyfile", "This flag will be removed in a future version.")
+	fs.MarkDeprecated(KubeApiServerSshKeyFile, "This flag will be removed in a future version.")
 
-	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
+	fs.Int64Var(&s.MaxConnectionBytesPerSec, KubeApiServerMaxConnectionBytesPerSec, s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
 		"Currently only applies to long-running requests.")
 
-	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
+	fs.IntVar(&s.MasterCount, KubeApiServerCount, s.MasterCount,
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 
-	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
+	fs.StringVar(&s.EndpointReconcilerType, KubeApiServerEndpointReconcilerType, string(s.EndpointReconcilerType),
 		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+")")
 
 	// See #14282 for details on how to test/try this option out.
 	// TODO: remove this comment once this option is tested in CI.
-	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, ""+
+	fs.IntVar(&s.KubernetesServiceNodePort, KubeApiServerKubernetesServiceNodePort, s.KubernetesServiceNodePort, ""+
 		"If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be "+
 		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
 		"service will be of type ClusterIP.")
 
-	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
+	fs.IPNetVar(&s.ServiceClusterIPRange, KubeApiServerServiceClusterIpRange, s.ServiceClusterIPRange, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
 		"overlap with any IP ranges assigned to nodes for pods.")
 
-	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
+	fs.Var(&s.ServiceNodePortRange, KubeApiServerServiceNodePortRange, ""+
 		"A port range to reserve for services with NodePort visibility. "+
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
 
 	// Kubelet related flags:
-	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,
+	fs.BoolVar(&s.KubeletConfig.EnableHttps, KubeApiServerKubeletHttps, s.KubeletConfig.EnableHttps,
 		"Use https for kubelet connections.")
 
-	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, "kubelet-preferred-address-types", s.KubeletConfig.PreferredAddressTypes,
+	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, KubeApiServerKubeletPreferredAddressTypes, s.KubeletConfig.PreferredAddressTypes,
 		"List of the preferred NodeAddressTypes to use for kubelet connections.")
 
-	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port,
+	fs.UintVar(&s.KubeletConfig.Port, KubeApiServerKubeletPort, s.KubeletConfig.Port,
 		"DEPRECATED: kubelet port.")
-	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed.")
+	fs.MarkDeprecated(KubeApiServerKubeletPort, "kubelet-port is deprecated and will be removed.")
 
-	fs.UintVar(&s.KubeletConfig.ReadOnlyPort, "kubelet-read-only-port", s.KubeletConfig.ReadOnlyPort,
+	fs.UintVar(&s.KubeletConfig.ReadOnlyPort, KubeApiServerKubeletReadOnlyPort, s.KubeletConfig.ReadOnlyPort,
 		"DEPRECATED: kubelet port.")
 
-	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
+	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, KubeApiServerKubeletTimeout, s.KubeletConfig.HTTPTimeout,
 		"Timeout for kubelet operations.")
 
-	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile,
+	fs.StringVar(&s.KubeletConfig.CertFile, KubeApiServerKubeletClientCertificate, s.KubeletConfig.CertFile,
 		"Path to a client cert file for TLS.")
 
-	fs.StringVar(&s.KubeletConfig.KeyFile, "kubelet-client-key", s.KubeletConfig.KeyFile,
+	fs.StringVar(&s.KubeletConfig.KeyFile, KubeApiServerKubeletClientKey, s.KubeletConfig.KeyFile,
 		"Path to a client key file for TLS.")
 
-	fs.StringVar(&s.KubeletConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.CAFile,
+	fs.StringVar(&s.KubeletConfig.CAFile, KubeApiServerKubeletCertificateAuthority, s.KubeletConfig.CAFile,
 		"Path to a cert file for the certificate authority.")
 
 	// TODO: delete this flag in 1.13
 	repair := false
-	fs.BoolVar(&repair, "repair-malformed-updates", false, "deprecated")
-	fs.MarkDeprecated("repair-malformed-updates", "This flag will be removed in a future version")
+	fs.BoolVar(&repair, KubeApiServerRepairMalformedUpdates, false, "deprecated")
+	fs.MarkDeprecated(KubeApiServerRepairMalformedUpdates, "This flag will be removed in a future version")
 
-	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile, ""+
+	fs.StringVar(&s.ProxyClientCertFile, KubeApiServerProxyClientCertFile, s.ProxyClientCertFile, ""+
 		"Client certificate used to prove the identity of the aggregator or kube-apiserver "+
 		"when it must call out during a request. This includes proxying requests to a user "+
 		"api-server and calling out to webhook admission plugins. It is expected that this "+
@@ -225,15 +225,15 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 		"That CA is published in the 'extension-apiserver-authentication' configmap in "+
 		"the kube-system namespace. Components receiving calls from kube-aggregator should "+
 		"use that CA to perform their half of the mutual TLS verification.")
-	fs.StringVar(&s.ProxyClientKeyFile, "proxy-client-key-file", s.ProxyClientKeyFile, ""+
+	fs.StringVar(&s.ProxyClientKeyFile, KubeApiServerProxyClientKeyFile, s.ProxyClientKeyFile, ""+
 		"Private key for the client certificate used to prove the identity of the aggregator or kube-apiserver "+
 		"when it must call out during a request. This includes proxying requests to a user "+
 		"api-server and calling out to webhook admission plugins.")
 
-	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
+	fs.BoolVar(&s.EnableAggregatorRouting, KubeApiServerEnableAggregatorRouting, s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
 
-	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
+	fs.StringVar(&s.ServiceAccountSigningKeyFile, KubeApiServerServiceAccountSigningKeyFile, s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
 
 	return fss
