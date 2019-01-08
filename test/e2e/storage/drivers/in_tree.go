@@ -1210,11 +1210,6 @@ func InitGcePdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				"ext4",
 				"xfs",
 			),
-			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
-			},
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
