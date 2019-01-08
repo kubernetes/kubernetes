@@ -142,6 +142,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq := req.WithContext(context.Background())
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = location
+	newReq.Host = location.Host
 
 	if handlingInfo.proxyRoundTripper == nil {
 		proxyError(w, req, "", http.StatusNotFound)
