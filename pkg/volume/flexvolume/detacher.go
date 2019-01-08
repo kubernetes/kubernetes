@@ -24,7 +24,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type flexVolumeDetacher struct {
@@ -57,13 +56,13 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
 	}
-	if pathErr != nil && !util.IsCorruptedMnt(pathErr) {
+	if pathErr != nil && !mount.IsCorruptedMnt(pathErr) {
 		return fmt.Errorf("Error checking path: %v", pathErr)
 	}
 
 	notmnt, err := isNotMounted(d.plugin.host.GetMounter(d.plugin.GetPluginName()), deviceMountPath)
 	if err != nil {
-		if util.IsCorruptedMnt(err) {
+		if mount.IsCorruptedMnt(err) {
 			notmnt = false // Corrupted error is assumed to be mounted.
 		} else {
 			return err

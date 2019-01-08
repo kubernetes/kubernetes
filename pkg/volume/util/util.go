@@ -125,12 +125,6 @@ func SetReady(dir string) {
 	file.Close()
 }
 
-// IsCorruptedMnt return true if err is about corrupted mount point
-// TODO: Change callers to call mount pkg directly
-func IsCorruptedMnt(err error) bool {
-	return mount.IsCorruptedMnt(err)
-}
-
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
 func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)

@@ -23,7 +23,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 )
 
@@ -50,7 +49,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 		return nil
 	}
 
-	if pathErr != nil && !util.IsCorruptedMnt(pathErr) {
+	if pathErr != nil && !mount.IsCorruptedMnt(pathErr) {
 		return fmt.Errorf("Error checking path: %v", pathErr)
 	}
 
