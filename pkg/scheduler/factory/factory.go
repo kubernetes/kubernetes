@@ -50,6 +50,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -918,7 +919,7 @@ func (n *nodeLister) List() ([]*v1.Node, error) {
 	return n.NodeLister.List(labels.Everything())
 }
 
-func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
+func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -927,7 +928,7 @@ func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]
 	return getPriorityFunctionConfigs(priorityKeys, *pluginArgs)
 }
 
-func (c *configFactory) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
+func (c *configFactory) GetPriorityMetadataProducer() (priorities.PriorityMetadataProducer, error) {
 	pluginArgs, err := c.getPluginArgs()
 	if err != nil {
 		return nil, err

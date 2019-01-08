@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -115,7 +116,7 @@ type ScheduleAlgorithm interface {
 	Predicates() map[string]predicates.FitPredicate
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
-	Prioritizers() []algorithm.PriorityConfig
+	Prioritizers() []priorities.PriorityConfig
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -133,9 +134,9 @@ type genericScheduler struct {
 	cache                    schedulerinternalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
-	priorityMetaProducer     algorithm.PriorityMetadataProducer
+	priorityMetaProducer     priorities.PriorityMetadataProducer
 	predicateMetaProducer    predicates.PredicateMetadataProducer
-	prioritizers             []algorithm.PriorityConfig
+	prioritizers             []priorities.PriorityConfig
 	pluginSet                pluginsv1alpha1.PluginSet
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndex            uint64
@@ -227,7 +228,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 // Prioritizers returns a slice containing all the scheduler's priority
 // functions and their config. It is exposed for testing only.
-func (g *genericScheduler) Prioritizers() []algorithm.PriorityConfig {
+func (g *genericScheduler) Prioritizers() []priorities.PriorityConfig {
 	return g.prioritizers
 }
 
@@ -637,7 +638,7 @@ func PrioritizeNodes(
 	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	meta interface{},
-	priorityConfigs []algorithm.PriorityConfig,
+	priorityConfigs []priorities.PriorityConfig,
 	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
@@ -1165,8 +1166,8 @@ func NewGenericScheduler(
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
 	predicateMetaProducer predicates.PredicateMetadataProducer,
-	prioritizers []algorithm.PriorityConfig,
-	priorityMetaProducer algorithm.PriorityMetadataProducer,
+	prioritizers []priorities.PriorityConfig,
+	priorityMetaProducer priorities.PriorityMetadataProducer,
 	pluginSet pluginsv1alpha1.PluginSet,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,

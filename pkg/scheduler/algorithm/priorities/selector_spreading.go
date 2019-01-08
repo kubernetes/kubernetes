@@ -46,7 +46,7 @@ func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
 	replicaSetLister algorithm.ReplicaSetLister,
-	statefulSetLister algorithm.StatefulSetLister) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+	statefulSetLister algorithm.StatefulSetLister) (PriorityMapFunction, PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
@@ -177,7 +177,7 @@ type ServiceAntiAffinity struct {
 }
 
 // NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
-func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
 	antiAffinity := &ServiceAntiAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,

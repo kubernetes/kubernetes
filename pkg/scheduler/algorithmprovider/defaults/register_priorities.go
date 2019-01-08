@@ -26,7 +26,7 @@ import (
 func init() {
 	// Register functions that extract metadata used by priorities computations.
 	factory.RegisterPriorityMetadataProducerFactory(
-		func(args factory.PluginFactoryArgs) algorithm.PriorityMetadataProducer {
+		func(args factory.PluginFactoryArgs) priorities.PriorityMetadataProducer {
 			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
 		})
 
@@ -37,7 +37,7 @@ func init() {
 	factory.RegisterPriorityConfigFactory(
 		priorities.ServiceSpreadingPriority,
 		factory.PriorityConfigFactory{
-			MapReduceFunction: func(args factory.PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+			MapReduceFunction: func(args factory.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
 			},
 			Weight: 1,
@@ -58,7 +58,7 @@ func init() {
 	factory.RegisterPriorityConfigFactory(
 		priorities.SelectorSpreadPriority,
 		factory.PriorityConfigFactory{
-			MapReduceFunction: func(args factory.PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+			MapReduceFunction: func(args factory.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 				return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
 			},
 			Weight: 1,
@@ -69,7 +69,7 @@ func init() {
 	factory.RegisterPriorityConfigFactory(
 		priorities.InterPodAffinityPriority,
 		factory.PriorityConfigFactory{
-			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
+			Function: func(args factory.PluginFactoryArgs) priorities.PriorityFunction {
 				return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight)
 			},
 			Weight: 1,
