@@ -206,7 +206,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedPodWorkerLatencyKey,
-			Help:      "Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
+			Help:      "(Deprecated) Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
 		},
 		[]string{"operation_type"},
 	)
@@ -214,14 +214,14 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedPodStartLatencyKey,
-			Help:      "Latency in microseconds for a single pod to go from pending to running.",
+			Help:      "(Deprecated) Latency in microseconds for a single pod to go from pending to running.",
 		},
 	)
 	DeprecatedCgroupManagerLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedCgroupManagerOperationsKey,
-			Help:      "Latency in microseconds for cgroup manager operations. Broken down by method.",
+			Help:      "(Deprecated) Latency in microseconds for cgroup manager operations. Broken down by method.",
 		},
 		[]string{"operation_type"},
 	)
@@ -229,28 +229,28 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedPodWorkerStartLatencyKey,
-			Help:      "Latency in microseconds from seeing a pod to starting a worker.",
+			Help:      "(Deprecated) Latency in microseconds from seeing a pod to starting a worker.",
 		},
 	)
 	DeprecatedPLEGRelistLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedPLEGRelistLatencyKey,
-			Help:      "Latency in microseconds for relisting pods in PLEG.",
+			Help:      "(Deprecated) Latency in microseconds for relisting pods in PLEG.",
 		},
 	)
 	DeprecatedPLEGRelistInterval = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedPLEGRelistIntervalKey,
-			Help:      "Interval in microseconds between relisting in PLEG.",
+			Help:      "(Deprecated) Interval in microseconds between relisting in PLEG.",
 		},
 	)
 	DeprecatedRuntimeOperations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedRuntimeOperationsKey,
-			Help:      "Cumulative number of runtime operations by operation type.",
+			Help:      "(Deprecated) Cumulative number of runtime operations by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -258,7 +258,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedRuntimeOperationsLatencyKey,
-			Help:      "Latency in microseconds of runtime operations. Broken down by operation type.",
+			Help:      "(Deprecated) Latency in microseconds of runtime operations. Broken down by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -266,7 +266,7 @@ var (
 		prometheus.CounterOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedRuntimeOperationsErrorsKey,
-			Help:      "Cumulative number of runtime operation errors by operation type.",
+			Help:      "(Deprecated) Cumulative number of runtime operation errors by operation type.",
 		},
 		[]string{"operation_type"},
 	)
@@ -274,7 +274,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedEvictionStatsAgeKey,
-			Help:      "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
+			Help:      "(Deprecated) Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
 		},
 		[]string{"eviction_signal"},
 	)
@@ -282,7 +282,7 @@ var (
 		prometheus.CounterOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedDevicePluginRegistrationCountKey,
-			Help:      "Cumulative number of device plugin registrations. Broken down by resource name.",
+			Help:      "(Deprecated) Cumulative number of device plugin registrations. Broken down by resource name.",
 		},
 		[]string{"resource_name"},
 	)
@@ -290,7 +290,7 @@ var (
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      DeprecatedDevicePluginAllocationLatencyKey,
-			Help:      "Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
+			Help:      "(Deprecated) Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
 		},
 		[]string{"resource_name"},
 	)
