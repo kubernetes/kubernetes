@@ -405,6 +405,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: install storage CRDs
+ENABLE_STORAGE_CRDS="${ENABLE_STORAGE_CRDS:-true}"
+
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
 # Disabling this by default in tests ensures default RBAC policies are sufficient from 1.6+
 # Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.

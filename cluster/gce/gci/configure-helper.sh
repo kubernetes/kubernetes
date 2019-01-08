@@ -2599,8 +2599,10 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
-  # Setup Storage CRDs
-  setup-addon-manifests "addons" "storage-crds"
+  if [[ "${ENABLE_STORAGE_CRDS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "storage-crds"
+  fi
+
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
   fi
