@@ -41,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
-// AnnotateOptions have the data required to perform the annotate operation
-type AnnotateOptions struct {
+// Options have the data required to perform the annotate operation
+type Options struct {
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   printers.ResourcePrinterFunc
 
@@ -109,9 +109,9 @@ var (
     kubectl annotate pods foo description-`))
 )
 
-// NewAnnotateOptions creates the options for annotate
-func NewAnnotateOptions(ioStreams genericclioptions.IOStreams) *AnnotateOptions {
-	return &AnnotateOptions{
+// NewOptions creates the options for annotate
+func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
+	return &Options{
 		PrintFlags: genericclioptions.NewPrintFlags("annotated").WithTypeSetter(scheme.Scheme),
 
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -122,7 +122,7 @@ func NewAnnotateOptions(ioStreams genericclioptions.IOStreams) *AnnotateOptions 
 
 // NewCmdAnnotate creates the `annotate` command
 func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewAnnotateOptions(ioStreams)
+	o := NewOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
@@ -156,7 +156,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	o.RecordFlags.Complete(cmd)
@@ -203,7 +203,7 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 }
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
-func (o AnnotateOptions) Validate() error {
+func (o Options) Validate() error {
 	if o.all && len(o.selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
@@ -220,7 +220,7 @@ func (o AnnotateOptions) Validate() error {
 }
 
 // RunAnnotate does the work
-func (o AnnotateOptions) RunAnnotate() error {
+func (o Options) RunAnnotate() error {
 	b := o.builder.
 		Unstructured().
 		LocalParam(o.local).
@@ -354,7 +354,7 @@ func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[stri
 }
 
 // updateAnnotations updates annotations of obj
-func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
+func (o Options) updateAnnotations(obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
