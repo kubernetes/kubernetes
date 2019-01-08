@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -51,7 +52,7 @@ func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) 
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
-	pathExists, pathErr := util.PathExists(deviceMountPath)
+	pathExists, pathErr := mount.PathExists(deviceMountPath)
 	if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
@@ -85,7 +86,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
-	if pathExists, pathErr := util.PathExists(deviceMountPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		return nil

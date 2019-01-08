@@ -237,7 +237,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 				// Using the Cinder volume ID, find the real device path (See Issue #33128)
 				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
 			}
-			exists, err := volumeutil.PathExists(devicePath)
+			exists, err := mount.PathExists(devicePath)
 			if exists && err == nil {
 				klog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil

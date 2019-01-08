@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -73,7 +74,7 @@ type VolumeSpec struct {
 }
 
 func verifyDevicePath(path string) (string, error) {
-	if pathExists, err := volumeutil.PathExists(path); err != nil {
+	if pathExists, err := mount.PathExists(path); err != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", err)
 	} else if pathExists {
 		return path, nil

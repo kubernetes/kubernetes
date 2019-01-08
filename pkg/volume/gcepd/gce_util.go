@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -207,7 +208,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 	}
 
 	for _, path := range devicePaths {
-		if pathExists, err := volumeutil.PathExists(path); err != nil {
+		if pathExists, err := mount.PathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			// validate that the path actually resolves to the correct disk

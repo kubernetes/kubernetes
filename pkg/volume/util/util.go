@@ -125,12 +125,6 @@ func SetReady(dir string) {
 	file.Close()
 }
 
-// PathExists returns true if the specified path exists.
-// TODO: Change callers to call mount pkg directly
-func PathExists(path string) (bool, error) {
-	return mount.PathExists(path)
-}
-
 // IsCorruptedMnt return true if err is about corrupted mount point
 // TODO: Change callers to call mount pkg directly
 func IsCorruptedMnt(err error) bool {
