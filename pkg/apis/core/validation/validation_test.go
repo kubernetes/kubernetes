@@ -11528,13 +11528,11 @@ func TestValidateResourceQuota(t *testing.T) {
 			Spec: nonBestEffortSpec,
 		},
 	}
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, true)()
 	for _, successCase := range successCases {
 		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, false)()
 
 	errorCases := map[string]struct {
 		R core.ResourceQuota
@@ -11579,10 +11577,6 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
-		},
-		"forbidden-quota-scope-selector": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: scopeSelectorSpec},
-			"feature-gate is disabled",
 		},
 	}
 	for k, v := range errorCases {

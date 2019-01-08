@@ -4906,9 +4906,6 @@ func validateScopeSelector(resourceQuotaSpec *core.ResourceQuotaSpec, fld *field
 	if resourceQuotaSpec.ScopeSelector == nil {
 		return allErrs
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceQuotaScopeSelectors) && resourceQuotaSpec.ScopeSelector != nil {
-		allErrs = append(allErrs, field.Forbidden(fld.Child("scopeSelector"), "ResourceQuotaScopeSelectors feature-gate is disabled"))
-	}
 	allErrs = append(allErrs, validateScopedResourceSelectorRequirement(resourceQuotaSpec, fld.Child("scopeSelector"))...)
 	return allErrs
 }
