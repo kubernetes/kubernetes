@@ -121,7 +121,7 @@ filegroup(
         "//test/e2e/testing-manifests:all-srcs",
         "//test/e2e/ui:all-srcs",
         "//test/e2e/upgrades:all-srcs",
-        "//test/e2e/windows:all-srcs"
+        "//test/e2e/windows:all-srcs",
     ],
     tags = ["automanaged"],
 )
