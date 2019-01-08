@@ -1,5 +1,5 @@
 {
-	"ImportPath": "k8s.io/kube-controller-manager",
+	"ImportPath": "k8s.io/component-base",
 	"GoVersion": "go1.11",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
@@ -136,14 +136,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/apimachinery/third_party/forked/golang/reflect",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/component-base/config",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/component-base/config/v1alpha1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

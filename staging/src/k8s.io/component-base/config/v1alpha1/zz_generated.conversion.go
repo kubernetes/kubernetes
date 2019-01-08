@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	config "k8s.io/apiserver/pkg/apis/config"
+	config "k8s.io/component-base/config"
 )
 
 func init() {
@@ -34,6 +34,16 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*ClientConnectionConfiguration)(nil), (*config.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*config.ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*config.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*DebuggingConfiguration)(nil), (*config.DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(a.(*DebuggingConfiguration), b.(*config.DebuggingConfiguration), scope)
 	}); err != nil {
@@ -54,6 +64,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*config.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*config.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*config.DebuggingConfiguration)(nil), (*DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(a.(*config.DebuggingConfiguration), b.(*DebuggingConfiguration), scope)
 	}); err != nil {
@@ -61,6 +76,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*config.LeaderElectionConfiguration)(nil), (*LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(a.(*config.LeaderElectionConfiguration), b.(*LeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ClientConnectionConfiguration)(nil), (*config.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*config.ClientConnectionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -74,6 +94,24 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+func autoConvert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *config.ClientConnectionConfiguration, s conversion.Scope) error {
+	out.Kubeconfig = in.Kubeconfig
+	out.AcceptContentTypes = in.AcceptContentTypes
+	out.ContentType = in.ContentType
+	out.QPS = in.QPS
+	out.Burst = in.Burst
+	return nil
+}
+
+func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *config.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
+	out.Kubeconfig = in.Kubeconfig
+	out.AcceptContentTypes = in.AcceptContentTypes
+	out.ContentType = in.ContentType
+	out.QPS = in.QPS
+	out.Burst = in.Burst
 	return nil
 }
 
