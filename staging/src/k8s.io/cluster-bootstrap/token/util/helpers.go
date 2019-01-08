@@ -41,17 +41,27 @@ var (
 
 // GenerateBootstrapToken generates a new, random Bootstrap Token.
 func GenerateBootstrapToken() (string, error) {
-	tokenID, err := randBytes(api.BootstrapTokenIDBytes)
+	tokenID, err := GenerateBootstrapTokenID()
 	if err != nil {
 		return "", err
 	}
 
-	tokenSecret, err := randBytes(api.BootstrapTokenSecretBytes)
+	tokenSecret, err := GenerateBootstrapTokenSecret()
 	if err != nil {
 		return "", err
 	}
 
 	return TokenFromIDAndSecret(tokenID, tokenSecret), nil
+}
+
+// GenerateBootstrapTokenID generates a new, random Bootstrap Token ID
+func GenerateBootstrapTokenID() (string, error) {
+	return randBytes(api.BootstrapTokenIDBytes)
+}
+
+// GenerateBootstrapTokenSecret generates a new, random Bootstrap Token ID
+func GenerateBootstrapTokenSecret() (string, error) {
+	return randBytes(api.BootstrapTokenSecretBytes)
 }
 
 // randBytes returns a random string consisting of the characters in
