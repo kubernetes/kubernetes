@@ -19,8 +19,8 @@ package test
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
+	"strings"
 
 	"github.com/stretchr/testify/assert"
 
