@@ -18,8 +18,6 @@ package testsuites
 
 import (
 	"fmt"
-	"math"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -165,7 +163,7 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSize())
+			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSizeRange())
 			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 
 			By("creating a StorageClass " + r.sc.Name)
@@ -351,22 +349,37 @@ func convertTestConfig(in *TestConfig) framework.VolumeTestConfig {
 // intersection of the intervals (if it exists) and return the minimum of the intersection
 // to be used as the claim size for the test.
 func getSizeRangesIntersection(first framework.SizeRange, second framework.SizeRange) string {
-	if strings.Compare(first.Units, second.Units) != 0 {
-		// both ranges must have same units
-		// TODO: return an error or try to convert the units instead
-		return ""
+	var firstMin, firstMax, secondMin, secondMax resource.Quantity
+	var err error
+	if firstMin, err = resource.ParseQuantity(first.Min); err != nil {
+		framework.Failf("Failed parsing quantity %s", first.Min)
 	}
 
-	if second.Min > first.Max || first.Min > second.Max {
-		// TODO: this means a NULL intersection, return a better error
-		return ""
+	if firstMax, err = resource.ParseQuantity(first.Max); err != nil {
+		framework.Failf("Failed parsing quantity %s", first.Max)
 	}
 
-	intersection := framework.SizeRange{
-		Min:   math.Max(first.Min, second.Min),
-		Max:   math.Min(first.Max, second.Max),
-		Units: first.Units,
+	if secondMin, err = resource.ParseQuantity(second.Min); err != nil {
+		framework.Failf("Failed parsing quantity %s", second.Min)
 	}
 
-	return fmt.Sprintf("%.2f%s", intersection.Min, intersection.Units)
+	if secondMax, err = resource.ParseQuantity(second.Max); err != nil {
+		framework.Failf("Failed parsing quantity %s", second.Max)
+	}
+
+	if secondMin.Cmp(firstMax) > 0 || firstMin.Cmp(secondMax) > 0 {
+		framework.Failf("Intersection of size ranges %+v, %+v is null", first, second)
+	}
+
+	// the minimum of the intersection shall be returned as the claim size
+	var intersectionMin resource.Quanity
+
+	if firstMin.Cmp(secondMin) > 0 {
+		intersectionMin = firstMin
+	} else {
+		intersectionMin = secondMin
+	}
+
+	// return the minimum of the intersection as the claim size
+	return intersectionMin
 }

@@ -195,7 +195,7 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 			}
 			s.sc.VolumeBindingMode = &volBindMode
 
-			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSize())
+			claimSize := getSizeRangesIntersection(pattern.SupportedSizeRange, dDriver.GetClaimSizeRange())
 			s.pvc = getClaim(claimSize, ns.Name)
 			s.pvc.Spec.StorageClassName = &s.sc.Name
 			s.pvc.Spec.VolumeMode = &volMode

@@ -72,9 +72,9 @@ type DynamicPVTestDriver interface {
 	// It will return nil, if the TestDriver doesn't support it.
 	GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass
 
-	// GetClaimSize returns a range of size for which a volume can be provisioned with this driver.
+	// GetClaimSizeRange returns a range of size for which a volume can be provisioned with this driver.
 	// The actual size to be provisioned is determined dynamically based on this range and the test's range.
-	GetClaimSize() framework.SizeRange
+	GetClaimSizeRange() framework.SizeRange
 }
 
 // Capability represents a feature that a volume plugin supports

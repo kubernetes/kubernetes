@@ -63,9 +63,8 @@ var (
 		Name:    "Inline-volume (default fs)",
 		VolType: InlineVolume,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:  "10Gi",
 		},
 	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
@@ -73,9 +72,8 @@ var (
 		Name:    "Pre-provisioned PV (default fs)",
 		VolType: PreprovisionedPV,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// DefaultFsDynamicPV is TestPattern for "Dynamic PV (default fs)"
@@ -83,9 +81,8 @@ var (
 		Name:    "Dynamic PV (default fs)",
 		VolType: DynamicPV,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 
@@ -97,9 +94,8 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext3",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// Ext3PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext3)"
@@ -108,9 +104,8 @@ var (
 		VolType: PreprovisionedPV,
 		FsType:  "ext3",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// Ext3DynamicPV is TestPattern for "Dynamic PV (ext3)"
@@ -119,9 +114,8 @@ var (
 		VolType: DynamicPV,
 		FsType:  "ext3",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 
@@ -133,9 +127,8 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext4",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// Ext4PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext4)"
@@ -144,9 +137,8 @@ var (
 		VolType: PreprovisionedPV,
 		FsType:  "ext4",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// Ext4DynamicPV is TestPattern for "Dynamic PV (ext4)"
@@ -155,9 +147,8 @@ var (
 		VolType: DynamicPV,
 		FsType:  "ext4",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi"
+			Max:   "10Gi",
 		},
 	}
 
@@ -169,9 +160,8 @@ var (
 		VolType: InlineVolume,
 		FsType:  "xfs",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// XfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (xfs)"
@@ -180,9 +170,8 @@ var (
 		VolType: PreprovisionedPV,
 		FsType:  "xfs",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// XfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
@@ -191,9 +180,8 @@ var (
 		VolType: DynamicPV,
 		FsType:  "xfs",
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 
@@ -205,9 +193,8 @@ var (
 		VolType: PreprovisionedPV,
 		VolMode: v1.PersistentVolumeFilesystem,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// FsVolModeDynamicPV is TestPattern for "Dynamic PV (filesystem)"
@@ -216,9 +203,8 @@ var (
 		VolType: DynamicPV,
 		VolMode: v1.PersistentVolumeFilesystem,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 
@@ -230,9 +216,8 @@ var (
 		VolType: PreprovisionedPV,
 		VolMode: v1.PersistentVolumeBlock,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 	// BlockVolModeDynamicPV is TestPattern for "Dynamic PV (block)(immediate bind)"
@@ -241,9 +226,8 @@ var (
 		VolType: DynamicPV,
 		VolMode: v1.PersistentVolumeBlock,
 		SupportedSizeRange: framework.SizeRange{
-			Min:   float64(1), // TODO: choose appropriate value
-			Max:   float64(2),
-			Units: "Gi",
+			Min:   "1Mi",
+			Max:   "10Gi",
 		},
 	}
 )
