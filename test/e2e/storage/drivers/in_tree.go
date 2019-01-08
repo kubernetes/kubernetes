@@ -90,9 +90,8 @@ func InitNFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				"", // Default fsType
 			),
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
@@ -146,7 +145,7 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (n *nfsDriver) GetClaimSize() framework.SizeRange {
+func (n *nfsDriver) GetClaimSizeRange() framework.SizeRange {
 	return n.driverInfo.SupportedSizeRange
 }
 
@@ -249,9 +248,8 @@ func InitGlusterFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "gluster",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -376,9 +374,8 @@ func InitISCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -496,6 +493,10 @@ func InitRbdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "rbd",
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min: "1Gi",
+				Max: "10Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -629,9 +630,8 @@ func InitCephFSDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			FeatureTag:  "[Feature:Volumes]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -738,9 +738,8 @@ func InitHostPathDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "hostPath",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -817,9 +816,8 @@ func InitHostPathSymlinkDriver(config testsuites.TestConfig) testsuites.TestDriv
 			Name:        "hostPathSymlink",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -963,6 +961,10 @@ func InitEmptydirDriver(config testsuites.TestConfig) testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:        "emptydir",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min: "1Gi",
+				Max: "10Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -1032,9 +1034,8 @@ func InitCinderDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "cinder",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1103,7 +1104,7 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (c *cinderDriver) GetClaimSize() framework.SizeRange {
+func (c *cinderDriver) GetClaimSizeRange() framework.SizeRange {
 	return c.driverInfo.SupportedSizeRange
 }
 
@@ -1198,6 +1199,10 @@ func InitGcePdDriver(config testsuites.TestConfig) testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:        "gcepd",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min: "1Gi",
+				Max: "10Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -1276,7 +1281,7 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (h *gcePdDriver) GetClaimSize() framework.SizeRange {
+func (h *gcePdDriver) GetClaimSizeRange() framework.SizeRange {
 	return h.driverInfo.SupportedSizeRange
 }
 
@@ -1331,9 +1336,8 @@ func InitVSphereDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "vSphere",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1409,7 +1413,7 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(fsType string) *storagev
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (v *vSphereDriver) GetClaimSize() framework.SizeRange {
+func (v *vSphereDriver) GetClaimSizeRange() framework.SizeRange {
 	return v.driverInfo.SupportedSizeRange
 }
 
@@ -1460,9 +1464,8 @@ func InitAzureDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "azure",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1538,7 +1541,7 @@ func (a *azureDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (a *azureDriver) GetClaimSize() framework.SizeRange {
+func (a *azureDriver) GetClaimSizeRange() framework.SizeRange {
 	return a.driverInfo.SupportedSizeRange
 }
 
@@ -1586,9 +1589,8 @@ func InitAwsDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			Name:        "aws",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1),
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1656,7 +1658,7 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (a *awsDriver) GetClaimSize() framework.SizeRange {
+func (a *awsDriver) GetClaimSizeRange() framework.SizeRange {
 	return a.driverInfo.SupportedSizeRange
 }
 

@@ -62,9 +62,8 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 			FeatureTag:  "",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1), // TODO: choose appropriate values
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "1Gi", // TODO: choose appropriate values
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -111,7 +110,7 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *stor
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (h *hostpathCSIDriver) GetClaimSize() framework.SizeRange {
+func (h *hostpathCSIDriver) GetClaimSizeRange() framework.SizeRange {
 	return h.driverInfo.SupportedSizeRange
 }
 
@@ -181,9 +180,8 @@ func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: framework.SizeRange{
-				Min:   float64(1), // TODO: choose appropriate value
-				Max:   float64(3),
-				Units: "Gi",
+				Min: "5Gi",
+				Max: "10Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -223,7 +221,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storage
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (g *gcePDCSIDriver) GetClaimSize() framework.SizeRange {
+func (g *gcePDCSIDriver) GetClaimSizeRange() framework.SizeRange {
 	return g.driverInfo.SupportedSizeRange
 }
 
@@ -281,6 +279,10 @@ func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDri
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
 			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: framework.SizeRange{
+				Min: "5Gi",
+				Max: "10Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -318,7 +320,7 @@ func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (g *gcePDExternalCSIDriver) GetClaimSize() framework.SizeRange {
+func (g *gcePDExternalCSIDriver) GetClaimSizeRange() framework.SizeRange {
 	return g.driverInfo.SupportedSizeRange
 }
 

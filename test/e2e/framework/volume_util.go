@@ -74,11 +74,10 @@ const (
 	PodCleanupTimeout = 20 * time.Second
 )
 
-// SizeRange encapsulates a size range (along with its units) [min,max] that a storage driver supports.
+// SizeRange encapsulates a range of sizes specified as minimum and maximum quantity strings
 type SizeRange struct {
-	Max   float64 // Max size specified
-	Min   float64 // Min size specified
-	Units string  // The units in which Min and Max were specified
+	Max string // Max quantity specified as a string including units. E.g "1Gi"
+	Min string // Min quantity specified as a string including units. E.g "3Gi"
 }
 
 // Configuration of one tests. The test consist of:
