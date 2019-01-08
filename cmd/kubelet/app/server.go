@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -537,66 +538,39 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		return err
 	}
 
-	if s.BootstrapKubeconfig != "" {
-		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
-			return err
-		}
-	}
-
 	// if in standalone mode, indicate as much by setting all clients to nil
-	if standaloneMode {
+	switch {
+	case standaloneMode:
 		kubeDeps.KubeClient = nil
 		kubeDeps.DynamicKubeClient = nil
 		kubeDeps.EventClient = nil
 		kubeDeps.HeartbeatClient = nil
 		klog.Warningf("standalone mode, no API client")
-	} else if kubeDeps.KubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil || kubeDeps.DynamicKubeClient == nil {
-		// initialize clients if not standalone mode and any of the clients are not provided
-		var kubeClient clientset.Interface
-		var eventClient v1core.EventsGetter
-		var heartbeatClient clientset.Interface
-		var dynamicKubeClient dynamic.Interface
 
-		clientConfig, err := createAPIServerClientConfig(s)
-		if err != nil {
-			return fmt.Errorf("invalid kubeconfig: %v", err)
-		}
-
-		var clientCertificateManager certificate.Manager
-		if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-			clientCertificateManager, err = kubeletcertificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
-			if err != nil {
-				return err
-			}
-		}
-		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
-		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
-		// or the bootstrapping credentials to potentially lay down new initial config.
-		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, 5*time.Minute)
+	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil, kubeDeps.DynamicKubeClient == nil:
+		clientConfig, closeAllConns, err := buildKubeletClientConfig(s, nodeName)
 		if err != nil {
 			return err
 		}
+		kubeDeps.OnHeartbeatFailure = closeAllConns
 
-		kubeClient, err = clientset.NewForConfig(clientConfig)
+		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
-			klog.Warningf("New kubeClient from clientConfig error: %v", err)
-		} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
-			klog.V(2).Info("Starting client certificate rotation.")
-			clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
-			clientCertificateManager.Start()
+			return fmt.Errorf("failed to initialize kubelet client: %v", err)
 		}
-		dynamicKubeClient, err = dynamic.NewForConfig(clientConfig)
+
+		kubeDeps.DynamicKubeClient, err = dynamic.NewForConfig(clientConfig)
 		if err != nil {
-			klog.Warningf("Failed to initialize dynamic KubeClient: %v", err)
+			return fmt.Errorf("failed to initialize kubelet dynamic client: %v", err)
 		}
 
 		// make a separate client for events
 		eventClientConfig := *clientConfig
 		eventClientConfig.QPS = float32(s.EventRecordQPS)
 		eventClientConfig.Burst = int(s.EventBurst)
-		eventClient, err = v1core.NewForConfig(&eventClientConfig)
+		kubeDeps.EventClient, err = v1core.NewForConfig(&eventClientConfig)
 		if err != nil {
-			klog.Warningf("Failed to create API Server client for Events: %v", err)
+			return fmt.Errorf("failed to initialize kubelet event client: %v", err)
 		}
 
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
@@ -610,28 +584,18 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 			}
 		}
 		heartbeatClientConfig.QPS = float32(-1)
-		heartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
+		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
-			klog.Warningf("Failed to create API Server client for heartbeat: %v", err)
+			return fmt.Errorf("failed to initialize kubelet heartbeat client: %v", err)
 		}
 
-		// csiClient works with CRDs that support json only
-		clientConfig.ContentType = "application/json"
-		csiClient, err := csiclientset.NewForConfig(clientConfig)
+		// CRDs are JSON only, and client renegotiation for streaming is not correct as per #67803
+		csiClientConfig := restclient.CopyConfig(clientConfig)
+		csiClientConfig.ContentType = "application/json"
+		kubeDeps.CSIClient, err = csiclientset.NewForConfig(csiClientConfig)
 		if err != nil {
-			klog.Warningf("Failed to create CSI API client: %v", err)
+			return fmt.Errorf("failed to initialize kubelet storage client: %v", err)
 		}
-
-		kubeDeps.KubeClient = kubeClient
-		kubeDeps.DynamicKubeClient = dynamicKubeClient
-		if heartbeatClient != nil {
-			kubeDeps.HeartbeatClient = heartbeatClient
-			kubeDeps.OnHeartbeatFailure = closeAllConns
-		}
-		if eventClient != nil {
-			kubeDeps.EventClient = eventClient
-		}
-		kubeDeps.CSIClient = csiClient
 	}
 
 	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
@@ -771,6 +735,118 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	return nil
 }
 
+// buildKubeletClientConfig constructs the appropriate client config for the kubelet depending on whether
+// bootstrapping is enabled or client certificate rotation is enabled.
+func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName) (*restclient.Config, func(), error) {
+	if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+		// Rules for client rotation and the handling of kube config files:
+		//
+		// 1. If the client provides only a kubeconfig file, we must use that as the initial client
+		//    kubeadm needs the initial data in the kubeconfig to be placed into the cert store
+		// 2. If the client provides only an initial bootstrap kubeconfig file, we must create a
+		//    kubeconfig file at the target location that points to the cert store, but until
+		//    the file is present the client config will have no certs
+		// 3. If the client provides both and the kubeconfig is valid, we must ignore the bootstrap
+		//    kubeconfig.
+		// 4. If the client provides both and the kubeconfig is expired or otherwise invalid, we must
+		//    replace the kubeconfig with a new file that points to the cert dir
+		//
+		// The desired configuration for bootstrapping is to use a bootstrap kubeconfig and to have
+		// the kubeconfig file be managed by this process. For backwards compatibility with kubeadm,
+		// which provides a high powered kubeconfig on the master with cert/key data, we must
+		// bootstrap the cert manager with the contents of the initial client config.
+
+		klog.Infof("Client rotation is on, will bootstrap in background")
+		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// the rotating transport will use the cert from the cert manager instead of these files
+		transportConfig := restclient.AnonymousClientConfig(clientConfig)
+		kubeClientConfigOverrides(s, transportConfig)
+
+		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
+		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
+		// or the bootstrapping credentials to potentially lay down new initial config.
+		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, transportConfig, clientCertificateManager, 5*time.Minute)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		klog.V(2).Info("Starting client certificate rotation.")
+		clientCertificateManager.Start()
+
+		return transportConfig, closeAllConns, nil
+	}
+
+	if len(s.BootstrapKubeconfig) > 0 {
+		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	clientConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid kubeconfig: %v", err)
+	}
+
+	kubeClientConfigOverrides(s, clientConfig)
+
+	return clientConfig, nil, nil
+}
+
+// buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
+// if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
+// write out).
+func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
+	newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
+		// credentials. In the future it would be desirable to change the behavior of bootstrap
+		// to always fall back to the external bootstrap credentials when such credentials are
+		// provided by a fundamental trust system like cloud VM identity or an HSM module.
+		config := certConfig
+		if current != nil {
+			config = clientConfig
+		}
+		client, err := clientset.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return client.CertificatesV1beta1().CertificateSigningRequests(), nil
+	}
+
+	return kubeletcertificate.NewKubeletClientCertificateManager(
+		certDir,
+		nodeName,
+
+		// this preserves backwards compatibility with kubeadm which passes
+		// a high powered certificate to the kubelet as --kubeconfig and expects
+		// it to be rotated out immediately
+		clientConfig.CertData,
+		clientConfig.KeyData,
+
+		clientConfig.CertFile,
+		clientConfig.KeyFile,
+		newClientFn,
+	)
+}
+
+func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclient.Config) {
+	clientConfig.ContentType = s.ContentType
+	// Override kubeconfig qps/burst settings from flags
+	clientConfig.QPS = float32(s.KubeAPIQPS)
+	clientConfig.Burst = int(s.KubeAPIBurst)
+}
+
 // getNodeName returns the node name according to the cloud provider
 // if cloud provider is specified. Otherwise, returns the hostname of the node.
 func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName, error) {
@@ -857,39 +933,6 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 	}
 
 	return tlsOptions, nil
-}
-
-func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
-}
-
-// createClientConfig creates a client configuration from the command line arguments.
-// If --kubeconfig is explicitly set, it will be used.
-func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if s.BootstrapKubeconfig != "" || len(s.KubeConfig) > 0 {
-		return kubeconfigClientConfig(s)
-	} else {
-		return nil, fmt.Errorf("createClientConfig called in standalone mode")
-	}
-}
-
-// createAPIServerClientConfig generates a client.Config from command line flags
-// via createClientConfig and then injects chaos into the configuration via addChaosToClientConfig.
-func createAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	clientConfig, err := createClientConfig(s)
-	if err != nil {
-		return nil, err
-	}
-
-	clientConfig.ContentType = s.ContentType
-	// Override kubeconfig qps/burst settings from flags
-	clientConfig.QPS = float32(s.KubeAPIQPS)
-	clientConfig.Burst = int(s.KubeAPIBurst)
-
-	return clientConfig, nil
 }
 
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:

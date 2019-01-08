@@ -47,6 +47,10 @@ type configMapPlugin struct {
 
 var _ volume.VolumePlugin = &configMapPlugin{}
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(configMapPluginName), volName)
+}
+
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.getConfigMap = host.GetConfigMapFunc()
@@ -92,7 +96,7 @@ func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 			pod.UID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:       *spec.Volume.ConfigMap,
 		pod:          *pod,
@@ -108,7 +112,7 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 			podUID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -128,7 +132,7 @@ type configMapVolume struct {
 	podUID  types.UID
 	plugin  *configMapPlugin
 	mounter mount.Interface
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &configMapVolume{}

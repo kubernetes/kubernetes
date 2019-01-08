@@ -41,6 +41,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
+        "//vendor/github.com/liggitt/tabwriter:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

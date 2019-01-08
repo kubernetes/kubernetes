@@ -166,6 +166,12 @@ func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createVal
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
 	}
 
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	if errs := appsvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
 		return nil, errors.NewInvalid(apps.Kind("DeploymentRollback"), rollback.Name, errs)
 	}

@@ -117,7 +117,12 @@ type DelegatingAuthenticationOptions struct {
 	ClientCert    ClientCertAuthenticationOptions
 	RequestHeader RequestHeaderAuthenticationOptions
 
+	// SkipInClusterLookup indicates missing authentication configuration should not be retrieved from the cluster configmap
 	SkipInClusterLookup bool
+
+	// TolerateInClusterLookupFailure indicates failures to look up authentication configuration from the cluster configmap should not be fatal.
+	// Setting this can result in an authenticator that will reject all requests.
+	TolerateInClusterLookupFailure bool
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -160,6 +165,9 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.SkipInClusterLookup, "authentication-skip-lookup", s.SkipInClusterLookup, ""+
 		"If false, the authentication-kubeconfig will be used to lookup missing authentication "+
 		"configuration from the cluster.")
+	fs.BoolVar(&s.TolerateInClusterLookupFailure, "authentication-tolerate-lookup-failure", s.TolerateInClusterLookupFailure, ""+
+		"If true, failures to look up missing authentication configuration from the cluster are not considered fatal. "+
+		"Note that this can result in authentication that treats all requests as anonymous.")
 }
 
 func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
@@ -187,7 +195,13 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 	if !s.SkipInClusterLookup {
 		err := s.lookupMissingConfigInCluster(client)
 		if err != nil {
-			return err
+			if s.TolerateInClusterLookupFailure {
+				klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
+				klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
+				klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -246,7 +260,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 		// ignore, authConfigMap is nil now
 	case errors.IsForbidden(err):
 		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
+			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
 		return err
 	case err != nil:

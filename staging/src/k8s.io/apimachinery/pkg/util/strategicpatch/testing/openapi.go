@@ -62,7 +62,7 @@ func (f *Fake) OpenAPISchema() (*openapi_v2.Document, error) {
 	return f.document, f.err
 }
 
-func getSchema(f Fake, model string) (openapi.Schema, error) {
+func getSchema(f *Fake, model string) (openapi.Schema, error) {
 	s, err := f.OpenAPISchema()
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func getSchema(f Fake, model string) (openapi.Schema, error) {
 }
 
 // GetSchemaOrDie returns the openapi schema.
-func GetSchemaOrDie(f Fake, model string) openapi.Schema {
+func GetSchemaOrDie(f *Fake, model string) openapi.Schema {
 	s, err := getSchema(f, model)
 	if err != nil {
 		panic(err)

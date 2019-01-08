@@ -11,6 +11,7 @@ go_test(
     srcs = ["memcache_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
     ],
@@ -22,6 +23,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/discovery/cached",
     importpath = "k8s.io/client-go/discovery/cached",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",

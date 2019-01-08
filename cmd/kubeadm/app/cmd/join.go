@@ -316,7 +316,7 @@ func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ig
 		internalCfg.NodeRegistration.CRISocket = defaultcfg.NodeRegistration.CRISocket
 	}
 
-	if defaultcfg.ControlPlane != nil {
+	if internalCfg.ControlPlane != nil {
 		if err := configutil.VerifyAPIServerBindAddress(internalCfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 			return nil, err
 		}
@@ -586,10 +586,12 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 func waitForTLSBootstrappedClient() error {
 	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
 
-	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {
-		_, err := os.Stat(kubeletKubeConfig)
+		// Check that we can create a client set out of the kubelet kubeconfig. This ensures not
+		// only that the kubeconfig file exists, but that other files required by it also exist (like
+		// client certificate and key)
+		_, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
 		return (err == nil), nil
 	})
 }

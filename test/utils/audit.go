@@ -20,6 +20,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,17 +30,19 @@ import (
 )
 
 type AuditEvent struct {
-	Level             auditinternal.Level
-	Stage             auditinternal.Stage
-	RequestURI        string
-	Verb              string
-	Code              int32
-	User              string
-	Resource          string
-	Namespace         string
-	RequestObject     bool
-	ResponseObject    bool
-	AuthorizeDecision string
+	Level              auditinternal.Level
+	Stage              auditinternal.Stage
+	RequestURI         string
+	Verb               string
+	Code               int32
+	User               string
+	ImpersonatedUser   string
+	ImpersonatedGroups string
+	Resource           string
+	Namespace          string
+	RequestObject      bool
+	ResponseObject     bool
+	AuthorizeDecision  string
 }
 
 // Search the audit log for the expected audit lines.
@@ -100,6 +104,11 @@ func parseAuditLine(line string, version schema.GroupVersion) (AuditEvent, error
 	}
 	if e.RequestObject != nil {
 		event.RequestObject = true
+	}
+	if e.ImpersonatedUser != nil {
+		event.ImpersonatedUser = e.ImpersonatedUser.Username
+		sort.Strings(e.ImpersonatedUser.Groups)
+		event.ImpersonatedGroups = strings.Join(e.ImpersonatedUser.Groups, ",")
 	}
 	event.AuthorizeDecision = e.Annotations["authorization.k8s.io/decision"]
 	return event, nil

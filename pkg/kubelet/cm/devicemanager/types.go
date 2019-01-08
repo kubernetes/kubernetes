@@ -25,7 +25,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Manager manages all the Device Plugins running on a node.
@@ -41,7 +41,7 @@ type Manager interface {
 	// variables, mount points and device files). The node object is provided
 	// for the device manager to update the node capacity to reflect the
 	// currently available devices.
-	Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
+	Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
 
 	// Stop stops the manager.
 	Stop() error

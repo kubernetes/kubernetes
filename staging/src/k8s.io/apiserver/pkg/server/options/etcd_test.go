@@ -36,12 +36,14 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when ServerList is not specified",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:                  "etcd3",
-					ServerList:            nil,
-					Prefix:                "/registry",
-					KeyFile:               "/var/run/kubernetes/etcd.key",
-					CAFile:                "/var/run/kubernetes/etcdca.crt",
-					CertFile:              "/var/run/kubernetes/etcdce.crt",
+					Type:   "etcd3",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList: nil,
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,
 				},
@@ -58,12 +60,14 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when storage-backend is invalid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:                  "etcd4",
-					ServerList:            []string{"http://127.0.0.1"},
-					Prefix:                "/registry",
-					KeyFile:               "/var/run/kubernetes/etcd.key",
-					CAFile:                "/var/run/kubernetes/etcdca.crt",
-					CertFile:              "/var/run/kubernetes/etcdce.crt",
+					Type:   "etcd4",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,
 				},
@@ -80,12 +84,14 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when etcd-servers-overrides is invalid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:                  "etcd3",
-					ServerList:            []string{"http://127.0.0.1"},
+					Type: "etcd3",
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
 					Prefix:                "/registry",
-					KeyFile:               "/var/run/kubernetes/etcd.key",
-					CAFile:                "/var/run/kubernetes/etcdca.crt",
-					CertFile:              "/var/run/kubernetes/etcdce.crt",
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,
 				},
@@ -102,12 +108,14 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			name: "test when EtcdOptions is valid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
-					Type:                  "etcd3",
-					ServerList:            []string{"http://127.0.0.1"},
-					Prefix:                "/registry",
-					KeyFile:               "/var/run/kubernetes/etcd.key",
-					CAFile:                "/var/run/kubernetes/etcdca.crt",
-					CertFile:              "/var/run/kubernetes/etcdce.crt",
+					Type:   "etcd3",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,
 				},

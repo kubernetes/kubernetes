@@ -107,3 +107,19 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 	}
 	return nil
 }
+
+// ClearEntriesForPortNAT uses the conntrack tool to delete the contrack entries
+// for connections specified by the {dest IP, port} pair.
+// Known issue:
+// https://github.com/kubernetes/kubernetes/issues/59368
+func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protocol v1.Protocol) error {
+	if port <= 0 {
+		return fmt.Errorf("Wrong port number. The port number must be greater then zero")
+	}
+	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
+	err := Exec(execer, parameters...)
+	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
+		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
+	}
+	return nil
+}

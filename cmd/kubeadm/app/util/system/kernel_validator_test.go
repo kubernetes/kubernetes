@@ -33,40 +33,45 @@ func TestValidateKernelVersion(t *testing.T) {
 	// not the DefaultSysSpec. The DefaultSysSpec should be tested with node e2e.
 	testRegex := []string{`3\.[1-9][0-9].*`, `4\..*`}
 	for _, test := range []struct {
+		name    string
 		version string
 		err     bool
 	}{
-		// first version regex matches
 		{
+			name:    "3.19.9-99-test first version regex matches",
 			version: "3.19.9-99-test",
 			err:     false,
 		},
-		// one of version regexes matches
 		{
+			name:    "4.4.14+ one of version regexes matches",
 			version: "4.4.14+",
 			err:     false,
 		},
-		// no version regex matches
 		{
+			name:    "2.0.0 no version regex matches",
 			version: "2.0.0",
 			err:     true,
 		},
 		{
+			name:    "5.0.0 no version regex matches",
 			version: "5.0.0",
 			err:     true,
 		},
 		{
+			name:    "3.9.0 no version regex matches",
 			version: "3.9.0",
 			err:     true,
 		},
 	} {
-		v.kernelRelease = test.version
-		err := v.validateKernelVersion(KernelSpec{Versions: testRegex})
-		if !test.err {
-			assert.Nil(t, err, "Expect error not to occur with kernel version %q", test.version)
-		} else {
-			assert.NotNil(t, err, "Expect error to occur with kenrel version %q", test.version)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			v.kernelRelease = test.version
+			err := v.validateKernelVersion(KernelSpec{Versions: testRegex})
+			if !test.err {
+				assert.Nil(t, err, "Expect error not to occur with kernel version %q", test.version)
+			} else {
+				assert.NotNil(t, err, "Expect error to occur with kenrel version %q", test.version)
+			}
+		})
 	}
 }
 
@@ -82,13 +87,13 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			{Name: "FORBIDDEN_2", Aliases: []string{"ALIASE_FORBIDDEN_2"}},
 		},
 	}
-	for c, test := range []struct {
+	for _, test := range []struct {
 		desc   string
 		config map[string]kConfigOption
 		err    bool
 	}{
 		{
-			desc: "meet all required configurations should not report error.",
+			desc: "meet all required configurations should not report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1": builtIn,
 				"REQUIRED_2": asModule,
@@ -96,7 +101,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			desc: "one required configuration disabled should report error.",
+			desc: "one required configuration disabled should report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1": leftOut,
 				"REQUIRED_2": builtIn,
@@ -104,14 +109,14 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: true,
 		},
 		{
-			desc: "one required configuration missing should report error.",
+			desc: "one required configuration missing should report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1": builtIn,
 			},
 			err: true,
 		},
 		{
-			desc: "alias of required configuration should not report error.",
+			desc: "alias of required configuration should not report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1":        builtIn,
 				"ALIASE_REQUIRED_2": asModule,
@@ -119,7 +124,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			desc: "optional configuration set or not should not report error.",
+			desc: "optional configuration set or not should not report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1": builtIn,
 				"REQUIRED_2": asModule,
@@ -128,7 +133,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			desc: "forbidden configuration disabled should not report error.",
+			desc: "forbidden configuration disabled should not report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1":  builtIn,
 				"REQUIRED_2":  asModule,
@@ -137,7 +142,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			desc: "forbidden configuration built-in should report error.",
+			desc: "forbidden configuration built-in should report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1":  builtIn,
 				"REQUIRED_2":  asModule,
@@ -146,7 +151,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: true,
 		},
 		{
-			desc: "forbidden configuration built as module should report error.",
+			desc: "forbidden configuration built as module should report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1":  builtIn,
 				"REQUIRED_2":  asModule,
@@ -155,7 +160,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: true,
 		},
 		{
-			desc: "alias of forbidden configuration should report error.",
+			desc: "alias of forbidden configuration should report error",
 			config: map[string]kConfigOption{
 				"REQUIRED_1":         builtIn,
 				"REQUIRED_2":         asModule,
@@ -164,18 +169,19 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			err: true,
 		},
 	} {
-		t.Logf("TestCase #%d %s", c, test.desc)
-		// Add kernel config prefix.
-		for k, v := range test.config {
-			delete(test.config, k)
-			test.config[kConfigPrefix+k] = v
-		}
-		err := v.validateCachedKernelConfig(test.config, testKernelSpec)
-		if !test.err {
-			assert.Nil(t, err, "Expect error not to occur with kernel config %q", test.config)
-		} else {
-			assert.NotNil(t, err, "Expect error to occur with kenrel config %q", test.config)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			// Add kernel config prefix.
+			for k, v := range test.config {
+				delete(test.config, k)
+				test.config[kConfigPrefix+k] = v
+			}
+			err := v.validateCachedKernelConfig(test.config, testKernelSpec)
+			if !test.err {
+				assert.Nil(t, err, "Expect error not to occur with kernel config %q", test.config)
+			} else {
+				assert.NotNil(t, err, "Expect error to occur with kenrel config %q", test.config)
+			}
+		})
 	}
 }
 

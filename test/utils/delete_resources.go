@@ -38,11 +38,11 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(namespace).Delete(name, options)
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.ExtensionsV1beta1().ReplicaSets(namespace).Delete(name, options)
+		return c.AppsV1().ReplicaSets(namespace).Delete(name, options)
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.ExtensionsV1beta1().Deployments(namespace).Delete(name, options)
+		return c.AppsV1().Deployments(namespace).Delete(name, options)
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.ExtensionsV1beta1().DaemonSets(namespace).Delete(name, options)
+		return c.AppsV1().DaemonSets(namespace).Delete(name, options)
 	case batchinternal.Kind("Job"):
 		return c.BatchV1().Jobs(namespace).Delete(name, options)
 	case api.Kind("Secret"):

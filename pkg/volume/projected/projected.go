@@ -111,10 +111,11 @@ func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
-			volName: spec.Name(),
-			sources: spec.Volume.Projected.Sources,
-			podUID:  pod.UID,
-			plugin:  plugin,
+			volName:         spec.Name(),
+			sources:         spec.Volume.Projected.Sources,
+			podUID:          pod.UID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source: *spec.Volume.Projected,
 		pod:    pod,
@@ -125,9 +126,10 @@ func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 func (plugin *projectedPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	return &projectedVolumeUnmounter{
 		&projectedVolume{
-			volName: volName,
-			podUID:  podUID,
-			plugin:  plugin,
+			volName:         volName,
+			podUID:          podUID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -148,7 +150,7 @@ type projectedVolume struct {
 	sources []v1.VolumeProjection
 	podUID  types.UID
 	plugin  *projectedPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &projectedVolume{}

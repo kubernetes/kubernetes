@@ -31,7 +31,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1627,15 +1626,15 @@ func createProvisionerDaemonset(config *localTestConfig) {
 	provisionerPrivileged := true
 	mountProp := v1.MountPropagationHostToContainer
 
-	provisioner := &extv1beta1.DaemonSet{
+	provisioner := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: "extensions/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: daemonSetName,
 		},
-		Spec: extv1beta1.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "local-volume-provisioner"},
 			},
@@ -1708,7 +1707,7 @@ func createProvisionerDaemonset(config *localTestConfig) {
 			},
 		},
 	}
-	_, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Create(provisioner)
+	_, err := config.client.AppsV1().DaemonSets(config.ns).Create(provisioner)
 	Expect(err).NotTo(HaveOccurred())
 
 	kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
@@ -1732,12 +1731,12 @@ func findProvisionerDaemonsetPodName(config *localTestConfig) string {
 }
 
 func deleteProvisionerDaemonset(config *localTestConfig) {
-	ds, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Get(daemonSetName, metav1.GetOptions{})
+	ds, err := config.client.AppsV1().DaemonSets(config.ns).Get(daemonSetName, metav1.GetOptions{})
 	if ds == nil {
 		return
 	}
 
-	err = config.client.ExtensionsV1beta1().DaemonSets(config.ns).Delete(daemonSetName, nil)
+	err = config.client.AppsV1().DaemonSets(config.ns).Delete(daemonSetName, nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {

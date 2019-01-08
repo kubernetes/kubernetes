@@ -7,6 +7,7 @@ filters:
       - lavalamp
       - smarterclayton
       - thockin
+      - liggitt
     approvers:
       - bgrant0607
       - brendandburns
@@ -17,9 +18,11 @@ filters:
       - smarterclayton
       - thockin
       - wojtek-t
+      - liggitt
       # Only meant for FEATURE BRANCH
       - apelisse
       - jennybuckley
+
   # Bazel build infrastructure changes often touch files throughout the tree
   "\\.bzl$":
     reviewers:

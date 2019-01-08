@@ -39,6 +39,11 @@ type Config struct {
 	// Bearer token for authentication
 	BearerToken string
 
+	// Path to a file containing a BearerToken.
+	// If set, the contents are periodically read.
+	// The last successfully read value takes precedence over BearerToken.
+	BearerTokenFile string
+
 	// Impersonate is the config that this Config will impersonate using
 	Impersonate ImpersonationConfig
 
@@ -80,7 +85,7 @@ func (c *Config) HasBasicAuth() bool {
 
 // HasTokenAuth returns whether the configuration has token authentication or not.
 func (c *Config) HasTokenAuth() bool {
-	return len(c.BearerToken) != 0
+	return len(c.BearerToken) != 0 || len(c.BearerTokenFile) != 0
 }
 
 // HasCertAuth returns whether the configuration has certificate authentication or not.

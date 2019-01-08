@@ -165,12 +165,12 @@ func RunServer(
 type NamedTLSCert struct {
 	TLSCert tls.Certificate
 
-	// names is a list of domain patterns: fully qualified domain names, possibly prefixed with
+	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
 	// wildcard segments.
 	Names []string
 }
 
-// getNamedCertificateMap returns a map of *tls.Certificate by name. It's is
+// GetNamedCertificateMap returns a map of *tls.Certificate by name. It's
 // suitable for use in tls.Config#NamedCertificates. Returns an error if any of the certs
 // cannot be loaded. Returns nil if len(certs) == 0
 func GetNamedCertificateMap(certs []NamedTLSCert) (map[string]*tls.Certificate, error) {

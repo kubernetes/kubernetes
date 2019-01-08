@@ -117,6 +117,168 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
+// Call AddPodToVolume() on different pods for different kinds of volumes
+// Verities generated names are same for different pods if volume is device mountable or attachable
+// Verities generated names are different for different pods if volume is not device mountble and attachable
+func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *testing.T) {
+	// Arrange
+	fakeVolumeHost := volumetesting.NewFakeVolumeHost(
+		"",  /* rootDir */
+		nil, /* kubeClient */
+		nil, /* plugins */
+	)
+	plugins := []volume.VolumePlugin{
+		&volumetesting.FakeBasicVolumePlugin{
+			Plugin: volumetesting.FakeVolumePlugin{
+				PluginName: "basic",
+			},
+		},
+		&volumetesting.FakeDeviceMountableVolumePlugin{
+			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+				Plugin: volumetesting.FakeVolumePlugin{
+					PluginName: "device-mountable",
+				},
+			},
+		},
+		&volumetesting.FakeAttachableVolumePlugin{
+			FakeDeviceMountableVolumePlugin: volumetesting.FakeDeviceMountableVolumePlugin{
+				FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+					Plugin: volumetesting.FakeVolumePlugin{
+						PluginName: "attachable",
+					},
+				},
+			},
+		},
+	}
+	volumePluginMgr := volume.VolumePluginMgr{}
+	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
+	dsw := NewDesiredStateOfWorld(&volumePluginMgr)
+
+	testcases := map[string]struct {
+		pod1 *v1.Pod
+		pod2 *v1.Pod
+		same bool
+	}{
+		"basic": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name:         "basic",
+							VolumeSource: v1.VolumeSource{},
+						},
+					},
+				},
+			},
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+					UID:  "pod2uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name:         "basic",
+							VolumeSource: v1.VolumeSource{},
+						},
+					},
+				},
+			},
+			false,
+		},
+		"device-mountable": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name:         "device-mountable",
+							VolumeSource: v1.VolumeSource{},
+						},
+					},
+				},
+			},
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+					UID:  "pod2uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name:         "device-mountable",
+							VolumeSource: v1.VolumeSource{},
+						},
+					},
+				},
+			},
+			true,
+		},
+		"attachable": {
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name:         "attachable",
+							VolumeSource: v1.VolumeSource{},
+						},
+					},
+				},
+			},
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+					UID:  "pod2uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name:         "attachable",
+							VolumeSource: v1.VolumeSource{},
+						},
+					},
+				},
+			},
+			true,
+		},
+	}
+
+	// Act & Assert
+	for name, v := range testcases {
+		volumeSpec1 := &volume.Spec{Volume: &v.pod1.Spec.Volumes[0]}
+		volumeSpec2 := &volume.Spec{Volume: &v.pod2.Spec.Volumes[0]}
+		generatedVolumeName1, err1 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod1), v.pod1, volumeSpec1, volumeSpec1.Name(), "")
+		generatedVolumeName2, err2 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod2), v.pod2, volumeSpec2, volumeSpec2.Name(), "")
+		if err1 != nil {
+			t.Fatalf("test %q: AddPodToVolume failed. Expected: <no error> Actual: <%v>", name, err1)
+		}
+		if err2 != nil {
+			t.Fatalf("test %q: AddPodToVolume failed. Expected: <no error> Actual: <%v>", name, err2)
+		}
+		if v.same {
+			if generatedVolumeName1 != generatedVolumeName2 {
+				t.Fatalf("test %q: AddPodToVolume should generate same names, but got %q != %q", name, generatedVolumeName1, generatedVolumeName2)
+			}
+		} else {
+			if generatedVolumeName1 == generatedVolumeName2 {
+				t.Fatalf("test %q: AddPodToVolume should generate different names, but got %q == %q", name, generatedVolumeName1, generatedVolumeName2)
+			}
+		}
+	}
+
+}
+
 // Populates data struct with a new volume/pod
 // Calls DeletePodFromVolume() to removes the pod
 // Verifies newly added pod/volume are deleted

@@ -473,6 +473,7 @@ runTests() {
   # Kubectl diff #
   ################
   record_command run_kubectl_diff_tests
+  record_command run_kubectl_diff_same_names
 
   ###############
   # Kubectl get #

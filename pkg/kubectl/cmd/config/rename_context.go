@@ -67,15 +67,9 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 		Long:                  renameContextLong,
 		Example:               renameContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(cmd, args, out); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
-			}
-			if err := options.RunRenameContext(out); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(options.Complete(cmd, args, out))
+			cmdutil.CheckErr(options.Validate())
+			cmdutil.CheckErr(options.RunRenameContext(out))
 		},
 	}
 	return cmd
@@ -92,6 +86,7 @@ func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out i
 	return nil
 }
 
+// Validate makes sure that provided values for command-line options are valid
 func (o RenameContextOptions) Validate() error {
 	if len(o.newName) == 0 {
 		return errors.New("You must specify a new non-empty context name")
@@ -99,6 +94,7 @@ func (o RenameContextOptions) Validate() error {
 	return nil
 }
 
+// RunRenameContext performs the execution for 'config rename-context' sub command
 func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {

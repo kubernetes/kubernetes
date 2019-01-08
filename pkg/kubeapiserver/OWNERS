@@ -8,6 +8,7 @@ reviewers:
 - lavalamp
 - liggitt
 - sttts
+- cheftako
 labels:
 - sig/api-machinery
 - area/apiserver

@@ -33,6 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -47,6 +48,8 @@ type cadvisorStatsProvider struct {
 	resourceAnalyzer stats.ResourceAnalyzer
 	// imageService is used to get the stats of the image filesystem.
 	imageService kubecontainer.ImageService
+	// statusProvider is used to get pod metadata
+	statusProvider status.PodStatusProvider
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -55,11 +58,13 @@ func newCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	imageService kubecontainer.ImageService,
+	statusProvider status.PodStatusProvider,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
 		cadvisor:         cadvisor,
 		resourceAnalyzer: resourceAnalyzer,
 		imageService:     imageService,
+		statusProvider:   statusProvider,
 	}
 }
 
@@ -114,7 +119,6 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			// Special case for infrastructure container which is hidden from
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats("pod:"+ref.Namespace+"_"+ref.Name, &cinfo)
-			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
 		} else {
 			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo))
 		}
@@ -139,7 +143,13 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			podStats.CPU = cpu
 			podStats.Memory = memory
 		}
-		result = append(result, *podStats)
+
+		status, found := p.statusProvider.GetPodStatus(podUID)
+		if found && status.StartTime != nil && !status.StartTime.IsZero() {
+			podStats.StartTime = *status.StartTime
+			// only append stats if we were able to get the start time of the pod
+			result = append(result, *podStats)
+		}
 	}
 
 	return result, nil

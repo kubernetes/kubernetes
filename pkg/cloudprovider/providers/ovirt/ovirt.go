@@ -49,6 +49,9 @@ type Instance struct {
 // InstanceMap provides the map of Ovirt instances.
 type InstanceMap map[string]Instance
 
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+
 // Cloud is an implementation of the cloud provider interface for Ovirt.
 type Cloud struct {
 	VmsRequest   *url.URL

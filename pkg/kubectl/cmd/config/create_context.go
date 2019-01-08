@@ -41,16 +41,17 @@ type createContextOptions struct {
 }
 
 var (
-	create_context_long = templates.LongDesc(`
+	createContextLong = templates.LongDesc(`
 		Sets a context entry in kubeconfig
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
 
-	create_context_example = templates.Examples(`
+	createContextExample = templates.Examples(`
 		# Set the user field on the gce context entry without touching other values
 		kubectl config set-context gce --user=cluster-admin`)
 )
 
+// NewCmdConfigSetContext returns a Command instance for 'config set-context' sub command
 func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createContextOptions{configAccess: configAccess}
 
@@ -58,8 +59,8 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Use:                   fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Sets a context entry in kubeconfig"),
-		Long:                  create_context_long,
-		Example:               create_context_example,
+		Long:                  createContextLong,
+		Example:               createContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			name, exists, err := options.run()

@@ -1,10 +1,13 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     run: hostname
   name: hostname
 spec:
+  selector:
+    matchLabels:
+      run: hostname  
   template:
     metadata:
       labels:

@@ -37,6 +37,23 @@
 #    * arm
 #    * arm64
 #
+#  Set KUBERNETES_NODE_PLATFORM to choose the platform for which to download
+#  the node binaries. If none of KUBERNETES_NODE_PLATFORM and
+#  KUBERNETES_NODE_ARCH is set, no node binaries will be downloaded. If only
+#  one of the two is set, the other will be defaulted to the
+#  KUBERNETES_SERVER_PLATFORM/ARCH.
+#    * linux
+#    * windows
+#
+#  Set KUBERNETES_NODE_ARCH to choose the node architecture to download the
+#  node binaries. If none of KUBERNETES_NODE_PLATFORM and
+#  KUBERNETES_NODE_ARCH is set, no node binaries will be downloaded. If only
+#  one of the two is set, the other will be defaulted to the
+#  KUBERNETES_SERVER_PLATFORM/ARCH.
+#    * amd64 [default]
+#    * arm
+#    * arm64
+#
 #  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_SKIP_CREATE_CLUSTER to skip starting a cluster.

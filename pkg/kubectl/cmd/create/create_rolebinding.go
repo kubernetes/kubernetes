@@ -36,13 +36,14 @@ var (
 		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
+// RoleBindingOpts holds the options for 'create rolebinding' sub command
 type RoleBindingOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
 
-// RoleBinding is a command to ease creating RoleBindings.
+// NewCmdCreateRoleBinding returns an initialized Command instance for 'create rolebinding' sub command
 func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &RoleBindingOpts{
+	o := &RoleBindingOpts{
 		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
@@ -53,12 +54,12 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 		Long:                  roleBindingLong,
 		Example:               roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
@@ -71,6 +72,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -95,6 +97,7 @@ func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
+// Run calls the CreateSubcommandOptions.Run in RoleBindingOpts instance
 func (o *RoleBindingOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

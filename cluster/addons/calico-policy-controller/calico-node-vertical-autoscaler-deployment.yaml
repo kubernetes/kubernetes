@@ -1,5 +1,5 @@
 kind: Deployment
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   name: calico-node-vertical-autoscaler
   namespace: kube-system
@@ -9,6 +9,9 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: calico-node-autoscaler
   template:
     metadata:
       labels:

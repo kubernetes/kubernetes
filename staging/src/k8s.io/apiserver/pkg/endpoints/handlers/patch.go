@@ -91,6 +91,12 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
 		patchBytes, err := readBody(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -223,7 +229,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			status = http.StatusCreated
 		}
 		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, status, result)
+		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
 	}
 }
 

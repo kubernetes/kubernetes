@@ -38,17 +38,14 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/globalflag"
-	storageinformers "k8s.io/client-go/informers/storage/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -165,11 +162,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
 func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
-	var storageClassInformer storageinformers.StorageClassInformer
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		storageClassInformer = cc.InformerFactory.Storage().V1().StorageClasses()
-	}
-
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory.Core().V1().Nodes(),
@@ -181,13 +173,12 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.InformerFactory.Apps().V1().StatefulSets(),
 		cc.InformerFactory.Core().V1().Services(),
 		cc.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		storageClassInformer,
+		cc.InformerFactory.Storage().V1().StorageClasses(),
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
-		scheduler.WithEquivalenceClassCacheEnabled(cc.ComponentConfig.EnableContentionProfiling),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds))
@@ -197,6 +188,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 	// Prepare the event broadcaster.
 	if cc.Broadcaster != nil && cc.EventClient != nil {
+		cc.Broadcaster.StartLogging(klog.V(6).Infof)
 		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
 	}
 
@@ -336,11 +328,6 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 
 // NewSchedulerConfig creates the scheduler configuration. This is exposed for use by tests.
 func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*factory.Config, error) {
-	var storageClassInformer storageinformers.StorageClassInformer
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		storageClassInformer = s.InformerFactory.Storage().V1().StorageClasses()
-	}
-
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  s.ComponentConfig.SchedulerName,
@@ -354,9 +341,8 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*factory.Confi
 		StatefulSetInformer:            s.InformerFactory.Apps().V1().StatefulSets(),
 		ServiceInformer:                s.InformerFactory.Core().V1().Services(),
 		PdbInformer:                    s.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           storageClassInformer,
+		StorageClassInformer:           s.InformerFactory.Storage().V1().StorageClasses(),
 		HardPodAffinitySymmetricWeight: s.ComponentConfig.HardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              s.ComponentConfig.DisablePreemption,
 		PercentageOfNodesToScore:       s.ComponentConfig.PercentageOfNodesToScore,
 		BindTimeoutSeconds:             *s.ComponentConfig.BindTimeoutSeconds,

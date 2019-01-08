@@ -98,6 +98,10 @@
     "description": "API at /apis/coordination.k8s.io/v1beta1"
    },
    {
+    "path": "/apis/coordination.k8s.io/v1",
+    "description": "API at /apis/coordination.k8s.io/v1"
+   },
+   {
     "path": "/apis/coordination.k8s.io",
     "description": "get information of a group"
    },

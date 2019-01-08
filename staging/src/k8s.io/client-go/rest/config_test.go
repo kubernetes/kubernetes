@@ -264,6 +264,7 @@ func TestAnonymousConfig(t *testing.T) {
 		// is added to Config, update AnonymousClientConfig to preserve the field otherwise.
 		expected.Impersonate = ImpersonationConfig{}
 		expected.BearerToken = ""
+		expected.BearerTokenFile = ""
 		expected.Username = ""
 		expected.Password = ""
 		expected.AuthProvider = nil
