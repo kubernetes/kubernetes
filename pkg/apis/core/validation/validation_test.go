@@ -5917,7 +5917,6 @@ func TestValidatePodSpec(t *testing.T) {
 	maxGroupID := int64(2147483647)
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 
 	successCases := []core.PodSpec{
@@ -6250,25 +6249,6 @@ func TestValidatePodSpec(t *testing.T) {
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
-		}
-	}
-
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)()
-
-	featuregatedCases := map[string]core.PodSpec{
-		"set ShareProcessNamespace": {
-			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			SecurityContext: &core.PodSecurityContext{
-				ShareProcessNamespace: &[]bool{true}[0],
-			},
-		},
-	}
-	for k, v := range featuregatedCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
-			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
 }
