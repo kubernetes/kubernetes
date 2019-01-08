@@ -381,5 +381,5 @@ func getSizeRangesIntersection(first framework.SizeRange, second framework.SizeR
 	}
 
 	// return the minimum of the intersection as the claim size
-	return intersectionMin
+	return intersectionMin.String()
 }
