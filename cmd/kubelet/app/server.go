@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-systemd/daemon"
@@ -205,6 +206,10 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
 				klog.Fatal(err)
+			}
+
+			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (0 != strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup)) {
+				klog.Warning("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
 			// use dynamic kubelet config, if enabled
