@@ -82,7 +82,7 @@ var (
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
-			Help:      "E2e scheduling latency in microseconds (scheduling algorithm + binding)",
+			Help:      "(Deprecated) E2e scheduling latency in microseconds (scheduling algorithm + binding)",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -98,7 +98,7 @@ var (
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_latency_microseconds",
-			Help:      "Scheduling algorithm latency in microseconds",
+			Help:      "(Deprecated) Scheduling algorithm latency in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -114,7 +114,7 @@ var (
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_predicate_evaluation",
-			Help:      "Scheduling algorithm predicate evaluation duration in microseconds",
+			Help:      "(Deprecated) Scheduling algorithm predicate evaluation duration in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -130,7 +130,7 @@ var (
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_priority_evaluation",
-			Help:      "Scheduling algorithm priority evaluation duration in microseconds",
+			Help:      "(Deprecated) Scheduling algorithm priority evaluation duration in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -146,7 +146,7 @@ var (
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_preemption_evaluation",
-			Help:      "Scheduling algorithm preemption evaluation duration in microseconds",
+			Help:      "(Deprecated) Scheduling algorithm preemption evaluation duration in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -162,7 +162,7 @@ var (
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "binding_latency_microseconds",
-			Help:      "Binding latency in microseconds",
+			Help:      "(Deprecated) Binding latency in microseconds",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
