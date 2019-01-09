@@ -783,6 +783,26 @@
 			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
 		},
 		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
+			"Rev": "d43a45b8663b01dd7d86e7cc1656dd8651280ed7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
+			"Rev": "d43a45b8663b01dd7d86e7cc1656dd8651280ed7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
+			"Rev": "d43a45b8663b01dd7d86e7cc1656dd8651280ed7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
+			"Rev": "d43a45b8663b01dd7d86e7cc1656dd8651280ed7"
+		},
+		{
+			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
+			"Rev": "d43a45b8663b01dd7d86e7cc1656dd8651280ed7"
+		},
+		{
 			"ImportPath": "sigs.k8s.io/yaml",
 			"Rev": "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
 		}
