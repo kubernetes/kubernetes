@@ -900,9 +900,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
-		NextPod: func() *v1.Pod {
-			return c.getNextPod()
-		},
+		NextPod:         internalqueue.MakeNextPodFunc(c.podQueue),
 		Error:           c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
 		StopEverything:  c.StopEverything,
 		VolumeBinder:    c.volumeBinder,
@@ -969,16 +967,6 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil
-}
-
-func (c *configFactory) getNextPod() *v1.Pod {
-	pod, err := c.podQueue.Pop()
-	if err == nil {
-		klog.V(4).Infof("About to try and schedule pod %v/%v", pod.Namespace, pod.Name)
-		return pod
-	}
-	klog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
-	return nil
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).
