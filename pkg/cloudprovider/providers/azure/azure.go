@@ -155,7 +155,6 @@ type Config struct {
 	// AllocatedOutboundPorts is number of outbound ports to be used for outbound NAT.
 	// Used together with EnableOutboundConnection.
 	AllocatedOutboundPorts *int `json:"allocatedOutboundPorts" yaml:"allocatedOutboundPorts"`
-	// TODO(feiskyer): the following two options will be enabled after Azure SDK upgrades.
 	// IdleTimeoutInMinutes is the idle timeout for outbound NAT.
 	// Used together with EnableOutboundConnection.
 	IdleTimeoutInMinutes *int `json:"idleTimeoutInMinutes" yaml:"idleTimeoutInMinutes"`

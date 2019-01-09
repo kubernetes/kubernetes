@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
@@ -302,4 +302,8 @@ func (az *Cloud) IsNodeUnmanaged(nodeName string) (bool, error) {
 // All managed node's providerIDs are in format 'azure:///subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Compute/.*'
 func (az *Cloud) IsNodeUnmanagedByProviderID(providerID string) bool {
 	return !azureNodeProviderIDRE.Match([]byte(providerID))
+}
+
+func (az *Cloud) outboundConnectionEnabled() bool {
+	return az.EnableOutboundConnection != nil && *az.EnableOutboundConnection
 }

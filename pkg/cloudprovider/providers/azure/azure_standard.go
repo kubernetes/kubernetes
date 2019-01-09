@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/api/core/v1"
@@ -48,6 +48,7 @@ const (
 	frontendIPConfigIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/frontendIPConfigurations/%s"
 	backendPoolIDTemplate       = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/backendAddressPools/%s"
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
+	outboundRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/outboundRules/%s"
 
 	// InternalLoadBalancerNameSuffix is load balancer posfix
 	InternalLoadBalancerNameSuffix = "-internal"
@@ -111,6 +112,17 @@ func (az *Cloud) getLoadBalancerProbeID(lbName, lbRuleName string) string {
 		az.ResourceGroup,
 		lbName,
 		lbRuleName)
+}
+
+func (az *Cloud) getOutboundRuleID(lbName, ruleName string) string {
+	return fmt.Sprintf(
+		outboundRuleIDTemplate,
+		az.SubscriptionID,
+		az.ResourceGroup,
+		lbName,
+		ruleName,
+	)
+
 }
 
 func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (vmSetName string) {

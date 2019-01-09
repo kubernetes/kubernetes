@@ -25,12 +25,13 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
@@ -83,6 +84,9 @@ const (
 	// ServiceAnnotationLoadBalancerMixedProtocols is the annotation used on the service
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
+
+	// outboundRuleName is the outbound rule name for standard LB.
+	outboundRuleName = "cloud-provider-outbound-rule-uid"
 )
 
 var (
@@ -116,13 +120,21 @@ func getPublicIPDomainNameLabel(service *v1.Service) string {
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	if az.useStandardLoadBalancer() {
+		// If standard LB is used, the outbound rules should be reconciled for both Internal LB and Public LB.
+		// Reconcile outbound rules first because Internal standard LB would break node's internet connectivity.
+		if err := az.reconcileOutboundRules(clusterName, az.outboundConnectionEnabled()); err != nil {
+			return nil, err
+		}
+	}
+
 	// When a client updates the internal load balancer annotation,
 	// the service may be switched from an internal LB to a public one, or vise versa.
 	// Here we'll firstly ensure service do not lie in the opposite LB.
 	serviceName := getServiceName(service)
 	klog.V(5).Infof("ensureloadbalancer(%s): START clusterName=%q", serviceName, clusterName)
 
-	lb, err := az.reconcileLoadBalancer(clusterName, service, nodes, true /* wantLb */)
+	lb, err := az.reconcileLoadBalancer(clusterName, service, nodes, true /* wantLb */, false /* isOutboundRule */)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +155,7 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 
 	updateService := updateServiceLoadBalancerIP(service, to.String(serviceIP))
 	flippedService := flipServiceInternalAnnotation(updateService)
-	if _, err := az.reconcileLoadBalancer(clusterName, flippedService, nil, false /* wantLb */); err != nil {
+	if _, err := az.reconcileLoadBalancer(clusterName, flippedService, nil, false /* wantLb */, false /* isOutboundRule */); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +193,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 		return err
 	}
 
-	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */); err != nil {
+	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */, false /* isOutboundRule */); err != nil {
 		return err
 	}
 
@@ -197,6 +209,32 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 func (az *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
 	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(service)
+}
+
+// reconcileOutboundRules ensures the outbound rules are created for standard load balancer.
+func (az *Cloud) reconcileOutboundRules(clusterName string, outboundEnabled bool) error {
+	nodes, err := az.GetCachedNodes()
+	if err != nil {
+		return err
+	}
+
+	outboundService := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  outboundRuleName,
+			Name: outboundRuleName,
+		},
+	}
+
+	lb, err := az.reconcileLoadBalancer(clusterName, outboundService, nodes, outboundEnabled, true)
+	if err != nil {
+		return err
+	}
+
+	if _, err := az.reconcilePublicIP(clusterName, outboundService, lb, true /* wantLb */); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // getServiceLoadBalancer gets the loadbalancer for the service if it already exists.
@@ -567,7 +605,7 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
 // nodes only used if wantLb is true
-func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node, wantLb bool) (*network.LoadBalancer, error) {
+func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node, wantLb, isOutboundRule bool) (*network.LoadBalancer, error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s) - wantLb(%t): started", serviceName, wantLb)
@@ -714,88 +752,153 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 		lb.FrontendIPConfigurations = &newConfigs
 	}
 
-	// update probes/rules
-	expectedProbes, expectedRules, err := az.reconcileLoadBalancerRule(service, wantLb, lbFrontendIPConfigID, lbBackendPoolID, lbName, lbIdleTimeout)
+	// Ensure probes and lb rules.
+	if !isOutboundRule {
+		expectedProbes, expectedRules, err := az.reconcileLoadBalancerRule(service, wantLb, lbFrontendIPConfigID, lbBackendPoolID, lbName, lbIdleTimeout)
+		if err != nil {
+			return nil, err
+		}
 
-	// remove unwanted probes
-	dirtyProbes := false
-	var updatedProbes []network.Probe
-	if lb.Probes != nil {
-		updatedProbes = *lb.Probes
-	}
-	for i := len(updatedProbes) - 1; i >= 0; i-- {
-		existingProbe := updatedProbes[i]
-		if az.serviceOwnsRule(service, *existingProbe.Name) {
-			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - considering evicting", serviceName, wantLb, *existingProbe.Name)
-			keepProbe := false
-			if findProbe(expectedProbes, existingProbe) {
-				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - keeping", serviceName, wantLb, *existingProbe.Name)
-				keepProbe = true
+		// remove unwanted probes
+		dirtyProbes := false
+		var updatedProbes []network.Probe
+		if lb.Probes != nil {
+			updatedProbes = *lb.Probes
+		}
+		for i := len(updatedProbes) - 1; i >= 0; i-- {
+			existingProbe := updatedProbes[i]
+			if az.serviceOwnsRule(service, *existingProbe.Name) {
+				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - considering evicting", serviceName, wantLb, *existingProbe.Name)
+				keepProbe := false
+				if findProbe(expectedProbes, existingProbe) {
+					klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - keeping", serviceName, wantLb, *existingProbe.Name)
+					keepProbe = true
+				}
+				if !keepProbe {
+					updatedProbes = append(updatedProbes[:i], updatedProbes[i+1:]...)
+					klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - dropping", serviceName, wantLb, *existingProbe.Name)
+					dirtyProbes = true
+				}
 			}
-			if !keepProbe {
-				updatedProbes = append(updatedProbes[:i], updatedProbes[i+1:]...)
-				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - dropping", serviceName, wantLb, *existingProbe.Name)
+		}
+		// add missing, wanted probes
+		for _, expectedProbe := range expectedProbes {
+			foundProbe := false
+			if findProbe(updatedProbes, expectedProbe) {
+				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - already exists", serviceName, wantLb, *expectedProbe.Name)
+				foundProbe = true
+			}
+			if !foundProbe {
+				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - adding", serviceName, wantLb, *expectedProbe.Name)
+				updatedProbes = append(updatedProbes, expectedProbe)
 				dirtyProbes = true
 			}
 		}
-	}
-	// add missing, wanted probes
-	for _, expectedProbe := range expectedProbes {
-		foundProbe := false
-		if findProbe(updatedProbes, expectedProbe) {
-			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - already exists", serviceName, wantLb, *expectedProbe.Name)
-			foundProbe = true
+		if dirtyProbes {
+			dirtyLb = true
+			lb.Probes = &updatedProbes
 		}
-		if !foundProbe {
-			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb probe(%s) - adding", serviceName, wantLb, *expectedProbe.Name)
-			updatedProbes = append(updatedProbes, expectedProbe)
-			dirtyProbes = true
-		}
-	}
-	if dirtyProbes {
-		dirtyLb = true
-		lb.Probes = &updatedProbes
-	}
 
-	// update rules
-	dirtyRules := false
-	var updatedRules []network.LoadBalancingRule
-	if lb.LoadBalancingRules != nil {
-		updatedRules = *lb.LoadBalancingRules
-	}
-	// update rules: remove unwanted
-	for i := len(updatedRules) - 1; i >= 0; i-- {
-		existingRule := updatedRules[i]
-		if az.serviceOwnsRule(service, *existingRule.Name) {
-			keepRule := false
-			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - considering evicting", serviceName, wantLb, *existingRule.Name)
-			if findRule(expectedRules, existingRule) {
-				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - keeping", serviceName, wantLb, *existingRule.Name)
-				keepRule = true
+		// update rules
+		dirtyRules := false
+		var updatedRules []network.LoadBalancingRule
+		if lb.LoadBalancingRules != nil {
+			updatedRules = *lb.LoadBalancingRules
+		}
+		// update rules: remove unwanted
+		for i := len(updatedRules) - 1; i >= 0; i-- {
+			existingRule := updatedRules[i]
+			if az.serviceOwnsRule(service, *existingRule.Name) {
+				keepRule := false
+				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - considering evicting", serviceName, wantLb, *existingRule.Name)
+				if findRule(expectedRules, existingRule) {
+					klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - keeping", serviceName, wantLb, *existingRule.Name)
+					keepRule = true
+				}
+				if !keepRule {
+					klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - dropping", serviceName, wantLb, *existingRule.Name)
+					updatedRules = append(updatedRules[:i], updatedRules[i+1:]...)
+					dirtyRules = true
+				}
 			}
-			if !keepRule {
-				klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - dropping", serviceName, wantLb, *existingRule.Name)
-				updatedRules = append(updatedRules[:i], updatedRules[i+1:]...)
+		}
+		// update rules: add needed
+		for _, expectedRule := range expectedRules {
+			foundRule := false
+			if findRule(updatedRules, expectedRule) {
+				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - already exists", serviceName, wantLb, *expectedRule.Name)
+				foundRule = true
+			}
+			if !foundRule {
+				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) adding", serviceName, wantLb, *expectedRule.Name)
+				updatedRules = append(updatedRules, expectedRule)
 				dirtyRules = true
 			}
 		}
-	}
-	// update rules: add needed
-	for _, expectedRule := range expectedRules {
-		foundRule := false
-		if findRule(updatedRules, expectedRule) {
-			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - already exists", serviceName, wantLb, *expectedRule.Name)
-			foundRule = true
+		if dirtyRules {
+			dirtyLb = true
+			lb.LoadBalancingRules = &updatedRules
 		}
-		if !foundRule {
-			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) adding", serviceName, wantLb, *expectedRule.Name)
-			updatedRules = append(updatedRules, expectedRule)
+	}
+
+	// Ensure outbound rules.
+	if isOutboundRule {
+		outboundRuleID := az.getOutboundRuleID(lbName, outboundRuleName)
+		updateOutboundRules := []network.OutboundRule{}
+		if lb.OutboundRules != nil {
+			updateOutboundRules = *lb.OutboundRules
+		}
+
+		findRule := false
+		dirtyRules := false
+		for i := range updateOutboundRules {
+			rule := updateOutboundRules[i]
+			if rule.ID != nil && rule.OutboundRulePropertiesFormat != nil &&
+				strings.EqualFold(to.String(rule.ID), outboundRuleID) &&
+				strings.EqualFold(to.String(rule.OutboundRulePropertiesFormat.BackendAddressPool.ID), lbBackendPoolID) {
+				findRule = true
+			}
+
+			// Remove unwanted rule
+			if findRule && !wantLb {
+				updateOutboundRules = append(updateOutboundRules[:i], updateOutboundRules[i+1:]...)
+				dirtyRules = true
+			}
+		}
+
+		if wantLb && !findRule {
+			defaultRule := network.OutboundRule{
+				Name: to.StringPtr(outboundRuleName),
+				ID:   to.StringPtr(outboundRuleID),
+				OutboundRulePropertiesFormat: &network.OutboundRulePropertiesFormat{
+					Protocol: network.Protocol1All,
+					FrontendIPConfigurations: &[]network.SubResource{
+						{
+							ID: to.StringPtr(lbFrontendIPConfigID),
+						},
+					},
+					BackendAddressPool: &network.SubResource{
+						ID: to.StringPtr(lbBackendPoolID),
+					},
+				},
+			}
+			if az.IdleTimeoutInMinutes != nil {
+				defaultRule.IdleTimeoutInMinutes = to.Int32Ptr(int32(*az.IdleTimeoutInMinutes))
+			}
+			if az.EnableTCPReset != nil {
+				defaultRule.EnableTCPReset = to.BoolPtr(*az.EnableTCPReset)
+			}
+			if az.AllocatedOutboundPorts != nil {
+				defaultRule.AllocatedOutboundPorts = to.Int32Ptr(int32(*az.AllocatedOutboundPorts))
+			}
+			updateOutboundRules = append(updateOutboundRules, defaultRule)
 			dirtyRules = true
 		}
-	}
-	if dirtyRules {
-		dirtyLb = true
-		lb.LoadBalancingRules = &updatedRules
+
+		if dirtyRules {
+			lb.OutboundRules = &updateOutboundRules
+			dirtyLb = true
+		}
 	}
 
 	// We don't care if the LB exists or not
