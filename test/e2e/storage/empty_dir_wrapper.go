@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -179,10 +179,9 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	/*
 		Release : v1.13
 		Testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
-		Description: Slow by design [~180 Seconds].
-		Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
+		Description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
 	*/
-	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial] [Slow]", func() {
+	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial]", func() {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)

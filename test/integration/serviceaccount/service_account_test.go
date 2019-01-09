@@ -319,6 +319,19 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
+	// wait for delete to be observed and reacted to via watch
+	wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		sa, err := c.Core().ServiceAccounts(myns).Get(readOnlyServiceAccountName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, secretRef := range sa.Secrets {
+			if secretRef.Name == roTokenName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 	doServiceAccountAPIRequests(t, roClient, myns, false, false, false)
 
 	// Create "rw" user in myns

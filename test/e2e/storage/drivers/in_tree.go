@@ -151,9 +151,6 @@ func (n *nfsDriver) CreateDriver() {
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
 
-	// Reset config. It might have been modified by a previous CreateVolume call.
-	n.driverInfo.Config.ServerConfig = nil
-
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
 	framework.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
@@ -298,8 +295,6 @@ func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 }
 
 func (g *glusterFSDriver) CreateDriver() {
-	// Reset config. It might have been modified by a previous CreateVolume call.
-	g.driverInfo.Config.ServerConfig = nil
 }
 
 func (g *glusterFSDriver) CleanupDriver() {
@@ -429,8 +424,6 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, te
 }
 
 func (i *iSCSIDriver) CreateDriver() {
-	// Reset config. It might have been modified by a previous CreateVolume call.
-	i.driverInfo.Config.ServerConfig = nil
 }
 
 func (i *iSCSIDriver) CleanupDriver() {
@@ -556,8 +549,6 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, test
 }
 
 func (r *rbdDriver) CreateDriver() {
-	// Reset config. It might have been modified by a previous CreateVolume call.
-	r.driverInfo.Config.ServerConfig = nil
 }
 
 func (r *rbdDriver) CleanupDriver() {
@@ -670,8 +661,6 @@ func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, t
 }
 
 func (c *cephFSDriver) CreateDriver() {
-	// Reset config. It might have been modified by a previous CreateVolume call.
-	c.driverInfo.Config.ServerConfig = nil
 }
 
 func (c *cephFSDriver) CleanupDriver() {

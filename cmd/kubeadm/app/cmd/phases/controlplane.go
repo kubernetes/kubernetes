@@ -17,8 +17,9 @@ limitations under the License.
 package phases
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"

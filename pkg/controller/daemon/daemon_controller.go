@@ -1027,10 +1027,8 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 				defer createWait.Done()
 				var err error
 
-				podTemplate := &template
-
+				podTemplate := template.DeepCopy()
 				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-					podTemplate = template.DeepCopy()
 					// The pod's NodeAffinity will be updated to make sure the Pod is bound
 					// to the target node by default scheduler. It is safe to do so because there
 					// should be no conflicting node affinity with the target node.
@@ -1040,6 +1038,9 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
 						ds, metav1.NewControllerRef(ds, controllerKind))
 				} else {
+					// If pod is scheduled by DaemonSetController, set its '.spec.scheduleName'.
+					podTemplate.Spec.SchedulerName = "kubernetes.io/daemonset-controller"
+
 					err = dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, podTemplate,
 						ds, metav1.NewControllerRef(ds, controllerKind))
 				}

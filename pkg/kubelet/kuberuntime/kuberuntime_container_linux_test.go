@@ -124,7 +124,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.Error(t, err)
 
-	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil)
+	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	image, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID})
 
 	image.Uid = nil

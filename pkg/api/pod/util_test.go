@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,6 +31,7 @@ import (
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestPodSecrets(t *testing.T) {
@@ -375,7 +377,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -469,7 +471,7 @@ func TestDropSubPath(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -558,7 +560,7 @@ func TestDropRuntimeClass(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -652,7 +654,7 @@ func TestDropProcMount(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -768,7 +770,7 @@ func TestDropPodPriority(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -878,7 +880,7 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -899,6 +901,88 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 						// new pod should not have EmptyDir SizeLimit
 						if !reflect.DeepEqual(newPod, podWithoutEmptyDirSizeLimit()) {
 							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutEmptyDirSizeLimit()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropAppArmor(t *testing.T) {
+	podWithAppArmor := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", apparmor.ContainerAnnotationKeyPrefix + "foo": "default"}},
+			Spec:       api.PodSpec{},
+		}
+	}
+	podWithoutAppArmor := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec:       api.PodSpec{},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasAppArmor bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "has AppArmor",
+			hasAppArmor: true,
+			pod:         podWithAppArmor,
+		},
+		{
+			description: "does not have AppArmor",
+			hasAppArmor: false,
+			pod:         podWithoutAppArmor,
+		},
+		{
+			description: "is nil",
+			hasAppArmor: false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasAppArmor, oldPod := oldPodInfo.hasAppArmor, oldPodInfo.pod()
+				newPodHasAppArmor, newPod := newPodInfo.hasAppArmor, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+
+					DropDisabledPodFields(newPod, oldPod)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasAppArmor:
+						// new pod should not be changed if the feature is enabled, or if the old pod had AppArmor
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasAppArmor:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have AppArmor
+						if !reflect.DeepEqual(newPod, podWithoutAppArmor()) {
+							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutAppArmor()))
 						}
 					default:
 						// new pod should not need to be changed
@@ -1013,7 +1097,7 @@ func TestDropRunAsGroup(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {

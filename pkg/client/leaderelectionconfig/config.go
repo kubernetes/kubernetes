@@ -20,16 +20,17 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 const (
 	// DefaultLeaseDuration defines a default duration of lease.
+	// TODO: This constant should move to the k8s.io/component-base/config package
 	DefaultLeaseDuration = 15 * time.Second
 )
 
 // BindFlags binds the LeaderElectionConfiguration struct fields to a flagset
-func BindFlags(l *apiserverconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
+func BindFlags(l *componentbaseconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
 	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+

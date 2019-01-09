@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -97,7 +97,7 @@ func TestRunCreateToken(t *testing.T) {
 	var buf bytes.Buffer
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, errors.NewNotFound(v1.Resource("secrets"), "foo")
+		return true, nil, apierrors.NewNotFound(v1.Resource("secrets"), "foo")
 	})
 
 	testCases := []struct {

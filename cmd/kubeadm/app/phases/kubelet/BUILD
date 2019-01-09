@@ -54,6 +54,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

@@ -17,6 +17,9 @@ limitations under the License.
 package debugger
 
 import (
+	"os"
+	"os/signal"
+
 	corelisters "k8s.io/client-go/listers/core/v1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -47,4 +50,23 @@ func New(
 			podQueue: podQueue,
 		},
 	}
+}
+
+// ListenForSignal starts a goroutine that will trigger the CacheDebugger's
+// behavior when the process receives SIGINT (Windows) or SIGUSER2 (non-Windows).
+func (d *CacheDebugger) ListenForSignal(stopCh <-chan struct{}) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, compareSignal)
+
+	go func() {
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ch:
+				d.Comparer.Compare()
+				d.Dumper.DumpAll()
+			}
+		}
+	}()
 }

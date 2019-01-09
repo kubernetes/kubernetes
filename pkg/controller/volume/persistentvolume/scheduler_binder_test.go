@@ -22,17 +22,17 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -55,7 +55,7 @@ var (
 	provisionedPVC              = makeTestPVC("provisioned-pvc", "1Gi", "", pvcUnbound, "", "1", &waitClassWithProvisioner)
 	provisionedPVC2             = makeTestPVC("provisioned-pvc2", "1Gi", "", pvcUnbound, "", "1", &waitClassWithProvisioner)
 	provisionedPVCHigherVersion = makeTestPVC("provisioned-pvc2", "1Gi", "", pvcUnbound, "", "2", &waitClassWithProvisioner)
-	provisionedPVCBound         = makeTestPVC("provisioned-pvc", "1Gi", "", pvcBound, "some-pv", "1", &waitClassWithProvisioner)
+	provisionedPVCBound         = makeTestPVC("provisioned-pvc", "1Gi", "", pvcBound, "pv-bound", "1", &waitClassWithProvisioner)
 	noProvisionerPVC            = makeTestPVC("no-provisioner-pvc", "1Gi", "", pvcUnbound, "", "1", &waitClass)
 	topoMismatchPVC             = makeTestPVC("topo-mismatch-pvc", "1Gi", "", pvcUnbound, "", "1", &topoMismatchClass)
 
@@ -89,18 +89,24 @@ var (
 	waitClassWithProvisioner = "waitClassWithProvisioner"
 	topoMismatchClass        = "topoMismatchClass"
 
+	// nodes objects
+	node1         = makeNode("node1", map[string]string{nodeLabelKey: "node1"})
+	node2         = makeNode("node2", map[string]string{nodeLabelKey: "node2"})
+	node1NoLabels = makeNode("node1", nil)
+
 	// node topology
 	nodeLabelKey   = "nodeKey"
 	nodeLabelValue = "node1"
 )
 
 type testEnv struct {
-	client           clientset.Interface
-	reactor          *volumeReactor
-	binder           SchedulerVolumeBinder
-	internalBinder   *volumeBinder
-	internalPVCache  *pvAssumeCache
-	internalPVCCache *pvcAssumeCache
+	client               clientset.Interface
+	reactor              *volumeReactor
+	binder               SchedulerVolumeBinder
+	internalBinder       *volumeBinder
+	internalNodeInformer coreinformers.NodeInformer
+	internalPVCache      *pvAssumeCache
+	internalPVCCache     *pvcAssumeCache
 }
 
 func newTestBinder(t *testing.T) *testEnv {
@@ -108,11 +114,13 @@ func newTestBinder(t *testing.T) *testEnv {
 	reactor := newVolumeReactor(client, nil, nil, nil, nil)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
+	nodeInformer := informerFactory.Core().V1().Nodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 
 	binder := NewVolumeBinder(
 		client,
+		nodeInformer,
 		pvcInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
@@ -195,12 +203,20 @@ func newTestBinder(t *testing.T) *testEnv {
 	}
 
 	return &testEnv{
-		client:           client,
-		reactor:          reactor,
-		binder:           binder,
-		internalBinder:   internalBinder,
-		internalPVCache:  internalPVCache,
-		internalPVCCache: internalPVCCache,
+		client:               client,
+		reactor:              reactor,
+		binder:               binder,
+		internalBinder:       internalBinder,
+		internalNodeInformer: nodeInformer,
+		internalPVCache:      internalPVCache,
+		internalPVCCache:     internalPVCCache,
+	}
+}
+
+func (env *testEnv) initNodes(cachedNodes []*v1.Node) {
+	nodeInformer := env.internalNodeInformer.Informer()
+	for _, node := range cachedNodes {
+		nodeInformer.GetIndexer().Add(node)
 	}
 }
 
@@ -538,6 +554,15 @@ func pvRemoveClaimUID(pv *v1.PersistentVolume) *v1.PersistentVolume {
 	newPV := pv.DeepCopy()
 	newPV.Spec.ClaimRef.UID = ""
 	return newPV
+}
+
+func makeNode(name string, labels map[string]string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+	}
 }
 
 func makePod(pvcs []*v1.PersistentVolumeClaim) *v1.Pod {
@@ -1210,6 +1235,7 @@ func TestCheckBindings(t *testing.T) {
 		"provisioning-pvc-bound": {
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
+			cachedPVs:       []*v1.PersistentVolume{pvBound},
 			cachedPVCs:      []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVCBound)},
 			expectedBound:   true,
 		},
@@ -1255,6 +1281,7 @@ func TestCheckBindings(t *testing.T) {
 		// Setup
 		pod := makePod(nil)
 		testEnv := newTestBinder(t)
+		testEnv.initNodes([]*v1.Node{node1})
 		testEnv.initVolumes(scenario.cachedPVs, nil)
 		testEnv.initClaims(scenario.cachedPVCs, nil)
 
@@ -1278,14 +1305,16 @@ func TestBindPodVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		// Inputs
 		// These tests only support a single pv and pvc and static binding
-		bindingsNil bool // Pass in nil bindings slice
-		binding     *bindingInfo
-		cachedPV    *v1.PersistentVolume
-		cachedPVC   *v1.PersistentVolumeClaim
-		apiPV       *v1.PersistentVolume
+		bindingsNil     bool // Pass in nil bindings slice
+		binding         *bindingInfo
+		cachedPVs       []*v1.PersistentVolume
+		cachedPVCs      []*v1.PersistentVolumeClaim
+		provisionedPVCs []*v1.PersistentVolumeClaim
+		apiPVs          []*v1.PersistentVolume
+		nodes           []*v1.Node
 
 		// This function runs with a delay of 5 seconds
-		delayFunc func(*testing.T, *testEnv, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim)
+		delayFunc func(*testing.T, *testEnv, *v1.Pod, *bindingInfo, []*v1.PersistentVolumeClaim)
 
 		// Expected return values
 		shouldFail bool
@@ -1296,19 +1325,19 @@ func TestBindPodVolumes(t *testing.T) {
 		},
 		"nothing-to-bind-empty": {},
 		"already-bound": {
-			binding:   binding1aBound,
-			cachedPV:  pvNode1aBound,
-			cachedPVC: boundPVCNode1a,
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs: []*v1.PersistentVolumeClaim{boundPVCNode1a},
 		},
 		"binding-succeeds-after-time": {
-			binding:   binding1aBound,
-			cachedPV:  pvNode1a,
-			cachedPVC: unboundPVC,
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
 				// Update PVC to be fully bound to PV
-				newPVC := pvc.DeepCopy()
+				newPVC := binding.pvc.DeepCopy()
 				newPVC.ResourceVersion = "100"
-				newPVC.Spec.VolumeName = pv.Name
+				newPVC.Spec.VolumeName = binding.pv.Name
 				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
 
 				// Update pvc cache, fake client doesn't invoke informers
@@ -1326,10 +1355,10 @@ func TestBindPodVolumes(t *testing.T) {
 			},
 		},
 		"pod-deleted-after-time": {
-			binding:   binding1aBound,
-			cachedPV:  pvNode1a,
-			cachedPVC: unboundPVC,
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
 				bindingsCache := testEnv.binder.GetBindingsCache()
 				if bindingsCache == nil {
 					t.Fatalf("Failed to get bindings cache")
@@ -1348,22 +1377,22 @@ func TestBindPodVolumes(t *testing.T) {
 		},
 		"binding-times-out": {
 			binding:    binding1aBound,
-			cachedPV:   pvNode1a,
-			cachedPVC:  unboundPVC,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
 			shouldFail: true,
 		},
 		"binding-fails": {
 			binding:    binding1bBound,
-			cachedPV:   pvNode1b,
-			apiPV:      pvNode1bBoundHigherVersion,
-			cachedPVC:  unboundPVC2,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1b},
+			apiPVs:     []*v1.PersistentVolume{pvNode1bBoundHigherVersion},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC2},
 			shouldFail: true,
 		},
 		"check-fails": {
-			binding:   binding1aBound,
-			cachedPV:  pvNode1a,
-			cachedPVC: unboundPVC,
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
 				// Delete PVC
 				// Update pvc cache, fake client doesn't invoke informers
 				internalBinder, ok := testEnv.binder.(*volumeBinder)
@@ -1376,7 +1405,41 @@ func TestBindPodVolumes(t *testing.T) {
 				if !ok {
 					t.Fatalf("Failed to convert to internal PVC cache")
 				}
-				internalPVCCache.delete(pvc)
+				internalPVCCache.delete(binding.pvc)
+			},
+			shouldFail: true,
+		},
+		"node-affinity-fails": {
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs: []*v1.PersistentVolumeClaim{boundPVCNode1a},
+			nodes:      []*v1.Node{node1NoLabels},
+			shouldFail: true,
+		},
+		"node-affinity-fails-dynamic-provisioning": {
+			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode2},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{selectedNodePVC},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{selectedNodePVC},
+			nodes:           []*v1.Node{node1, node2},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
+				// Update PVC to be fully bound to a PV with a different node
+				newPVC := pvcs[0].DeepCopy()
+				newPVC.ResourceVersion = "100"
+				newPVC.Spec.VolumeName = pvNode2.Name
+				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
+
+				// Update PVC cache, fake client doesn't invoke informers
+				internalBinder, ok := testEnv.binder.(*volumeBinder)
+				if !ok {
+					t.Fatalf("Failed to convert to internal binder")
+				}
+
+				pvcCache := internalBinder.pvcCache
+				internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
+				if !ok {
+					t.Fatalf("Failed to convert to internal PVC cache")
+				}
+				internalPVCCache.add(newPVC)
 			},
 			shouldFail: true,
 		},
@@ -1387,25 +1450,32 @@ func TestBindPodVolumes(t *testing.T) {
 
 		// Setup
 		pod := makePod(nil)
-		if scenario.apiPV == nil {
-			scenario.apiPV = scenario.cachedPV
+		if scenario.apiPVs == nil {
+			scenario.apiPVs = scenario.cachedPVs
+		}
+		if scenario.nodes == nil {
+			scenario.nodes = []*v1.Node{node1}
+		}
+		if scenario.provisionedPVCs == nil {
+			scenario.provisionedPVCs = []*v1.PersistentVolumeClaim{}
 		}
 		testEnv := newTestBinder(t)
 		if !scenario.bindingsNil {
+			bindings := []*bindingInfo{}
 			if scenario.binding != nil {
-				testEnv.initVolumes([]*v1.PersistentVolume{scenario.cachedPV}, []*v1.PersistentVolume{scenario.apiPV})
-				testEnv.initClaims([]*v1.PersistentVolumeClaim{scenario.cachedPVC}, nil)
-				testEnv.assumeVolumes(t, name, "node1", pod, []*bindingInfo{scenario.binding}, []*v1.PersistentVolumeClaim{})
-			} else {
-				testEnv.assumeVolumes(t, name, "node1", pod, []*bindingInfo{}, []*v1.PersistentVolumeClaim{})
+				bindings = []*bindingInfo{scenario.binding}
 			}
+			testEnv.initNodes(scenario.nodes)
+			testEnv.initVolumes(scenario.cachedPVs, scenario.apiPVs)
+			testEnv.initClaims(scenario.cachedPVCs, nil)
+			testEnv.assumeVolumes(t, name, "node1", pod, bindings, scenario.provisionedPVCs)
 		}
 
 		if scenario.delayFunc != nil {
 			go func() {
 				time.Sleep(5 * time.Second)
 				klog.V(5).Infof("Running delay function")
-				scenario.delayFunc(t, testEnv, pod, scenario.binding.pv, scenario.binding.pvc)
+				scenario.delayFunc(t, testEnv, pod, scenario.binding, scenario.provisionedPVCs)
 			}()
 		}
 

@@ -1,6 +1,7 @@
 ---
 name: Enhancement Request
 about: Suggest an enhancement to the Kubernetes project
+labels: kind/feature
 
 ---
 <!-- Please only use this template for submitting enhancement requests -->
@@ -8,6 +9,3 @@ about: Suggest an enhancement to the Kubernetes project
 **What would you like to be added**:
 
 **Why is this needed**:
-
-<!-- DO NOT EDIT BELOW THIS LINE -->
-/kind feature

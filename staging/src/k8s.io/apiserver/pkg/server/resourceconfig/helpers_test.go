@@ -117,11 +117,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.EnableVersions(scheme.PrioritizedVersionsAllGroups()...)
-				config.EnableResources(
-					extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
-					extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
-					extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
-				)
 				return config
 			},
 			err: false,
@@ -138,7 +133,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
-				config.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
 				return config
 			},
 			err: false,
@@ -197,11 +191,9 @@ func TestParseRuntimeConfig(t *testing.T) {
 				return newFakeAPIResourceConfigSource()
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
-				config := newFakeAPIResourceConfigSource()
-				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
-				return config
+				return newFakeAPIResourceConfigSource()
 			},
-			err: true,
+			err: false, // no error for backwards compatibility
 		},
 	}
 	for index, test := range testCases {

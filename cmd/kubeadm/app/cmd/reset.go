@@ -225,7 +225,7 @@ func getEtcdDataDir(manifestPath string, client clientset.Interface) (string, er
 		}
 	}
 	if dataDir == "" {
-		return dataDir, fmt.Errorf("invalid etcd pod manifest")
+		return dataDir, errors.New("invalid etcd pod manifest")
 	}
 	return dataDir, nil
 }

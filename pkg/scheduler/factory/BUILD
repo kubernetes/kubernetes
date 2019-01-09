@@ -5,8 +5,6 @@ go_library(
     srcs = [
         "factory.go",
         "plugins.go",
-        "signal.go",
-        "signal_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/factory",
     visibility = ["//visibility:public"],

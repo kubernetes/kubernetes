@@ -98,26 +98,59 @@ func TestDisabledResource(t *testing.T) {
 		t.Errorf("expected enabled for %v, from %v", g2v1rEnabled, config)
 	}
 
-	// Enable all enables specific resources
+	// DisableAll() only disables to the group/version level for compatibility
+	// corresponds to --runtime-config=api/all=false
+	config.DisableAll()
+	if config.ResourceEnabled(g1v1rEnabled) {
+		t.Errorf("expected disabled for %v, from %v", g1v1rEnabled, config)
+	}
+	if config.ResourceEnabled(g1v2rEnabled) {
+		t.Errorf("expected disabled for %v, from %v", g1v2rEnabled, config)
+	}
+	if config.ResourceEnabled(g2v1rEnabled) {
+		t.Errorf("expected disabled for %v, from %v", g2v1rEnabled, config)
+	}
+
+	// DisableAll() only disables to the group/version level for compatibility
+	// corresponds to --runtime-config=api/all=false,g1/v1=true
+	config.DisableAll()
+	config.EnableVersions(g1v1)
+	if !config.ResourceEnabled(g1v1rEnabled) {
+		t.Errorf("expected enabled for %v, from %v", g1v1rEnabled, config)
+	}
+
+	// EnableAll() only enables to the group/version level for compatibility
 	config.EnableAll()
 
-	// all resources under g1v1 are now enabled
+	// all unspecified or enabled resources under all groups now enabled
 	if !config.ResourceEnabled(g1v1rUnspecified) {
 		t.Errorf("expected enabled for %v, from %v", g1v1rUnspecified, config)
 	}
 	if !config.ResourceEnabled(g1v1rEnabled) {
 		t.Errorf("expected enabled for %v, from %v", g1v1rEnabled, config)
 	}
-	if !config.ResourceEnabled(g1v1rDisabled) {
-		t.Errorf("expected enabled for %v, from %v", g1v1rDisabled, config)
+	if !config.ResourceEnabled(g1v2rUnspecified) {
+		t.Errorf("expected enabled for %v, from %v", g1v2rUnspecified, config)
+	}
+	if !config.ResourceEnabled(g1v2rEnabled) {
+		t.Errorf("expected enabled for %v, from %v", g1v2rEnabled, config)
+	}
+	if !config.ResourceEnabled(g2v1rUnspecified) {
+		t.Errorf("expected enabled for %v, from %v", g2v1rUnspecified, config)
+	}
+	if !config.ResourceEnabled(g2v1rEnabled) {
+		t.Errorf("expected enabled for %v, from %v", g2v1rEnabled, config)
 	}
 
-	// previously disabled resources are now enabled
-	if !config.ResourceEnabled(g1v2rDisabled) {
-		t.Errorf("expected enabled for %v, from %v", g1v2rDisabled, config)
+	// previously disabled resources are still disabled
+	if config.ResourceEnabled(g1v1rDisabled) {
+		t.Errorf("expected disabled for %v, from %v", g1v1rDisabled, config)
 	}
-	if !config.ResourceEnabled(g2v1rDisabled) {
-		t.Errorf("expected enabled for %v, from %v", g2v1rDisabled, config)
+	if config.ResourceEnabled(g1v2rDisabled) {
+		t.Errorf("expected disabled for %v, from %v", g1v2rDisabled, config)
+	}
+	if config.ResourceEnabled(g2v1rDisabled) {
+		t.Errorf("expected disabled for %v, from %v", g2v1rDisabled, config)
 	}
 }
 
