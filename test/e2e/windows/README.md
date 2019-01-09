@@ -1,14 +1,17 @@
 # Notes to run sig-windows tests
 
 1. Prereqs:
-    * KUBECONFIG=path/to/kubeconfig
-    * curl https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/repo-list.txt -o repo_list.yaml
-    * export KUBE_TEST_REPO_LIST=$(pwd)/repo_list.yaml
+
+```bash
+KUBECONFIG=path/to/kubeconfig
+curl https://raw.githubusercontent.com/e2e-win/e2e-win-prow-deployment/master/repo-list -o repo_list
+export KUBE_TEST_REPO_LIST=$(pwd)/repo_list
+```
 
 1. Run only sig-windows tests:
 
     ```bash
-    ./e2e.test --provider=local --ginkgo.noColor --ginkgo.focus=.*sig-windows*
+    ./e2e.test --provider=local --ginkgo.noColor --ginkgo.focus="\[sig-windows\]" --node-os-distro="windows"
     ```
 
 
