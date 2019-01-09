@@ -36,8 +36,10 @@ go get -u github.com/jstemmer/go-junit-report
 
 # Enable the Go race detector.
 export KUBE_RACE=-race
-# Produce a JUnit-style XML test report for Jenkins.
-export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/_artifacts
+# Set artifacts directory
+export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
+# Produce a JUnit-style XML test report
+export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 
