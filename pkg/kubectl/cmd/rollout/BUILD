@@ -64,7 +64,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["rollout_pause_test.go"],
+    srcs = [
+        "rollout_pause_test.go",
+        "rollout_resume_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/cmd/testing:go_default_library",
