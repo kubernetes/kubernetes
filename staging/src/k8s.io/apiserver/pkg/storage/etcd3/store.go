@@ -162,6 +162,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
 	if err != nil {
+		klog.Errorf(">>>> failed in etcd Create: %v", err)
 		return err
 	}
 	if !txnResp.Succeeded {
@@ -196,6 +197,7 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 		clientv3.OpDelete(key),
 	).Commit()
 	if err != nil {
+		klog.Errorf(">>>> failed in etcd unconditionalDelete: %v", err)
 		return err
 	}
 	getResp := txnResp.Responses[0].GetResponseRange()
@@ -232,6 +234,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 			clientv3.OpGet(key),
 		).Commit()
 		if err != nil {
+			klog.Errorf(">>>> failed in conditionalDelete: %v", err)
 			return err
 		}
 		if !txnResp.Succeeded {
@@ -347,6 +350,7 @@ func (s *store) GuaranteedUpdate(
 			clientv3.OpGet(key),
 		).Commit()
 		if err != nil {
+			klog.Errorf(">>>> failed in etcd GuaranteedUpdate: %v", err)
 			return err
 		}
 		trace.Step("Transaction committed")
