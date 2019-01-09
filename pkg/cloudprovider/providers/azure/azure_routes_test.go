@@ -22,7 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
@@ -39,7 +40,7 @@ func TestDeleteRoute(t *testing.T) {
 			RouteTableName: "bar",
 			Location:       "location",
 		},
-		unmanagedNodes:     sets.NewString(),
+		nodeCaches:         make(map[string]*v1.Node),
 		nodeInformerSynced: func() bool { return true },
 	}
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
@@ -71,7 +72,14 @@ func TestDeleteRoute(t *testing.T) {
 	// test delete route for unmanaged nodes.
 	nodeName := "node1"
 	nodeCIDR := "4.3.2.1/24"
-	cloud.unmanagedNodes.Insert(nodeName)
+	cloud.nodeCaches[nodeName] = &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			Labels: map[string]string{
+				managedByAzureLabel: "false",
+			},
+		},
+	}
 	cloud.routeCIDRs = map[string]string{
 		nodeName: nodeCIDR,
 	}
@@ -104,7 +112,7 @@ func TestCreateRoute(t *testing.T) {
 			RouteTableName: "bar",
 			Location:       "location",
 		},
-		unmanagedNodes:     sets.NewString(),
+		nodeCaches:         make(map[string]*v1.Node),
 		nodeInformerSynced: func() bool { return true },
 	}
 	cache, _ := cloud.newRouteTableCache()
@@ -153,7 +161,14 @@ func TestCreateRoute(t *testing.T) {
 	// test create route for unmanaged nodes.
 	nodeName := "node1"
 	nodeCIDR := "4.3.2.1/24"
-	cloud.unmanagedNodes.Insert(nodeName)
+	cloud.nodeCaches[nodeName] = &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+			Labels: map[string]string{
+				managedByAzureLabel: "false",
+			},
+		},
+	}
 	cloud.routeCIDRs = map[string]string{}
 	route1 := cloudprovider.Route{
 		TargetNode:      mapRouteNameToNodeName(nodeName),

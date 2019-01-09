@@ -220,11 +220,13 @@ func (az *Cloud) reconcileOutboundRules(clusterName string, outboundEnabled bool
 
 	outboundService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:  outboundRuleName,
-			Name: outboundRuleName,
+			UID:       outboundRuleName,
+			Name:      outboundRuleName,
+			Namespace: "kube-system",
 		},
 	}
 
+	klog.V(2).Infof("Reconciling outbound rules for standard load balancer with %d nodes", len(nodes))
 	lb, err := az.reconcileLoadBalancer(clusterName, outboundService, nodes, outboundEnabled, true)
 	if err != nil {
 		return err

@@ -24,6 +24,8 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -90,7 +92,16 @@ func TestIsNodeUnmanaged(t *testing.T) {
 
 	az := getTestCloud()
 	for _, test := range tests {
-		az.unmanagedNodes = test.unmanagedNodes
+		for _, nodeName := range test.unmanagedNodes.List() {
+			az.nodeCaches[nodeName] = &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+					Labels: map[string]string{
+						managedByAzureLabel: "false",
+					},
+				},
+			}
+		}
 		if test.expectErr {
 			az.nodeInformerSynced = func() bool {
 				return false
