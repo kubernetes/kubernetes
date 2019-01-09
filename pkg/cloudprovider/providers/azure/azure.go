@@ -73,6 +73,8 @@ const (
 var (
 	// Master nodes are not added to standard load balancer by default.
 	defaultExcludeMasterFromStandardLB = true
+	// The outbound rules would be created for standard load balancer by default.
+	defaultEnableOutboundConnection = true
 )
 
 // Config holds the configuration parsed from the --cloud-config flag
@@ -145,6 +147,25 @@ type Config struct {
 	// ExcludeMasterFromStandardLB excludes master nodes from standard load balancer.
 	// If not set, it will be default to true.
 	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB" yaml:"excludeMasterFromStandardLB"`
+	// EnableOutboundConnection indicates that a default outbound rule would be provisioned.
+	// The outbound rule is required because of 'secure by default' feature of standard load balancer.
+	// Refer https://docs.microsoft.com/en-us/azure/load-balancer/load-balancer-standard-overview.
+	// Used together with standard load balancer (default: true).
+	EnableOutboundConnection *bool `json:"enableOutboundConnection" yaml:"enableOutboundConnection"`
+	// AllocatedOutboundPorts is number of outbound ports to be used for outbound NAT.
+	// Used together with EnableOutboundConnection.
+	AllocatedOutboundPorts *int `json:"allocatedOutboundPorts" yaml:"allocatedOutboundPorts"`
+	// TODO(feiskyer): the following two options will be enabled after Azure SDK upgrades.
+	// IdleTimeoutInMinutes is the idle timeout for outbound NAT.
+	// Used together with EnableOutboundConnection.
+	IdleTimeoutInMinutes *int `json:"idleTimeoutInMinutes" yaml:"idleTimeoutInMinutes"`
+	// EnableTcpReset indicates wether reset tcp on idle timeout.
+	// The default behavior of Load Balancer is to drop the flow silently when the outbound
+	// idle timeout has been reached. With the enableTCPReset parameter, you can enable a more
+	// predictable application behavior and control whether to send bidirectional TCP Reset
+	// (TCP RST) at the time out of outbound idle timeout.
+	// Used together with EnableOutboundConnection.
+	EnableTCPReset *bool `json:"enableTcpReset" yaml:"enableTcpReset"`
 
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
@@ -178,13 +199,8 @@ type Cloud struct {
 
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
 	nodeCachesLock sync.Mutex
-	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
-	// it is updated by the nodeInformer
-	nodeZones map[string]sets.String
-	// nodeResourceGroups holds nodes external resource groups
-	nodeResourceGroups map[string]string
-	// unmanagedNodes holds a list of nodes not managed by Azure cloud provider.
-	unmanagedNodes sets.String
+	// nodeCaches holds the list of all Nodes in the cluster.
+	nodeCaches map[string]*v1.Node
 	// nodeInformerSynced is for determining if the informer has synced.
 	nodeInformerSynced cache.InformerSynced
 
@@ -325,6 +341,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
 	}
 
+	// Enable outbound connection for standard LB by default.
+	if config.EnableOutboundConnection == nil && config.LoadBalancerSku == loadBalancerSkuStandard {
+		config.EnableOutboundConnection = &defaultEnableOutboundConnection
+	}
+
 	azClientConfig := &azClientConfig{
 		subscriptionID:                 config.SubscriptionID,
 		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
@@ -338,9 +359,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az := Cloud{
 		Config:                 *config,
 		Environment:            *env,
-		nodeZones:              map[string]sets.String{},
-		nodeResourceGroups:     map[string]string{},
-		unmanagedNodes:         sets.NewString(),
+		nodeCaches:             map[string]*v1.Node{},
 		routeCIDRs:             map[string]string{},
 		resourceRequestBackoff: resourceRequestBackoff,
 
@@ -555,49 +574,15 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 	defer az.nodeCachesLock.Unlock()
 
 	if prevNode != nil {
-		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
-		if ok && az.isAvailabilityZone(prevZone) {
-			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
-			if az.nodeZones[prevZone].Len() == 0 {
-				az.nodeZones[prevZone] = nil
-			}
-		}
-
-		// Remove from nodeResourceGroups cache.
-		_, ok = prevNode.ObjectMeta.Labels[externalResourceGroupLabel]
-		if ok {
-			delete(az.nodeResourceGroups, prevNode.ObjectMeta.Name)
-		}
-
-		// Remove from unmanagedNodes cache.
-		managed, ok := prevNode.ObjectMeta.Labels[managedByAzureLabel]
-		if ok && managed == "false" {
-			az.unmanagedNodes.Delete(prevNode.ObjectMeta.Name)
+		// Remove from nodes cache.
+		if _, ok := az.nodeCaches[prevNode.ObjectMeta.Name]; ok {
+			delete(az.nodeCaches, prevNode.ObjectMeta.Name)
 		}
 	}
 
 	if newNode != nil {
-		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
-		if ok && az.isAvailabilityZone(newZone) {
-			if az.nodeZones[newZone] == nil {
-				az.nodeZones[newZone] = sets.NewString()
-			}
-			az.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
-		}
-
-		// Add to nodeResourceGroups cache.
-		newRG, ok := newNode.ObjectMeta.Labels[externalResourceGroupLabel]
-		if ok && len(newRG) > 0 {
-			az.nodeResourceGroups[newNode.ObjectMeta.Name] = newRG
-		}
-
-		// Add to unmanagedNodes cache.
-		managed, ok := newNode.ObjectMeta.Labels[managedByAzureLabel]
-		if ok && managed == "false" {
-			az.unmanagedNodes.Insert(newNode.ObjectMeta.Name)
-		}
+		// Add to nodes cache.
+		az.nodeCaches[newNode.Name] = newNode
 	}
 }
 
@@ -614,11 +599,13 @@ func (az *Cloud) GetActiveZones() (sets.String, error) {
 	}
 
 	zones := sets.NewString()
-	for zone, nodes := range az.nodeZones {
-		if len(nodes) > 0 {
-			zones.Insert(zone)
+	for _, node := range az.nodeCaches {
+		azZone, ok := node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if ok && az.isAvailabilityZone(azZone) {
+			zones.Insert(azZone)
 		}
 	}
+
 	return zones, nil
 }
 
@@ -641,8 +628,11 @@ func (az *Cloud) GetNodeResourceGroup(nodeName string) (string, error) {
 	}
 
 	// Return external resource group if it has been cached.
-	if cachedRG, ok := az.nodeResourceGroups[nodeName]; ok {
-		return cachedRG, nil
+	if cachedNode, ok := az.nodeCaches[nodeName]; ok {
+		newRG, ok := cachedNode.ObjectMeta.Labels[externalResourceGroupLabel]
+		if ok {
+			return newRG, nil
+		}
 	}
 
 	// Return resource group from cloud provider options.
@@ -663,8 +653,10 @@ func (az *Cloud) GetResourceGroups() (sets.String, error) {
 	}
 
 	resourceGroups := sets.NewString(az.ResourceGroup)
-	for _, rg := range az.nodeResourceGroups {
-		resourceGroups.Insert(rg)
+	for _, node := range az.nodeCaches {
+		if rg, ok := node.ObjectMeta.Labels[externalResourceGroupLabel]; ok {
+			resourceGroups.Insert(rg)
+		}
 	}
 
 	return resourceGroups, nil
@@ -683,7 +675,36 @@ func (az *Cloud) GetUnmanagedNodes() (sets.String, error) {
 		return nil, fmt.Errorf("node informer is not synced when trying to GetUnmanagedNodes")
 	}
 
-	return sets.NewString(az.unmanagedNodes.List()...), nil
+	unmanagedNodes := sets.NewString()
+	for _, node := range az.nodeCaches {
+		managed, ok := node.ObjectMeta.Labels[managedByAzureLabel]
+		if ok && managed == "false" {
+			unmanagedNodes.Insert(node.ObjectMeta.Name)
+		}
+	}
+
+	return sets.NewString(unmanagedNodes.List()...), nil
+}
+
+// GetCachedNodes returns a list of cached Nodes.
+func (az *Cloud) GetCachedNodes() ([]*v1.Node, error) {
+	// Kubelet won't set az.nodeInformerSynced, always return nil.
+	if az.nodeInformerSynced == nil {
+		return nil, nil
+	}
+
+	az.nodeCachesLock.Lock()
+	defer az.nodeCachesLock.Unlock()
+	if !az.nodeInformerSynced() {
+		return nil, fmt.Errorf("node informer is not synced when trying to get nodes")
+	}
+
+	nodes := []*v1.Node{}
+	for i := range az.nodeCaches {
+		nodes = append(nodes, az.nodeCaches[i])
+	}
+
+	return nodes, nil
 }
 
 // ShouldNodeExcludedFromLoadBalancer returns true if node is unmanaged or in external resource group.
