@@ -29,10 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
@@ -50,27 +48,8 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		Use:   "plan [version] [flags]",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
 		Run: func(_ *cobra.Command, args []string) {
-			var userVersion string
-			var err error
-			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
+			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, false)
 			kubeadmutil.CheckErr(err)
-			// Ensure the user is root
-			err = runPreflightChecks(flags.ignorePreflightErrorsSet)
-			kubeadmutil.CheckErr(err)
-
-			// If the version is specified in config file, pick up that value.
-			if flags.cfgPath != "" {
-				cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
-				kubeadmutil.CheckErr(err)
-
-				if cfg.KubernetesVersion != "" {
-					userVersion = cfg.KubernetesVersion
-				}
-			}
-			// If option was specified in both args and config file, args will overwrite the config file.
-			if len(args) == 1 {
-				userVersion = args[0]
-			}
 
 			err = runPlan(flags, userVersion)
 			kubeadmutil.CheckErr(err)
