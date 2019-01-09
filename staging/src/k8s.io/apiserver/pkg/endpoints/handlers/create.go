@@ -140,9 +140,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			if err != nil {
 				klog.Errorf("FieldManager: Failed to create new object: %v", err)
 			} else {
-				if tmpObj, err := scope.FieldManager.Update(liveObj, obj, "create"); err == nil {
-					obj = tmpObj
-				} else {
+				if obj, err = scope.FieldManager.Update(liveObj, obj, "create"); err != nil {
 					scope.err(fmt.Errorf("failed to update object managed fields: %v", err), w, req)
 					return
 				}
