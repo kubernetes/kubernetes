@@ -93,12 +93,6 @@ checkEtcdOnPath
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
 
-# If a test case is specified, just run once with v1 API version and exit
-if [[ -n "${KUBE_TEST_ARGS}" ]]; then
-  runTests v1
-  exit 0
-fi
-
 # Convert the CSV to an array of API versions to test
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
