@@ -175,9 +175,9 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring at least two jobs and at least one finished job exists by listing jobs explicitly")
 		err = waitForJobsAtLeast(f.ClientSet, f.Namespace.Name, 2)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure at least two job exists in namespace %s", f.Namespace.Name)
 		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure at least on finished job exists in namespace %s", f.Namespace.Name)
 
 		By("Ensuring no unexpected event has happened")
 		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
@@ -198,11 +198,11 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure a %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure exactly one %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Deleting the job")
@@ -216,15 +216,15 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Ensuring the job is not in the cronjob active list")
 		err = waitForJobNotActive(f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure the %s cronjob is not in active list in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		By("Ensuring MissingJob event has occurred")
 		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure missing job event has occurred for %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to remove %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// cleanup of successful finished jobs, with limit of one successful job
@@ -234,37 +234,37 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			successCommand, &successLimit)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to create allowconcurrent cronjob with custom history limits in namespace %s", f.Namespace.Name)
 
 		// Job is going to complete instantly: do not check for an active job
 		// as we are most likely to miss it
 
 		By("Ensuring a finished job exists")
 		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure a finished cronjob exists in namespace %s", f.Namespace.Name)
 
 		By("Ensuring a finished job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
 		_, finishedJobs := filterActiveJobs(jobs)
 		Expect(len(finishedJobs) == 1).To(BeTrue())
 
 		// Job should get deleted when the next job finishes the next minute
 		By("Ensuring this job and its pods does not exist anymore")
 		err = waitForJobToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure that job does not exists anymore in namespace %s", f.Namespace.Name)
 		err = waitForJobsPodToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure that pods for job does not exists anymore in namespace %s", f.Namespace.Name)
 
 		By("Ensuring there is 1 finished job by listing jobs explicitly")
 		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to ensure there is one finished job by listing job explicitly in namespace %s", f.Namespace.Name)
 		_, finishedJobs = filterActiveJobs(jobs)
 		Expect(len(finishedJobs) == 1).To(BeTrue())
 
 		By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 })
 
