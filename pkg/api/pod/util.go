@@ -293,6 +293,12 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && !shareProcessNamespaceInUse(oldPodSpec) {
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.ShareProcessNamespace = nil
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) && !podPriorityInUse(oldPodSpec) {
 		// Set to nil pod's priority fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
@@ -454,6 +460,16 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
 			return true
 		}
+	}
+	return false
+}
+
+func shareProcessNamespaceInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.ShareProcessNamespace != nil {
+		return true
 	}
 	return false
 }
