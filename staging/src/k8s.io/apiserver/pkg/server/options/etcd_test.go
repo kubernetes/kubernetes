@@ -57,6 +57,30 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			expectErr: "--etcd-servers must be specified",
 		},
 		{
+			name: "test when ServerList is invalid",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Type:   "etcd3",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"127.0.0.1:4001"},
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
+					CompactionInterval:    storagebackend.DefaultCompactInterval,
+					CountMetricPollPeriod: time.Minute,
+				},
+				DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
+				DeleteCollectionWorkers: 1,
+				EnableGarbageCollection: true,
+				EnableWatchCache:        true,
+				DefaultWatchCacheSize:   100,
+				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
+			},
+			expectErr: "--etcd-servers is invalid, 127.0.0.1:4001 is not a valid url",
+		},
+		{
 			name: "test when storage-backend is invalid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{

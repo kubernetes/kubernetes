@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -83,6 +84,14 @@ func (s *EtcdOptions) Validate() []error {
 	allErrors := []error{}
 	if len(s.StorageConfig.Transport.ServerList) == 0 {
 		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
+	}
+
+	for _, server := range s.StorageConfig.Transport.ServerList {
+		_, err := url.Parse(server)
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers is invalid, %s is not a valid url", server))
+			break
+		}
 	}
 
 	if s.StorageConfig.Type != storagebackend.StorageTypeUnset && !storageTypes.Has(s.StorageConfig.Type) {
