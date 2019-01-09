@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/klog"
 )
 
 func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
@@ -138,12 +137,14 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		if scope.FieldManager != nil {
 			liveObj, err := scope.Creater.New(scope.Kind)
 			if err != nil {
-				klog.Errorf("FieldManager: Failed to create new object: %v", err)
-			} else {
-				if obj, err = scope.FieldManager.Update(liveObj, obj, "create"); err != nil {
-					scope.err(fmt.Errorf("failed to update object managed fields: %v", err), w, req)
-					return
-				}
+				scope.err(fmt.Errorf("failed to create new object: %v", err), w, req)
+				return
+			}
+
+			obj, err = scope.FieldManager.Update(liveObj, obj, "create")
+			if err != nil {
+				scope.err(fmt.Errorf("failed to update object managed fields: %v", err), w, req)
+				return
 			}
 		}
 
