@@ -2669,9 +2669,6 @@ const (
 
 func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates) && len(readinessGates) > 0 {
-		return append(allErrs, field.Forbidden(fldPath, "PodReadinessGates is disabled by feature gate"))
-	}
 	for i, value := range readinessGates {
 		for _, msg := range validation.IsQualifiedName(string(value.ConditionType)) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("conditionType"), string(value.ConditionType), msg))

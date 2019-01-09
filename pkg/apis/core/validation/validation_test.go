@@ -5739,8 +5739,6 @@ func TestValidatePodDNSConfig(t *testing.T) {
 }
 
 func TestValidatePodReadinessGates(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadinessGates, true)()
-
 	successCases := []struct {
 		desc           string
 		readinessGates []core.PodReadinessGate
