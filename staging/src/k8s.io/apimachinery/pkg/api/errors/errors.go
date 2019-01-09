@@ -186,14 +186,13 @@ func NewConflict(qualifiedResource schema.GroupResource, name string, err error)
 }
 
 // NewApplyConflict returns an error including details on the requests apply conflicts
-func NewApplyConflict(conflicts merge.Conflicts, err error) *StatusError {
+func NewApplyConflict(conflicts merge.Conflicts) *StatusError {
 	causes := make([]metav1.StatusCause, 0, len(conflicts))
-	for i := range conflicts {
-		err := conflicts[i]
+	for _, conflict := range conflicts {
 		causes = append(causes, metav1.StatusCause{
 			Type:    metav1.CauseType("conflict"),
-			Message: err.Error(),
-			Field:   err.Path.String(),
+			Message: conflict.Error(),
+			Field:   conflict.Path.String(),
 		})
 	}
 
@@ -205,7 +204,7 @@ func NewApplyConflict(conflicts merge.Conflicts, err error) *StatusError {
 			// TODO: Get obj details here?
 			Causes: causes,
 		},
-		Message: fmt.Sprintf("Apply failed with %d conflicts: %v", len(conflicts), err),
+		Message: fmt.Sprintf("Apply failed with %d conflicts: %s", len(conflicts), conflicts.Error()),
 	}}
 }
 

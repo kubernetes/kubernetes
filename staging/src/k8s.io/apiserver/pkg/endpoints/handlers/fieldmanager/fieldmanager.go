@@ -138,7 +138,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, applyManager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
-			return nil, errors.NewApplyConflict(conflicts, err)
+			return nil, errors.NewApplyConflict(conflicts)
 		}
 		return nil, err
 	}
