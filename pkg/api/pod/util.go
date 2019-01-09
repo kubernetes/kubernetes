@@ -310,6 +310,12 @@ func dropDisabledFields(
 		podSpec.ReadinessGates = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.Sysctls = nil
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) && !emptyDirSizeLimitInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
@@ -491,6 +497,16 @@ func podReadinessGatesInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	if podSpec.ReadinessGates != nil {
+		return true
+	}
+	return false
+}
+
+func sysctlsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.Sysctls != nil {
 		return true
 	}
 	return false

@@ -1327,3 +1327,103 @@ func TestDropRunAsGroup(t *testing.T) {
 		}
 	}
 }
+
+func TestDropPodSysctls(t *testing.T) {
+	podWithSysctls := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					Sysctls: []api.Sysctl{{Name: "test", Value: "value"}},
+				},
+			},
+		}
+	}
+	podWithoutSysctls := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{},
+			},
+		}
+	}
+	podWithoutSecurityContext := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasSysctls  bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "has Sysctls",
+			hasSysctls:  true,
+			pod:         podWithSysctls,
+		},
+		{
+			description: "does not have Sysctls",
+			hasSysctls:  false,
+			pod:         podWithoutSysctls,
+		},
+		{
+			description: "does not have SecurityContext",
+			hasSysctls:  false,
+			pod:         podWithoutSecurityContext,
+		},
+		{
+			description: "is nil",
+			hasSysctls:  false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSysctls, oldPod := oldPodInfo.hasSysctls, oldPodInfo.pod()
+				newPodHasSysctls, newPod := newPodInfo.hasSysctls, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Sysctls, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasSysctls:
+						// new pod should not be changed if the feature is enabled, or if the old pod had Sysctls set
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSysctls:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have Sysctls
+						if !reflect.DeepEqual(newPod, podWithoutSysctls()) {
+							t.Errorf("new pod had Sysctls: %v", diff.ObjectReflectDiff(newPod, podWithoutSysctls()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
