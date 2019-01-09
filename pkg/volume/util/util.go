@@ -251,8 +251,8 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 
 // SelectZoneForVolume is a wrapper around SelectZonesForVolume
 // to select a single zone for a volume based on parameters
-func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
-	zones, err := SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent, zoneParameter, zonesParameter, zonesWithNodes, node, allowedTopologies, pvcName, 1)
+func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcNamespace, pvcName string) (string, error) {
+	zones, err := SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent, zoneParameter, zonesParameter, zonesWithNodes, node, allowedTopologies, pvcNamespace, pvcName, 1)
 	if err != nil {
 		return "", err
 	}
@@ -266,7 +266,7 @@ func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneP
 // SelectZonesForVolume selects zones for a volume based on several factors:
 // node.zone, allowedTopologies, zone/zones parameters from storageclass,
 // zones with active nodes from the cluster. The number of zones = replicas.
-func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string, numReplicas uint32) (sets.String, error) {
+func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcNamespace, pvcName string, numReplicas uint32) (sets.String, error) {
 	if zoneParameterPresent && zonesParameterPresent {
 		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
@@ -308,7 +308,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 		}
 		// scheduler will guarantee if node != null above, zoneFromNode is member of allowedZones.
 		// so if zoneFromNode != "", we can safely assume it is part of allowedZones.
-		zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcName, zoneFromNode, numReplicas)
+		zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcNamespace, pvcName, zoneFromNode, numReplicas)
 		if err != nil {
 			return nil, fmt.Errorf("cannot process zones in allowedTopologies: %v", err)
 		}
@@ -328,13 +328,13 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 			return nil, fmt.Errorf("not enough zones found in zones parameter to provision a volume with %d replicas. Found %d zones, need %d zones", numReplicas, zonesParameter.Len(), numReplicas)
 		}
 		// directly choose from zones parameter; no zone from node need to be considered
-		return ChooseZonesForVolume(zonesParameter, pvcName, numReplicas), nil
+		return ChooseZonesForVolume(zonesParameter, pvcNamespace, pvcName, numReplicas), nil
 	}
 
 	// pick zone from zones with nodes
 	if zonesWithNodes.Len() > 0 {
 		// If node != null (and thus zoneFromNode != ""), zoneFromNode will be member of zonesWithNodes
-		zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcName, zoneFromNode, numReplicas)
+		zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcNamespace, pvcName, zoneFromNode, numReplicas)
 		if err != nil {
 			return nil, fmt.Errorf("cannot process zones where nodes exist in the cluster: %v", err)
 		}
@@ -514,7 +514,7 @@ func GetPath(mounter volume.Mounter) (string, error) {
 // However, if the PVCName ends with `-<integer>`, we will hash the prefix, and then add the integer to the hash.
 // This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
 // assuming the id values are consecutive.
-func ChooseZoneForVolume(zones sets.String, pvcName string) string {
+func ChooseZoneForVolume(zones sets.String, pvcNamespace, pvcName string) string {
 	// No zones available, return empty string.
 	if zones.Len() == 0 {
 		return ""
@@ -522,7 +522,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
-	hash, index := getPVCNameHashAndIndexOffset(pvcName)
+	hash, index := getPVCNameHashAndIndexOffset(pvcNamespace, pvcName)
 
 	// Zones.List returns zones in a consistent order (sorted)
 	// We do have a potential failure case where volumes will not be properly spread,
@@ -535,14 +535,14 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	zoneSlice := zones.List()
 	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
 
-	klog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	klog.V(2).Infof("Creating volume for PVC %s/%s; chose zone=%q from zones=%q", pvcNamespace, pvcName, zone, zoneSlice)
 	return zone
 }
 
 // chooseZonesForVolumeIncludingZone is a wrapper around ChooseZonesForVolume that ensures zoneToInclude is chosen
 // zoneToInclude can either be empty in which case it is ignored. If non-empty, zoneToInclude is expected to be member of zones.
 // numReplicas is expected to be > 0 and <= zones.Len()
-func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude string, numReplicas uint32) (sets.String, error) {
+func chooseZonesForVolumeIncludingZone(zones sets.String, pvcNamespace, pvcName, zoneToInclude string, numReplicas uint32) (sets.String, error) {
 	if numReplicas == 0 {
 		return nil, fmt.Errorf("invalid number of replicas passed")
 	}
@@ -559,7 +559,7 @@ func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude
 		zones.Delete(zoneToInclude)
 		numReplicas = numReplicas - 1
 	}
-	zonesChosen := ChooseZonesForVolume(zones, pvcName, numReplicas)
+	zonesChosen := ChooseZonesForVolume(zones, pvcNamespace, pvcName, numReplicas)
 	if zoneToInclude != "" {
 		zonesChosen.Insert(zoneToInclude)
 	}
@@ -567,7 +567,7 @@ func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude
 }
 
 // ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
-func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+func ChooseZonesForVolume(zones sets.String, pvcNamespace, pvcName string, numZones uint32) sets.String {
 	// No zones available, return empty set.
 	replicaZones := sets.NewString()
 	if zones.Len() == 0 {
@@ -576,7 +576,7 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
-	hash, index := getPVCNameHashAndIndexOffset(pvcName)
+	hash, index := getPVCNameHashAndIndexOffset(pvcNamespace, pvcName)
 
 	// Zones.List returns zones in a consistent order (sorted)
 	// We do have a potential failure case where volumes will not be properly spread,
@@ -594,19 +594,19 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 		replicaZones.Insert(zone)
 	}
 
-	klog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
-		pvcName, replicaZones.UnsortedList(), zoneSlice)
+	klog.V(2).Infof("Creating volume for replicated PVC %s/%s; chosen zones=%q from zones=%q",
+		pvcNamespace, pvcName, replicaZones.UnsortedList(), zoneSlice)
 	return replicaZones
 }
 
-func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
+func getPVCNameHashAndIndexOffset(pvcNamespace, pvcName string) (hash uint32, index uint32) {
 	if pvcName == "" {
 		// We should always be called with a name; this shouldn't happen
 		klog.Warningf("No name defined during volume create; choosing random zone")
 
 		hash = rand.Uint32()
 	} else {
-		hashString := pvcName
+		hashString := pvcNamespace + "/" + pvcName
 
 		// Heuristic to make sure that volumes in a StatefulSet are spread across zones
 		// StatefulSet PVCs are (currently) named ClaimName-StatefulSetName-Id,
@@ -625,7 +625,7 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 				// Offset by the statefulsetID, so we round-robin across zones
 				index = uint32(statefulsetID)
 				// We still hash the volume name, but only the prefix
-				hashString = pvcName[:lastDash]
+				cutPVCName := pvcName[:lastDash]
 
 				// In the special case where it looks like `ClaimName-StatefulSetName-Id`,
 				// hash only the StatefulSetName, so that different claims on the same StatefulSet
@@ -633,12 +633,13 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 				// Note that StatefulSetName (and ClaimName) might themselves both have dashes.
 				// We actually just take the portion after the final - of ClaimName-StatefulSetName.
 				// For our purposes it doesn't much matter (just suboptimal spreading).
-				lastDash := strings.LastIndexByte(hashString, '-')
+				lastDash := strings.LastIndexByte(cutPVCName, '-')
 				if lastDash != -1 {
-					hashString = hashString[lastDash+1:]
+					cutPVCName = cutPVCName[lastDash+1:]
 				}
+				hashString = pvcNamespace + "/" + cutPVCName
 
-				klog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
+				klog.V(2).Infof("Detected StatefulSet-style volume name %s/%s; index=%d", pvcNamespace, pvcName, index)
 			}
 		}
 

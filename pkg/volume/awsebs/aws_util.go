@@ -95,7 +95,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 		return "", 0, nil, "", fmt.Errorf("error querying for all zones: %v", err)
 	}
 
-	volumeOptions, err := populateVolumeOptions(c.plugin.GetPluginName(), c.options.PVC.Name, capacity, tags, c.options.Parameters, node, allowedTopologies, zonesWithNodes)
+	volumeOptions, err := populateVolumeOptions(c.plugin.GetPluginName(), c.options.PVC.Namespace, c.options.PVC.Name, capacity, tags, c.options.Parameters, node, allowedTopologies, zonesWithNodes)
 	if err != nil {
 		klog.V(2).Infof("Error populating EBS options: %v", err)
 		return "", 0, nil, "", err
@@ -128,7 +128,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 }
 
 // returns volumeOptions for EBS based on storageclass parameters and node configuration
-func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quantity, tags map[string]string, storageParams map[string]string, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, zonesWithNodes sets.String) (*aws.VolumeOptions, error) {
+func populateVolumeOptions(pluginName, pvcNamespace, pvcName string, capacityGB resource.Quantity, tags map[string]string, storageParams map[string]string, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, zonesWithNodes sets.String) (*aws.VolumeOptions, error) {
 	requestGiB, err := volumeutil.RoundUpToGiBInt(capacityGB)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 		}
 	}
 
-	volumeOptions.AvailabilityZone, err = volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, zone, zones, zonesWithNodes, node, allowedTopologies, pvcName)
+	volumeOptions.AvailabilityZone, err = volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, zone, zones, zonesWithNodes, node, allowedTopologies, pvcNamespace, pvcName)
 	if err != nil {
 		return nil, err
 	}
