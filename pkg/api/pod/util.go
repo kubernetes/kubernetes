@@ -285,6 +285,18 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) &&
+		!tokenRequestProjectionInUse(oldPodSpec) {
+		for i := range podSpec.Volumes {
+			if podSpec.Volumes[i].Projected != nil {
+				for j := range podSpec.Volumes[i].Projected.Sources {
+					podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken = nil
+				}
+			}
+
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
 			if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
@@ -470,6 +482,23 @@ func shareProcessNamespaceInUse(podSpec *api.PodSpec) bool {
 	}
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.ShareProcessNamespace != nil {
 		return true
+	}
+	return false
+}
+
+func tokenRequestProjectionInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Projected == nil {
+			continue
+		}
+		for _, s := range v.Projected.Sources {
+			if s.ServiceAccountToken != nil {
+				return true
+			}
+		}
 	}
 	return false
 }
