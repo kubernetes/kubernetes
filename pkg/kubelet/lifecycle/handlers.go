@@ -52,24 +52,32 @@ func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontain
 	}
 }
 
+func (hr *HandlerRunner) runExec(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, exec *v1.ExecAction) (string, error) {
+	var msg string
+	// TODO(tallclair): Pass a proper timeout value.
+	output, err := hr.commandRunner.RunInContainer(containerID, exec.Command, 0)
+	if err != nil {
+		msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", exec.Command, container.Name, format.Pod(pod), err, string(output))
+		klog.V(1).Infof(msg)
+	}
+	return msg, err
+}
+
+func (hr *HandlerRunner) runHTTPGet(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, httpGetAction *v1.HTTPGetAction) (string, error) {
+	msg, err := hr.runHTTPHandler(pod, container, httpGetAction)
+	if err != nil {
+		msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", httpGetAction.Path, container.Name, format.Pod(pod), err, msg)
+		klog.V(1).Infof(msg)
+	}
+	return msg, err
+}
+
 func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
 	switch {
 	case handler.Exec != nil:
-		var msg string
-		// TODO(tallclair): Pass a proper timeout value.
-		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
-		if err != nil {
-			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
-			klog.V(1).Infof(msg)
-		}
-		return msg, err
+		return hr.runExec(containerID, pod, container, handler.Exec)
 	case handler.HTTPGet != nil:
-		msg, err := hr.runHTTPHandler(pod, container, handler)
-		if err != nil {
-			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
-			klog.V(1).Infof(msg)
-		}
-		return msg, err
+		return hr.runHTTPGet(containerID, pod, container, handler.HTTPGet)
 	default:
 		err := fmt.Errorf("Invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
@@ -79,11 +87,20 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 }
 
 func (hr *HandlerRunner) RunPreStop(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.PreStopHandler) (string, error) {
-	if handler.Sleep != nil {
-			time.Sleep(time.Duration(int64(handler.Sleep.Seconds) * int64(time.Second)))
-			return "", nil
+	switch {
+	case handler.Exec != nil:
+		return hr.runExec(containerID, pod, container, handler.Exec)
+	case handler.HTTPGet != nil:
+		return hr.runHTTPGet(containerID, pod, container, handler.HTTPGet)
+	case handler.Sleep != nil:
+		time.Sleep(time.Duration(int64(handler.Sleep.Seconds) * int64(time.Second)))
+		return "", nil
+	default:
+		err := fmt.Errorf("Invalid pre stop handler: %v", handler)
+		msg := fmt.Sprintf("Cannot run pre stop handler: %v", err)
+		klog.Errorf(msg)
+		return msg, err
 	}
-	return hr.Run(containerID, pod, container, &handler.Handler)
 }
 
 // resolvePort attempts to turn an IntOrString port reference into a concrete port number.
@@ -109,8 +126,8 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
-	host := handler.HTTPGet.Host
+func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, get *v1.HTTPGetAction) (string, error) {
+	host := get.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
@@ -123,16 +140,16 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		host = status.IP
 	}
 	var port int
-	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
+	if get.Port.Type == intstr.String && len(get.Port.StrVal) == 0 {
 		port = 80
 	} else {
 		var err error
-		port, err = resolvePort(handler.HTTPGet.Port, container)
+		port, err = resolvePort(get.Port, container)
 		if err != nil {
 			return "", err
 		}
 	}
-	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
+	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), get.Path)
 	resp, err := hr.httpGetter.Get(url)
 	return getHttpRespBody(resp), err
 }

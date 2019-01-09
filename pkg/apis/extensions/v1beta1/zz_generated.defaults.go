@@ -133,8 +133,8 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -178,8 +178,8 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -286,8 +286,8 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -331,8 +331,8 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -461,8 +461,8 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -506,8 +506,8 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}

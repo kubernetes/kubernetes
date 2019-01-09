@@ -5852,9 +5852,9 @@ func Convert_core_PortworxVolumeSource_To_v1_PortworxVolumeSource(in *core.Portw
 }
 
 func autoConvert_v1_PreStopHandler_To_core_PreStopHandler(in *v1.PreStopHandler, out *core.PreStopHandler, s conversion.Scope) error {
-	if err := Convert_v1_Handler_To_core_Handler(&in.Handler, &out.Handler, s); err != nil {
-		return err
-	}
+	out.Exec = (*core.ExecAction)(unsafe.Pointer(in.Exec))
+	out.HTTPGet = (*core.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
+	out.TCPSocket = (*core.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
 	out.Sleep = (*core.SleepAction)(unsafe.Pointer(in.Sleep))
 	return nil
 }
@@ -5865,9 +5865,9 @@ func Convert_v1_PreStopHandler_To_core_PreStopHandler(in *v1.PreStopHandler, out
 }
 
 func autoConvert_core_PreStopHandler_To_v1_PreStopHandler(in *core.PreStopHandler, out *v1.PreStopHandler, s conversion.Scope) error {
-	if err := Convert_core_Handler_To_v1_Handler(&in.Handler, &out.Handler, s); err != nil {
-		return err
-	}
+	out.Exec = (*v1.ExecAction)(unsafe.Pointer(in.Exec))
+	out.HTTPGet = (*v1.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
+	out.TCPSocket = (*v1.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
 	out.Sleep = (*v1.SleepAction)(unsafe.Pointer(in.Sleep))
 	return nil
 }

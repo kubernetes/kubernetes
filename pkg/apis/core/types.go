@@ -2023,8 +2023,17 @@ type Handler struct {
 
 // PreStopHandler defines the action that can be taken before a Pod is shut down.
 type PreStopHandler struct {
-	// All handler operations are valid during pre-stop
-	Handler
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	// +optional
+	Exec *ExecAction
+	// HTTPGet specifies the http request to perform.
+	// +optional
+	HTTPGet *HTTPGetAction
+	// TCPSocket specifies an action involving a TCP port.
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction
 	// Sleep specifies a wait time that will be executed in the kubelet only.
 	// Using sleep is useful during pod shutdown to delay the SIGTERM and thus
 	// giving DNS and API clients time to drain the pod before the application

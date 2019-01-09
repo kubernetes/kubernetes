@@ -2214,14 +2214,24 @@ type Handler struct {
 
 // PreStopHandler defines the action that can be taken before a Pod is shut down.
 type PreStopHandler struct {
-	// All handler operations are valid during pre-stop
-	Handler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	// +optional
+	Exec *ExecAction `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
+	// HTTPGet specifies the http request to perform.
+	// +optional
+	HTTPGet *HTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
+	// TCPSocket specifies an action involving a TCP port.
+	// TCP hooks not yet supported
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 	// Sleep specifies a wait time that will be executed in the kubelet only.
 	// Using sleep is useful during pod shutdown to delay the SIGTERM and thus
 	// giving DNS and API clients time to drain the pod before the application
 	// enters its shutdown.
 	// +optional
-	Sleep *SleepAction `json:"sleep,omitempty" ,protobuf:"bytes,2,opt,name=sleep" protobuf:"bytes,2,opt,name=sleep"`
+	Sleep *SleepAction `json:"sleep,omitempty" protobuf:"bytes,4,opt,name=sleep"`
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle

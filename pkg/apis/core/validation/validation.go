@@ -2479,6 +2479,7 @@ func validateSleepAction(sleep *core.SleepAction, fldPath *field.Path) field.Err
 func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
+
 	if handler.Exec != nil {
 		if numHandlers > 0 {
 			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
@@ -2512,6 +2513,7 @@ func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList
 func validatePreStopHandler(handler *core.PreStopHandler, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
+
 	if handler.Exec != nil {
 		if numHandlers > 0 {
 			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
@@ -2544,9 +2546,11 @@ func validatePreStopHandler(handler *core.PreStopHandler, fldPath *field.Path) f
 			allErrors = append(allErrors, validateSleepAction(handler.Sleep, fldPath.Child("sleep"))...)
 		}
 	}
+
 	if numHandlers == 0 {
 		allErrors = append(allErrors, field.Required(fldPath, "must specify a handler type"))
 	}
+
 	return allErrors
 }
 

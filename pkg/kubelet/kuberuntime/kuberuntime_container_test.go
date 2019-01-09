@@ -241,21 +241,17 @@ func TestLifeCycleHook(t *testing.T) {
 
 	httpLifeCycle := &v1.Lifecycle{
 		PreStop: &v1.PreStopHandler{
-			Handler: v1.Handler{
-				HTTPGet: &v1.HTTPGetAction{
-					Host: "testHost.com",
-					Path: "/GracefulExit",
-				},
+			HTTPGet: &v1.HTTPGetAction{
+				Host: "testHost.com",
+				Path: "/GracefulExit",
 			},
 		},
 	}
 
 	cmdLifeCycle := &v1.Lifecycle{
 		PreStop: &v1.PreStopHandler{
-			Handler: v1.Handler{
-				Exec: &v1.ExecAction{
-					Command: []string{"PreStopCMD"},
-				},
+			Exec: &v1.ExecAction{
+				Command: []string{"PreStopCMD"},
 			},
 		},
 	}
@@ -274,7 +270,7 @@ func TestLifeCycleHook(t *testing.T) {
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
 		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
-		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Handler.Exec.Command[0] {
+		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
 		}
 	})
@@ -285,7 +281,7 @@ func TestLifeCycleHook(t *testing.T) {
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
 
-		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.Handler.HTTPGet.Host) {
+		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Prestop hook was not invoked")
 		}
 	})
@@ -299,7 +295,7 @@ func TestLifeCycleHook(t *testing.T) {
 
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriodLocal)
 
-		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.Handler.HTTPGet.Host) {
+		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Should not execute when gracePeriod is 0")
 		}
 	})

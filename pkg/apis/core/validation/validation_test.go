@@ -5132,9 +5132,7 @@ func TestValidateContainers(t *testing.T) {
 			Image: "image",
 			Lifecycle: &core.Lifecycle{
 				PreStop: &core.PreStopHandler{
-					Handler: core.Handler{
-						Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
-					},
+					Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -5315,9 +5313,7 @@ func TestValidateContainers(t *testing.T) {
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
 					PreStop: &core.PreStopHandler{
-						Handler: core.Handler{
-							Exec: &core.ExecAction{},
-						},
+						Exec: &core.ExecAction{},
 					},
 				},
 				ImagePullPolicy:          "IfNotPresent",
@@ -5330,9 +5326,7 @@ func TestValidateContainers(t *testing.T) {
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
 					PreStop: &core.PreStopHandler{
-						Handler: core.Handler{
-							HTTPGet: &core.HTTPGetAction{},
-						},
+						HTTPGet: &core.HTTPGetAction{},
 					},
 				},
 				ImagePullPolicy:          "IfNotPresent",
@@ -5345,9 +5339,7 @@ func TestValidateContainers(t *testing.T) {
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
 					PreStop: &core.PreStopHandler{
-						Handler: core.Handler{
-							TCPSocket: &core.TCPSocketAction{},
-						},
+						TCPSocket: &core.TCPSocketAction{},
 					},
 				},
 				ImagePullPolicy:          "IfNotPresent",
@@ -5360,10 +5352,8 @@ func TestValidateContainers(t *testing.T) {
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
 					PreStop: &core.PreStopHandler{
-						Handler: core.Handler{
-							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(0),
-							},
+						TCPSocket: &core.TCPSocketAction{
+							Port: intstr.FromInt(0),
 						},
 					},
 				},

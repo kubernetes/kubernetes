@@ -3315,15 +3315,27 @@ message PortworxVolumeSource {
 
 // PreStopHandler defines the action that can be taken before a Pod is shut down.
 message PreStopHandler {
-  // All handler operations are valid during pre-stop
-  optional Handler handler = 1;
+  // One and only one of the following should be specified.
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // TCPSocket specifies an action involving a TCP port.
+  // TCP hooks not yet supported
+  // TODO: implement a realistic TCP lifecycle hook
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
 
   // Sleep specifies a wait time that will be executed in the kubelet only.
   // Using sleep is useful during pod shutdown to delay the SIGTERM and thus
   // giving DNS and API clients time to drain the pod before the application
   // enters its shutdown.
   // +optional
-  optional SleepAction sleep = 2;
+  optional SleepAction sleep = 4;
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.

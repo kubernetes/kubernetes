@@ -108,10 +108,8 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		framework.ConformanceIt("should execute prestop exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.PreStopHandler{
-					Handler: v1.Handler{
-						Exec: &v1.ExecAction{
-							Command: []string{"sh", "-c", "curl http://" + targetIP + ":8080/echo?msg=prestop"},
-						},
+					Exec: &v1.ExecAction{
+						Command: []string{"sh", "-c", "curl http://" + targetIP + ":8080/echo?msg=prestop"},
 					},
 				},
 			}
@@ -144,12 +142,10 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		framework.ConformanceIt("should execute prestop http hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.PreStopHandler{
-					Handler: v1.Handler{
-						HTTPGet: &v1.HTTPGetAction{
-							Path: "/echo?msg=prestop",
-							Host: targetIP,
-							Port: intstr.FromInt(8080),
-						},
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/echo?msg=prestop",
+						Host: targetIP,
+						Port: intstr.FromInt(8080),
 					},
 				},
 			}

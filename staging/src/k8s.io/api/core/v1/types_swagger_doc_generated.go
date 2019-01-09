@@ -1618,8 +1618,11 @@ func (PortworxVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_PreStopHandler = map[string]string{
-	"":      "PreStopHandler defines the action that can be taken before a Pod is shut down.",
-	"sleep": "Sleep specifies a wait time that will be executed in the kubelet only. Using sleep is useful during pod shutdown to delay the SIGTERM and thus giving DNS and API clients time to drain the pod before the application enters its shutdown.",
+	"":          "PreStopHandler defines the action that can be taken before a Pod is shut down.",
+	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
+	"httpGet":   "HTTPGet specifies the http request to perform.",
+	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+	"sleep":     "Sleep specifies a wait time that will be executed in the kubelet only. Using sleep is useful during pod shutdown to delay the SIGTERM and thus giving DNS and API clients time to drain the pod before the application enters its shutdown.",
 }
 
 func (PreStopHandler) SwaggerDoc() map[string]string {

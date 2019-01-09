@@ -126,8 +126,8 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -171,8 +171,8 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -278,8 +278,8 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
@@ -323,8 +323,8 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
