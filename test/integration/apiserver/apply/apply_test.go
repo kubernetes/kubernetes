@@ -182,9 +182,15 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Resource("deployments").
 		Name("deployment").
 		Body([]byte(obj)).Do().Get()
-	// TODO: We should check that this is a conflict.
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object")
+	}
+	status, ok := err.(*errors.StatusError)
+	if !ok {
+		t.Fatalf("Expecting to get conflicts as API error")
+	}
+	if len(status.Status().Details.Causes) < 1 {
+		t.Fatalf("Expecting to get at least one conflict when applying object, got: %v", status.Status().Details.Causes)
 	}
 
 	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
