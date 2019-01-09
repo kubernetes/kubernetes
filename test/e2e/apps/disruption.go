@@ -108,14 +108,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 			minAvailable:   intstr.FromString("90%"),
 			maxUnavailable: intstr.FromString(""),
 			replicaSetSize: 10,
-			exclusive:      false,
 			shouldDeny:     false,
 		}, {
 			description:    "too few pods, replicaSet, percentage",
 			minAvailable:   intstr.FromString("90%"),
 			maxUnavailable: intstr.FromString(""),
 			replicaSetSize: 10,
-			exclusive:      true,
 			shouldDeny:     true,
 			// This tests assumes that there is less than replicaSetSize nodes in the cluster.
 			skipForBigClusters: true,
@@ -125,7 +123,6 @@ var _ = SIGDescribe("DisruptionController", func() {
 			minAvailable:   intstr.FromString(""),
 			maxUnavailable: intstr.FromString("10%"),
 			replicaSetSize: 10,
-			exclusive:      false,
 			shouldDeny:     false,
 		},
 		{
@@ -133,7 +130,6 @@ var _ = SIGDescribe("DisruptionController", func() {
 			minAvailable:   intstr.FromString(""),
 			maxUnavailable: intstr.FromInt(1),
 			replicaSetSize: 10,
-			exclusive:      true,
 			shouldDeny:     true,
 			// This tests assumes that there is less than replicaSetSize nodes in the cluster.
 			skipForBigClusters: true,
@@ -151,7 +147,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 			createPodsOrDie(cs, ns, c.podCount)
 			if c.replicaSetSize > 0 {
-				createReplicaSetOrDie(cs, ns, c.replicaSetSize, c.exclusive)
+				createReplicaSetOrDie(cs, ns, c.replicaSetSize)
 			}
 
 			if c.minAvailable.String() != "" {
@@ -258,8 +254,8 @@ func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
-						Name:  "busybox",
-						Image: imageutils.GetE2EImage(imageutils.EchoServer),
+						Name:  "pause",
+						Image: imageutils.GetE2EImage(imageutils.Pause),
 					},
 				},
 				RestartPolicy: v1.RestartPolicyAlways,
@@ -300,17 +296,11 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 	framework.ExpectNoError(err, "Waiting for pods in namespace %q to be ready", ns)
 }
 
-func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclusive bool) {
+func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32) {
 	container := v1.Container{
-		Name:  "busybox",
-		Image: imageutils.GetE2EImage(imageutils.EchoServer),
+		Name:  "pause",
+		Image: imageutils.GetE2EImage(imageutils.Pause),
 	}
-	if exclusive {
-		container.Ports = []v1.ContainerPort{
-			{HostPort: 5555, ContainerPort: 5555},
-		}
-	}
-
 	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rs",
