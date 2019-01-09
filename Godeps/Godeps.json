@@ -12,6 +12,7 @@
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
 		"github.com/kubernetes/repo-infra/kazel",
 		"k8s.io/kube-openapi/cmd/openapi-gen",
+		"golang.org/x/lint/golint",
 		"./..."
 	],
 	"Deps": [
@@ -3334,6 +3335,14 @@
 			"Rev": "292a51b8d262487dab23a588950e8052d63d9113"
 		},
 		{
+			"ImportPath": "golang.org/x/lint",
+			"Rev": "8f45f776aaf18cebc8d65861cc70c33c60471952"
+		},
+		{
+			"ImportPath": "golang.org/x/lint/golint",
+			"Rev": "8f45f776aaf18cebc8d65861cc70c33c60471952"
+		},
+		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "0ed95abb35c445290478a5348a7b38bb154135fd"
 		},
@@ -3495,6 +3504,14 @@
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/ast/astutil",
+			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/gcexportdata",
+			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/gcimporter15",
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
 		},
 		{
