@@ -52,7 +52,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	// Check if the cluster is self-hosted
 	if upgrade.IsControlPlaneSelfHosted(client) {
-		return nil, nil, nil, errors.Errorf("cannot upgrade a self-hosted control plane")
+		return nil, nil, nil, errors.New("cannot upgrade a self-hosted control plane")
 	}
 
 	// Run healthchecks against the cluster
