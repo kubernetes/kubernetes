@@ -749,21 +749,12 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
 	}
 
-	// Enable alpha feature VolumeSnapshotDataSource
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSnapshotDataSource, true)()
 	for _, tc := range successTestCases {
 		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 	for _, tc := range failedTestCases {
-		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
-			t.Errorf("expected failure: %v", errs)
-		}
-	}
-	// Disable alpha feature VolumeSnapshotDataSource
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSnapshotDataSource, false)()
-	for _, tc := range successTestCases {
 		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
