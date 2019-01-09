@@ -829,7 +829,7 @@ func LogContainersInPodsWithLabels(c clientset.Interface, ns string, match map[s
 func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) ([]string, error) {
 	By("Deleting namespaces")
 	nsList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to get namespace list")
 	var deleted []string
 	var wg sync.WaitGroup
 OUTER:
@@ -1835,7 +1835,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to get endpoints for %s/%s", ns, name)
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
@@ -1867,7 +1867,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	successes := 0
 	options := metav1.ListOptions{LabelSelector: r.label.String()}
 	currentPods, err := r.c.CoreV1().Pods(r.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to get list of currentPods in namespace: %s", r.ns)
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.
 		if !isElementOf(pod.UID, currentPods) {
@@ -2498,7 +2498,7 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to list events in namespace %q", namespace)
 
 	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
@@ -3603,7 +3603,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		tweak(execPod)
 	}
 	created, err := client.CoreV1().Pods(ns).Create(execPod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create new exec pod in namespace: %s", ns)
 	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
 		if err != nil {
@@ -3639,13 +3639,13 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 		},
 	}
 	_, err := c.CoreV1().Pods(ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace %s", name, ns)
 }
 
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
@@ -4172,7 +4172,7 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 		}
 		return s.RestartCount, nil
 	}
-	return -1, fmt.Errorf("failed to find kube-apiserver container in pod")
+	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
 }
 
 func RestartControllerManager() error {
@@ -4388,7 +4388,7 @@ func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
 func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tls config: %v", err)
+		return nil, fmt.Errorf("Failed to create tls config: %v", err)
 	}
 	if tlsConfig != nil {
 		url.Scheme = "wss"
@@ -4403,11 +4403,11 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	}
 	headers, err := headersForConfig(config, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load http headers: %v", err)
+		return nil, fmt.Errorf("Failed to load http headers: %v", err)
 	}
 	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create websocket config: %v", err)
+		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
 	}
 	cfg.Header = headers
 	cfg.TlsConfig = tlsConfig
@@ -5230,7 +5230,7 @@ func DsFromManifest(url string) (*apps.DaemonSet, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get url: %v", err)
+		return nil, fmt.Errorf("Failed to get url: %v", err)
 	}
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
@@ -5239,17 +5239,17 @@ func DsFromManifest(url string) (*apps.DaemonSet, error) {
 
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read html response body: %v", err)
+		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}
 
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse data to json: %v", err)
+		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
 	}
 
 	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &controller)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DaemonSet spec: %v", err)
+		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
 	return &controller, nil
 }
@@ -5313,7 +5313,7 @@ func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.
 	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		has, err := NodeHasTaint(c, nodeName, taint)
 		if err != nil {
-			return false, fmt.Errorf("failed to check taint %s on node %s or not", taint.ToString(), nodeName)
+			return false, fmt.Errorf("Failed to check taint %s on node %s or not", taint.ToString(), nodeName)
 		}
 		return has == wantTrue, nil
 	}); err != nil {

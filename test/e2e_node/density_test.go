@@ -455,7 +455,7 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, inter
 func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 	latencyMetrics := framework.KubeletLatencyMetrics{}
 	ms, err := metrics.GrabKubeletMetricsWithoutProxy(node)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to get kubelet metrics without proxy in node %s", node)
 
 	for _, samples := range ms {
 		for _, sample := range samples {
