@@ -2469,8 +2469,8 @@ func (f *Framework) MatchContainerOutput(
 		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
 	}
 
-	Logf("Trying to get logs from node %s pod %s container %s: %v",
-		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+	Logf("Trying to get logs from node %s pod %s container %s",
+		podStatus.Spec.NodeName, podStatus.Name, containerName)
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
 	logs, err := GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
