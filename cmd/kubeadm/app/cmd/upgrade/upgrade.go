@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -39,7 +38,6 @@ type applyPlanFlags struct {
 	allowRCUpgrades           bool
 	printConfig               bool
 	ignorePreflightErrors     []string
-	ignorePreflightErrorsSet  sets.String
 	out                       io.Writer
 }
 
@@ -52,7 +50,6 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		allowExperimentalUpgrades: false,
 		allowRCUpgrades:           false,
 		printConfig:               false,
-		ignorePreflightErrorsSet:  sets.NewString(),
 		out:                       out,
 	}
 

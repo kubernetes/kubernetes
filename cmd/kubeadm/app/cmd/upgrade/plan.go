@@ -29,68 +29,36 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
-type planFlags struct {
-	*applyPlanFlags
-
-	newK8sVersionStr string
-}
-
 // NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
-func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
-	flags := &planFlags{
-		applyPlanFlags: apf,
-	}
-
+func NewCmdPlan(flags *applyPlanFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan [version] [flags]",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
 		Run: func(_ *cobra.Command, args []string) {
-			var err error
-			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
-			kubeadmutil.CheckErr(err)
-			// Ensure the user is root
-			err = runPreflightChecks(flags.ignorePreflightErrorsSet)
+			userVersion, err := getK8sVersionFromUserInput(flags, args, false)
 			kubeadmutil.CheckErr(err)
 
-			// If the version is specified in config file, pick up that value.
-			if flags.cfgPath != "" {
-				klog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
-				kubeadmutil.CheckErr(err)
-
-				if cfg.KubernetesVersion != "" {
-					flags.newK8sVersionStr = cfg.KubernetesVersion
-				}
-			}
-			// If option was specified in both args and config file, args will overwrite the config file.
-			if len(args) == 1 {
-				flags.newK8sVersionStr = args[0]
-			}
-
-			err = runPlan(flags)
+			err = runPlan(flags, userVersion)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 
 	// Register the common flags for apply and plan
-	addApplyPlanFlags(cmd.Flags(), flags.applyPlanFlags)
+	addApplyPlanFlags(cmd.Flags(), flags)
 	return cmd
 }
 
 // runPlan takes care of outputting available versions to upgrade to for the user
-func runPlan(flags *planFlags) error {
+func runPlan(flags *applyPlanFlags, userVersion string) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infof("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
-	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, false, flags.newK8sVersionStr)
+	client, versionGetter, cfg, err := enforceRequirements(flags, userVersion, false)
 	if err != nil {
 		return err
 	}
@@ -99,29 +67,24 @@ func runPlan(flags *planFlags) error {
 
 	// Currently this is the only method we have for distinguishing
 	// external etcd vs static pod etcd
-	isExternalEtcd := upgradeVars.cfg.Etcd.External != nil
+	isExternalEtcd := cfg.Etcd.External != nil
 	if isExternalEtcd {
-		client, err := etcdutil.New(
-			upgradeVars.cfg.Etcd.External.Endpoints,
-			upgradeVars.cfg.Etcd.External.CAFile,
-			upgradeVars.cfg.Etcd.External.CertFile,
-			upgradeVars.cfg.Etcd.External.KeyFile)
-		if err != nil {
-			return err
-		}
-		etcdClient = client
+		etcdClient, err = etcdutil.New(
+			cfg.Etcd.External.Endpoints,
+			cfg.Etcd.External.CAFile,
+			cfg.Etcd.External.CertFile,
+			cfg.Etcd.External.KeyFile)
 	} else {
 		// Connects to local/stacked etcd existing in the cluster
-		client, err := etcdutil.NewFromCluster(upgradeVars.client, upgradeVars.cfg.CertificatesDir)
-		if err != nil {
-			return err
-		}
-		etcdClient = client
+		etcdClient, err = etcdutil.NewFromCluster(client, cfg.CertificatesDir)
+	}
+	if err != nil {
+		return err
 	}
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.DNS.Type, upgradeVars.client)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, cfg.DNS.Type, client)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
