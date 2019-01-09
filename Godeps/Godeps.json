@@ -9,8 +9,8 @@
 		"github.com/cloudflare/cfssl/cmd/cfssl",
 		"github.com/cloudflare/cfssl/cmd/cfssljson",
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
-		"github.com/kubernetes/repo-infra/kazel",
 		"k8s.io/kube-openapi/cmd/openapi-gen",
+		"k8s.io/repo-infra/kazel",
 		"golang.org/x/lint/golint",
 		"./..."
 	],
@@ -2406,10 +2406,6 @@
 			"Rev": "6807e777504f54ad073ecef66747de158294b639"
 		},
 		{
-			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
-			"Rev": "f2459dc75fc429b813d92c0622b408fd7f0d4cac"
-		},
-		{
 			"ImportPath": "github.com/lib/pq",
 			"Rev": "88edab0803230a3898347e77b474f8c1820a1f20"
 		},
@@ -4097,6 +4093,10 @@
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/sets",
 			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+		},
+		{
+			"ImportPath": "k8s.io/repo-infra/kazel",
+			"Rev": "00fe14e3d1a3f9a73c4cea62d9c33b29c1e03ac4"
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
