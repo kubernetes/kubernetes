@@ -109,9 +109,9 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 				flags.newK8sVersionStr = args[0]
 			}
 
-			// Default the flags dynamically, based on each others' value
-			err = SetImplicitFlags(flags)
-			kubeadmutil.CheckErr(err)
+			if len(flags.newK8sVersionStr) == 0 {
+				kubeadmutil.CheckErr(errors.New("version string can't be empty"))
+			}
 
 			err = runApply(flags)
 			kubeadmutil.CheckErr(err)
@@ -227,15 +227,6 @@ func runApply(flags *applyFlags) error {
 	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
 	fmt.Println("")
 	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
-
-	return nil
-}
-
-// SetImplicitFlags handles dynamically defaulting flags based on each other's value
-func SetImplicitFlags(flags *applyFlags) error {
-	if len(flags.newK8sVersionStr) == 0 {
-		return errors.New("version string can't be empty")
-	}
 
 	return nil
 }

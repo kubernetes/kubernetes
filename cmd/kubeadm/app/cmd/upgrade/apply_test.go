@@ -19,57 +19,11 @@ package upgrade
 import (
 	"io/ioutil"
 	"os"
-	"reflect"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
-
-func TestSetImplicitFlags(t *testing.T) {
-	var tests = []struct {
-		name          string
-		flags         *applyFlags
-		expectedFlags applyFlags
-		errExpected   bool
-	}{
-		{
-			name: "if the new version is empty; it should error out",
-			flags: &applyFlags{
-				newK8sVersionStr: "",
-			},
-			expectedFlags: applyFlags{
-				newK8sVersionStr: "",
-			},
-			errExpected: true,
-		},
-	}
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			actualErr := SetImplicitFlags(rt.flags)
-
-			// If an error was returned; make newK8sVersion nil so it's easy to match using reflect.DeepEqual later (instead of a random pointer)
-			if actualErr != nil {
-				rt.flags.newK8sVersion = nil
-			}
-
-			if !reflect.DeepEqual(*rt.flags, rt.expectedFlags) {
-				t.Errorf(
-					"failed SetImplicitFlags:\n\texpected flags: %v\n\t  actual: %v",
-					rt.expectedFlags,
-					*rt.flags,
-				)
-			}
-			if (actualErr != nil) != rt.errExpected {
-				t.Errorf(
-					"failed SetImplicitFlags:\n\texpected error: %t\n\t  actual: %t",
-					rt.errExpected,
-					(actualErr != nil),
-				)
-			}
-		})
-	}
-}
 
 func TestSessionIsInteractive(t *testing.T) {
 	var tcases = []struct {
