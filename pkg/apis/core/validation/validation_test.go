@@ -553,32 +553,6 @@ func TestValidateLocalVolumes(t *testing.T) {
 	}
 }
 
-func TestValidateLocalVolumesDisabled(t *testing.T) {
-	scenarios := map[string]struct {
-		isExpectedFailure bool
-		volume            *core.PersistentVolume
-	}{
-		"feature disabled valid local volume": {
-			isExpectedFailure: true,
-			volume: testVolume("valid-local-volume", "",
-				testLocalVolume("/foo", simpleVolumeNodeAffinity("foo", "bar"))),
-		},
-	}
-
-	for name, scenario := range scenarios {
-		t.Run(name+" PersistentLocalVolumes disabled", func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, false)()
-			errs := ValidatePersistentVolume(scenario.volume)
-			if len(errs) == 0 && scenario.isExpectedFailure {
-				t.Errorf("Unexpected success for scenario: %s", name)
-			}
-			if len(errs) > 0 && !scenario.isExpectedFailure {
-				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-			}
-		})
-	}
-}
-
 func testVolumeWithNodeAffinity(affinity *core.VolumeNodeAffinity) *core.PersistentVolume {
 	return testVolume("test-affinity-volume", "",
 		core.PersistentVolumeSpec{
