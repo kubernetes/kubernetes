@@ -46,15 +46,15 @@ func VerifyGroupNames(scheme *runtime.Scheme, legacyUnsuffixedGroups sets.String
 }
 
 // VerifyTagNaming ensures that all types in the scheme have JSON tags set on external types, and JSON tags not set on internal types.
-// Exceptions can be tolerated using the typesAllowedTags and allowedNonstandardJSONNames parameters
-func VerifyTagNaming(scheme *runtime.Scheme, typesAllowedTags map[reflect.Type]bool, allowedNonstandardJSONNames map[reflect.Type]string) error {
+// Exceptions can be tolerated using the typesAllowedTags and allowedNonstandardJSONNames, allowedNoJSONTags parameters
+func VerifyTagNaming(scheme *runtime.Scheme, typesAllowedTags map[reflect.Type]bool, allowedNonstandardJSONNames map[reflect.Type]sets.String, allowedNoJSONTags map[reflect.Type]sets.String) error {
 	errs := []error{}
 	for gvk, knownType := range scheme.AllKnownTypes() {
 		var err error
 		if gvk.Version == runtime.APIVersionInternal {
 			err = errors.NewAggregate(ensureNoTags(gvk, knownType, nil, typesAllowedTags))
 		} else {
-			err = errors.NewAggregate(ensureTags(gvk, knownType, nil, allowedNonstandardJSONNames))
+			err = errors.NewAggregate(ensureTags(gvk, knownType, nil, allowedNonstandardJSONNames, allowedNoJSONTags))
 		}
 		if err != nil {
 			errs = append(errs, err)
@@ -103,7 +103,7 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 	return errs
 }
 
-func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type, allowedNonstandardJSONNames map[reflect.Type]string) []error {
+func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type, allowedNonstandardJSONNames map[reflect.Type]sets.String, allowedNoJSONTags map[reflect.Type]sets.String) []error {
 	errs := []error{}
 	// This type handles its own encoding/decoding and doesn't need json tags
 	if tp.Implements(marshalerType) && (tp.Implements(unmarshalerType) || reflect.PtrTo(tp).Implements(unmarshalerType)) {
@@ -118,7 +118,7 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 
 	switch tp.Kind() {
 	case reflect.Map, reflect.Slice, reflect.Ptr:
-		errs = append(errs, ensureTags(gvk, tp.Elem(), parents, allowedNonstandardJSONNames)...)
+		errs = append(errs, ensureTags(gvk, tp.Elem(), parents, allowedNonstandardJSONNames, allowedNoJSONTags)...)
 
 	case reflect.String, reflect.Bool, reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Interface:
 		// no-op
@@ -127,16 +127,24 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 		for i := 0; i < tp.NumField(); i++ {
 			f := tp.Field(i)
 			jsonTag := f.Tag.Get("json")
+			if allowedNoJSONTags[tp].Has(f.Name) {
+				continue
+			}
 			if len(jsonTag) == 0 {
 				errs = append(errs, fmt.Errorf("External types should have json tags. %#v tags on field %v are: %s.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
 			}
-
+			if jsonTag == "-" {
+				continue
+			}
 			jsonTagName := strings.Split(jsonTag, ",")[0]
+			if allowedNonstandardJSONNames[tp].Has(jsonTagName) {
+				continue
+			}
 			if len(jsonTagName) > 0 && (jsonTagName[0] < 'a' || jsonTagName[0] > 'z') && jsonTagName != "-" && allowedNonstandardJSONNames[tp] != jsonTagName {
 				errs = append(errs, fmt.Errorf("External types should have json names starting with lowercase letter. %#v has json tag on field %v with name %s.\n%s", gvk, f.Name, jsonTagName, fmtParentString(parents)))
 			}
 
-			errs = append(errs, ensureTags(gvk, f.Type, parents, allowedNonstandardJSONNames)...)
+			errs = append(errs, ensureTags(gvk, f.Type, parents, allowedNonstandardJSONNames, allowedNoJSONTags)...)
 		}
 
 	default:
