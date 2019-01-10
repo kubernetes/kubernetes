@@ -108,6 +108,7 @@ func TestRunOnce(t *testing.T) {
 		kb.mounter,
 		kb.getPodsDir(),
 		kb.recorder,
+		kb.logPluginManager,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false /* keepTerminatedPodVolumes */)
 

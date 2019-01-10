@@ -17,10 +17,13 @@ limitations under the License.
 package pod
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
+	logapiutil "k8s.io/kubernetes/pkg/kubelet/log/api/util"
 )
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -146,6 +149,9 @@ func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor) bool {
 			}
 		}
 	}
+	if !visitPodLogPolicyConfigmapNames(pod, visitor) {
+		return false
+	}
 	return true
 }
 
@@ -162,6 +168,20 @@ func visitContainerConfigmapNames(container *api.Container, visitor Visitor) boo
 			if !visitor(envVar.ValueFrom.ConfigMapKeyRef.Name) {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+func visitPodLogPolicyConfigmapNames(pod *api.Pod, visitor Visitor) bool {
+	v1Pod := &v1.Pod{}
+	err := apiv1.Convert_core_Pod_To_v1_Pod(pod, v1Pod, nil)
+	if err != nil {
+		return false
+	}
+	for name := range logapiutil.GetPodLogConfigMapNames(v1Pod) {
+		if !visitor(name) {
+			return false
 		}
 	}
 	return true
