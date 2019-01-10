@@ -3659,24 +3659,17 @@ func TestValidateVolumes(t *testing.T) {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
 
-	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
+	// Validate HugePages medium type for EmptyDir
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
 	// Enable HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, true)()
 	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
 
-	// Disable feature HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, false)()
-	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
-		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
-	}
-
 }
 
-func TestAlphaHugePagesIsolation(t *testing.T) {
+func TestHugePagesIsolation(t *testing.T) {
 	successCases := []core.Pod{
 		{ // Basic fields.
 			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -3774,8 +3767,6 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 			},
 		},
 	}
-	// Enable feature HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, true)()
 	for i := range successCases {
 		pod := &successCases[i]
 		if errs := ValidatePod(pod); len(errs) != 0 {
@@ -3784,15 +3775,6 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 	}
 	for i := range failureCases {
 		pod := &failureCases[i]
-		if errs := ValidatePod(pod); len(errs) == 0 {
-			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
-		}
-	}
-	// Disable feature HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, false)()
-	// Disable feature HugePages and ensure all success cases fail
-	for i := range successCases {
-		pod := &successCases[i]
 		if errs := ValidatePod(pod); len(errs) == 0 {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
