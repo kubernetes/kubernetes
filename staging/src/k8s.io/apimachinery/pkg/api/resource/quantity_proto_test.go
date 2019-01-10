@@ -101,3 +101,40 @@ func TestQuantityProtoUnmarshal(t *testing.T) {
 		}
 	}
 }
+
+func TestProtoCompatibility(t *testing.T) {
+	// Test when d is nil
+	table1 := []struct {
+		input  []byte
+		expect string
+	}{
+		{[]byte{10, 1, 48}, "0"},
+		{[]byte{10, 4, 49, 48, 48, 106}, "100m"},
+		{[]byte{10, 4, 53, 48, 48, 106}, "500m"},
+	}
+	for _, testCase := range table1 {
+		var inputQ Quantity
+		inputQ.Unmarshal(testCase.input)
+		expectQ := Quantity{s: testCase.expect, d: infDecAmount{}, Format: DecimalSI}
+		if inputQ.Cmp(expectQ) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", inputQ, expectQ)
+		}
+	}
+	// Test when i is {0,0}
+	table2 := []struct {
+		input  []byte
+		expect *inf.Dec
+	}{
+		{[]byte{10, 1, 48}, dec(0, 0).Dec},
+		{[]byte{10, 4, 49, 48, 48, 109}, dec(100, -3).Dec},
+		{[]byte{10, 4, 53, 48, 48, 109}, dec(50, -2).Dec},
+	}
+	for _, testCase := range table2 {
+		var inputQ Quantity
+		inputQ.Unmarshal(testCase.input)
+		expectQ := Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{testCase.expect}, Format: DecimalSI}
+		if inputQ.Cmp(expectQ) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", inputQ, expectQ)
+		}
+	}
+}
