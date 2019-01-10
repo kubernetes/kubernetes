@@ -297,10 +297,10 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 					if pod, ok := t.Obj.(*v1.Pod); ok {
 						return assignedPod(pod)
 					}
-					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
+					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod for filtering scheduledPod in %T", obj, c))
 					return false
 				default:
-					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
+					runtime.HandleError(fmt.Errorf("unable to handle object for filtering scheduledPod in %T: %T", c, obj))
 					return false
 				}
 			},
@@ -322,10 +322,10 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 					if pod, ok := t.Obj.(*v1.Pod); ok {
 						return !assignedPod(pod) && responsibleForPod(pod, args.SchedulerName)
 					}
-					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
+					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod for filtering unscheduledPod in %T", obj, c))
 					return false
 				default:
-					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
+					runtime.HandleError(fmt.Errorf("unable to handle object for filtering unscheduledPod in %T: %T", c, obj))
 					return false
 				}
 			},
@@ -450,7 +450,7 @@ func (c *configFactory) onPvAdd(obj interface{}) {
 	// Pods created when there are no PVs available will be stuck in
 	// unschedulable queue. But unbound PVs created for static provisioning and
 	// delay binding storage class are skipped in PV controller dynamic
-	// provisiong and binding process, will not trigger events to schedule pod
+	// provisioning and binding process, will not trigger events to schedule pod
 	// again. So we need to move pods to active queue on PV add for this
 	// scenario.
 	c.podQueue.MoveAllToActiveQueue()
@@ -480,7 +480,7 @@ func (c *configFactory) onPvcUpdate(old, new interface{}) {
 func (c *configFactory) onStorageClassAdd(obj interface{}) {
 	sc, ok := obj.(*storagev1.StorageClass)
 	if !ok {
-		klog.Errorf("cannot convert to *storagev1.StorageClass: %v", obj)
+		klog.Errorf("cannot convert to *storagev1.StorageClass for storageClassAdd: %v", obj)
 		return
 	}
 
@@ -523,7 +523,7 @@ func (c *configFactory) GetClient() clientset.Interface {
 	return c.client
 }
 
-// GetScheduledPodListerIndexer provides a pod lister, mostly internal use, but may also be called by mock-tests.
+// GetScheduledPodLister provides a pod lister, mostly internal use, but may also be called by mock-tests.
 func (c *configFactory) GetScheduledPodLister() corelisters.PodLister {
 	return c.scheduledPodLister
 }
@@ -611,7 +611,7 @@ func (c *configFactory) deletePodFromCache(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			klog.Errorf("cannot convert to *v1.Pod: %v", t.Obj)
+			klog.Errorf("cannot convert DeletedFinalStateUnknown obj to *v1.Pod: %v", t.Obj)
 			return
 		}
 	default:
@@ -722,7 +722,7 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 		var ok bool
 		node, ok = t.Obj.(*v1.Node)
 		if !ok {
-			klog.Errorf("cannot convert to *v1.Node: %v", t.Obj)
+			klog.Errorf("cannot convert DeletedFinalStateUnknown obj to *v1.Node: %v", t.Obj)
 			return
 		}
 	default:
