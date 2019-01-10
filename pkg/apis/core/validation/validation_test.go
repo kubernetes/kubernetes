@@ -11274,12 +11274,6 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		newClaim          *core.PersistentVolumeClaim
 		enableResize      bool
 	}{
-		"condition-update-with-disabled-feature-gate": {
-			isExpectedFailure: true,
-			oldClaim:          validClaim,
-			newClaim:          validConditionUpdate,
-			enableResize:      false,
-		},
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
@@ -11290,8 +11284,6 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
-
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
