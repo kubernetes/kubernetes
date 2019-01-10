@@ -47,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/klog"
 )
 
 // PatchResource returns a function that will handle a resource patch.
@@ -310,13 +309,8 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if obj, err := p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher"); err == nil {
-			objToUpdate = obj
-		} else {
-			// Just log an error rather than fail, since we
-			// don't want to prevent updates because of
-			// field managers.
-			klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher"); err != nil {
+			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
 	return objToUpdate, nil
@@ -377,13 +371,8 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if obj, err := p.fieldManager.Update(currentObject, newObj, "smPatcher"); err == nil {
-			newObj = obj
-		} else {
-			// Just log an error rather than fail, since we
-			// don't want to prevent updates because of
-			// field managers.
-			klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, "smPatcher"); err != nil {
+			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
 	return newObj, nil

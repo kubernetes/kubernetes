@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
-	"k8s.io/klog"
 )
 
 // UpdateResource returns a function that will handle a resource update
@@ -125,12 +124,10 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		transformers := []rest.TransformFunc{}
 		if scope.FieldManager != nil {
 			transformers = append(transformers, func(_ context.Context, liveObj, newObj runtime.Object) (runtime.Object, error) {
-				if obj, err := scope.FieldManager.Update(liveObj, newObj, "update"); err == nil {
-					return obj, nil
-				} else {
-					klog.Errorf("FieldManager: Failed to update object managed fields: %v", err)
-					return newObj, nil
+				if obj, err = scope.FieldManager.Update(liveObj, newObj, "update"); err != nil {
+					return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 				}
+				return obj, nil
 			})
 		}
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
