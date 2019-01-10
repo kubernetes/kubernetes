@@ -167,7 +167,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 	}
 
 	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
-		AbsPath("/apis/apps/v1").
+		AbsPath("/apis/extensions/v1beta1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
