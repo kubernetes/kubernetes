@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
-	"fmt"
 	"time"
 
 	batch "k8s.io/api/batch/v1"
@@ -32,11 +31,10 @@ import (
 
 const dummyFinalizer = "k8s.io/dummy-finalizer"
 
-var _ = framework.KubeDescribe("TTLAfterFinished", func() {
+var _ = framework.KubeDescribe("[Feature:TTLAfterFinished][NodeAlphaFeature:TTLAfterFinished]", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
 
-	alphaFeatureStr := "[Feature:TTLAfterFinished]"
-	It(fmt.Sprintf("Job should be deleted once it finishes after TTL seconds %s", alphaFeatureStr), func() {
+	It("job should be deleted once it finishes after TTL seconds", func() {
 		testFinishedJob(f)
 	})
 })
