@@ -59,6 +59,11 @@ func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.AP
 		return object, err
 	}
 
+	// If attempting to convert to the same version as we already have, just return it.
+	if objectToConvert.GetObjectKind().GroupVersionKind().GroupVersion() == groupVersion {
+		return object, nil
+	}
+
 	// Convert to internal
 	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, v.hubVersion)
 	if err != nil {
