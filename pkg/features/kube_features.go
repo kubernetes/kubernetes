@@ -197,14 +197,14 @@ const (
 
 	// owner: @saad-ali
 	// alpha: v1.12
-	// beta: v1.13
+	// beta: v1.14
 	//
 	// Enable all logic related to the CSIDriver API object in csi.storage.k8s.io
 	CSIDriverRegistry utilfeature.Feature = "CSIDriverRegistry"
 
 	// owner: @verult
 	// alpha: v1.12
-	// beta: v1.13
+	// beta: v1.14
 	//
 	// Enable all logic related to the CSINodeInfo API object in csi.storage.k8s.io
 	CSINodeInfo utilfeature.Feature = "CSINodeInfo"
