@@ -254,13 +254,6 @@ const (
 	ContainerStateUnknown ContainerState = "unknown"
 )
 
-type ContainerType string
-
-const (
-	ContainerTypeInit    ContainerType = "INIT"
-	ContainerTypeRegular ContainerType = "REGULAR"
-)
-
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
 type Container struct {
