@@ -36,6 +36,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/install:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
 )

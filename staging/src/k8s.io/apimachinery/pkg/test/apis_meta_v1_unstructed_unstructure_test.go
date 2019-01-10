@@ -451,7 +451,7 @@ func TestDecodeNumbers(t *testing.T) {
 	// Start with a valid pod
 	originalJSON := []byte(`{
 		"kind":"Carp",
-		"apiVersion":"v1",
+		"apiVersion":"testapigroup.apimachinery.k8s.io/v1",
 		"metadata":{"name":"pod","namespace":"foo"},
 		"spec":{
 			"containers":[{"name":"container","image":"container"}],

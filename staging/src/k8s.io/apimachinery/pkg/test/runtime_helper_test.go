@@ -31,7 +31,7 @@ func TestDecodeList(t *testing.T) {
 			&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
 				TypeMeta:    runtime.TypeMeta{Kind: "Carp", APIVersion: "v1"},
-				Raw:         []byte(`{"kind":"Carp","apiVersion":"` + "v1" + `","metadata":{"name":"test"}}`),
+				Raw:         []byte(`{"kind":"Carp","apiVersion":"` + "testapigroup.apimachinery.k8s.io/v1" + `","metadata":{"name":"test"}}`),
 				ContentType: runtime.ContentTypeJSON,
 			},
 		},

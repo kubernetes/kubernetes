@@ -18,12 +18,10 @@ package test
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/testapigroup"
-	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	testapigroupinstall "k8s.io/apimachinery/pkg/apis/testapigroup/install"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // List and ListV1 should be kept in sync with k8s.io/kubernetes/pkg/api#List
@@ -51,20 +49,13 @@ func TestScheme() (*runtime.Scheme, apiserializer.CodecFactory) {
 	internalGV := schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 	externalGV := schema.GroupVersion{Group: "", Version: "v1"}
 	scheme := runtime.NewScheme()
-
+	testapigroupinstall.Install(scheme)
 	scheme.AddKnownTypes(internalGV,
-		&testapigroup.Carp{},
-		&testapigroup.CarpList{},
 		&List{},
 	)
 	scheme.AddKnownTypes(externalGV,
-		&v1.Carp{},
-		&v1.CarpList{},
 		&List{},
 	)
-	utilruntime.Must(testapigroup.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
-
 	codecs := apiserializer.NewCodecFactory(scheme)
 	return scheme, codecs
 }
