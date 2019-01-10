@@ -71,9 +71,15 @@ type Mounter struct {
 // It provides options to override the default mounter behavior.
 // mounterPath allows using an alternative to `/bin/mount` for mounting.
 func New(mounterPath string) Interface {
+	withSystemd := DetectSystemd(NewOsExec(), "")
+	if withSystemd {
+		glog.V(2).Infof("Detected OS without systemd")
+	} else {
+		glog.V(2).Infof("Detected OS with systemd")
+	}
 	return &Mounter{
 		mounterPath: mounterPath,
-		withSystemd: detectSystemd(),
+		withSystemd: withSystemd,
 	}
 }
 
@@ -133,7 +139,8 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 		//
 		// systemd-mount is not used because it's too new for older distros
 		// (CentOS 7, Debian Jessie).
-		mountCmd, mountArgs = addSystemdScope("systemd-run", target, mountCmd, mountArgs)
+		description := fmt.Sprintf("Kubernetes transient mount for %s", target)
+		mountCmd, mountArgs = AddSystemdScope("", description, mountCmd, mountArgs)
 	} else {
 		// No systemd-run on the host (or we failed to check it), assume kubelet
 		// does not run as a systemd service.
@@ -229,13 +236,6 @@ func makeMountArgs(source, target, fstype string, options []string) []string {
 	mountArgs = append(mountArgs, target)
 
 	return mountArgs
-}
-
-// addSystemdScope adds "system-run --scope" to given command line
-func addSystemdScope(systemdRunPath, mountName, command string, args []string) (string, []string) {
-	descriptionArg := fmt.Sprintf("--description=Kubernetes transient mount for %s", mountName)
-	systemdRunArgs := []string{descriptionArg, "--scope", "--", command}
-	return systemdRunPath, append(systemdRunArgs, args...)
 }
 
 // Unmount unmounts the target.
