@@ -225,6 +225,7 @@ spec:
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
     - --bind-address=127.0.0.1
     - --use-service-account-credentials=true
+    - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
     image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
@@ -300,6 +301,7 @@ spec:
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
         - --bind-address=127.0.0.1
         - --use-service-account-credentials=true
+        - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
         image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
