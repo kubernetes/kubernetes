@@ -68,7 +68,7 @@ func New(exec utilexec.Interface) Interface {
 
 // EnsurePortProxyRule checks if the specified redirect exists, if not creates it.
 func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
-	klog.V(4).Infof("running netsh interface portproxy add v4tov4 %v", args)
+	klog.V(4).Infof("running netsh %v", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -87,7 +87,7 @@ func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
 
 // DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.
 func (runner *runner) DeletePortProxyRule(args []string) error {
-	klog.V(4).Infof("running netsh interface portproxy delete v4tov4 %v", args)
+	klog.V(4).Infof("running netsh %v", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {

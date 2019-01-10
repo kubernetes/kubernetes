@@ -19,6 +19,8 @@ go_library(
         "docker_stats_unsupported.go",
         "docker_stats_windows.go",
         "docker_streaming.go",
+        "docker_streaming_others.go",
+        "docker_streaming_windows.go",
         "exec.go",
         "helpers.go",
         "helpers_linux.go",
@@ -73,6 +75,8 @@ go_library(
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
             "//pkg/kubelet/winstats:go_default_library",
+            "//pkg/util/netsh:go_default_library",
+            "//vendor/github.com/Microsoft/hcsshim:go_default_library",
         ],
         "//conditions:default": [],
     }),
