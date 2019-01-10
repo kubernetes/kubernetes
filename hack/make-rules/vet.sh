@@ -35,9 +35,6 @@ fi
 # See https://github.com/golang/go/issues/16086 for details.
 go install ./cmd/...
 
-# Use eval to preserve embedded quoted strings.
-eval "goflags=(${GOFLAGS:-})"
-
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()
 for arg; do
