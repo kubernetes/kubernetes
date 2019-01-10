@@ -14,24 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheme
+package v1alpha1
 
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/fuzzer"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	configtesting "k8s.io/component/pkg/testing"
 )
 
-func TestRoundTripFuzzing(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, fuzzer.Funcs)
-}
-
-func TestRoundTripYAML(t *testing.T) {
-	disallowMarshalGroupVersions := sets.NewString()
-	tc := configtesting.GetRoundtripTestCases(Scheme, disallowMarshalGroupVersions)
+func TestDefaulting(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatalf("programmer error: AddToScheme must not error: %v", err)
+	}
+	tc := configtesting.GetDefaultingTestCases(scheme)
 	t.Logf("%v", tc)
-	configtesting.RunTestsOnYAMLData(t, tc, Scheme, &Codecs)
+	configtesting.RunTestsOnYAMLData(t, tc, scheme, &codecs)
+	t.Error("foo")
 }

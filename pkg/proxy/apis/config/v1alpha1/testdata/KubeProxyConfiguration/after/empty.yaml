@@ -1,0 +1,37 @@
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: ""
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+clusterCIDR: ""
+configSyncPeriod: 0s
+conntrack:
+  max: null
+  maxPerCore: null
+  min: null
+  tcpCloseWaitTimeout: null
+  tcpEstablishedTimeout: null
+enableProfiling: false
+healthzBindAddress: ""
+hostnameOverride: ""
+iptables:
+  masqueradeAll: false
+  masqueradeBit: null
+  minSyncPeriod: 0s
+  syncPeriod: 0s
+ipvs:
+  excludeCIDRs: null
+  minSyncPeriod: 0s
+  scheduler: ""
+  syncPeriod: 0s
+kind: KubeProxyConfiguration
+metricsBindAddress: ""
+mode: ""
+nodePortAddresses: null
+oomScoreAdj: null
+portRange: ""
+resourceContainer: ""
+udpIdleTimeout: 0s
