@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +46,9 @@ import (
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> UpdateResource wrap up : %#v", req)
+		}()
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)

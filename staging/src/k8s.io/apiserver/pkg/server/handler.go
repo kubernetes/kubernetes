@@ -186,5 +186,12 @@ func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.Serv
 
 // ServeHTTP makes it an http.Handler
 func (a *APIServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if flusher, ok := w.(http.Flusher); ok {
+			klog.V(4).Infof(">>>> flushed %#v : %s %s", w, r.RequestURI, r.Method)
+			flusher.Flush()
+		}
+	}()
+
 	a.FullHandlerChain.ServeHTTP(w, r)
 }

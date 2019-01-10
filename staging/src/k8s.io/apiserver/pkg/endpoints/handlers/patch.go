@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/klog"
+
 	"github.com/evanphx/json-patch"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,6 +52,9 @@ import (
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> PatchResource wrap up : %#v", req)
+		}()
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)

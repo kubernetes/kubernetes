@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -42,6 +44,9 @@ import (
 
 func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> createHandler wrap up : %#v", req)
+		}()
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)

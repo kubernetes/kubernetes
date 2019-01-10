@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -35,6 +37,9 @@ import (
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
 func transformResponseObject(ctx context.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+	defer func() {
+		klog.Infof(">>>> transformResponseObject wrap up : %#v", req)
+	}()
 	// status objects are ignored for transformation
 	if _, ok := result.(*metav1.Status); ok {
 		responsewriters.WriteObject(statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)

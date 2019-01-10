@@ -48,6 +48,9 @@ type getterFunc func(ctx context.Context, name string, req *http.Request, trace 
 // passed-in getterFunc to perform the actual get.
 func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> getResourceHandler wrap up : %#v", req)
+		}()
 		trace := utiltrace.New("Get " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -165,6 +168,9 @@ func getRequestOptions(req *http.Request, scope RequestScope, into runtime.Objec
 
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> ListResource wrap up : %#v", req)
+		}()
 		// For performance tracking purposes.
 		trace := utiltrace.New("List " + req.URL.Path)
 

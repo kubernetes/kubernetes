@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +44,9 @@ import (
 // TODO admission here becomes solely validating admission
 func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> DeleteResource wrap up : %#v", req)
+		}()
 		// For performance tracking purposes.
 		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
@@ -176,6 +181,9 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			klog.Infof(">>>> DeleteCollection wrap up : %#v", req)
+		}()
 		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
