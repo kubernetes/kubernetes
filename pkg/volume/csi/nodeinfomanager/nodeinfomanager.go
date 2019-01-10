@@ -349,22 +349,6 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 	driverNodeID string,
 	topology map[string]string) error {
 
-	// Check if the CRD is not installed.
-	kubeClient := nim.volumeHost.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("error getting kube client")
-	}
-
-	// TODO (bertinatto): for now we're not failing if CRDs are not found, we only log it.
-	// The reason is that CRDs are currently not installed during unit tests execution.
-	installed, err := util.IsCRDInstalled(csiv1beta1.CsiNodeInfoResourcePlural, csiv1beta1.GroupName+"/v1beta1", kubeClient.Discovery())
-	if err != nil {
-		klog.Errorf("error determining if csinodeinfo CRD is installed: %v", err)
-	}
-	if !installed {
-		klog.V(4).Infof("CSINodeInfo for %s as the csinodeinfo CRD is not installed", driverName)
-	}
-
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
