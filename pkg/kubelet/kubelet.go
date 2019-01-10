@@ -844,7 +844,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, err
 		}
 		klet.admitHandlers.AddPodAdmitHandler(runtimeSupport)
-		klet.admitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
+		klet.softAdmitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
 	}
 
 	// enable active deadline handler
