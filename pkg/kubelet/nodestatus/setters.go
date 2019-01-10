@@ -139,7 +139,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 					// no existing Hostname address found, add it
 					klog.Warningf("adding overridden hostname of %v to cloudprovider-reported addresses", hostname)
 					nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
-				} else {
+				} else if existingHostnameAddress.Address != hostname {
 					// override the Hostname address reported by the cloud provider
 					klog.Warningf("replacing cloudprovider-reported hostname of %v with overridden hostname of %v", existingHostnameAddress.Address, hostname)
 					existingHostnameAddress.Address = hostname
@@ -270,7 +270,9 @@ func MachineInfo(nodeName string,
 				// capacity for every node status request
 				initialCapacity := capacityFunc()
 				if initialCapacity != nil {
-					node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
+					if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
+						node.Status.Capacity[v1.ResourceEphemeralStorage] = v
+					}
 				}
 			}
 

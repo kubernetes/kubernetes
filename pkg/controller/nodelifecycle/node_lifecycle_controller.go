@@ -22,7 +22,6 @@ limitations under the License.
 package nodelifecycle
 
 import (
-	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -37,24 +36,22 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	coordlisters "k8s.io/client-go/listers/coordination/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -98,9 +95,6 @@ var (
 		v1.NodeMemoryPressure: {
 			v1.ConditionTrue: schedulerapi.TaintNodeMemoryPressure,
 		},
-		v1.NodeOutOfDisk: {
-			v1.ConditionTrue: schedulerapi.TaintNodeOutOfDisk,
-		},
 		v1.NodeDiskPressure: {
 			v1.ConditionTrue: schedulerapi.TaintNodeDiskPressure,
 		},
@@ -117,7 +111,6 @@ var (
 		schedulerapi.TaintNodeUnreachable:        v1.NodeReady,
 		schedulerapi.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		schedulerapi.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		schedulerapi.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
 		schedulerapi.TaintNodeDiskPressure:       v1.NodeDiskPressure,
 		schedulerapi.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
@@ -150,7 +143,6 @@ type Controller struct {
 	taintManager *scheduler.NoExecuteTaintManager
 
 	podInformerSynced cache.InformerSynced
-	cloud             cloudprovider.Interface
 	kubeClient        clientset.Interface
 
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
@@ -176,15 +168,13 @@ type Controller struct {
 
 	zoneStates map[string]ZoneState
 
-	daemonSetStore          extensionslisters.DaemonSetLister
+	daemonSetStore          appsv1listers.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
-	leaseLister                 coordlisters.LeaseLister
-	leaseInformerSynced         cache.InformerSynced
-	nodeLister                  corelisters.NodeLister
-	nodeInformerSynced          cache.InformerSynced
-	nodeExistsInCloudProvider   func(types.NodeName) (bool, error)
-	nodeShutdownInCloudProvider func(context.Context, *v1.Node) (bool, error)
+	leaseLister         coordlisters.LeaseLister
+	leaseInformerSynced cache.InformerSynced
+	nodeLister          corelisters.NodeLister
+	nodeInformerSynced  cache.InformerSynced
 
 	recorder record.EventRecorder
 
@@ -235,7 +225,7 @@ type Controller struct {
 	useTaintBasedEvictions bool
 
 	// if set to true, NodeController will taint Nodes based on its condition for 'NetworkUnavailable',
-	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
+	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
 	taintNodeByCondition bool
 
 	nodeUpdateQueue workqueue.Interface
@@ -246,8 +236,7 @@ func NewNodeLifecycleController(
 	leaseInformer coordinformers.LeaseInformer,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer extensionsinformers.DaemonSetInformer,
-	cloud cloudprovider.Interface,
+	daemonSetInformer appsv1informers.DaemonSetInformer,
 	kubeClient clientset.Interface,
 	nodeMonitorPeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
@@ -280,17 +269,10 @@ func NewNodeLifecycleController(
 	}
 
 	nc := &Controller{
-		cloud:         cloud,
-		kubeClient:    kubeClient,
-		now:           metav1.Now,
-		knownNodeSet:  make(map[string]*v1.Node),
-		nodeHealthMap: make(map[string]*nodeHealthData),
-		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
-			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
-		},
-		nodeShutdownInCloudProvider: func(ctx context.Context, node *v1.Node) (bool, error) {
-			return nodeutil.ShutdownInCloudProvider(ctx, cloud, node)
-		},
+		kubeClient:                  kubeClient,
+		now:                         metav1.Now,
+		knownNodeSet:                make(map[string]*v1.Node),
+		nodeHealthMap:               make(map[string]*nodeHealthData),
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
 		nodeStartupGracePeriod:      nodeStartupGracePeriod,
@@ -306,7 +288,7 @@ func NewNodeLifecycleController(
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 		taintNodeByCondition:        taintNodeByCondition,
-		nodeUpdateQueue:             workqueue.New(),
+		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
 	}
 	if useTaintBasedEvictions {
 		klog.Infof("Controller is using taint based evictions.")
@@ -779,11 +761,6 @@ func (nc *Controller) monitorNodeHealth() error {
 						klog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 					}
 				}
-				// remove shutdown taint this is needed always depending do we use taintbased or not
-				err := nc.markNodeAsNotShutdown(node)
-				if err != nil {
-					klog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
-				}
 			}
 
 			// Report node event.
@@ -791,42 +768,6 @@ func (nc *Controller) monitorNodeHealth() error {
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				if err = nodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
-				}
-			}
-
-			// Check with the cloud provider to see if the node still exists. If it
-			// doesn't, delete the node immediately.
-			if currentReadyCondition.Status != v1.ConditionTrue && nc.cloud != nil {
-				// check is node shutdowned, if yes do not deleted it. Instead add taint
-				shutdown, err := nc.nodeShutdownInCloudProvider(context.TODO(), node)
-				if err != nil {
-					klog.Errorf("Error determining if node %v shutdown in cloud: %v", node.Name, err)
-				}
-				// node shutdown
-				if shutdown && err == nil {
-					err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, node.Name, controller.ShutdownTaint)
-					if err != nil {
-						klog.Errorf("Error patching node taints: %v", err)
-					}
-					continue
-				}
-				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
-				if err != nil {
-					klog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
-					continue
-				}
-				if !exists {
-					klog.V(2).Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
-					nodeutil.RecordNodeEvent(nc.recorder, node.Name, string(node.UID), v1.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
-					go func(nodeName string) {
-						defer utilruntime.HandleCrash()
-						// Kubelet is not reporting and Cloud Provider says node
-						// is gone. Delete it without worrying about grace
-						// periods.
-						if err := nodeutil.ForcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
-							klog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
-						}
-					}(node.Name)
 				}
 			}
 		}
@@ -976,7 +917,6 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 
 		// remaining node conditions should also be set to Unknown
 		remainingNodeConditionTypes := []v1.NodeConditionType{
-			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			v1.NodePIDPressure,
@@ -1266,17 +1206,6 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		return false, err
 	}
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
-}
-
-func (nc *Controller) markNodeAsNotShutdown(node *v1.Node) error {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, controller.ShutdownTaint)
-	if err != nil {
-		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
-		return err
-	}
-	return nil
 }
 
 // ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.

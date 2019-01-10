@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.2.24}
+ETCD_VERSION=${ETCD_VERSION:-3.3.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
@@ -70,8 +70,8 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
-  if [[ -d "${ARTIFACTS_DIR:-}" ]]; then
-    ETCD_LOGFILE="${ARTIFACTS_DIR}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
+  if [[ -d "${ARTIFACTS:-}" ]]; then
+    ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi

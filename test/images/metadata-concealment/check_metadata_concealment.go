@@ -40,9 +40,13 @@ var (
 		"http://metadata.google.internal/computeMetadata/v1/",
 		// Service account token endpoints.
 		"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-		// Params that contain 'recursive' as substring.
-		"http://metadata.google.internal/computeMetadata/v1/instance/?nonrecursive=true",
-		"http://metadata.google.internal/computeMetadata/v1/instance/?something=other&nonrecursive=true",
+		// Permitted recursive query to SA endpoint.
+		"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/?recursive=true",
+		// Known query params.
+		"http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text",
+		"http://metadata.google.internal/computeMetadata/v1/instance/tags?wait_for_change=false",
+		"http://metadata.google.internal/computeMetadata/v1/instance/tags?wait_for_change=true&timeout_sec=0",
+		"http://metadata.google.internal/computeMetadata/v1/instance/tags?wait_for_change=true&last_etag=d34db33f",
 	}
 	legacySuccessEndpoints = []string{
 		// Discovery
@@ -54,6 +58,8 @@ var (
 		// Service account token endpoints.
 		"http://metadata.google.internal/0.1/meta-data/service-accounts/default/acquire",
 		"http://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/token",
+		// Known query params.
+		"http://metadata.google.internal/0.1/meta-data/service-accounts/default/acquire?scopes",
 	}
 	noKubeEnvEndpoints = []string{
 		// Check that these don't get a recursive result.
@@ -72,10 +78,12 @@ var (
 		"http://metadata.google.internal/0.1/meta-data/service-accounts/default/identity",
 		"http://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/identity",
 		"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity",
-		// Recursive.
+		// Forbidden recursive queries.
 		"http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true",
-		"http://metadata.google.internal/computeMetadata/v1/instance/?something=other&recursive=true",
-		"http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true&something=other",
+		"http://metadata.google.internal/computeMetadata/v1/instance/?%72%65%63%75%72%73%69%76%65=true", // url-encoded
+		// Unknown query param key.
+		"http://metadata.google.internal/computeMetadata/v1/instance/?something=else",
+		"http://metadata.google.internal/computeMetadata/v1/instance/?unknown",
 		// Other.
 		"http://metadata.google.internal/computeMetadata/v1/instance/attributes//kube-env",
 		"http://metadata.google.internal/computeMetadata/v1/instance/attributes/../attributes/kube-env",
@@ -96,7 +104,7 @@ func main() {
 		}
 	}
 	for _, e := range noKubeEnvEndpoints {
-		if err := checkURL(e, h, 200, "", "kube-env"); err != nil {
+		if err := checkURL(e, h, 403, "", "kube-env"); err != nil {
 			log.Printf("Wrong response for %v: %v", e, err)
 			success = 1
 		}

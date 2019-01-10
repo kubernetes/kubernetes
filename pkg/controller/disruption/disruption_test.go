@@ -23,9 +23,8 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -102,9 +101,9 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Extensions().V1beta1().Deployments(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().Deployments(),
+		informerFactory.Apps().V1().StatefulSets(),
 		nil,
 	)
 	dc.getUpdater = func() updater { return ps.Set }
@@ -120,9 +119,9 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Informer().GetStore(),
 		informerFactory.Core().V1().ReplicationControllers().Informer().GetStore(),
-		informerFactory.Extensions().V1beta1().ReplicaSets().Informer().GetStore(),
-		informerFactory.Extensions().V1beta1().Deployments().Informer().GetStore(),
-		informerFactory.Apps().V1beta1().StatefulSets().Informer().GetStore(),
+		informerFactory.Apps().V1().ReplicaSets().Informer().GetStore(),
+		informerFactory.Apps().V1().Deployments().Informer().GetStore(),
+		informerFactory.Apps().V1().StatefulSets().Informer().GetStore(),
 	}, ps
 }
 
@@ -192,7 +191,7 @@ func updatePodOwnerToRc(t *testing.T, pod *v1.Pod, rc *v1.ReplicationController)
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
 
-func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *extensions.ReplicaSet) {
+func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *apps.ReplicaSet) {
 	var controllerReference metav1.OwnerReference
 	var trueVar = true
 	controllerReference = metav1.OwnerReference{UID: rs.UID, APIVersion: controllerKindRS.GroupVersion().String(), Kind: controllerKindRS.Kind, Name: rs.Name, Controller: &trueVar}
@@ -258,8 +257,8 @@ func newReplicationController(t *testing.T, size int32) (*v1.ReplicationControll
 	return rc, rcName
 }
 
-func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
-	d := &extensions.Deployment{
+func newDeployment(t *testing.T, size int32) (*apps.Deployment, string) {
+	d := &apps.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
@@ -268,7 +267,7 @@ func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: &size,
 			Selector: newSelFooBar(),
 		},
@@ -282,8 +281,8 @@ func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 	return d, dName
 }
 
-func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
-	rs := &extensions.ReplicaSet{
+func newReplicaSet(t *testing.T, size int32) (*apps.ReplicaSet, string) {
+	rs := &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
@@ -292,7 +291,7 @@ func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: &size,
 			Selector: newSelFooBar(),
 		},

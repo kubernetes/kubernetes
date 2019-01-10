@@ -25,7 +25,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
 func TestCSIVolumeCountPredicate(t *testing.T) {
@@ -105,12 +104,12 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	}
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
+	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		node := getNodeWithPodAndVolumeLimits(test.existingPods, int64(test.maxVols), test.filterName)
 		pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIPVInfo("csi-ebs", "csi-ebs"), getFakeCSIPVCInfo("csi-ebs"))
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), node)
+		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}

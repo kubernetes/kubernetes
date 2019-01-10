@@ -121,6 +121,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
+	allErrs = append(allErrs, validatePSPAllowedProcMountTypes(fldPath.Child("allowedProcMountTypes"), spec.AllowedProcMountTypes)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
@@ -325,6 +326,17 @@ func validatePSPDefaultAllowPrivilegeEscalation(fldPath *field.Path, defaultAllo
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultAllowPrivilegeEscalation, "Cannot set DefaultAllowPrivilegeEscalation to true without also setting AllowPrivilegeEscalation to true"))
 	}
 
+	return allErrs
+}
+
+// validatePSPAllowedProcMountTypes validates the DefaultAllowPrivilegeEscalation field against the AllowPrivilegeEscalation field of a PodSecurityPolicy.
+func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes []core.ProcMountType) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, procMountType := range allowedProcMountTypes {
+		if err := apivalidation.ValidateProcMountType(fldPath.Index(i), procMountType); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
 	return allErrs
 }
 

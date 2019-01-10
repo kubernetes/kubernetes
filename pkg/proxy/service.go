@@ -74,6 +74,11 @@ func (info *BaseServiceInfo) GetHealthCheckNodePort() int {
 	return info.HealthCheckNodePort
 }
 
+// GetNodePort is part of the ServicePort interface.
+func (info *BaseServiceInfo) GetNodePort() int {
+	return info.NodePort
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {

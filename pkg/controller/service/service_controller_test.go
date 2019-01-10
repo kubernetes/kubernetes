@@ -43,7 +43,7 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 	return &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
 }
 
-//Wrap newService so that you dont have to call default argumetns again and again.
+//Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 
 	return newService("external-balancer", types.UID("123"), v1.ServiceTypeLoadBalancer)
@@ -325,8 +325,6 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 	}
 }
 
-// TODO(a-robinson): Add tests for update/sync/delete.
-
 func TestProcessServiceUpdate(t *testing.T) {
 	var controller *ServiceController
 
@@ -416,7 +414,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 }
 
 // TestConflictWhenProcessServiceUpdate tests if processServiceUpdate will
-// retry creating the load balancer if the update operation returns a conflict
+// retry creating the load balancer when the update operation returns a conflict
 // error.
 func TestConflictWhenProcessServiceUpdate(t *testing.T) {
 	svcName := "conflict-lb"
@@ -462,15 +460,14 @@ func TestSyncService(t *testing.T) {
 			key:      "invalid/key/string",
 			updateFn: func() {
 				controller, _, _ = newController()
-
 			},
 			expectedFn: func(e error) error {
-				//TODO: Expected error is of the format fmt.Errorf("unexpected key format: %q", "invalid/key/string"),
-				//TODO: should find a way to test for dependent package errors in such a way that it wont break
+				//TODO: should find a way to test for dependent package errors in such a way that it won't break
 				//TODO:	our tests, currently we only test if there is an error.
-				//Error should be non-nil
-				if e == nil {
-					return fmt.Errorf("Expected=unexpected key format: %q, Obtained=nil", "invalid/key/string")
+				//Error should be unexpected key format: "invalid/key/string"
+				expectedError := fmt.Sprintf("unexpected key format: %q", "invalid/key/string")
+				if e == nil || e.Error() != expectedError {
+					return fmt.Errorf("Expected=unexpected key format: %q, Obtained=%v", "invalid/key/string", e)
 				}
 				return nil
 			},
@@ -536,11 +533,11 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 	testCases := []struct {
 		testName   string
-		updateFn   func(*ServiceController) // Update function used to manupulate srv and controller values
+		updateFn   func(*ServiceController) // Update function used to manipulate srv and controller values
 		expectedFn func(svcErr error) error // Function to check if the returned value is expected
 	}{
 		{
-			testName: "If an non-existent service is deleted",
+			testName: "If a non-existent service is deleted",
 			updateFn: func(controller *ServiceController) {
 				// Does not do anything
 			},
@@ -717,7 +714,7 @@ func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
 	}
 }
 
-//All the testcases for ServiceCache uses a single cache, these below test cases should be run in order,
+//All the test cases for ServiceCache uses a single cache, these below test cases should be run in order,
 //as tc1 (addCache would add elements to the cache)
 //and tc2 (delCache would remove element from the cache without it adding automatically)
 //Please keep this in mind while adding new test cases.
@@ -827,7 +824,7 @@ func TestServiceCache(t *testing.T) {
 	}
 }
 
-//Test a utility functions as its not easy to unit test nodeSyncLoop directly
+//Test a utility functions as it's not easy to unit test nodeSyncLoop directly
 func TestNodeSlicesEqualForLB(t *testing.T) {
 	numNodes := 10
 	nArray := make([]*v1.Node, numNodes)

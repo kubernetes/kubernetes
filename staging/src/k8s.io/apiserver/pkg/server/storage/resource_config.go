@@ -23,6 +23,7 @@ import (
 // APIResourceConfigSource is the interface to determine which groups and versions are enabled
 type APIResourceConfigSource interface {
 	VersionEnabled(version schema.GroupVersion) bool
+	ResourceEnabled(resource schema.GroupVersionResource) bool
 	AnyVersionForGroupEnabled(group string) bool
 }
 
@@ -30,18 +31,21 @@ var _ APIResourceConfigSource = &ResourceConfig{}
 
 type ResourceConfig struct {
 	GroupVersionConfigs map[schema.GroupVersion]bool
+	ResourceConfigs     map[schema.GroupVersionResource]bool
 }
 
 func NewResourceConfig() *ResourceConfig {
-	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}}
+	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{}}
 }
 
+// DisableAll disables all group/versions. It does not modify individual resource enablement/disablement.
 func (o *ResourceConfig) DisableAll() {
 	for k := range o.GroupVersionConfigs {
 		o.GroupVersionConfigs[k] = false
 	}
 }
 
+// EnableAll enables all group/versions. It does not modify individual resource enablement/disablement.
 func (o *ResourceConfig) EnableAll() {
 	for k := range o.GroupVersionConfigs {
 		o.GroupVersionConfigs[k] = true
@@ -68,6 +72,29 @@ func (o *ResourceConfig) VersionEnabled(version schema.GroupVersion) bool {
 	}
 
 	return false
+}
+
+func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		o.ResourceConfigs[resource] = false
+	}
+}
+
+func (o *ResourceConfig) EnableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		o.ResourceConfigs[resource] = true
+	}
+}
+
+func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) bool {
+	if !o.VersionEnabled(resource.GroupVersion()) {
+		return false
+	}
+	resourceEnabled, explicitlySet := o.ResourceConfigs[resource]
+	if !explicitlySet {
+		return true
+	}
+	return resourceEnabled
 }
 
 func (o *ResourceConfig) AnyVersionForGroupEnabled(group string) bool {

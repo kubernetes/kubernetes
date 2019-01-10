@@ -278,6 +278,22 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 }
 
+func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
+	assert := assert.New(t)
+
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).Core().Nodes()
+	addressProvider := nodeAddressProvider{fakeNodeClient}
+
+	// Pass case with 1 External type IP (index == 1) and nodes (indexes 0 & 2) have no External IP.
+	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
+	nodes.Items[1].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
+	fakeNodeClient.Update(&nodes.Items[1])
+
+	addrs, err := addressProvider.externalAddresses()
+	assert.NoError(err, "addresses should not have returned an error.")
+	assert.Equal([]string{"127.0.0.1"}, addrs)
+}
+
 func decodeResponse(resp *http.Response, obj interface{}) error {
 	defer resp.Body.Close()
 

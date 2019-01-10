@@ -109,7 +109,7 @@ func (VolumeAttachmentStatus) SwaggerDoc() map[string]string {
 var map_VolumeError = map[string]string{
 	"":        "VolumeError captures an error encountered during a volume operation.",
 	"time":    "Time the error was encountered.",
-	"message": "String detailing the error encountered during Attach or Detach operation. This string maybe logged, so it should not contain sensitive information.",
+	"message": "String detailing the error encountered during Attach or Detach operation. This string may be logged, so it should not contain sensitive information.",
 }
 
 func (VolumeError) SwaggerDoc() map[string]string {

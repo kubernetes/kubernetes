@@ -44,8 +44,8 @@ func (v *ConfigValidator) Validate(config *configs.Config) error {
 	if err := v.intelrdt(config); err != nil {
 		return err
 	}
-	if config.Rootless {
-		if err := v.rootless(config); err != nil {
+	if config.RootlessEUID {
+		if err := v.rootlessEUID(config); err != nil {
 			return err
 		}
 	}
@@ -151,6 +151,16 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 				return fmt.Errorf("sysctl %q is not allowed in the hosts network namespace", s)
 			}
 		}
+		if config.Namespaces.Contains(configs.NEWUTS) {
+			switch s {
+			case "kernel.domainname":
+				// This is namespaced and there's no explicit OCI field for it.
+				continue
+			case "kernel.hostname":
+				// This is namespaced but there's a conflicting (dedicated) OCI field for it.
+				return fmt.Errorf("sysctl %q is not allowed as it conflicts with the OCI %q field", s, "hostname")
+			}
+		}
 		return fmt.Errorf("sysctl %q is not in a separate kernel namespace", s)
 	}
 
@@ -159,11 +169,22 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 
 func (v *ConfigValidator) intelrdt(config *configs.Config) error {
 	if config.IntelRdt != nil {
-		if !intelrdt.IsEnabled() {
-			return fmt.Errorf("intelRdt is specified in config, but Intel RDT feature is not supported or enabled")
+		if !intelrdt.IsCatEnabled() && !intelrdt.IsMbaEnabled() {
+			return fmt.Errorf("intelRdt is specified in config, but Intel RDT is not supported or enabled")
 		}
-		if config.IntelRdt.L3CacheSchema == "" {
-			return fmt.Errorf("intelRdt is specified in config, but intelRdt.l3CacheSchema is empty")
+
+		if !intelrdt.IsCatEnabled() && config.IntelRdt.L3CacheSchema != "" {
+			return fmt.Errorf("intelRdt.l3CacheSchema is specified in config, but Intel RDT/CAT is not enabled")
+		}
+		if !intelrdt.IsMbaEnabled() && config.IntelRdt.MemBwSchema != "" {
+			return fmt.Errorf("intelRdt.memBwSchema is specified in config, but Intel RDT/MBA is not enabled")
+		}
+
+		if intelrdt.IsCatEnabled() && config.IntelRdt.L3CacheSchema == "" {
+			return fmt.Errorf("Intel RDT/CAT is enabled and intelRdt is specified in config, but intelRdt.l3CacheSchema is empty")
+		}
+		if intelrdt.IsMbaEnabled() && config.IntelRdt.MemBwSchema == "" {
+			return fmt.Errorf("Intel RDT/MBA is enabled and intelRdt is specified in config, but intelRdt.memBwSchema is empty")
 		}
 	}
 

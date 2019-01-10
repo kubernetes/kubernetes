@@ -131,8 +131,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 		case PatchActionImpl:
 			obj, err := tracker.Get(gvr, ns, action.GetName())
 			if err != nil {
-				// object is not registered
-				return false, nil, err
+				return true, nil, err
 			}
 
 			old, err := json.Marshal(obj)
@@ -339,8 +338,10 @@ func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watc
 		if w := t.watchers[gvr][ns]; w != nil {
 			watches = append(watches, w...)
 		}
-		if w := t.watchers[gvr][""]; w != nil {
-			watches = append(watches, w...)
+		if ns != metav1.NamespaceAll {
+			if w := t.watchers[gvr][metav1.NamespaceAll]; w != nil {
+				watches = append(watches, w...)
+			}
 		}
 	}
 	return watches

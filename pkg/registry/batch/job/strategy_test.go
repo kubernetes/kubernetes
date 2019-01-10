@@ -25,6 +25,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -121,10 +122,39 @@ func TestJobStrategy(t *testing.T) {
 		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
 	}
 
+	// set TTLSecondsAfterFinished on both old and new jobs
+	job.Spec.TTLSecondsAfterFinished = newInt32(1)
+	updatedJob.Spec.TTLSecondsAfterFinished = newInt32(2)
+
+	// Existing TTLSecondsAfterFinished should be preserved when feature is on
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, true)()
+	Strategy.PrepareForUpdate(ctx, updatedJob, job)
+	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
+		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
+	}
+
+	// Existing TTLSecondsAfterFinished should be preserved when feature is off
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, false)()
+	Strategy.PrepareForUpdate(ctx, updatedJob, job)
+	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
+		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
+	}
+
 	// Make sure we correctly implement the interface.
 	// Otherwise a typo could silently change the default.
 	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	if got, want := gcds.DefaultGarbageCollectionPolicy(genericapirequest.NewContext()), rest.OrphanDependents; got != want {
+	if got, want := gcds.DefaultGarbageCollectionPolicy(genericapirequest.NewContext()), rest.DeleteDependents; got != want {
+		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
+	}
+
+	var (
+		v1Ctx           = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v1", Resource: "jobs"})
+		otherVersionCtx = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v100", Resource: "jobs"})
+	)
+	if got, want := gcds.DefaultGarbageCollectionPolicy(v1Ctx), rest.OrphanDependents; got != want {
+		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
+	}
+	if got, want := gcds.DefaultGarbageCollectionPolicy(otherVersionCtx), rest.DeleteDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
 	}
 }

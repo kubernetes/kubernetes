@@ -12,6 +12,7 @@ go_test(
     srcs = [
         "audit_test.go",
         "crd_test.go",
+        "graceful_shutdown_test.go",
         "kms_transformation_test.go",
         "kube_apiserver_test.go",
         "main_test.go",
@@ -22,7 +23,6 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/master:go_default_library",

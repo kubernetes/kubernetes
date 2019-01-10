@@ -31,6 +31,6 @@ spec:
         - name: MEMORY_REQUEST
           value: 200Mi
         - name: CPU_LIMIT
-          value: 1000m
+          value: "1"
         - name: MEMORY_LIMIT
           value: 500Mi

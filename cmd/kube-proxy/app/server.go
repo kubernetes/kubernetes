@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
+	v1 "k8s.io/api/core/v1"
+	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
+	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -208,7 +209,7 @@ func (o *Options) Complete() error {
 		return err
 	}
 
-	if err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
 		return err
 	}
 
@@ -421,7 +422,7 @@ type ProxyServer struct {
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config apimachineryconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
 	var kubeConfig *rest.Config
 	var err error
 
@@ -537,10 +538,11 @@ func (s *ProxyServer) Run() error {
 				// the only remediation we know is to restart the docker daemon.
 				// Here we'll send an node event with specific reason and message, the
 				// administrator should decide whether and how to handle this issue,
-				// whether to drain the node and restart docker.
+				// whether to drain the node and restart docker.  Occurs in other container runtimes
+				// as well.
 				// TODO(random-liu): Remove this when the docker bug is fixed.
-				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: " +
-					"cannot modify conntrack limits, problems may arise later."
+				const message = "CRI error: /sys is read-only: " +
+					"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
 				s.Recorder.Eventf(s.NodeRef, api.EventTypeWarning, err.Error(), message)
 			}
 		}
@@ -560,7 +562,10 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(s.Client, s.ConfigSyncPeriod)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
+			options.LabelSelector = "!service.kubernetes.io/service-proxy-name"
+		}))
 
 	// Create configs (i.e. Watches for Services and Endpoints)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources

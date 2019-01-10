@@ -20,7 +20,7 @@ type: Opaque
 data:
   service-account.json: {{.ServiceAccountCredentials}}
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: logexporter

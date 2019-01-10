@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "compression_test.go",
+        "content_type_test.go",
         "cors_test.go",
         "maxinflight_test.go",
         "timeout_test.go",
@@ -32,6 +33,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "compression.go",
+        "content_type.go",
         "cors.go",
         "doc.go",
         "longrunning.go",

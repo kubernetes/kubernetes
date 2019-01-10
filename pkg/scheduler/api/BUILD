@@ -22,7 +22,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 
@@ -37,6 +36,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/scheduler/api/compatibility:all-srcs",
         "//pkg/scheduler/api/latest:all-srcs",
         "//pkg/scheduler/api/v1:all-srcs",
         "//pkg/scheduler/api/validation:all-srcs",

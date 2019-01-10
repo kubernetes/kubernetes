@@ -124,13 +124,17 @@ type initData struct {
 }
 
 // NewCmdInit returns "kubeadm init" command.
-func NewCmdInit(out io.Writer) *cobra.Command {
-	initOptions := newInitOptions()
+// NB. initOptions is exposed as parameter for allowing unit testing of
+//     the newInitOptions method, that implements all the command options validation logic
+func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
+	if initOptions == nil {
+		initOptions = newInitOptions()
+	}
 	initRunner := workflow.NewRunner()
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this command in order to set up the Kubernetes master.",
+		Short: "Run this command in order to set up the Kubernetes control plane.",
 		Run: func(cmd *cobra.Command, args []string) {
 			c, err := initRunner.InitData()
 			kubeadmutil.CheckErr(err)
@@ -192,7 +196,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
-		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
+		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
 	)
 	flagSet.Int32Var(
 		&cfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
@@ -289,7 +293,9 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return initData{}, err
+	}
 
 	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return initData{}, err

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -74,14 +75,6 @@ func featureToggle(feature utilfeature.Feature) []string {
 }
 
 func TestValidateJob(t *testing.T) {
-	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
-	defer func() {
-		err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.TTLAfterFinished, ttlEnabled))
-		if err != nil {
-			t.Fatalf("Failed to set feature gate for %s: %v", features.TTLAfterFinished, err)
-		}
-	}()
-
 	validManualSelector := getValidManualSelector()
 	validPodTemplateSpecForManual := getValidPodTemplateSpecForManual(validManualSelector)
 	validGeneratedSelector := getValidGeneratedSelector()
@@ -231,11 +224,8 @@ func TestValidateJob(t *testing.T) {
 		},
 	}
 
-	for _, setFeature := range featureToggle(features.TTLAfterFinished) {
-		// Set error cases based on if TTLAfterFinished feature is enabled or not
-		if err := utilfeature.DefaultFeatureGate.Set(setFeature); err != nil {
-			t.Fatalf("Failed to set feature gate for %s: %v", features.TTLAfterFinished, err)
-		}
+	for _, setFeature := range []bool{true, false} {
+		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, setFeature)()
 		ttlCase := "spec.ttlSecondsAfterFinished:must be greater than or equal to 0"
 		if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 			errorCases[ttlCase] = batch.Job{

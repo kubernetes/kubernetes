@@ -355,9 +355,8 @@ type fcDisk struct {
 }
 
 func (fc *fcDisk) GetPath() string {
-	name := fcPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(name), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(fcPluginName), fc.volName)
 }
 
 func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
@@ -370,8 +369,7 @@ func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
 }
 
 func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
-	name := fcPluginName
-	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(name)), fc.volName
+	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(fcPluginName)), fc.volName
 }
 
 type fcDiskMounter struct {
@@ -462,9 +460,8 @@ func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	if err != nil {
 		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", mapPath, err)
 	}
-	klog.V(4).Infof("fc: %q is unmounted, deleting the directory", mapPath)
-	err = os.RemoveAll(mapPath)
-	if err != nil {
+	klog.V(4).Infof("fc: %s is unmounted, deleting the directory", mapPath)
+	if err = os.RemoveAll(mapPath); err != nil {
 		return fmt.Errorf("fc: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
 	klog.V(4).Infof("fc: successfully detached disk: %s", mapPath)

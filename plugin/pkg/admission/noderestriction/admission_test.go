@@ -868,7 +868,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of my node with forbidden labels",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, false, mynode),
-			err:        `cannot set labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo`,
+			err:        `is not allowed to set the following labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo`,
 		},
 		{
 			name:       "allow update of my node",
@@ -892,7 +892,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of my node with non-nil configSource",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(mynodeObjConfigA, nil, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Create, false, mynode),
-			err:        "create with non-nil configSource",
+			err:        "is not allowed to create pods with a non-nil configSource",
 		},
 		{
 			name:       "forbid update of my node: nil configSource to new non-nil configSource",
@@ -964,37 +964,37 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid update of my node: add taints",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify taints",
+			err:        "is not allowed to modify taints",
 		},
 		{
 			name:       "forbid update of my node: remove taints",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjTaintA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify taints",
+			err:        "is not allowed to modify taints",
 		},
 		{
 			name:       "forbid update of my node: change taints",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintB, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify taints",
+			err:        "is not allowed to modify taints",
 		},
 		{
 			name:       "forbid update of my node: add labels",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(setForbiddenUpdateLabels(mynodeObj, ""), mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        `cannot modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
+			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 		{
 			name:       "forbid update of my node: remove labels",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, setForbiddenUpdateLabels(mynodeObj, ""), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        `cannot modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
+			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 		{
 			name:       "forbid update of my node: change labels",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(setForbiddenUpdateLabels(mynodeObj, "new"), setForbiddenUpdateLabels(mynodeObj, "old"), nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        `cannot modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
+			err:        `is not allowed to modify labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 
 		// Other node object
@@ -1002,31 +1002,31 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of other node",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, nil, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Create, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid create of other node pulling name from object",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, nil, nodeKind, othernodeObj.Namespace, "", nodeResource, "", admission.Create, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid update of other node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, othernodeObj, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Update, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid delete of other node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "", admission.Delete, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 		{
 			name:       "forbid update of other node status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(othernodeObj, othernodeObj, nodeKind, othernodeObj.Namespace, othernodeObj.Name, nodeResource, "status", admission.Update, false, mynode),
-			err:        "cannot modify node",
+			err:        "is not allowed to modify node",
 		},
 
 		// Service accounts

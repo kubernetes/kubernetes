@@ -15,6 +15,9 @@ package prometheus
 
 import (
 	"strings"
+	"time"
+
+	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -43,9 +46,8 @@ type Metric interface {
 	// While populating dto.Metric, it is the responsibility of the
 	// implementation to ensure validity of the Metric protobuf (like valid
 	// UTF-8 strings or syntactically valid metric and label names). It is
-	// recommended to sort labels lexicographically. (Implementers may find
-	// LabelPairSorter useful for that.) Callers of Write should still make
-	// sure of sorting if they depend on it.
+	// recommended to sort labels lexicographically. Callers of Write should
+	// still make sure of sorting if they depend on it.
 	Write(*dto.Metric) error
 	// TODO(beorn7): The original rationale of passing in a pre-allocated
 	// dto.Metric protobuf to save allocations has disappeared. The
@@ -57,8 +59,9 @@ type Metric interface {
 // implementation XXX has its own XXXOpts type, but in most cases, it is just be
 // an alias of this type (which might change when the requirement arises.)
 //
-// It is mandatory to set Name and Help to a non-empty string. All other fields
-// are optional and can safely be left at their zero value.
+// It is mandatory to set Name to a non-empty string. All other fields are
+// optional and can safely be left at their zero value, although it is strongly
+// encouraged to set a Help string.
 type Opts struct {
 	// Namespace, Subsystem, and Name are components of the fully-qualified
 	// name of the Metric (created by joining these components with
@@ -69,7 +72,7 @@ type Opts struct {
 	Subsystem string
 	Name      string
 
-	// Help provides information about this metric. Mandatory!
+	// Help provides information about this metric.
 	//
 	// Metrics with the same fully-qualified name must have the same Help
 	// string.
@@ -79,20 +82,12 @@ type Opts struct {
 	// with the same fully-qualified name must have the same label names in
 	// their ConstLabels.
 	//
-	// Note that in most cases, labels have a value that varies during the
-	// lifetime of a process. Those labels are usually managed with a metric
-	// vector collector (like CounterVec, GaugeVec, UntypedVec). ConstLabels
-	// serve only special purposes. One is for the special case where the
-	// value of a label does not change during the lifetime of a process,
-	// e.g. if the revision of the running binary is put into a
-	// label. Another, more advanced purpose is if more than one Collector
-	// needs to collect Metrics with the same fully-qualified name. In that
-	// case, those Metrics must differ in the values of their
-	// ConstLabels. See the Collector examples.
-	//
-	// If the value of a label never changes (not even between binaries),
-	// that label most likely should not be a label at all (but part of the
-	// metric name).
+	// ConstLabels are only used rarely. In particular, do not use them to
+	// attach the same labels to all your metrics. Those use cases are
+	// better covered by target labels set by the scraping Prometheus
+	// server, or by one specific metric (e.g. a build_info or a
+	// machine_role metric). See also
+	// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels,-not-static-scraped-labels
 	ConstLabels Labels
 }
 
@@ -118,35 +113,20 @@ func BuildFQName(namespace, subsystem, name string) string {
 	return name
 }
 
-// LabelPairSorter implements sort.Interface. It is used to sort a slice of
-// dto.LabelPair pointers. This is useful for implementing the Write method of
-// custom metrics.
-type LabelPairSorter []*dto.LabelPair
+// labelPairSorter implements sort.Interface. It is used to sort a slice of
+// dto.LabelPair pointers.
+type labelPairSorter []*dto.LabelPair
 
-func (s LabelPairSorter) Len() int {
+func (s labelPairSorter) Len() int {
 	return len(s)
 }
 
-func (s LabelPairSorter) Swap(i, j int) {
+func (s labelPairSorter) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s LabelPairSorter) Less(i, j int) bool {
+func (s labelPairSorter) Less(i, j int) bool {
 	return s[i].GetName() < s[j].GetName()
-}
-
-type hashSorter []uint64
-
-func (s hashSorter) Len() int {
-	return len(s)
-}
-
-func (s hashSorter) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s hashSorter) Less(i, j int) bool {
-	return s[i] < s[j]
 }
 
 type invalidMetric struct {
@@ -164,3 +144,31 @@ func NewInvalidMetric(desc *Desc, err error) Metric {
 func (m *invalidMetric) Desc() *Desc { return m.desc }
 
 func (m *invalidMetric) Write(*dto.Metric) error { return m.err }
+
+type timestampedMetric struct {
+	Metric
+	t time.Time
+}
+
+func (m timestampedMetric) Write(pb *dto.Metric) error {
+	e := m.Metric.Write(pb)
+	pb.TimestampMs = proto.Int64(m.t.Unix()*1000 + int64(m.t.Nanosecond()/1000000))
+	return e
+}
+
+// NewMetricWithTimestamp returns a new Metric wrapping the provided Metric in a
+// way that it has an explicit timestamp set to the provided Time. This is only
+// useful in rare cases as the timestamp of a Prometheus metric should usually
+// be set by the Prometheus server during scraping. Exceptions include mirroring
+// metrics with given timestamps from other metric
+// sources.
+//
+// NewMetricWithTimestamp works best with MustNewConstMetric,
+// MustNewConstHistogram, and MustNewConstSummary, see example.
+//
+// Currently, the exposition formats used by Prometheus are limited to
+// millisecond resolution. Thus, the provided time will be rounded down to the
+// next full millisecond value.
+func NewMetricWithTimestamp(t time.Time, m Metric) Metric {
+	return timestampedMetric{Metric: m, t: t}
+}

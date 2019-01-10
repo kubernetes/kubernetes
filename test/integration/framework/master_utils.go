@@ -17,10 +17,12 @@ limitations under the License.
 package framework
 
 import (
+	"flag"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -111,6 +113,13 @@ func (h *MasterHolder) SetMaster(m *master.Master) {
 func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	var m *master.Master
 	var s *httptest.Server
+
+	// Ensure we log at least level 4
+	v := flag.Lookup("v").Value
+	level, _ := strconv.Atoi(v.String())
+	if level < 4 {
+		v.Set("4")
+	}
 
 	if incomingServer != nil {
 		s = incomingServer
@@ -242,7 +251,7 @@ func NewMasterConfig() *master.Config {
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
 	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
-	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURL()}
+	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
 
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
@@ -341,7 +350,7 @@ func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, mast
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
 func SharedEtcd() *storagebackend.Config {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
-	cfg.ServerList = []string{GetEtcdURL()}
+	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }
 

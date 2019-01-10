@@ -344,8 +344,7 @@ func (o *LabelOptions) RunLabel() error {
 		if err != nil {
 			return err
 		}
-		printer.PrintObj(info.Object, o.Out)
-		return nil
+		return printer.PrintObj(info.Object, o.Out)
 	})
 }
 

@@ -38,7 +38,7 @@ const (
 	baseHeapsterServiceAddress = "/api/v1/namespaces/kube-system/services/http:heapster:/proxy"
 	baseMetricsAddress         = baseHeapsterServiceAddress + "/apis/metrics"
 	baseMetricsServerAddress   = "/apis/metrics.k8s.io/v1beta1"
-	metricsApiVersion          = "v1alpha1"
+	metricsAPIVersion          = "v1alpha1"
 )
 
 func TestTopSubcommandsExist(t *testing.T) {

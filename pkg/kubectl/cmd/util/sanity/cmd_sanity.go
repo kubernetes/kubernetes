@@ -28,20 +28,27 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
+// CmdCheck is the commom type of functions to check cobra commands
 type CmdCheck func(cmd *cobra.Command) []error
+
+// GlobalCheck is the common type of functions to check global flags
 type GlobalCheck func() []error
 
 var (
+	// AllCmdChecks is the list of CmdCheck type functions
 	AllCmdChecks = []CmdCheck{
 		CheckLongDesc,
 		CheckExamples,
 		CheckFlags,
 	}
+
+	// AllGlobalChecks is the list of GlobalCheck type functions
 	AllGlobalChecks = []GlobalCheck{
 		CheckGlobalVarFlags,
 	}
 )
 
+// RunGlobalChecks runs all the GlobalCheck functions passed and checks for error
 func RunGlobalChecks(globalChecks []GlobalCheck) []error {
 	fmt.Fprint(os.Stdout, "---+ RUNNING GLOBAL CHECKS\n")
 	errors := []error{}
@@ -51,6 +58,7 @@ func RunGlobalChecks(globalChecks []GlobalCheck) []error {
 	return errors
 }
 
+// RunCmdChecks runs all the CmdCheck functions passed, skipping skippable commands and looks for error
 func RunCmdChecks(cmd *cobra.Command, cmdChecks []CmdCheck, skipCmd []string) []error {
 	cmdPath := cmd.CommandPath()
 
@@ -80,6 +88,7 @@ func RunCmdChecks(cmd *cobra.Command, cmdChecks []CmdCheck, skipCmd []string) []
 	return errors
 }
 
+// CheckLongDesc checks if the long description is valid
 func CheckLongDesc(cmd *cobra.Command) []error {
 	fmt.Fprint(os.Stdout, "   ↳ checking long description\n")
 	cmdPath := cmd.CommandPath()
@@ -92,6 +101,7 @@ func CheckLongDesc(cmd *cobra.Command) []error {
 	return nil
 }
 
+// CheckExamples checks if the command examples are valid
 func CheckExamples(cmd *cobra.Command) []error {
 	fmt.Fprint(os.Stdout, "   ↳ checking examples\n")
 	cmdPath := cmd.CommandPath()
@@ -110,6 +120,7 @@ func CheckExamples(cmd *cobra.Command) []error {
 	return errors
 }
 
+// CheckFlags checks if the command-line flags are valid
 func CheckFlags(cmd *cobra.Command) []error {
 	allFlagsSlice := []*pflag.Flag{}
 
@@ -140,6 +151,7 @@ func CheckFlags(cmd *cobra.Command) []error {
 	return errors
 }
 
+// CheckGlobalVarFlags checks if the global flags are valid
 func CheckGlobalVarFlags() []error {
 	fmt.Fprint(os.Stdout, "   ↳ checking flags from global vars\n")
 	errors := []error{}

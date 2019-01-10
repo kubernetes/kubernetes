@@ -43,19 +43,20 @@ type statefulSetStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
 var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+// DefaultGarbageCollectionPolicy returns OrphanDependents for apps/v1beta1 and apps/v1beta2 for backwards compatibility,
+// and DeleteDependents for all other versions.
 func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		switch groupVersion {
-		case appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
-			// for back compatibility
-			return rest.OrphanDependents
-		default:
-			return rest.DeleteDependents
-		}
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
-	return rest.OrphanDependents
+	switch groupVersion {
+	case appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all StatefulSet' need to be within a namespace.
@@ -71,7 +72,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 
 	statefulSet.Generation = 1
 
-	pod.DropDisabledAlphaFields(&statefulSet.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -81,8 +82,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	// Update is not allowed to set status
 	newStatefulSet.Status = oldStatefulSet.Status
 
-	pod.DropDisabledAlphaFields(&newStatefulSet.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldStatefulSet.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.

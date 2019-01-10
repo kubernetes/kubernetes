@@ -590,6 +590,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager, checkpointManager)
 
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
+
 	if remoteRuntimeEndpoint != "" {
 		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
 		if remoteImageEndpoint == "" {
@@ -705,7 +707,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.resourceAnalyzer,
 			klet.podManager,
 			klet.runtimeCache,
-			klet.containerRuntime)
+			klet.containerRuntime,
+			klet.statusManager)
 	} else {
 		klet.StatsProvider = stats.NewCRIStatsProvider(
 			klet.cadvisor,
@@ -753,8 +756,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	} else {
 		klet.containerLogManager = logs.NewStubContainerLogManager()
 	}
-
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
@@ -1064,15 +1065,15 @@ type Kubelet struct {
 	lastStatusReportTime time.Time
 
 	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
-	// This lock is used by Kublet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	syncNodeStatusMux sync.Mutex
 
 	// updatePodCIDRMux is a lock on updating pod CIDR, because this path is not thread-safe.
-	// This lock is used by Kublet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	updatePodCIDRMux sync.Mutex
 
 	// updateRuntimeMux is a lock on updating runtime, because this path is not thread-safe.
-	// This lock is used by Kublet.updateRuntimeUp function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.updateRuntimeUp function and shouldn't be used anywhere else.
 	updateRuntimeMux sync.Mutex
 
 	// nodeLeaseController claims and renews the node lease for this Kubelet
@@ -1219,29 +1220,6 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
-}
-
-func allGlobalUnicastIPs() ([]net.IP, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("could not list network interfaces: %v", err)
-	}
-	var ips []net.IP
-	for _, i := range interfaces {
-		addresses, err := i.Addrs()
-		if err != nil {
-			return nil, fmt.Errorf("could not list the addresses for network interface %v: %v", i, err)
-		}
-		for _, address := range addresses {
-			switch v := address.(type) {
-			case *net.IPNet:
-				if v.IP.IsGlobalUnicast() {
-					ips = append(ips, v.IP)
-				}
-			}
-		}
-	}
-	return ips, nil
 }
 
 // setupDataDirs creates:

@@ -73,7 +73,7 @@ type ApplyOptions struct {
 	cmdBaseName                string
 	All                        bool
 	Overwrite                  bool
-	OpenApiPatch               bool
+	OpenAPIPatch               bool
 	PruneWhitelist             []string
 	ShouldIncludeUninitialized bool
 
@@ -93,7 +93,7 @@ type ApplyOptions struct {
 const (
 	// maxPatchRetry is the maximum number of conflicts retry for during a patch operation before returning failure
 	maxPatchRetry = 5
-	// backOffPeriod is the period to back off when apply patch resutls in error.
+	// backOffPeriod is the period to back off when apply patch results in error.
 	backOffPeriod = 1 * time.Second
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
@@ -133,7 +133,7 @@ func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
-		OpenApiPatch: true,
+		OpenAPIPatch: true,
 
 		Recorder: genericclioptions.NoopRecorder{},
 
@@ -141,6 +141,7 @@ func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 	}
 }
 
+// NewCmdApply creates the `apply` command
 func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewApplyOptions(ioStreams)
 
@@ -174,7 +175,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().BoolVar(&o.OpenApiPatch, "openapi-patch", o.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
@@ -258,7 +259,7 @@ func validatePruneAll(prune, all bool, selector string) error {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 	if prune && !all && selector == "" {
-		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector.")
+		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
 	}
 	return nil
 }
@@ -296,7 +297,7 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 
 func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
-	if o.OpenApiPatch {
+	if o.OpenAPIPatch {
 		openapiSchema = o.OpenAPISchema
 	}
 
@@ -343,6 +344,13 @@ func (o *ApplyOptions) Run() error {
 			return err
 		}
 
+		// If server-dry-run is requested but the type doesn't support it, fail right away.
+		if o.ServerDryRun {
+			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
+
 		if info.Namespaced() {
 			visitedNamespaces.Insert(info.Namespace)
 		}
@@ -365,12 +373,6 @@ func (o *ApplyOptions) Run() error {
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
-			}
-			// If server-dry-run is requested but the type doesn't support it, fail right away.
-			if o.ServerDryRun {
-				if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return err
-				}
 			}
 
 			// Create the resource if it doesn't exist
@@ -574,12 +576,11 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
 			{"batch", "v1beta1", "CronJob", true},
-			{"extensions", "v1beta1", "DaemonSet", true},
-			{"extensions", "v1beta1", "Deployment", true},
 			{"extensions", "v1beta1", "Ingress", true},
-			{"extensions", "v1beta1", "ReplicaSet", true},
-			{"apps", "v1beta1", "StatefulSet", true},
-			{"apps", "v1beta1", "Deployment", true},
+			{"apps", "v1", "DaemonSet", true},
+			{"apps", "v1", "Deployment", true},
+			{"apps", "v1", "ReplicaSet", true},
+			{"apps", "v1", "StatefulSet", true},
 		}
 	}
 
@@ -901,7 +902,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		// but still propagate and advertise error to user
 		recreated, recreateErr := p.Helper.Create(namespace, true, original, &options)
 		if recreateErr != nil {
-			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
+			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v", err, recreateErr)
 		} else {
 			createdObject = recreated
 		}

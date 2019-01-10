@@ -92,7 +92,7 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(pod *v1.Pod, container 
 // * run the post start lifecycle hooks (if applicable)
 func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, containerType kubecontainer.ContainerType) (string, error) {
 	// Step 1: pull the image.
-	imageRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
+	imageRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets, podSandboxConfig)
 	if err != nil {
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return msg, err
@@ -394,7 +394,8 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 	for i, c := range containers {
 		status, err := m.runtimeService.ContainerStatus(c.Id)
 		if err != nil {
-			klog.Errorf("ContainerStatus for %s error: %v", c.Id, err)
+			// Merely log this here; GetPodStatus will actually report the error out.
+			klog.V(4).Infof("ContainerStatus for %s error: %v", c.Id, err)
 			return nil, err
 		}
 		cStatus := toKubeContainerStatus(status, m.runtimeName)
@@ -583,7 +584,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		klog.V(3).Infof("Container %q exited normally", containerID.String())
 	}
 
-	message := fmt.Sprintf("Killing container with id %s", containerID.String())
+	message := fmt.Sprintf("Killing container %s", containerID.String())
 	if reason != "" {
 		message = fmt.Sprint(message, ":", reason)
 	}

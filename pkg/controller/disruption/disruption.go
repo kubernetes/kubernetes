@@ -31,17 +31,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyclientset "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -79,13 +77,13 @@ type DisruptionController struct {
 	rcLister       corelisters.ReplicationControllerLister
 	rcListerSynced cache.InformerSynced
 
-	rsLister       extensionslisters.ReplicaSetLister
+	rsLister       appsv1listers.ReplicaSetLister
 	rsListerSynced cache.InformerSynced
 
-	dLister       extensionslisters.DeploymentLister
+	dLister       appsv1listers.DeploymentLister
 	dListerSynced cache.InformerSynced
 
-	ssLister       appslisters.StatefulSetLister
+	ssLister       appsv1listers.StatefulSetLister
 	ssListerSynced cache.InformerSynced
 
 	// PodDisruptionBudget keys that need to be synced.
@@ -113,9 +111,9 @@ func NewDisruptionController(
 	podInformer coreinformers.PodInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	rcInformer coreinformers.ReplicationControllerInformer,
-	rsInformer extensionsinformers.ReplicaSetInformer,
-	dInformer extensionsinformers.DeploymentInformer,
-	ssInformer appsinformers.StatefulSetInformer,
+	rsInformer appsv1informers.ReplicaSetInformer,
+	dInformer appsv1informers.DeploymentInformer,
+	ssInformer appsv1informers.StatefulSetInformer,
 	kubeClient clientset.Interface,
 ) *DisruptionController {
 	dc := &DisruptionController{

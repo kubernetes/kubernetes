@@ -49,8 +49,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
@@ -97,6 +97,14 @@ const (
 type gceObject interface {
 	MarshalJSON() ([]byte, error)
 }
+
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var _ cloudprovider.Clusters = (*Cloud)(nil)
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type Cloud struct {
@@ -764,9 +772,6 @@ func isProjectNumber(idOrNumber string) bool {
 	_, err := strconv.ParseUint(idOrNumber, 10, 64)
 	return err == nil
 }
-
-// Cloud implements cloudprovider.Interface.
-var _ cloudprovider.Interface = (*Cloud)(nil)
 
 func gceNetworkURL(apiEndpoint, project, network string) string {
 	if apiEndpoint == "" {

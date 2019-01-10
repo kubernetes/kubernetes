@@ -67,7 +67,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 					KubernetesVersion: "v1.7.0",
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
-							DataDir: "/var/lib/etcd",
+							DataDir: tmpdir + "/etcd",
 						},
 					},
 				},

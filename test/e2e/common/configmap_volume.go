@@ -18,7 +18,6 @@ package common
 
 import (
 	"fmt"
-	"os"
 	"path"
 
 	. "github.com/onsi/ginkgo"
@@ -642,17 +641,14 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 
 	if defaultMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = defaultMode
-	} else {
-		mode := int32(0644)
-		defaultMode = &mode
 	}
 
-	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
+	fileModeRegexp := framework.GetFileModeRegex("/etc/configmap-volume/data-1", defaultMode)
 	output := []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
-		"mode of file \"/etc/configmap-volume/data-1\": " + modeString,
+		fileModeRegexp,
 	}
-	f.TestContainerOutput("consume configMaps", pod, 0, output)
+	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
@@ -728,9 +724,6 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 
 	if itemMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
-	} else {
-		mode := int32(0644)
-		itemMode = &mode
 	}
 
 	// Just check file mode if fsGroup is not set. If fsGroup is set, the
@@ -739,10 +732,10 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
 	}
 	if fsGroup == 0 {
-		modeString := fmt.Sprintf("%v", os.FileMode(*itemMode))
-		output = append(output, "mode of file \"/etc/configmap-volume/path/to/data-2\": "+modeString)
+		fileModeRegexp := framework.GetFileModeRegex("/etc/configmap-volume/path/to/data-2", itemMode)
+		output = append(output, fileModeRegexp)
 	}
-	f.TestContainerOutput("consume configMaps", pod, 0, output)
+	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
 func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podName string) error {

@@ -179,7 +179,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 
 	// kubectl create -f deploy.yaml
 	deploymentName := "sample-apiserver-deployment"
-	etcdImage := "quay.io/coreos/etcd:v3.2.24"
+	etcdImage := "quay.io/coreos/etcd:v3.3.10"
 	podLabels := map[string]string{"app": "sample-apiserver", "apiserver": "true"}
 	replicas := int32(1)
 	zero := int64(0)

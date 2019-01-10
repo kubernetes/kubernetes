@@ -30,7 +30,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -370,7 +370,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Role", Type: "string", Priority: 1, Description: rbacv1beta1.RoleBinding{}.SwaggerDoc()["roleRef"]},
 		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the roleBinding"},
-		{Name: "Groups", Type: "string", Priority: 1, Description: "Gruops in the roleBinding"},
+		{Name: "Groups", Type: "string", Priority: 1, Description: "Groups in the roleBinding"},
 		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
 	}
 	h.TableHandler(roleBindingsColumnDefinitions, printRoleBinding)
@@ -380,9 +380,9 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Role", Type: "string", Priority: 1, Description: rbacv1beta1.ClusterRoleBinding{}.SwaggerDoc()["roleRef"]},
-		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the roleBinding"},
-		{Name: "Groups", Type: "string", Priority: 1, Description: "Gruops in the roleBinding"},
-		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
+		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the clusterRoleBinding"},
+		{Name: "Groups", Type: "string", Priority: 1, Description: "Groups in the clusterRoleBinding"},
+		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the clusterRoleBinding"},
 	}
 	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBinding)
 	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBindingList)
@@ -398,7 +398,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	leaseColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Holder", Type: "string", Description: coordinationv1beta1.LeaseSpec{}.SwaggerDoc()["holderIdentity"]},
+		{Name: "Holder", Type: "string", Description: coordinationv1.LeaseSpec{}.SwaggerDoc()["holderIdentity"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(leaseColumnDefinitions, printLease)

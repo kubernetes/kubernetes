@@ -19,7 +19,7 @@ package predicates
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // FindLabelsInSet gets as many key/value pairs as possible out of a label set.
@@ -68,7 +68,7 @@ func CreateSelectorFromLabels(aL map[string]string) labels.Selector {
 
 // portsConflict check whether existingPorts and wantPorts conflict with each other
 // return true if we have a conflict
-func portsConflict(existingPorts schedulercache.HostPortInfo, wantPorts []*v1.ContainerPort) bool {
+func portsConflict(existingPorts schedulernodeinfo.HostPortInfo, wantPorts []*v1.ContainerPort) bool {
 	for _, cp := range wantPorts {
 		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
 			return true

@@ -319,6 +319,19 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
+	// wait for delete to be observed and reacted to via watch
+	wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		sa, err := c.Core().ServiceAccounts(myns).Get(readOnlyServiceAccountName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, secretRef := range sa.Secrets {
+			if secretRef.Name == roTokenName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 	doServiceAccountAPIRequests(t, roClient, myns, false, false, false)
 
 	// Create "rw" user in myns
@@ -363,6 +376,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
 	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
 	externalRootClientset := kubernetes.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
+
+	externalInformers := informers.NewSharedInformerFactory(externalRootClientset, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
+
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
@@ -373,7 +390,12 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		return nil, false, nil
 	})
 	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(rootClientset)
+	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(
+		rootClientset,
+		externalInformers.Core().V1().Secrets().Lister(),
+		externalInformers.Core().V1().ServiceAccounts().Lister(),
+		externalInformers.Core().V1().Pods().Lister(),
+	)
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
@@ -418,9 +440,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
 	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
-	externalInformers := informers.NewSharedInformerFactory(externalRootClientset, controller.NoResyncPeriodFunc())
 	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
-	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true

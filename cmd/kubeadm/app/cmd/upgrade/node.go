@@ -46,14 +46,14 @@ var (
 		what the _desired_ kubelet version is. Give 
 		`)
 
-	upgradeNodeConfigExample = normalizer.Examples(`
+	upgradeNodeConfigExample = normalizer.Examples(fmt.Sprintf(`
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
-		kubeadm upgrade node config --kubelet-version v1.13.0
+		kubeadm upgrade node config --kubelet-version %s
 
 		# Simulates the downloading of the kubelet configuration from the ConfigMap in the cluster with a specific desired
 		# version. Does not change any state locally on the node.
-		kubeadm upgrade node config --kubelet-version v1.13.0 --dry-run
-		`)
+		kubeadm upgrade node config --kubelet-version %[1]s --dry-run
+		`, constants.CurrentKubernetesVersion))
 )
 
 type nodeUpgradeFlags struct {

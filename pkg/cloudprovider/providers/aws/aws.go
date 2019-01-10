@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -260,9 +261,6 @@ const DefaultVolumeType = "gp2"
 
 // Used to call recognizeWellKnownRegions just once
 var once sync.Once
-
-// AWS implements PVLabeler.
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
@@ -480,6 +478,13 @@ type InstanceGroupInfo interface {
 	CurrentSize() (int, error)
 }
 
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {
 	ec2      EC2
@@ -588,6 +593,11 @@ func newAWSSDKProvider(creds *credentials.Credentials) *awsSDKProvider {
 }
 
 func (p *awsSDKProvider) addHandlers(regionName string, h *request.Handlers) {
+	h.Build.PushFrontNamed(request.NamedHandler{
+		Name: "k8s/user-agent",
+		Fn:   request.MakeAddToUserAgentHandler("kubernetes", version.Get().String()),
+	})
+
 	h.Sign.PushFrontNamed(request.NamedHandler{
 		Name: "k8s/logger",
 		Fn:   awsHandlerLogger,
@@ -2324,6 +2334,11 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 
 // GetLabelsForVolume gets the volume labels for a volume
 func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore if not AWSElasticBlockStore.
+	if pv.Spec.AWSElasticBlockStore == nil {
+		return nil, nil
+	}
+
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
 		return nil, nil

@@ -61,7 +61,6 @@ type ClusterInfoDumpOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),
@@ -84,7 +83,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 	cmd.Flags().StringVar(&o.OutputDir, "output-directory", o.OutputDir, i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
 	cmd.Flags().StringSliceVar(&o.Namespaces, "namespaces", o.Namespaces, "A comma separated list of namespaces to dump.")
-	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, dump all namespaces.  If true, --namespaces is ignored.")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If true, dump all namespaces.  If true, --namespaces is ignored.")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	return cmd
 }

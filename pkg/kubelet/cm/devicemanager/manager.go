@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -125,7 +125,7 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
-	// The following structs are populated with real implementations in manager.Start()
+	// The following structures are populated with real implementations in manager.Start()
 	// Before that, initializes them to perform no-op operations.
 	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
 	manager.sourcesReady = &sourcesReadyStub{}
@@ -189,8 +189,8 @@ func (m *ManagerImpl) checkpointFile() string {
 	return filepath.Join(m.socketdir, kubeletDeviceManagerCheckpoint)
 }
 
-// Start starts the Device Plugin Manager amd start initialization of
-// podDevices and allocatedDevices information from checkpoint-ed state and
+// Start starts the Device Plugin Manager and start initialization of
+// podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
 	klog.V(2).Infof("Starting Device Plugin manager")
@@ -313,7 +313,7 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 	devicesToReuse := make(map[string]sets.String)
 	for _, container := range pod.Spec.InitContainers {
@@ -669,7 +669,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// and container2 both require X resource A and Y resource B. Both allocation
 		// requests may fail if we serve them in mixed order.
 		// TODO: may revisit this part later if we see inefficient resource allocation
-		// in real use as the result of this. Should also consider to parallize device
+		// in real use as the result of this. Should also consider to parallelize device
 		// plugin Allocate grpc calls if it becomes common that a container may require
 		// resources from multiple device plugins.
 		m.mutex.Lock()
@@ -769,8 +769,8 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 // and if necessary, updates allocatableResource in nodeInfo to at least equal to
 // the allocated capacity. This allows pods that have already been scheduled on
 // the node to pass GeneralPredicates admission checking even upon device plugin failure.
-func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulercache.NodeInfo) {
-	var newAllocatableResource *schedulercache.Resource
+func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulernodeinfo.NodeInfo) {
+	var newAllocatableResource *schedulernodeinfo.Resource
 	allocatableResource := node.AllocatableResource()
 	if allocatableResource.ScalarResources == nil {
 		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)

@@ -360,9 +360,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
 		return err
-	} else {
-		createdObjects = append(createdObjects, runObject)
 	}
+	createdObjects = append(createdObjects, runObject)
+
 	allErrs := []error{}
 	if o.Expose {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
@@ -567,9 +567,8 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolic
 	if len(restart) == 0 {
 		if interactive {
 			return corev1.RestartPolicyOnFailure, nil
-		} else {
-			return corev1.RestartPolicyAlways, nil
 		}
+		return corev1.RestartPolicyAlways, nil
 	}
 	switch corev1.RestartPolicy(restart) {
 	case corev1.RestartPolicyAlways:

@@ -56,28 +56,28 @@ import (
 // KEEP THE SPACE SHUTTLE FLYING.
 // ==================================================================
 //
-// This controller is intentionally written in a very verbose style.  You will
+// This controller is intentionally written in a very verbose style. You will
 // notice:
 //
-// 1.  Every 'if' statement has a matching 'else' (exception: simple error
-//     checks for a client API call)
-// 2.  Things that may seem obvious are commented explicitly
+// 1. Every 'if' statement has a matching 'else' (exception: simple error
+//    checks for a client API call)
+// 2. Things that may seem obvious are commented explicitly
 //
-// We call this style 'space shuttle style'.  Space shuttle style is meant to
+// We call this style 'space shuttle style'. Space shuttle style is meant to
 // ensure that every branch and condition is considered and accounted for -
 // the same way code is written at NASA for applications like the space
 // shuttle.
 //
 // Originally, the work of this controller was split amongst three
-// controllers.  This controller is the result a large effort to simplify the
-// PV subsystem.  During that effort, it became clear that we needed to ensure
+// controllers. This controller is the result a large effort to simplify the
+// PV subsystem. During that effort, it became clear that we needed to ensure
 // that every single condition was handled and accounted for in the code, even
 // if it resulted in no-op code branches.
 //
 // As a result, the controller code may seem overly verbose, commented, and
-// 'branchy'.  However, a large amount of business knowledge and context is
+// 'branchy'. However, a large amount of business knowledge and context is
 // recorded here in order to ensure that future maintainers can correctly
-// reason through the complexities of the binding behavior.  For that reason,
+// reason through the complexities of the binding behavior. For that reason,
 // changes to this file should preserve and add to the space shuttle style.
 //
 // ==================================================================
@@ -92,7 +92,7 @@ import (
 // represented here as pvc.Spec.VolumeName and pv.Spec.ClaimRef. The bi-
 // directionality is complicated to manage in a transactionless system, but
 // without it we can't ensure sane behavior in the face of different forms of
-// trouble.  For example, a rogue HA controller instance could end up racing
+// trouble. For example, a rogue HA controller instance could end up racing
 // and making multiple bindings that are indistinguishable, resulting in
 // potential data loss.
 //
@@ -119,8 +119,8 @@ import (
 // annotation does not matter.
 const annBindCompleted = "pv.kubernetes.io/bind-completed"
 
-// annBoundByController annotation applies to PVs and PVCs.  It indicates that
-// the binding (PV->PVC or PVC->PV) was installed by the controller.  The
+// annBoundByController annotation applies to PVs and PVCs. It indicates that
+// the binding (PV->PVC or PVC->PV) was installed by the controller. The
 // absence of this annotation means the binding was done by the user (i.e.
 // pre-bound). Value of this annotation does not matter.
 // External PV binders must bind PV the same way as PV controller, otherwise PV
@@ -247,7 +247,7 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 	}
 }
 
-//checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
+// checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
 func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestedSize := requestedQty.Value()
@@ -286,10 +286,6 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 }
 
 func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentVolumeClaim) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		return false, nil
-	}
-
 	// When feature VolumeScheduling enabled,
 	// Scheduler signal to the PV controller to start dynamic
 	// provisioning by setting the "annSelectedNode" annotation
@@ -396,10 +392,10 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume is unbound, binding", claimToClaimKey(claim))
 				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
 					klog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
-					//send an event
+					// send an event
 					msg := fmt.Sprintf("Cannot bind to requested volume %q: %s", volume.Name, err)
 					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, msg)
-					//volume does not satisfy the requirements of the claim
+					// volume does not satisfy the requirements of the claim
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
 					}
@@ -553,7 +549,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			//   2) apiserver if not found in informer cache
 			// to make sure we will not reclaim a PV wrongly.
 			// Note that only non-released and non-failed volumes will be
-			// updated to Released state when PVC does not eixst.
+			// updated to Released state when PVC does not exist.
 			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
 				obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
 				if err != nil && !apierrs.IsNotFound(err) {
@@ -1100,8 +1096,8 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 	return nil
 }
 
-// doRerecycleVolumeOperationcycleVolume recycles a volume. This method is
-// running in standalone goroutine and already has all necessary locks.
+// recycleVolumeOperation recycles a volume. This method is running in
+// standalone goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.PersistentVolume) {
 	klog.V(4).Infof("recycleVolumeOperation [%s] started", volume.Name)
 
@@ -1335,7 +1331,7 @@ func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([
 
 // doDeleteVolume finds appropriate delete plugin and deletes given volume, returning
 // the volume plugin name. Also, it returns 'true', when the volume was deleted and
-// 'false' when the volume cannot be deleted because of the deleter is external. No
+// 'false' when the volume cannot be deleted because the deleter is external. No
 // error should be reported in this case.
 func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolume) (string, bool, error) {
 	klog.V(4).Infof("doDeleteVolume [%s]", volume.Name)

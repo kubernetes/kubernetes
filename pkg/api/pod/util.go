@@ -17,10 +17,13 @@ limitations under the License.
 package pod
 
 import (
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -232,15 +235,82 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	return !isEqual
 }
 
-// DropDisabledAlphaFields removes disabled fields from the pod spec.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod spec.
-func DropDisabledAlphaFields(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+// DropDisabledTemplateFields removes disabled fields from the pod template metadata and spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a PodTemplateSpec
+func DropDisabledTemplateFields(podTemplate, oldPodTemplate *api.PodTemplateSpec) {
+	var (
+		podSpec           *api.PodSpec
+		podAnnotations    map[string]string
+		oldPodSpec        *api.PodSpec
+		oldPodAnnotations map[string]string
+	)
+	if podTemplate != nil {
+		podSpec = &podTemplate.Spec
+		podAnnotations = podTemplate.Annotations
+	}
+	if oldPodTemplate != nil {
+		oldPodSpec = &oldPodTemplate.Spec
+		oldPodAnnotations = oldPodTemplate.Annotations
+	}
+	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
+}
+
+// DropDisabledPodFields removes disabled fields from the pod metadata and spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a Pod
+func DropDisabledPodFields(pod, oldPod *api.Pod) {
+	var (
+		podSpec           *api.PodSpec
+		podAnnotations    map[string]string
+		oldPodSpec        *api.PodSpec
+		oldPodAnnotations map[string]string
+	)
+	if pod != nil {
+		podSpec = &pod.Spec
+		podAnnotations = pod.Annotations
+	}
+	if oldPod != nil {
+		oldPodSpec = &oldPod.Spec
+		oldPodAnnotations = oldPod.Annotations
+	}
+	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
+}
+
+// dropDisabledFields removes disabled fields from the pod metadata and spec.
+func dropDisabledFields(
+	podSpec *api.PodSpec, podAnnotations map[string]string,
+	oldPodSpec *api.PodSpec, oldPodAnnotations map[string]string,
+) {
+	// the new spec must always be non-nil
+	if podSpec == nil {
+		podSpec = &api.PodSpec{}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
+		for k := range podAnnotations {
+			if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+				delete(podAnnotations, k)
+			}
+		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && !shareProcessNamespaceInUse(oldPodSpec) {
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.ShareProcessNamespace = nil
+		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) && !podPriorityInUse(oldPodSpec) {
+		// Set to nil pod's priority fields if the feature is disabled and the old pod
+		// does not specify any values for these fields.
 		podSpec.Priority = nil
 		podSpec.PriorityClassName = ""
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates) && !podReadinessGatesInUse(oldPodSpec) {
+		podSpec.ReadinessGates = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) && !emptyDirSizeLimitInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
 				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
@@ -248,21 +318,36 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 		}
 	}
 
-	DropDisabledVolumeDevicesAlphaFields(podSpec)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
+		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
+		for i := range podSpec.Containers {
+			for j := range podSpec.Containers[i].VolumeMounts {
+				podSpec.Containers[i].VolumeMounts[j].SubPath = ""
+			}
+		}
+		for i := range podSpec.InitContainers {
+			for j := range podSpec.InitContainers[i].VolumeMounts {
+				podSpec.InitContainers[i].VolumeMounts[j].SubPath = ""
+			}
+		}
+	}
 
-	DropDisabledRunAsGroupField(podSpec)
+	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && podSpec.RuntimeClassName != nil {
+	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
+		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
 	}
 
-	DropDisabledProcMountField(podSpec)
+	dropDisabledProcMountField(podSpec, oldPodSpec)
 }
 
-// DropDisabledRunAsGroupField removes disabled fields from PodSpec related
+// dropDisabledRunAsGroupField removes disabled fields from PodSpec related
 // to RunAsGroup
-func DropDisabledRunAsGroupField(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && !runAsGroupInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
 		}
@@ -279,28 +364,28 @@ func DropDisabledRunAsGroupField(podSpec *api.PodSpec) {
 	}
 }
 
-// DropDisabledProcMountField removes disabled fields from PodSpec related
-// to ProcMount
-func DropDisabledProcMountField(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
-		defProcMount := api.DefaultProcMount
+// dropDisabledProcMountField removes disabled fields from PodSpec related
+// to ProcMount only if it is not already used by the old spec
+func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
+		defaultProcMount := api.DefaultProcMount
 		for i := range podSpec.Containers {
 			if podSpec.Containers[i].SecurityContext != nil {
-				podSpec.Containers[i].SecurityContext.ProcMount = &defProcMount
+				podSpec.Containers[i].SecurityContext.ProcMount = &defaultProcMount
 			}
 		}
 		for i := range podSpec.InitContainers {
 			if podSpec.InitContainers[i].SecurityContext != nil {
-				podSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
+				podSpec.InitContainers[i].SecurityContext.ProcMount = &defaultProcMount
 			}
 		}
 	}
 }
 
-// DropDisabledVolumeDevicesAlphaFields removes disabled fields from []VolumeDevice.
+// dropDisabledVolumeDevicesFields removes disabled fields from []VolumeDevice if it has not been already populated.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
-func DropDisabledVolumeDevicesAlphaFields(podSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeDevicesInUse(oldPodSpec) {
 		for i := range podSpec.Containers {
 			podSpec.Containers[i].VolumeDevices = nil
 		}
@@ -308,4 +393,160 @@ func DropDisabledVolumeDevicesAlphaFields(podSpec *api.PodSpec) {
 			podSpec.InitContainers[i].VolumeDevices = nil
 		}
 	}
+}
+
+// subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
+func subpathInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		for j := range podSpec.Containers[i].VolumeMounts {
+			if len(podSpec.Containers[i].VolumeMounts[j].SubPath) > 0 {
+				return true
+			}
+		}
+	}
+	for i := range podSpec.InitContainers {
+		for j := range podSpec.InitContainers[i].VolumeMounts {
+			if len(podSpec.InitContainers[i].VolumeMounts[j].SubPath) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// runtimeClassInUse returns true if the pod spec is non-nil and has a RuntimeClassName set
+func runtimeClassInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.RuntimeClassName != nil {
+		return true
+	}
+	return false
+}
+
+// procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set
+func procMountInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].SecurityContext != nil {
+			if podSpec.Containers[i].SecurityContext.ProcMount != nil {
+				if *podSpec.Containers[i].SecurityContext.ProcMount != api.DefaultProcMount {
+					return true
+				}
+			}
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].SecurityContext != nil {
+			if podSpec.InitContainers[i].SecurityContext.ProcMount != nil {
+				if *podSpec.InitContainers[i].SecurityContext.ProcMount != api.DefaultProcMount {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// appArmorInUse returns true if the pod has apparmor related information
+func appArmorInUse(podAnnotations map[string]string) bool {
+	for k := range podAnnotations {
+		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func shareProcessNamespaceInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.ShareProcessNamespace != nil {
+		return true
+	}
+	return false
+}
+
+// podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
+func podPriorityInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
+		return true
+	}
+	return false
+}
+
+// podReadinessGatesInUse returns true if the pod spec is non-nil and has ReadinessGates
+func podReadinessGatesInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.ReadinessGates != nil {
+		return true
+	}
+	return false
+}
+
+// emptyDirSizeLimitInUse returns true if any pod's EptyDir volumes use SizeLimit.
+func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].EmptyDir != nil {
+			if podSpec.Volumes[i].EmptyDir.SizeLimit != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// volumeDevicesInUse returns true if the pod spec is non-nil and has VolumeDevices set.
+func volumeDevicesInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].VolumeDevices != nil {
+			return true
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].VolumeDevices != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// runAsGroupInUse returns true if the pod spec is non-nil and has a SecurityContext's RunAsGroup field set
+func runAsGroupInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.RunAsGroup != nil {
+		return true
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].SecurityContext != nil && podSpec.Containers[i].SecurityContext.RunAsGroup != nil {
+			return true
+		}
+	}
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].SecurityContext != nil && podSpec.InitContainers[i].SecurityContext.RunAsGroup != nil {
+			return true
+		}
+	}
+	return false
 }

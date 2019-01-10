@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
@@ -79,7 +80,7 @@ func shredFile(filePath string) {
 
 // createGCESecrets downloads the GCP IAM Key for the default compute service account
 // and puts it in a secret for the GCE PD CSI Driver to consume
-func createGCESecrets(client clientset.Interface, config framework.VolumeTestConfig) {
+func createGCESecrets(client clientset.Interface, ns string) {
 	saEnv := "E2E_GOOGLE_APPLICATION_CREDENTIALS"
 	saFile := fmt.Sprintf("/tmp/%s/cloud-sa.json", string(uuid.NewUUID()))
 
@@ -106,7 +107,7 @@ func createGCESecrets(client clientset.Interface, config framework.VolumeTestCon
 	s := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cloud-sa",
-			Namespace: config.Namespace,
+			Namespace: ns,
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -114,6 +115,8 @@ func createGCESecrets(client clientset.Interface, config framework.VolumeTestCon
 		},
 	}
 
-	_, err = client.CoreV1().Secrets(config.Namespace).Create(s)
-	framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
+	_, err = client.CoreV1().Secrets(ns).Create(s)
+	if !apierrors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
+	}
 }

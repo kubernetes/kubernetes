@@ -52,16 +52,19 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 	}
 
 	var tests = []struct {
+		name            string
 		command         string
 		withClientCert  bool
 		withToken       bool
 		additionalFlags []string
 	}{
-		{ // Test user subCommand withClientCert
+		{
+			name:           "user subCommand withClientCert",
 			command:        "user",
 			withClientCert: true,
 		},
-		{ // Test user subCommand withToken
+		{
+			name:            "user subCommand withToken",
 			withToken:       true,
 			command:         "user",
 			additionalFlags: []string{"--token=123456"},
@@ -69,36 +72,38 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		buf := new(bytes.Buffer)
+		t.Run(test.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
 
-		// Get subcommands working in the temporary directory
-		cmd := newCmdUserKubeConfig(buf)
+			// Get subcommands working in the temporary directory
+			cmd := newCmdUserKubeConfig(buf)
 
-		// Execute the subcommand
-		allFlags := append(commonFlags, test.additionalFlags...)
-		cmd.SetArgs(allFlags)
-		if err := cmd.Execute(); err != nil {
-			t.Fatal("Could not execute subcommand")
-		}
+			// Execute the subcommand
+			allFlags := append(commonFlags, test.additionalFlags...)
+			cmd.SetArgs(allFlags)
+			if err := cmd.Execute(); err != nil {
+				t.Fatal("Could not execute subcommand")
+			}
 
-		// reads kubeconfig written to stdout
-		config, err := clientcmd.Load(buf.Bytes())
-		if err != nil {
-			t.Errorf("couldn't read kubeconfig file from buffer: %v", err)
-			continue
-		}
+			// reads kubeconfig written to stdout
+			config, err := clientcmd.Load(buf.Bytes())
+			if err != nil {
+				t.Errorf("couldn't read kubeconfig file from buffer: %v", err)
+				return
+			}
 
-		// checks that CLI flags are properly propagated
-		kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
+			// checks that CLI flags are properly propagated
+			kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
 
-		if test.withClientCert {
-			// checks that kubeconfig files have expected client cert
-			kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myUser")
-		}
+			if test.withClientCert {
+				// checks that kubeconfig files have expected client cert
+				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myUser")
+			}
 
-		if test.withToken {
-			// checks that kubeconfig files have expected token
-			kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "123456")
-		}
+			if test.withToken {
+				// checks that kubeconfig files have expected token
+				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "123456")
+			}
+		})
 	}
 }

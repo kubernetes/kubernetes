@@ -1,0 +1,15 @@
+approvers:
+- luxas
+- sttts
+- jbeda
+- lavalamp
+reviewers:
+- luxas
+- sttts
+- stewart-yu
+- dims
+- dixudx
+- rosti
+labels:
+- sig/cluster-lifecycle
+- sig/api-machinery

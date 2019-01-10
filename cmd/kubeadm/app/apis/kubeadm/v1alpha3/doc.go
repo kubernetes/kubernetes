@@ -177,7 +177,7 @@ limitations under the License.
 // 	    value: "master"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
-// 	    cgroupDriver: "cgroupfs"
+// 	    cgroup-driver: "cgroupfs"
 // 	apiEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443

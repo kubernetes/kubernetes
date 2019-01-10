@@ -234,3 +234,50 @@ func TestDeleteUDPConnections(t *testing.T) {
 		t.Errorf("Expect command executed %d times, but got %d", svcCount, fexec.CommandCalls)
 	}
 }
+
+func TestClearUDPConntrackForPortNAT(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) {
+				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+			},
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+	testCases := []struct {
+		name string
+		port int
+		dest string
+	}{
+		{
+			name: "IPv4 success",
+			port: 30211,
+			dest: "1.2.3.4",
+		},
+	}
+	svcCount := 0
+	for i, tc := range testCases {
+		err := ClearEntriesForPortNAT(&fexec, tc.dest, tc.port, v1.ProtocolUDP)
+		if err != nil {
+			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
+		}
+		expectCommand := fmt.Sprintf("conntrack -D -p udp --dport %d --dst-nat %s", tc.port, tc.dest) + familyParamStr(utilnet.IsIPv6String(tc.dest))
+		execCommand := strings.Join(fcmd.CombinedOutputLog[i], " ")
+		if expectCommand != execCommand {
+			t.Errorf("%s test case: Expect command: %s, but executed %s", tc.name, expectCommand, execCommand)
+		}
+		svcCount++
+	}
+	if svcCount != fexec.CommandCalls {
+		t.Errorf("Expect command executed %d times, but got %d", svcCount, fexec.CommandCalls)
+	}
+}

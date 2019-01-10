@@ -705,15 +705,15 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 	return nil, fmt.Errorf("None of the CSI versions reported by this driver are supported")
 }
 
-// Only CSI 0.x drivers are allowed to use deprecated socket dir.
+// Only drivers that implement CSI 0.x are allowed to use deprecated socket dir.
 func isDeprecatedSocketDirAllowed(versions []string) bool {
 	for _, version := range versions {
-		if !isV0Version(version) {
-			return false
+		if isV0Version(version) {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 func isV0Version(version string) bool {

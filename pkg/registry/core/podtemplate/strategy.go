@@ -47,7 +47,7 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	template := obj.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&template.Template.Spec)
+	pod.DropDisabledTemplateFields(&template.Template, nil)
 }
 
 // Validate validates a new pod template.
@@ -70,8 +70,7 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	newTemplate := obj.(*api.PodTemplate)
 	oldTemplate := old.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&newTemplate.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldTemplate.Template.Spec)
+	pod.DropDisabledTemplateFields(&newTemplate.Template, &oldTemplate.Template)
 }
 
 // ValidateUpdate is the default update validation for an end user.

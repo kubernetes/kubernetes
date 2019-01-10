@@ -718,6 +718,22 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"Mounts", "mounted-volume", "/opt/", "(ro)"},
 		},
 
+		// volumeMounts subPath
+		{
+			container: corev1.Container{
+				Name:  "test",
+				Image: "image",
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "mounted-volume",
+						MountPath: "/opt/",
+						SubPath:   "foo",
+					},
+				},
+			},
+			expectedElements: []string{"Mounts", "mounted-volume", "/opt/", "(rw,path=\"foo\")"},
+		},
+
 		// volumeDevices
 		{
 			container: corev1.Container{

@@ -20,8 +20,6 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/quota/v1:go_default_library",
         "//pkg/quota/v1/generic:go_default_library",
-        "//pkg/util/reflector/prometheus:go_default_library",
-        "//pkg/util/workqueue/prometheus:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/install:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1:go_default_library",
@@ -51,10 +49,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "admission_test.go",
-        "main_test.go",
-    ],
+    srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",

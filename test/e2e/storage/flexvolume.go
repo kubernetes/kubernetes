@@ -44,10 +44,8 @@ const (
 	// On gci, root is read-only and controller-manager containerized. Assume
 	// controller-manager has started with --flex-volume-plugin-dir equal to this
 	// (see cluster/gce/config-test.sh)
-	gciVolumePluginDir        = "/home/kubernetes/flexvolume"
-	gciVolumePluginDirLegacy  = "/etc/srv/kubernetes/kubelet-plugins/volume/exec"
-	gciVolumePluginDirVersion = "1.10.0"
-	detachTimeout             = 10 * time.Second
+	gciVolumePluginDir = "/home/kubernetes/flexvolume"
+	detachTimeout      = 10 * time.Second
 )
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
@@ -130,24 +128,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) string {
 	volumePluginDir := defaultVolumePluginDir
 	if framework.ProviderIs("gce") {
-		if node == nil && framework.MasterOSDistroIs("gci", "ubuntu") {
-			v, err := getMasterVersion(c)
-			if err != nil {
-				framework.Failf("Error getting master version: %v", err)
-			}
-
-			if v.AtLeast(versionutil.MustParseGeneric(gciVolumePluginDirVersion)) {
-				volumePluginDir = gciVolumePluginDir
-			} else {
-				volumePluginDir = gciVolumePluginDirLegacy
-			}
-		} else if node != nil && framework.NodeOSDistroIs("gci", "ubuntu") {
-			if getNodeVersion(node).AtLeast(versionutil.MustParseGeneric(gciVolumePluginDirVersion)) {
-				volumePluginDir = gciVolumePluginDir
-			} else {
-				volumePluginDir = gciVolumePluginDirLegacy
-			}
-		}
+		volumePluginDir = gciVolumePluginDir
 	}
 	flexDir := path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
 	return flexDir
