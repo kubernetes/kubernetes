@@ -913,7 +913,7 @@ func TestFinishRequest(t *testing.T) {
 					t.Errorf("expected panic containing '%s', got '%v'", tc.expectedPanic, r)
 				}
 			}()
-			obj, err := finishRequest(tc.timeout, tc.fn)
+			obj, err := finishRequest("info", tc.timeout, tc.fn)
 			if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
 				t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
 			}

@@ -134,7 +134,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 
 		trace.Step("About to delete object from database")
 		wasDeleted := true
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		info := fmt.Sprintf("request uri %s method %s", req.RequestURI, req.Method)
+		result, err := finishRequest(info, timeout, func() (runtime.Object, error) {
 			obj, deleted, err := r.Delete(ctx, name, options)
 			wasDeleted = deleted
 			return obj, err
@@ -285,7 +286,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		info := fmt.Sprintf("request uri %s method %s", req.RequestURI, req.Method)
+		result, err := finishRequest(info, timeout, func() (runtime.Object, error) {
 			return r.DeleteCollection(ctx, options, &listOptions)
 		})
 		if err != nil {

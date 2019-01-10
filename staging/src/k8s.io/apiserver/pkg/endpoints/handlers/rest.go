@@ -175,7 +175,7 @@ type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
 // An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
+func finishRequest(info string, timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
 	ch := make(chan runtime.Object, 1)
@@ -215,6 +215,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	case p := <-panicCh:
 		panic(p)
 	case <-time.After(timeout):
+		klog.Errorf("timeout error: %s", info)
 		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
 	}
 }

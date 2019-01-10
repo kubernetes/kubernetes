@@ -135,7 +135,8 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		}
 
 		trace.Step("About to store object in database")
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		info := fmt.Sprintf("request uri %s method %s", req.RequestURI, req.Method)
+		result, err := finishRequest(info, timeout, func() (runtime.Object, error) {
 			return r.Create(
 				ctx,
 				name,

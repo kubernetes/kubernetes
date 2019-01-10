@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/klog"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -114,6 +116,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case <-after:
+		klog.Errorf("timeout error: %s request for %s did not complete", r.Method, r.RequestURI)
 		postTimeoutFn()
 		tw.timeout(err)
 	}

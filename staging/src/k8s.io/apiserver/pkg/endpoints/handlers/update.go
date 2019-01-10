@@ -156,7 +156,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 
 		trace.Step("About to store object in database")
 		wasCreated := false
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		info := fmt.Sprintf("request uri %s method %s", req.RequestURI, req.Method)
+		result, err := finishRequest(info, timeout, func() (runtime.Object, error) {
 			obj, created, err := r.Update(
 				ctx,
 				name,
