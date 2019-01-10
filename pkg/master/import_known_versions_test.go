@@ -74,12 +74,14 @@ var typesAllowedTags = map[reflect.Type]bool{
 
 // These fields are limited exceptions to the standard JSON naming structure.
 // Additions should only be made if a non-standard field name was released and cannot be changed for compatibility reasons.
-var allowedNonstandardJSONNames = map[reflect.Type]string{
-	reflect.TypeOf(v1.DaemonEndpoint{}): "Port",
+var allowedNonstandardJSONNames = map[reflect.Type]sets.String{
+	reflect.TypeOf(v1.DaemonEndpoint{}): sets.NewString("Port"),
 }
 
+var allowedNoJSONTags = map[reflect.Type]sets.String{}
+
 func TestTypeTags(t *testing.T) {
-	if err := apinamingtest.VerifyTagNaming(legacyscheme.Scheme, typesAllowedTags, allowedNonstandardJSONNames); err != nil {
+	if err := apinamingtest.VerifyTagNaming(legacyscheme.Scheme, typesAllowedTags, allowedNonstandardJSONNames, allowedNoJSONTags); err != nil {
 		t.Errorf("%v", err)
 	}
 }
