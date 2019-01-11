@@ -21,6 +21,8 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# upstream shellcheck latest stable image as of January 10th, 2019
+SHELLCHECK_IMAGE="koalaman/shellcheck:v0.6.0@sha256:bd13d6dd61da58f26fc665fa3a08ff5c7e4e13749f555876f32750668d341475"
 
 # disabled lints
 disabled=(
@@ -38,22 +40,17 @@ join_by() {
 SHELLCHECK_DISABLED="$(join_by , "${disabled[@]}")"
 readonly SHELLCHECK_DISABLED
 
-if ! which shellcheck > /dev/null; then
-  echo 'Can not find shellcheck, please install shellcheck to run this script'
-  echo 'see: https://github.com/koalaman/shellcheck#installing'
-  # TODO(bentheelder): we should discuss how to better handle this
-  exit 1
-fi
-
 cd "${KUBE_ROOT}"
 
-# find all shell scripts excluding ./_* and ./vendor*
+# find all shell scripts excluding ./_*, ./.git/*, ./vendor*,
+# and anything git-ignored
 all_shell_scripts=()
 while IFS=$'\n' read -r script;
-  do all_shell_scripts+=("$script");
+  do git check-ignore -q "$script" || all_shell_scripts+=("$script");
 done < <(find . -name "*.sh" \
   -not \( \
     -path ./_\*      -o \
+    -path ./.git\*   -o \
     -path ./vendor\*    \
   \))
 
@@ -95,7 +92,9 @@ errors=()
 not_failing=()
 for f in "${all_shell_scripts[@]}"; do
   set +o errexit
-  failedLint=$(shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+  # NOTE: this is much slower :(
+  failedLint=$(docker run -t -v "${PWD}:${PWD}" -w "${PWD}" "${SHELLCHECK_IMAGE}" --exclude="${SHELLCHECK_DISABLED}" "${f}")
+  #failedLint=$(shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
   set -o errexit
   array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
