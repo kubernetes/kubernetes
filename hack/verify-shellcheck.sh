@@ -22,7 +22,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # upstream shellcheck latest stable image as of January 10th, 2019
-SHELLCHECK_IMAGE="koalaman/shellcheck:v0.6.0@sha256:bd13d6dd61da58f26fc665fa3a08ff5c7e4e13749f555876f32750668d341475"
+SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.6.0@sha256:7d4d712a2686da99d37580b4e2f45eb658b74e4b01caf67c1099adc294b96b52"
+SHELLCHECK_CONTAINER="k8s-shellcheck"
 
 # disabled lints
 disabled=(
@@ -87,14 +88,40 @@ array_contains () {
   return $in
 }
 
+# creates the shellcheck container for later user
+create_container () {
+  # TODO(bentheelder): this is a performance hack, we create the container with
+  # a sleep MAX_INT32 so that it is effectively paused.
+  # We then repeatedly exec to it to run each shellcheck, and later rm it when
+  # we're done.
+  # This is incredibly much faster than creating a container for each shellcheck
+  # call ...
+  docker run --name "${SHELLCHECK_CONTAINER}" -d --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" --entrypoint="sleep" "${SHELLCHECK_IMAGE}" 2147483647
+}
+# removes the shellcheck container
+remove_container () {
+  docker rm -f "${SHELLCHECK_CONTAINER}" &> /dev/null || true
+}
+
+# remove any previous container, ensure we will attempt to cleanup on exit,
+# and create the container
+remove_container
+trap remove_container EXIT
+if ! output="$(create_container 2>&1)"; then
+    {
+      echo "Failed to create shellcheck container with output: "
+      echo ""
+      echo "${output}"
+    } >&2
+    exit 1
+fi
+
 # lint each script, tracking failures
 errors=()
 not_failing=()
 for f in "${all_shell_scripts[@]}"; do
   set +o errexit
-  # NOTE: this is much slower :(
-  failedLint=$(docker run -t -v "${PWD}:${PWD}" -w "${PWD}" "${SHELLCHECK_IMAGE}" --exclude="${SHELLCHECK_DISABLED}" "${f}")
-  #failedLint=$(shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+  failedLint=$(docker exec -t "${SHELLCHECK_CONTAINER}" shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
   set -o errexit
   array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
