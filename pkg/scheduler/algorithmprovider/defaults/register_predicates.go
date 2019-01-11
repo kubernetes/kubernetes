@@ -111,9 +111,6 @@ func init() {
 	// Fit is determined by node conditions: not ready, network unavailable or out of disk.
 	factory.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate)
 
-	// Fit is determined based on whether a pod can tolerate all of the node's taints
-	factory.RegisterFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
-
 	// Fit is determined by volume topology requirements.
 	factory.RegisterFitPredicateFactory(
 		predicates.CheckVolumeBindingPred,
