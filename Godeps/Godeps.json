@@ -45,7 +45,7 @@
 			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
 		},
 		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network",
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network",
 			"Comment": "v21.3.0",
 			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
 		},
@@ -1627,7 +1627,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
-			"Comment": "v0.18.0",
+			"Comment": "v0.17.2",
 			"Rev": "8483a886a90412cd6858df4ea3483dce9c8e35a3"
 		},
 		{
@@ -1657,7 +1657,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/validate",
-			"Comment": "v0.18.0",
+			"Comment": "v0.17.2",
 			"Rev": "d2eab7d93009e9215fc85b2faa2c2f2a98c2af48"
 		},
 		{
