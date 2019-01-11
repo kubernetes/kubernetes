@@ -126,6 +126,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
+		// node lifecycle controller uses existing cluster role from node-controller
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
@@ -149,7 +150,8 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
 	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.ClientBuilder.ClientOrDie("cloud-node-lifecycle-controller"),
+		// cloud node lifecycle controller uses existing cluster role from node-controller
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.Cloud,
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 	)

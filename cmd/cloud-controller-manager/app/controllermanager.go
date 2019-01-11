@@ -225,7 +225,8 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	// Start the CloudNodeController
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		c.SharedInformers.Core().V1().Nodes(),
-		client("cloud-node-controller"), cloud,
+		// cloud node controller uses existing cluster role from node-controller
+		client("node-controller"), cloud,
 		c.ComponentConfig.NodeStatusUpdateFrequency.Duration)
 
 	go nodeController.Run(stop)
@@ -233,7 +234,8 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 
 	cloudNodeLifecycleController, err := cloudcontrollers.NewCloudNodeLifecycleController(
 		c.SharedInformers.Core().V1().Nodes(),
-		client("cloud-node-lifecycle-controller"), cloud,
+		// cloud node lifecycle controller uses existing cluster role from node-controller
+		client("node-controller"), cloud,
 		c.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 	)
 	if err != nil {
