@@ -95,6 +95,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/e2e/storage/drivers:all-srcs",
+        "//test/e2e/storage/external:all-srcs",
         "//test/e2e/storage/testpatterns:all-srcs",
         "//test/e2e/storage/testsuites:all-srcs",
         "//test/e2e/storage/utils:all-srcs",
