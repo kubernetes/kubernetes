@@ -103,6 +103,8 @@ build() {
 }
 
 docker_version_check() {
+  # The reason for this version check is even though "docker manifest" command is available in 18.03, it does
+  # not work properly in that version. So we insist on 18.06.0 or higher.
   docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
   if [[ ${docker_version} != 18.06.0 && ${docker_version} < 18.06.0 ]]; then
     echo "Minimum docker version 18.06.0 is required for creating and pushing manifest images[found: ${docker_version}]"
