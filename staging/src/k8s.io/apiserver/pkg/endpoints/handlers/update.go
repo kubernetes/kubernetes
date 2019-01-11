@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +49,9 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfStepsLessThan(5, func() {
+			klog.V(4).Infof(">>>> UpdateResource bad count : %#v", req)
+		})
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
@@ -175,6 +180,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			return obj, err
 		})
 		if err != nil {
+			klog.V(4).Infof("Unable to store in database : %#v", err)
 			scope.err(err, w, req)
 			return
 		}

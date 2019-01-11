@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,6 +142,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			return obj, err
 		})
 		if err != nil {
+			klog.V(4).Infof("Unable to delete from database : %#v", err)
 			scope.err(err, w, req)
 			return
 		}
@@ -289,6 +292,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			return r.DeleteCollection(ctx, options, &listOptions)
 		})
 		if err != nil {
+			klog.V(4).Infof("Unable to delete collection : %#v", err)
 			scope.err(err, w, req)
 			return
 		}

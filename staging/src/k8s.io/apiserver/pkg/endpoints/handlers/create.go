@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -45,6 +47,9 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfStepsLessThan(4, func() {
+			klog.V(4).Infof(">>>> createHandler bad count : %#v", req)
+		})
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
@@ -145,6 +150,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			)
 		})
 		if err != nil {
+			klog.V(4).Infof("Unable to store in database : %#v", err)
 			scope.err(err, w, req)
 			return
 		}

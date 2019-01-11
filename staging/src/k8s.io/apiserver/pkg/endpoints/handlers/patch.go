@@ -45,6 +45,8 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
+
+	"k8s.io/klog"
 )
 
 // PatchResource returns a function that will handle a resource patch.
@@ -53,7 +55,9 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
-
+		defer trace.LogIfStepsLessThan(3, func() {
+			klog.V(4).Infof(">>>> PatchResource bad count : %#v", req)
+		})
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
@@ -191,6 +195,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 
 		result, err := p.patchResource(ctx)
 		if err != nil {
+			klog.V(4).Infof("Unable to store in database : %#v", err)
 			scope.err(err, w, req)
 			return
 		}

@@ -53,6 +53,14 @@ func (t *Trace) Log() {
 	t.logWithStepThreshold(0)
 }
 
+func (t *Trace) LogIfStepsLessThan(count int, f func()) {
+	if len(t.steps) < count {
+		// an explicit logging request should dump all the steps out at the higher level
+		t.logWithStepThreshold(0)
+		f()
+	}
+}
+
 func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 	var buffer bytes.Buffer
 	tracenum := rand.Int31()

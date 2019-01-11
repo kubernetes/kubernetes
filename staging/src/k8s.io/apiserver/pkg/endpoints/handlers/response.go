@@ -35,19 +35,21 @@ import (
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
 func transformResponseObject(ctx context.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+	trace := scope.Trace
+
 	// status objects are ignored for transformation
 	if _, ok := result.(*metav1.Status); ok {
+		trace.Step("writing metav1.Status")
 		responsewriters.WriteObject(statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 		return
 	}
 
 	// ensure the self link and empty list array are set
 	if err := setObjectSelfLink(ctx, result, req, scope.Namer); err != nil {
+		trace.Step("setObjectSelfLink failed")
 		scope.err(err, w, req)
 		return
 	}
-
-	trace := scope.Trace
 
 	// If conversion was allowed by the scope, perform it before writing the response
 	switch target := mediaType.Convert; {
@@ -57,6 +59,7 @@ func transformResponseObject(ctx context.Context, scope RequestScope, req *http.
 		responsewriters.WriteObject(statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 
 	case target.Kind == "PartialObjectMetadata" && target.GroupVersion() == metav1beta1.SchemeGroupVersion:
+		trace.Step("writing PartialObjectMetadata")
 		partial, err := asV1Beta1PartialObjectMetadata(result)
 		if err != nil {
 			scope.err(err, w, req)
@@ -101,6 +104,7 @@ func transformResponseObject(ctx context.Context, scope RequestScope, req *http.
 		}
 
 	default:
+		trace.Step("writing default")
 		// this block should only be hit if scope AllowsConversion is incorrect
 		accepted, _ := negotiation.MediaTypesForSerializer(metainternalversion.Codecs)
 		err := negotiation.NewNotAcceptableError(accepted)

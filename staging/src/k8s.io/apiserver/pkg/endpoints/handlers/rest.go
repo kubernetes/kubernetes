@@ -190,6 +190,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 				buf := make([]byte, size)
 				buf = buf[:goruntime.Stack(buf, false)]
 				panicReason = strings.TrimSuffix(fmt.Sprintf("%v\n%s", panicReason, string(buf)), "\n")
+				klog.Errorf(">>>> panic : %s", panicReason)
 			}
 			// Propagate to parent goroutine
 			panicCh <- panicReason
@@ -206,15 +207,19 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	case result = <-ch:
 		if status, ok := result.(*metav1.Status); ok {
 			if status.Status != metav1.StatusSuccess {
+				klog.Errorf(">>>> caught failure : %#v", errors.FromObject(status))
 				return nil, errors.FromObject(status)
 			}
 		}
 		return result, nil
 	case err = <-errCh:
+		klog.Errorf(">>>> caught error : %#v", err)
 		return nil, err
 	case p := <-panicCh:
+		klog.Errorf(">>>> panicking now : %#v", p)
 		panic(p)
 	case <-time.After(timeout):
+		klog.Errorf(">>>> timing out now")
 		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
 	}
 }

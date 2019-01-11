@@ -67,6 +67,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 
 		result, err := getter(ctx, name, req, trace)
 		if err != nil {
+			klog.V(4).Infof("Unable to get resource : %#v", err)
 			scope.err(err, w, req)
 			return
 		}
@@ -267,6 +268,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		trace.Step("About to List from storage")
 		result, err := r.List(ctx, &opts)
 		if err != nil {
+			klog.V(4).Infof("Unable to list from storage : %#v", err)
 			scope.err(err, w, req)
 			return
 		}
