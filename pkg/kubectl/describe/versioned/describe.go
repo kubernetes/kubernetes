@@ -2959,7 +2959,7 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
-		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", ps.Spec.Replicas, ps.Status.Replicas)
+		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", *ps.Spec.Replicas, ps.Status.Replicas)
 		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
 		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
 			ru := ps.Spec.UpdateStrategy.RollingUpdate
