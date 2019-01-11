@@ -440,7 +440,7 @@ func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now
 	runtimeErrorsFunc func() error, // typically Kubelet.runtimeState.runtimeErrors
 	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
-	storageErrorsFunc func() []string, // typically Kubelet.runtimeState.storageErrors
+	storageErrorsFunc func() error, // typically Kubelet.runtimeState.storageErrors
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
@@ -457,8 +457,7 @@ func ReadyCondition(
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-		errs := []error{runtimeErrorsFunc(), networkErrorsFunc()}
-		rs = append(rs, storageErrorsFunc()...)
+		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
 		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)

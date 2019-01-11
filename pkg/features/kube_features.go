@@ -390,7 +390,7 @@ const (
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
-	
+
 	// owner: @davidz627
 	// alpha: v1.14
 	//
@@ -412,8 +412,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig:                        {Default: true, PreRelease: utilfeature.Beta},
+	AppArmor:             {Default: true, PreRelease: utilfeature.Beta},
+	DynamicKubeletConfig: {Default: true, PreRelease: utilfeature.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},

@@ -110,62 +110,41 @@ func (nim *nodeInfoManager) InitializeMigratedDrivers() error {
 		return fmt.Errorf("initializeMigratedDrivers called but CSINodeInfo or CSIMigration is disabled")
 	}
 
-	var updateErrs []error
-
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	// TODO(dyzz): This should probably retry forever!!
 	// TODO(TODO): Change this into reconcile pattern
-	// Loop to initialize Specs
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
-		if nodeInfo == nil || errors.IsNotFound(err) {
-			nodeInfo, err = nim.CreateCSINodeInfo()
-		}
-		if err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		err = nim.tryInitializeMigratedDriverSpecs(nodeInfo)
-		if err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		return true, nil
+	// Initialize Specs
+	nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
+	if nodeInfo == nil || errors.IsNotFound(err) {
+		nodeInfo, err = nim.CreateCSINodeInfo()
+	}
+	if err != nil {
+		return err
+	}
+	nodeInfo, err = nim.tryInitializeMigratedDriverSpecs(nodeInfo)
+	if err != nil {
+		return fmt.Errorf("failed trying to initialize migrated driver specs: %v", err)
+	}
 
-	})
-
-	// Loop to initialize Status
+	// Initialize Statuses
 	// TODO(TODO) We can remove this once nodeinfomanager is refactored into a reconcile pattern because
 	// then we can just add the specs in the above loop and the reconciler will fill in the statuses based
 	// on that.
-	err = wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
-		if err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		err = nim.tryInitializeMigratedDriverStatuses(nodeInfo)
-		if err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		return true, nil
-	})
-
+	err = nim.tryInitializeMigratedDriverStatuses(nodeInfo)
 	if err != nil {
-		return fmt.Errorf("error updating node: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+		return fmt.Errorf("failed trying to initialize migrated driver statuses: %v", err)
 	}
+
 	return nil
 }
 
-func (nim *nodeInfoManager) tryInitializeMigratedDriverSpecs(nodeInfo *csiv1alpha1.CSINodeInfo) error {
+func (nim *nodeInfoManager) tryInitializeMigratedDriverSpecs(nodeInfo *csiv1alpha1.CSINodeInfo) (*csiv1alpha1.CSINodeInfo, error) {
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
-		return fmt.Errorf("error getting CSI client")
+		return nil, fmt.Errorf("error getting CSI client")
 	}
 
 	existingDrivers := sets.String{}
@@ -179,7 +158,7 @@ func (nim *nodeInfoManager) tryInitializeMigratedDriverSpecs(nodeInfo *csiv1alph
 		existingDrivers.Insert(driverInfoSpec.Name)
 	}
 
-	for driver, _ := range nim.migratedDrivers {
+	for driver := range nim.migratedDrivers {
 		if existingDrivers.Has(driver) {
 			// Skip adding new driver because already updated previously
 			continue
@@ -192,16 +171,22 @@ func (nim *nodeInfoManager) tryInitializeMigratedDriverSpecs(nodeInfo *csiv1alph
 		}
 
 		newDriverSpecs = append(newDriverSpecs, driverSpec)
+	}
 
+	if len(newDriverSpecs) == existingDrivers.Len() {
+		// No need to update because Spec's didn't change and all migrated drivers specs already existed
+		klog.V(4).Infof("InitializeMigratedDriverSpecs made no modifications, skipping API Update.")
+		return nodeInfo, nil
 	}
 
 	nodeInfo.Spec.Drivers = newDriverSpecs
 
-	_, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
-	return err
+	return csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
 }
 
 func (nim *nodeInfoManager) tryInitializeMigratedDriverStatuses(nodeInfo *csiv1alpha1.CSINodeInfo) error {
+	modified := false
+
 	csiKubeClient := nim.volumeHost.GetCSIClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
@@ -212,7 +197,11 @@ func (nim *nodeInfoManager) tryInitializeMigratedDriverStatuses(nodeInfo *csiv1a
 	newDriverStatuses := []csiv1alpha1.CSIDriverInfoStatus{}
 	// Add existing Statuses to newDriverStatuses
 	for _, driverInfoStatus := range nodeInfo.Status.Drivers {
-		driverInfoStatus.VolumePluginMechanism = nim.getVolumePluginMechanism(driverInfoStatus.Name)
+		vpm := nim.getVolumePluginMechanism(driverInfoStatus.Name)
+		if driverInfoStatus.VolumePluginMechanism != vpm {
+			driverInfoStatus.VolumePluginMechanism = vpm
+			modified = true
+		}
 		existingDrivers.Insert(driverInfoStatus.Name)
 		newDriverStatuses = append(newDriverStatuses, driverInfoStatus)
 	}
@@ -232,9 +221,17 @@ func (nim *nodeInfoManager) tryInitializeMigratedDriverStatuses(nodeInfo *csiv1a
 			VolumePluginMechanism: volumePluginMechanism,
 		}
 		newDriverStatuses = append(newDriverStatuses, driverStatus)
+		modified = true
+	}
+
+	if !modified {
+		// No modifications to NodeInfo have been made and so no need to do an API update
+		klog.V(4).Infof("InitializeMigratedDriverStatuses made no modifications, skipping API Update.")
+		return nil
 	}
 
 	nodeInfo.Status.Drivers = newDriverStatuses
+	// TODO: When CSINodeInfos is v1beta1 call UpdateStatus() instead
 	_, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
 	return err
 }
@@ -597,13 +594,6 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 		topologyKeys.Insert(k)
 	}
 
-	volumePluginMechanism := csiv1alpha1.VolumePluginMechanismInTree
-	if migratedFunc, ok := nim.migratedDrivers[driverName]; ok {
-		if migratedFunc() {
-			volumePluginMechanism = csiv1alpha1.VolumePluginMechanismCSI
-		}
-	}
-
 	specModified := true
 	statusModified := true
 	// Clone driver list, omitting the driver that matches the given driverName
@@ -619,6 +609,9 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 			newDriverSpecs = append(newDriverSpecs, driverInfoSpec)
 		}
 	}
+
+	volumePluginMechanism := nim.getVolumePluginMechanism(driverName)
+
 	newDriverStatuses := []csiv1alpha1.CSIDriverInfoStatus{}
 	for _, driverInfoStatus := range nodeInfo.Status.Drivers {
 		if driverInfoStatus.Name == driverName {

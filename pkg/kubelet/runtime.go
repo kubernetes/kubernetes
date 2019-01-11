@@ -98,14 +98,14 @@ func (s *runtimeState) runtimeErrors() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-func (s *runtimeState) storageErrors() []string {
+func (s *runtimeState) storageErrors() error {
 	s.RLock()
 	defer s.RUnlock()
-	var ret []string
+	errs := []error{}
 	if s.storageError != nil {
-		ret = append(ret, s.storageError.Error())
+		errs = append(errs, s.storageError)
 	}
-	return ret
+	return utilerrors.NewAggregate(errs)
 }
 
 func (s *runtimeState) networkErrors() error {

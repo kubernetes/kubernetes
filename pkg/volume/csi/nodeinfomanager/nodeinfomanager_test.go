@@ -1243,7 +1243,7 @@ func checkNodeInfoEquivilant(t *testing.T, gotNodeInfo *csiv1alpha1.CSINodeInfo,
 
 	if len(expectedDrivers) != gotSet.Len() {
 		expectedSet := sets.String{}
-		for k, _ := range expectedDrivers {
+		for k := range expectedDrivers {
 			expectedSet.Insert(k)
 		}
 		t.Fatalf("did not get all drivers that we expected, expected %v, got %v", expectedSet, gotSet)
@@ -1355,6 +1355,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 
 			/* CSINodeInfo validation */
 			nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
+			t.Logf("csiNodeInfo: %#v", nodeInfo)
 			if err != nil {
 				t.Errorf("error getting CSINodeInfo: %v", err)
 				continue

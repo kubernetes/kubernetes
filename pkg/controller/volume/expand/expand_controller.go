@@ -243,10 +243,6 @@ func (expc *expandController) GetPluginDir(pluginName string) string {
 	return ""
 }
 
-func (expc *expandController) SetKubeletError(err error) {
-	return
-}
-
 func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string {
 	return ""
 }

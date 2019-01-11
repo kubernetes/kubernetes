@@ -895,7 +895,7 @@ func TestReadyCondition(t *testing.T) {
 		node                     *v1.Node
 		runtimeErrors            error
 		networkErrors            error
-		storageErrors            []string
+		storageErrors            error
 		appArmorValidateHostFunc func() error
 		cmStatus                 cm.Status
 		expectConditions         []v1.NodeCondition
@@ -910,14 +910,14 @@ func TestReadyCondition(t *testing.T) {
 			// to ensure an event is sent.
 		},
 		{
-			desc: "new, ready: apparmor validator passed",
-			node: withCapacity.DeepCopy(),
+			desc:                     "new, ready: apparmor validator passed",
+			node:                     withCapacity.DeepCopy(),
 			appArmorValidateHostFunc: func() error { return nil },
 			expectConditions:         []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. AppArmor enabled", now, now)},
 		},
 		{
-			desc: "new, ready: apparmor validator failed",
-			node: withCapacity.DeepCopy(),
+			desc:                     "new, ready: apparmor validator failed",
+			node:                     withCapacity.DeepCopy(),
 			appArmorValidateHostFunc: func() error { return fmt.Errorf("foo") },
 			// absence of an additional message is understood to mean that AppArmor is disabled
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
@@ -933,7 +933,7 @@ func TestReadyCondition(t *testing.T) {
 		{
 			desc:             "new, not ready: storage errors",
 			node:             withCapacity.DeepCopy(),
-			storageErrors:    []string{"some storage error"},
+			storageErrors:    errors.New("some storage error"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "some storage error", now, now)},
 		},
 		{
@@ -1010,7 +1010,7 @@ func TestReadyCondition(t *testing.T) {
 			networkErrorsFunc := func() error {
 				return tc.networkErrors
 			}
-			storageErrorsFunc := func() []string {
+			storageErrorsFunc := func() error {
 				return tc.storageErrors
 			}
 			cmStatusFunc := func() cm.Status {

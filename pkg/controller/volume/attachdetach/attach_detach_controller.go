@@ -659,10 +659,6 @@ func (adc *attachDetachController) GetPluginDir(podUID string) string {
 	return ""
 }
 
-func (adc *attachDetachController) SetKubeletError(err error) {
-	return
-}
-
 func (adc *attachDetachController) GetVolumeDevicePluginDir(podUID string) string {
 	return ""
 }
