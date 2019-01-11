@@ -89,7 +89,7 @@ type Reconciler interface {
 //   safely (prevents more than one operation from being triggered on the same
 //   volume)
 // mounter - mounter passed in from kubelet, passed down unmount path
-// volumePluginMrg - volume plugin manager passed from kubelet
+// volumePluginMgr - volume plugin manager passed from kubelet
 func NewReconciler(
 	kubeClient clientset.Interface,
 	controllerAttachDetachEnabled bool,

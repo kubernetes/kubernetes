@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
@@ -438,8 +439,8 @@ func GoRuntime() Setter {
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now
-	runtimeErrorsFunc func() []string, // typically Kubelet.runtimeState.runtimeErrors
-	networkErrorsFunc func() []string, // typically Kubelet.runtimeState.networkErrors
+	runtimeErrorsFunc func() error, // typically Kubelet.runtimeState.runtimeErrors
+	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
@@ -456,7 +457,7 @@ func ReadyCondition(
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-		rs := append(runtimeErrorsFunc(), networkErrorsFunc()...)
+		errs := []error{runtimeErrorsFunc(), networkErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
 		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
@@ -468,14 +469,14 @@ func ReadyCondition(
 			}
 		}
 		if len(missingCapacities) > 0 {
-			rs = append(rs, fmt.Sprintf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
+			errs = append(errs, fmt.Errorf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
 		}
-		if len(rs) > 0 {
+		if aggregatedErr := errors.NewAggregate(errs); aggregatedErr != nil {
 			newNodeReadyCondition = v1.NodeCondition{
 				Type:              v1.NodeReady,
 				Status:            v1.ConditionFalse,
 				Reason:            "KubeletNotReady",
-				Message:           strings.Join(rs, ","),
+				Message:           aggregatedErr.Error(),
 				LastHeartbeatTime: currentTime,
 			}
 		}

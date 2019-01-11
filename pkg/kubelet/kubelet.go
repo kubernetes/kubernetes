@@ -1563,9 +1563,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
-	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod) {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, rs)
-		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, rs)
+	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
+		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
 	}
 
 	// Create Cgroups for the pod and apply resource parameters
@@ -1820,8 +1820,8 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	)
 	duration := base
 	for {
-		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
-			klog.Infof("skipping pod synchronization - %v", rs)
+		if err := kl.runtimeState.runtimeErrors(); err != nil {
+			klog.Infof("skipping pod synchronization - %v", err)
 			// exponential backoff
 			time.Sleep(duration)
 			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
