@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -74,7 +75,11 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
+	readyPodCount, ignoredPods, missingPods, hasMultipleOwners := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
+	if hasMultipleOwners {
+		return 0, 0, 0, time.Time{}, fmt.Errorf("pods have multiple owners, do not take action")
+	}
+
 	removeMetricsForPods(metrics, ignoredPods)
 	requests, err := calculatePodRequests(podList, resource)
 	if err != nil {
@@ -176,7 +181,11 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
+	readyPodCount, ignoredPods, missingPods, hasMultipleOwners := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
+	if hasMultipleOwners {
+		return 0, 0, fmt.Errorf("pods have multiple owners, do not take action")
+	}
+
 	removeMetricsForPods(metrics, ignoredPods)
 
 	if len(metrics) == 0 {
@@ -340,13 +349,26 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 	return replicaCount, utilization, timestamp, nil
 }
 
-func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, ignoredPods sets.String, missingPods sets.String) {
+func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, ignoredPods sets.String, missingPods sets.String, hasMultipleOwners bool) {
 	missingPods = sets.NewString()
 	ignoredPods = sets.NewString()
+	hasMultipleOwners = false
+	var podOwnerID types.UID
 	for _, pod := range pods {
 		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
+			// remove pod from metrics
+			delete(metrics, pod.Name)
 			continue
 		}
+		if len(pod.OwnerReferences) > 0 {
+			if podOwnerID != pod.OwnerReferences[0].UID {
+				if podOwnerID != types.UID("") {
+					hasMultipleOwners = true
+				}
+				podOwnerID = pod.OwnerReferences[0].UID
+			}
+		}
+
 		metric, found := metrics[pod.Name]
 		if !found {
 			missingPods.Insert(pod.Name)
