@@ -39,9 +39,9 @@ retry go get github.com/cespare/prettybench
 export KUBE_RACE=" "
 # Disable coverage report
 export KUBE_COVER="n"
-export ARTIFACTS_DIR=${WORKSPACE}/_artifacts
+export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
 
-mkdir -p "${ARTIFACTS_DIR}"
+mkdir -p "${ARTIFACTS}"
 cd /go/src/k8s.io/kubernetes
 
 ./hack/install-etcd.sh
@@ -49,5 +49,5 @@ cd /go/src/k8s.io/kubernetes
 # Run the benchmark tests and pretty-print the results into a separate file.
 make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
   | tee \
-   >(prettybench -no-passthrough > ${ARTIFACTS_DIR}/BenchmarkResults.txt) \
-   >(go run test/integration/benchmark/jsonify/main.go ${ARTIFACTS_DIR}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json || cat > /dev/null)
+   >(prettybench -no-passthrough > ${ARTIFACTS}/BenchmarkResults.txt) \
+   >(go run test/integration/benchmark/jsonify/main.go ${ARTIFACTS}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json || cat > /dev/null)
