@@ -45,6 +45,7 @@
 ./cluster/get-kube-binaries.sh
 ./cluster/get-kube-local.sh
 ./cluster/get-kube.sh
+./cluster/images/conformance/run_e2e.sh
 ./cluster/images/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
 ./cluster/juju/util.sh
@@ -72,6 +73,7 @@
 ./hack/cherry_pick_pull.sh
 ./hack/dev-build-and-push.sh
 ./hack/dev-build-and-up.sh
+./hack/dev-push-conformance.sh
 ./hack/dev-push-hyperkube.sh
 ./hack/e2e-internal/e2e-cluster-size.sh
 ./hack/e2e-internal/e2e-down.sh
@@ -80,7 +82,6 @@
 ./hack/e2e-internal/e2e-status.sh
 ./hack/e2e-internal/e2e-up.sh
 ./hack/e2e-node-test.sh
-./hack/gen-swagger-doc/gen-swagger-docs.sh
 ./hack/generate-bindata.sh
 ./hack/generate-docs.sh
 ./hack/get-build.sh
@@ -126,7 +127,6 @@
 ./hack/update-all.sh
 ./hack/update-api-reference-docs.sh
 ./hack/update-bazel.sh
-./hack/update-cloudprovider-gce.sh
 ./hack/update-codegen.sh
 ./hack/update-generated-device-plugin-dockerized.sh
 ./hack/update-generated-device-plugin.sh
@@ -135,6 +135,8 @@
 ./hack/update-generated-kms.sh
 ./hack/update-generated-kubelet-plugin-registration-dockerized.sh
 ./hack/update-generated-kubelet-plugin-registration.sh
+./hack/update-generated-pod-resources-dockerized.sh
+./hack/update-generated-pod-resources.sh
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-protobuf.sh
 ./hack/update-generated-runtime-dockerized.sh
@@ -154,7 +156,6 @@
 ./hack/verify-bazel.sh
 ./hack/verify-boilerplate.sh
 ./hack/verify-cli-conventions.sh
-./hack/verify-cloudprovider-gce.sh
 ./hack/verify-codegen.sh
 ./hack/verify-description.sh
 ./hack/verify-generated-device-plugin.sh
@@ -163,6 +164,7 @@
 ./hack/verify-generated-files.sh
 ./hack/verify-generated-kms.sh
 ./hack/verify-generated-kubelet-plugin-registration.sh
+./hack/verify-generated-pod-resources.sh
 ./hack/verify-generated-protobuf.sh
 ./hack/verify-generated-runtime.sh
 ./hack/verify-generated-swagger-docs.sh
@@ -183,10 +185,11 @@
 ./hack/verify-staging-meta-files.sh
 ./hack/verify-swagger-spec.sh
 ./hack/verify-symbols.sh
+./hack/verify-test-featuregates.sh
 ./hack/verify-test-images.sh
 ./hack/verify-test-owners.sh
 ./hack/verify-typecheck.sh
-./pkg/kubectl/cmd/testdata/edit/record_testcase.sh
+./pkg/kubectl/cmd/edit/testdata/record_testcase.sh
 ./pkg/util/verify-util-pkg.sh
 ./plugin/pkg/admission/imagepolicy/gencerts.sh
 ./staging/src/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
@@ -211,6 +214,8 @@
 ./staging/src/k8s.io/kube-aggregator/hack/verify-codegen.sh
 ./staging/src/k8s.io/metrics/hack/update-codegen.sh
 ./staging/src/k8s.io/metrics/hack/verify-codegen.sh
+./staging/src/k8s.io/node-api/hack/update-codegen.sh
+./staging/src/k8s.io/node-api/hack/verify-codegen.sh
 ./staging/src/k8s.io/sample-apiserver/hack/build-image.sh
 ./staging/src/k8s.io/sample-apiserver/hack/update-codegen.sh
 ./staging/src/k8s.io/sample-apiserver/hack/verify-codegen.sh
@@ -224,6 +229,7 @@
 ./test/cmd/core.sh
 ./test/cmd/crd.sh
 ./test/cmd/create.sh
+./test/cmd/diff.sh
 ./test/cmd/discovery.sh
 ./test/cmd/generic-resources.sh
 ./test/cmd/get.sh
@@ -273,3 +279,5 @@
 ./test/kubemark/stop-kubemark.sh
 ./third_party/forked/shell2junit/sh2ju.sh
 ./third_party/intemp/intemp.sh
+./third_party/multiarch/qemu-user-static/register/qemu-binfmt-conf.sh
+./third_party/multiarch/qemu-user-static/register/register.sh
