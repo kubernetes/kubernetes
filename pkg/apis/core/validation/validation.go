@@ -1039,9 +1039,6 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 		}
 		if projPath := srcPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
 			numSources++
-			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-				allErrs = append(allErrs, field.Forbidden(projPath, "TokenRequestProjection feature is not enabled"))
-			}
 			if source.ServiceAccountToken.ExpirationSeconds < 10*60 {
 				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration less than 10 minutes"))
 			}

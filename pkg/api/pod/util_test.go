@@ -1177,7 +1177,124 @@ func TestDropReadinessGates(t *testing.T) {
 						}
 						// new pod should not have ReadinessGates
 						if !reflect.DeepEqual(newPod, podWithoutReadinessGates()) {
-							t.Errorf("new pod had ReadinessGates: %v", diff.ObjectReflectDiff(newPod, podWithoutReadinessGates()))
+							t.Errorf("new pod had ReadinessGates: %v",
+								diff.ObjectReflectDiff(newPod, podWithoutReadinessGates()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropTokenRequestProjection(t *testing.T) {
+	podWithoutTRProjection := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{
+								ServiceAccountToken: nil,
+							}},
+						}}},
+				},
+			},
+		}
+	}
+	podWithoutProjectedVolumeSource := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{VolumeSource: api.VolumeSource{
+						ConfigMap: &api.ConfigMapVolumeSource{},
+					}},
+				},
+			},
+		}
+	}
+	podWithTRProjection := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{
+								ServiceAccountToken: &api.ServiceAccountTokenProjection{
+									Audience:          "api",
+									ExpirationSeconds: 3600,
+									Path:              "token",
+								}},
+							}},
+					},
+				},
+				},
+			}}
+	}
+	podInfo := []struct {
+		description     string
+		hasTRProjection bool
+		pod             func() *api.Pod
+	}{
+		{
+			description:     "has TokenRequestProjection",
+			hasTRProjection: true,
+			pod:             podWithTRProjection,
+		},
+		{
+			description:     "does not have TokenRequestProjection",
+			hasTRProjection: false,
+			pod:             podWithoutTRProjection,
+		},
+		{
+			description:     "does not have ProjectedVolumeSource",
+			hasTRProjection: false,
+			pod:             podWithoutProjectedVolumeSource,
+		},
+		{
+			description:     "is nil",
+			hasTRProjection: false,
+			pod:             func() *api.Pod { return nil },
+		},
+	}
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodhasTRProjection, oldPod := oldPodInfo.hasTRProjection, oldPodInfo.pod()
+				newPodhasTRProjection, newPod := newPodInfo.hasTRProjection, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequestProjection, enabled)()
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+					switch {
+					case enabled || oldPodhasTRProjection:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodhasTRProjection:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("%v", oldPod)
+							t.Errorf("%v", newPod)
+							t.Errorf("new pod was not changed")
+						}
+						if !reflect.DeepEqual(newPod, podWithoutTRProjection()) {
+							t.Errorf("new pod had Tokenrequestprojection: %v", diff.ObjectReflectDiff(newPod, podWithoutTRProjection()))
 						}
 					default:
 						// new pod should not need to be changed
