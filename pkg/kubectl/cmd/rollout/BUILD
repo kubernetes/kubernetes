@@ -64,10 +64,14 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["rollout_pause_test.go"],
+    srcs = [
+        "rollout_pause_test.go",
+        "rollout_undo_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/cmd/testing:go_default_library",
+        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

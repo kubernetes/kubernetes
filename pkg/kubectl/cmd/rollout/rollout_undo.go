@@ -40,6 +40,7 @@ type UndoOptions struct {
 	Builder          func() *resource.Builder
 	ToRevision       int64
 	DryRun           bool
+	UndoAll          bool
 	Resources        []string
 	Namespace        string
 	EnforceNamespace bool
@@ -80,7 +81,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use:                   "undo (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "undo (TYPE NAME | TYPE/NAME | --all) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Undo a previous rollout"),
 		Long:                  undoLong,
@@ -94,6 +95,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	}
 
 	cmd.Flags().Int64Var(&o.ToRevision, "to-revision", o.ToRevision, "The revision to rollback to. Default to 0 (last revision).")
+	cmd.Flags().BoolVar(&o.UndoAll, "all", *&o.UndoAll, "Undo all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
@@ -129,6 +131,10 @@ func (o *UndoOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return fmt.Errorf("required resource not specified")
 	}
+
+	if o.UndoAll && len(o.Filenames) > 0 {
+		return fmt.Errorf("cannot set --all and --filename at the same time")
+	}
 	return nil
 }
 
@@ -138,6 +144,7 @@ func (o *UndoOptions) RunUndo() error {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		SelectAllParam(o.UndoAll).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
 		Latest().

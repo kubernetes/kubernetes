@@ -65,7 +65,7 @@ run_daemonset_history_tests() {
   kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml --record "${kube_flags[@]}"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{$annotations_field}}:{{end}}" ".*rollingupdate-daemonset.yaml --record.*"
   # Rollback to revision 1 - should be no-op
-  kubectl rollout undo daemonset --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo daemonset --all --to-revision=1 "${kube_flags[@]}"
   kube::test::get_object_assert daemonset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Update the DaemonSet (revision 2)
@@ -75,21 +75,21 @@ run_daemonset_history_tests() {
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{$annotations_field}}:{{end}}" ".*rollingupdate-daemonset-rv2.yaml --record.*"
   # Rollback to revision 1 with dry-run - should be no-op
-  kubectl rollout undo daemonset --dry-run=true "${kube_flags[@]}"
+  kubectl rollout undo daemonset --all --dry-run=true "${kube_flags[@]}"
   kube::test::get_object_assert daemonset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{$image_field1}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
   # Rollback to revision 1
-  kubectl rollout undo daemonset --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo daemonset --all --to-revision=1 "${kube_flags[@]}"
   kube::test::wait_object_assert daemonset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Rollback to revision 1000000 - should fail
-  output_message=$(! kubectl rollout undo daemonset --to-revision=1000000 "${kube_flags[@]}" 2>&1)
+  output_message=$(! kubectl rollout undo daemonset --all --to-revision=1000000 "${kube_flags[@]}" 2>&1)
   kube::test::if_has_string "${output_message}" "unable to find specified revision"
   kube::test::get_object_assert daemonset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Rollback to last revision
-  kubectl rollout undo daemonset "${kube_flags[@]}"
+  kubectl rollout undo daemonset --all "${kube_flags[@]}"
   kube::test::wait_object_assert daemonset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
   kube::test::wait_object_assert daemonset "{{range.items}}{{$image_field1}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
@@ -416,7 +416,7 @@ run_statefulset_history_tests() {
   kubectl apply -f hack/testdata/rollingupdate-statefulset.yaml --record "${kube_flags[@]}"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{$annotations_field}}:{{end}}" ".*rollingupdate-statefulset.yaml --record.*"
   # Rollback to revision 1 - should be no-op
-  kubectl rollout undo statefulset --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo statefulset --all --to-revision=1 "${kube_flags[@]}"
   kube::test::get_object_assert statefulset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_STATEFULSET_R1}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Update the statefulset (revision 2)
@@ -426,12 +426,12 @@ run_statefulset_history_tests() {
   kube::test::get_object_assert statefulset "{{range.items}}{{$container_len}}{{end}}" "2"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{$annotations_field}}:{{end}}" ".*rollingupdate-statefulset-rv2.yaml --record.*"
   # Rollback to revision 1 with dry-run - should be no-op
-  kubectl rollout undo statefulset --dry-run=true "${kube_flags[@]}"
+  kubectl rollout undo statefulset --all --dry-run=true "${kube_flags[@]}"
   kube::test::get_object_assert statefulset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_STATEFULSET_R2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{$image_field1}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{$container_len}}{{end}}" "2"
   # Rollback to revision 1
-  kubectl rollout undo statefulset --to-revision=1 "${kube_flags[@]}"
+  kubectl rollout undo statefulset --all --to-revision=1 "${kube_flags[@]}"
   kube::test::wait_object_assert statefulset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_STATEFULSET_R1}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Rollback to revision 1000000 - should fail
@@ -440,7 +440,7 @@ run_statefulset_history_tests() {
   kube::test::get_object_assert statefulset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_STATEFULSET_R1}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Rollback to last revision
-  kubectl rollout undo statefulset "${kube_flags[@]}"
+  kubectl rollout undo statefulset --all "${kube_flags[@]}"
   kube::test::wait_object_assert statefulset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_STATEFULSET_R2}:"
   kube::test::wait_object_assert statefulset "{{range.items}}{{$image_field1}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{$container_len}}{{end}}" "2"
