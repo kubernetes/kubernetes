@@ -27,10 +27,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -265,12 +263,7 @@ func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 	dnsPolicy := pod.Spec.DNSPolicy
 	switch dnsPolicy {
 	case v1.DNSNone:
-		if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) {
-			return podDNSNone, nil
-		}
-		// This should not happen as kube-apiserver should have rejected
-		// setting dnsPolicy to DNSNone when feature gate is disabled.
-		return podDNSCluster, fmt.Errorf(fmt.Sprintf("invalid DNSPolicy=%v: custom pod DNS is disabled", dnsPolicy))
+		return podDNSNone, nil
 	case v1.DNSClusterFirstWithHostNet:
 		return podDNSCluster, nil
 	case v1.DNSClusterFirst:
@@ -383,7 +376,7 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CustomPodDNS) && pod.Spec.DNSConfig != nil {
+	if pod.Spec.DNSConfig != nil {
 		dnsConfig = appendDNSConfig(dnsConfig, pod.Spec.DNSConfig)
 	}
 	return c.formDNSConfigFitsLimits(dnsConfig, pod), nil
