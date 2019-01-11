@@ -234,6 +234,7 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 			return nil, err
 		}
 		mergedConfig.BearerToken = string(tokenBytes)
+		mergedConfig.BearerTokenFile = configAuthInfo.TokenFile
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = restclient.ImpersonationConfig{

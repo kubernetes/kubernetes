@@ -13,7 +13,6 @@ go_test(
         "config_test.go",
         "plugin_test.go",
         "request_test.go",
-        "token_source_test.go",
         "url_utils_test.go",
         "urlbackoff_test.go",
     ],
@@ -42,7 +41,6 @@ go_test(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/golang.org/x/oauth2:go_default_library",
     ],
 )
 
@@ -53,7 +51,6 @@ go_library(
         "config.go",
         "plugin.go",
         "request.go",
-        "token_source.go",
         "transport.go",
         "url_utils.go",
         "urlbackoff.go",
@@ -81,7 +78,6 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/http2:go_default_library",
-        "//vendor/golang.org/x/oauth2:go_default_library",
     ],
 )
 
