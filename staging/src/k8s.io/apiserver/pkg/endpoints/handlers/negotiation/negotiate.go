@@ -282,6 +282,12 @@ func NegotiateMediaTypeOptions(header string, accepted []AcceptedMediaType, endp
 		}
 	}
 
+	if len(accepted) > 0 {
+		return MediaTypeOptions{
+			Accepted: &accepted[0],
+		}, true
+	}
+
 	return MediaTypeOptions{}, false
 }
 
