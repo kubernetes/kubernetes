@@ -183,9 +183,9 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 				buf := make([]byte, size)
 				buf = buf[:goruntime.Stack(buf, false)]
 				panicReason = strings.TrimSuffix(fmt.Sprintf("%v\n%s", panicReason, string(buf)), "\n")
+				// Propagate to parent goroutine
+				panicCh <- panicReason
 			}
-			// Propagate to parent goroutine
-			panicCh <- panicReason
 		}()
 
 		if result, err := fn(); err != nil {
