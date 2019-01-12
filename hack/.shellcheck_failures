@@ -42,9 +42,6 @@
 ./cluster/gce/upgrade-aliases.sh
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
-./cluster/get-kube-binaries.sh
-./cluster/get-kube-local.sh
-./cluster/get-kube.sh
 ./cluster/images/conformance/run_e2e.sh
 ./cluster/images/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.sh
 ./cluster/juju/prereqs/ubuntu-juju.sh
