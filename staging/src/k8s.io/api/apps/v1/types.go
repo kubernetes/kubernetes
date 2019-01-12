@@ -69,7 +69,7 @@ const (
 	// ParallelPodManagement will create and delete pods as soon as the stateful set
 	// replica count is changed, and will not wait for pods to be ready or complete
 	// termination.
-	ParallelPodManagement = "Parallel"
+	ParallelPodManagement PodManagementPolicyType = "Parallel"
 )
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
