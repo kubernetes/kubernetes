@@ -44,6 +44,9 @@ type PodBindingCache interface {
 	// means that no provisioning operations are needed.
 	GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.PersistentVolumeClaim
 
+	// GetDecisions will return all cached decisions for the given pod.
+	GetDecisions(pod *v1.Pod) nodeDecisions
+
 	// DeleteBindings will remove all cached bindings and provisionings for the given pod.
 	// TODO: separate the func if it is needed to delete bindings/provisionings individually
 	DeleteBindings(pod *v1.Pod)
@@ -70,6 +73,17 @@ type nodeDecision struct {
 
 func NewPodBindingCache() PodBindingCache {
 	return &podBindingCache{bindingDecisions: map[string]nodeDecisions{}}
+}
+
+func (c *podBindingCache) GetDecisions(pod *v1.Pod) nodeDecisions {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+	podName := getPodName(pod)
+	decisions, ok := c.bindingDecisions[podName]
+	if !ok {
+		return nil
+	}
+	return decisions
 }
 
 func (c *podBindingCache) DeleteBindings(pod *v1.Pod) {
