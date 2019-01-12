@@ -54,6 +54,13 @@ if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
     )
 fi
 
+# Exclude readonly package check in certain cases, aka, in periodic jobs we don't care and a readonly package won't be touched
+if [[ ${EXCLUDE_READONLY_PACKAGE:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-readonly-packages.sh"  # skip in CI, if env is set
+    )
+fi
+
 # Only run whitelisted fast checks in quick mode.
 # These run in <10s each on enisoc's workstation, assuming that
 # `make` and `hack/godep-restore.sh` had already been run.
