@@ -531,18 +531,35 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, stopCh)
-	schedulerConfig2, err := schedulerConfigFactory2.Create()
-	if err != nil {
-		t.Errorf("Couldn't create scheduler config: %v", err)
-	}
 	eventBroadcaster2 := record.NewBroadcaster()
-	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet2.CoreV1().Events("")})
 	go podInformer2.Informer().Run(stopCh)
 	informerFactory2.Start(stopCh)
 
-	sched2 := scheduler.NewFromConfig(schedulerConfig2)
+	sched2, err := scheduler.New(
+		clientSet2,
+		informerFactory2.Core().V1().Nodes(),
+		podInformer2,
+		informerFactory2.Core().V1().PersistentVolumes(),
+		informerFactory2.Core().V1().PersistentVolumeClaims(),
+		informerFactory2.Core().V1().ReplicationControllers(),
+		informerFactory2.Apps().V1().ReplicaSets(),
+		informerFactory2.Apps().V1().StatefulSets(),
+		informerFactory2.Core().V1().Services(),
+		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory2.Storage().V1().StorageClasses(),
+		eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler}),
+		kubeschedulerconfig.SchedulerAlgorithmSource{},
+		stopCh,
+		scheduler.WithName(v1.DefaultSchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
+		scheduler.WithPreemptionDisabled(false),
+		scheduler.WithPercentageOfNodesToScore(schedulerapi.DefaultPercentageOfNodesToScore),
+	)
+	if err != nil {
+		t.Fatalf("Couldn't create scheduler: %v", err)
+	}
+
 	sched2.Run()
 
 	//	6. **check point-2**:

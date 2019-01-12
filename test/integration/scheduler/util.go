@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -64,35 +65,6 @@ type TestContext struct {
 	schedulerConfig        *factory.Config
 	scheduler              *scheduler.Scheduler
 	stopCh                 chan struct{}
-}
-
-// createConfiguratorWithPodInformer creates a configurator for scheduler.
-func createConfiguratorWithPodInformer(
-	schedulerName string,
-	clientSet clientset.Interface,
-	podInformer coreinformers.PodInformer,
-	informerFactory informers.SharedInformerFactory,
-	stopCh <-chan struct{},
-) factory.Configurator {
-	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  schedulerName,
-		Client:                         clientSet,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PodInformer:                    podInformer,
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		DisablePreemption:              false,
-		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		BindTimeoutSeconds:             600,
-		StopCh:                         stopCh,
-	})
 }
 
 // initTestMasterAndScheduler initializes a test environment and creates a master with default
@@ -171,11 +143,7 @@ func initTestSchedulerWithOptions(
 		podInformer = context.informerFactory.Core().V1().Pods()
 	}
 
-	context.schedulerConfigFactory = createConfiguratorWithPodInformer(
-		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, context.stopCh)
-
 	var err error
-
 	if policy != nil {
 		context.schedulerConfig, err = context.schedulerConfigFactory.CreateFromConfig(*policy)
 	} else {
@@ -212,7 +180,31 @@ func initTestSchedulerWithOptions(
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
 	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
 
-	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
+	context.scheduler, err = scheduler.New(
+		context.clientSet,
+		context.informerFactory.Core().V1().Nodes(),
+		podInformer,
+		context.informerFactory.Core().V1().PersistentVolumes(),
+		context.informerFactory.Core().V1().PersistentVolumeClaims(),
+		context.informerFactory.Core().V1().ReplicationControllers(),
+		context.informerFactory.Apps().V1().ReplicaSets(),
+		context.informerFactory.Apps().V1().StatefulSets(),
+		context.informerFactory.Core().V1().Services(),
+		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		context.informerFactory.Storage().V1().StorageClasses(),
+		context.schedulerConfig.Recorder,
+		kubeschedulerconfig.SchedulerAlgorithmSource{},
+		context.stopCh,
+		scheduler.WithName(v1.DefaultSchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
+		scheduler.WithPreemptionDisabled(false),
+		scheduler.WithPercentageOfNodesToScore(schedulerapi.DefaultPercentageOfNodesToScore),
+		scheduler.WithBindTimeoutSeconds(600),
+	)
+	if err != nil {
+		t.Fatalf("Couldn't create scheduler: %v", err)
+	}
+
 	context.scheduler.Run()
 	return context
 }
