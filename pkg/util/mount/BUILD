@@ -7,6 +7,7 @@ go_library(
         "exec.go",
         "fake.go",
         "mount.go",
+        "mount_helper.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "exec_mount_unsupported.go",
@@ -116,6 +117,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "mount_helper_test.go",
         "safe_format_and_mount_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [

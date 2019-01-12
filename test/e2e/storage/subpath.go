@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -331,6 +331,31 @@ var _ = utils.SIGDescribe("Subpath", func() {
 
 				// Pod should fail
 				testPodFailSubpathError(f, pod, "")
+			})
+
+			It("should be able to unmount after the subpath directory is deleted", func() {
+				// Change volume container to busybox so we can exec later
+				pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
+				pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+
+				By(fmt.Sprintf("Creating pod %s", pod.Name))
+				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+				Expect(err).ToNot(HaveOccurred(), "while creating pod")
+				defer func() {
+					By(fmt.Sprintf("Deleting pod %s", pod.Name))
+					framework.DeletePodWithWait(f, f.ClientSet, pod)
+				}()
+
+				// Wait for pod to be running
+				err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
+				Expect(err).ToNot(HaveOccurred(), "while waiting for pod to be running")
+
+				// Exec into container that mounted the volume, delete subpath directory
+				rmCmd := fmt.Sprintf("rm -rf %s", subPathDir)
+				_, err = podContainerExec(pod, 1, rmCmd)
+				Expect(err).ToNot(HaveOccurred(), "while removing subpath directory")
+
+				// Delete pod (from defer) and wait for it to be successfully deleted
 			})
 		})
 	}
