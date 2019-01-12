@@ -40,7 +40,7 @@ import (
 const (
 	defaultStorageAccountType       = storage.StandardLRS
 	defaultAzureDiskKind            = v1.AzureSharedBlobDisk
-	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingNone
+	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingReadOnly
 )
 
 type dataDisk struct {
