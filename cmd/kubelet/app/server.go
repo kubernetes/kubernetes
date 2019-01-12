@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	// The package is only imported for the side effect of registering its HTTP handlers
 	_ "net/http/pprof"
 	"net/url"
 	"os"
@@ -1063,6 +1064,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 	}
 }
 
+//CreateAndInitKubelet creates and instantiate kubelet
 func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
