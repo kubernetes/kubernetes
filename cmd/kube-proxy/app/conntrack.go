@@ -43,7 +43,7 @@ type Conntracker interface {
 
 type realConntracker struct{}
 
-var readOnlySysFSError = errors.New("readOnlySysFS")
+var ErrReadOnlySysFS = errors.New("readOnlySysFS")
 
 func (rct realConntracker) SetMax(max int) error {
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
@@ -70,14 +70,14 @@ func (rct realConntracker) SetMax(max int) error {
 	// issue (https://github.com/docker/docker/issues/24000). Setting
 	// conntrack will fail when sysfs is readonly. When that happens, we
 	// don't set conntrack hashsize and return a special error
-	// readOnlySysFSError here. The caller should deal with
-	// readOnlySysFSError differently.
+	// ErrReadOnlySysFS here. The caller should deal with
+	// ErrReadOnlySysFS differently.
 	writable, err := isSysFSWritable()
 	if err != nil {
 		return err
 	}
 	if !writable {
-		return readOnlySysFSError
+		return ErrReadOnlySysFS
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
 	klog.Infof("Setting conntrack hashsize to %d", max/4)
@@ -126,7 +126,7 @@ func isSysFSWritable() (bool, error) {
 		}
 		klog.Errorf("sysfs is not writable: %+v (mount options are %v)",
 			mountPoint, mountPoint.Opts)
-		return false, readOnlySysFSError
+		return false, ErrReadOnlySysFS
 	}
 
 	return false, errors.New("No sysfs mounted")

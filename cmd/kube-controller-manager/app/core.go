@@ -211,7 +211,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
 	// csiClient works with CRDs that support json only
