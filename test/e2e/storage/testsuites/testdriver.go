@@ -130,4 +130,8 @@ type TestConfig struct {
 	// the configuration that then has to be used to run tests.
 	// The values above are ignored for such tests.
 	ServerConfig *framework.VolumeTestConfig
+
+	// TopologyEnabled indicates that the Topology feature gate
+	// should be enabled in external-provisioner
+	TopologyEnabled bool
 }
