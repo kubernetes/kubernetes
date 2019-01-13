@@ -41,6 +41,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -71,6 +72,7 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 			),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
+				testsuites.CapDataSource:  true,
 			},
 
 			Config: config,
@@ -81,6 +83,7 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 
 var _ testsuites.TestDriver = &hostpathCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
+var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -88,8 +91,10 @@ func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
@@ -109,6 +114,15 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *stor
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (h *hostpathCSIDriver) GetSnapshotClass() *unstructured.Unstructured {
+	snapshotter := testsuites.GetUniqueDriverName(h)
+	parameters := map[string]string{}
+	ns := h.driverInfo.Config.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-vsc", snapshotter)
+
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
 func (h *hostpathCSIDriver) GetClaimSize() string {
@@ -133,6 +147,7 @@ func (h *hostpathCSIDriver) CreateDriver() {
 		DriverContainerName:      "hostpath",
 		DriverContainerArguments: []string{"--drivername=csi-hostpath-" + f.UniqueName},
 		ProvisionerContainerName: "csi-provisioner",
+		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 nodeName,
 	}
 	cleanup, err := h.driverInfo.Config.Framework.CreateFromManifests(func(item interface{}) error {
