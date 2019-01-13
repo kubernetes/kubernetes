@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -175,11 +175,14 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				buf.ReadFrom(rc)
 				hostsFileContent := buf.String()
 
-				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") {
-					return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
+				if strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") ||
+					(strings.Contains(hostsFileContent, "123.45.67.89\tfoo") &&
+						strings.Contains(hostsFileContent, "123.45.67.89\tbar")) {
+					return nil
 				}
 
-				return nil
+				return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
+
 			}, time.Minute, time.Second*4).Should(BeNil())
 		})
 	})
