@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -97,6 +99,12 @@ type nodeV0ClientCreator func(addr csiAddr) (
 	nodeClient csipbv0.NodeClient,
 	closer io.Closer,
 	err error,
+)
+
+const (
+	initialDuration = 1 * time.Second
+	factor          = 2.0
+	steps           = 5
 )
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
@@ -177,13 +185,26 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	accessibleTopology map[string]string,
 	err error) {
 	klog.V(4).Info(log("calling NodeGetInfo rpc"))
-	if c.nodeV1ClientCreator != nil {
-		return c.nodeGetInfoV1(ctx)
-	} else if c.nodeV0ClientCreator != nil {
-		return c.nodeGetInfoV0(ctx)
-	}
 
-	err = fmt.Errorf("failed to call NodeGetInfo. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+	// TODO retries should happen at a lower layer (issue #73371)
+	backoff := wait.Backoff{Duration: initialDuration, Factor: factor, Steps: steps}
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
+		var getNodeInfoError error
+		if c.nodeV1ClientCreator != nil {
+			nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
+		} else if c.nodeV0ClientCreator != nil {
+			nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV0(ctx)
+		}
+		if nodeID != "" {
+			return true, nil
+		}
+		// kubelet plugin registration service not implemented is a terminal error, no need to retry
+		if strings.Contains(getNodeInfoError.Error(), "no handler registered for plugin type") {
+			return false, getNodeInfoError
+		}
+		// Continue with exponential backoff
+		return false, nil
+	})
 
 	return nodeID, maxVolumePerNode, accessibleTopology, err
 }
