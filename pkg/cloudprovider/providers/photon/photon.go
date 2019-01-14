@@ -476,13 +476,11 @@ func (pc *PCCloud) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 		return pc.localInstanceID, nil
 	}
 	// We assume only master need to get InstanceID of a node other than itself
-	ID, err := getInstanceID(pc, name)
+	id, err := getInstanceID(pc, name)
 	if err != nil {
 		klog.Errorf("Photon Cloud Provider: getInstanceID failed for InstanceID. Error[%v]", err)
-		return ID, err
-	} else {
-		return ID, nil
 	}
+	return id, err
 
 }
 
@@ -544,7 +542,7 @@ func (pc *PCCloud) HasClusterID() bool {
 	return true
 }
 
-// AttacheDisk attaches given virtual disk volume to the compute running kubelet.
+// AttachDisk attaches given virtual disk volume to the compute running kubelet.
 func (pc *PCCloud) AttachDisk(ctx context.Context, pdID string, nodeName k8stypes.NodeName) error {
 	photonClient, err := getPhotonClient(pc)
 	if err != nil {
