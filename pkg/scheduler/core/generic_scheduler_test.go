@@ -1407,6 +1407,7 @@ func TestPreempt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Logf("===== Running test %v", t.Name())
 			stop := make(chan struct{})
 			cache := schedulerinternalcache.New(time.Duration(0), stop)
 			for _, pod := range test.pods {
@@ -1443,13 +1444,17 @@ func TestPreempt(t *testing.T) {
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
+			scheduler.(*genericScheduler).snapshot()
 			// Call Preempt and check the expected results.
 			node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
-			if (node != nil && node.Name != test.expectedNode) || (node == nil && len(test.expectedNode) != 0) {
+			if node != nil && node.Name != test.expectedNode {
 				t.Errorf("expected node: %v, got: %v", test.expectedNode, node.GetName())
+			}
+			if node == nil && len(test.expectedNode) != 0 {
+				t.Errorf("expected node: %v, got: nothing", test.expectedNode)
 			}
 			if len(victims) != len(test.expectedPods) {
 				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(victims))
