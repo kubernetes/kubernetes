@@ -32,7 +32,7 @@ type Updater struct {
 	Converter Converter
 }
 
-func (s *Updater) update(oldObject, newObject typed.TypedValue, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, error) {
+func (s *Updater) update(oldObject, newObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, error) {
 	if managers == nil {
 		managers = fieldpath.ManagedFields{}
 	}
@@ -41,7 +41,12 @@ func (s *Updater) update(oldObject, newObject typed.TypedValue, managers fieldpa
 		oldObject typed.TypedValue
 		newObject typed.TypedValue
 	}
-	versions := map[fieldpath.APIVersion]Versioned{}
+	versions := map[fieldpath.APIVersion]Versioned{
+		version: Versioned{
+			oldObject: oldObject,
+			newObject: newObject,
+		},
+	}
 
 	for manager, managerSet := range managers {
 		if manager == workflow {
@@ -92,7 +97,7 @@ func (s *Updater) update(oldObject, newObject typed.TypedValue, managers fieldpa
 // this is a CREATE call).
 func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (fieldpath.ManagedFields, error) {
 	var err error
-	managers, err = s.update(liveObject, newObject, managers, manager, true)
+	managers, err = s.update(liveObject, newObject, version, managers, manager, true)
 	if err != nil {
 		return fieldpath.ManagedFields{}, err
 	}
@@ -118,7 +123,7 @@ func (s *Updater) Apply(liveObject, configObject typed.TypedValue, version field
 	if err != nil {
 		return typed.TypedValue{}, fieldpath.ManagedFields{}, fmt.Errorf("failed to merge config: %v", err)
 	}
-	managers, err = s.update(liveObject, newObject, managers, manager, force)
+	managers, err = s.update(liveObject, newObject, version, managers, manager, force)
 	if err != nil {
 		return typed.TypedValue{}, fieldpath.ManagedFields{}, err
 	}
