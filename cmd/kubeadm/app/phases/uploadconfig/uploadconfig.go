@@ -19,7 +19,7 @@ package uploadconfig
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -36,6 +36,53 @@ const (
 	// or during upgrade nodes
 	NodesKubeadmConfigClusterRoleName = "kubeadm:nodes-kubeadm-config"
 )
+
+// UploadRemoveConfiguration uploads a new configuration with the client removed
+func UploadRemoveConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+	fmt.Printf("[reset] removing the configuration stored in the ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+
+	clusterConfigurationToUpload := cfg.ClusterConfiguration.DeepCopy()
+	clusterConfigurationToUpload.ComponentConfigs = kubeadmapi.ComponentConfigs{}
+
+	// Marshal the ClusterConfiguration into YAML
+	clusterConfigurationYaml, err := configutil.MarshalKubeadmConfigObject(clusterConfigurationToUpload)
+	if err != nil {
+		return err
+	}
+
+	// Prepare the ClusterStatus for upload
+	// Gets the current cluster status
+	// TODO: use configmap locks on this object on the get before the update.
+	clusterStatus, err := configutil.GetClusterStatus(client)
+	if err != nil {
+		return err
+	}
+
+	// Updates the ClusterStatus with the current control plane instance
+	if clusterStatus.APIEndpoints == nil {
+		clusterStatus.APIEndpoints = map[string]kubeadmapi.APIEndpoint{}
+	}
+
+	// Remove configuration from the cluster status
+	delete(clusterStatus.APIEndpoints, cfg.NodeRegistration.Name)
+
+	// Marshal the ClusterStatus back into YAML
+	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)
+	if err != nil {
+		return err
+	}
+
+	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			kubeadmconstants.ClusterConfigurationConfigMapKey: string(clusterConfigurationYaml),
+			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
+		},
+	})
+}
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
@@ -65,7 +112,6 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	if clusterStatus.APIEndpoints == nil {
 		clusterStatus.APIEndpoints = map[string]kubeadmapi.APIEndpoint{}
 	}
-	clusterStatus.APIEndpoints[cfg.NodeRegistration.Name] = cfg.LocalAPIEndpoint
 
 	// Marshal the ClusterStatus back into YAML
 	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)

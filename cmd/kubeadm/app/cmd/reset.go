@@ -31,11 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	uploadconfig "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -132,6 +134,20 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface) error {
 	// Only clear etcd data when using local etcd.
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 
+	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "reset", "", false)
+
+	if err != nil && cfg != nil {
+		cfg = nil
+	}
+
+	// Check if control plane node
+	klog.V(1).Infof("[reset] checking if control plane node")
+	if isControlPlane(cfg) {
+		klog.V(1).Infof("[reset] removing control plane node from cluster")
+		uploadconfig.UploadRemoveConfiguration(cfg, client)
+	}
+
+	// Try to stop etcd
 	klog.V(1).Infof("[reset] checking for etcd config")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, client)
 	if err == nil {
@@ -294,4 +310,18 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 			klog.Errorf("[reset] failed to remove file: %q [%v]\n", path, err)
 		}
 	}
+}
+
+// isControlPlane Checks if is control plane by checking if they have the cfg and if the KubeAPIServer static pod exists
+func isControlPlane(cfg *kubeadmapi.InitConfiguration) bool {
+	if cfg == nil {
+		return false
+	}
+
+	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, kubeadmconstants.GetStaticPodDirectory())
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
 }
