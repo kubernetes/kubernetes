@@ -272,16 +272,19 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // returns 1) the node, 2) the list of preempted pods if such a node is found,
 // 3) A list of pods whose nominated node name should be cleared, and 4) any
 // possible error.
+// Preempt does not update its snapshot. It uses the same snapshot used in the
+// scheduling cycle. This is to avoid a scenario where preempt finds feasible
+// nodes without preempting any pod. When there are many pending pods in the
+// scheduling queue a nominated pod will go back to the queue and behind
+// other pods with the same priority. The nominated pod prevents other pods from
+// using the nominated resources and the nominated pod could take a long time
+// before it is retried after many other pending pods.
 func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.
 	fitError, ok := scheduleErr.(*FitError)
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
-	}
-	err := g.snapshot()
-	if err != nil {
-		return nil, nil, nil, err
 	}
 	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
@@ -1073,7 +1076,7 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 	potentialNodes := []*v1.Node{}
 	for _, node := range nodes {
 		unresolvableReasonExist := false
-		failedPredicates, found := failedPredicatesMap[node.Name]
+		failedPredicates, _ := failedPredicatesMap[node.Name]
 		// If we assume that scheduler looks at all nodes and populates the failedPredicateMap
 		// (which is the case today), the !found case should never happen, but we'd prefer
 		// to rely less on such assumptions in the code when checking does not impose
@@ -1104,7 +1107,7 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 				break
 			}
 		}
-		if !found || !unresolvableReasonExist {
+		if !unresolvableReasonExist {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
 			potentialNodes = append(potentialNodes, node)
 		}
