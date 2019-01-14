@@ -17,7 +17,7 @@ limitations under the License.
 package common
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -196,14 +196,10 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		// watch for events instead of termination of pod because the kubelet deletes
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
-		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
+		err := f.PodClient().WaitForPending(pod)
 		Expect(err).NotTo(HaveOccurred())
-		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-			framework.Skipf("No sysctl support in Docker <1.12")
-		}
 
 		By("Checking that the pod was rejected")
-		Expect(ev).ToNot(BeNil())
-		Expect(ev.Reason).To(Equal("SysctlForbidden"))
+		Expect(pod.Status.Reason).To(Equal("SysctlForbidden"))
 	})
 })

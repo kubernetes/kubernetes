@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -244,6 +244,20 @@ func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 			}
 		},
 	)).To(Succeed(), "wait for pod %q to fail", name)
+}
+
+func (c *PodClient) WaitForPending(pod *v1.Pod) error {
+	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+		switch pod.Status.Phase {
+		case v1.PodPending:
+			return true, nil
+		case v1.PodSucceeded:
+			return false, fmt.Errorf("pod %q successed with reason: %q, message: %q", pod.Name, pod.Status.Reason, pod.Status.Message)
+		default:
+			return false, fmt.Errorf("pod %q not in pending state with reason: %q, message: %q", pod.Status.Reason, pod.Status.Message)
+		}
+	})
+	return err
 }
 
 // WaitForSuccess waits for pod to succeed or an error event for that pod.
