@@ -71,7 +71,6 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverfl
 	genericfs.Float32Var(&o.ClientConnection.QPS, "kube-api-qps", o.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver.")
 	genericfs.Int32Var(&o.ClientConnection.Burst, "kube-api-burst", o.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
 	genericfs.DurationVar(&o.ControllerStartInterval.Duration, "controller-start-interval", o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
-	// TODO: complete the work of the cloud-controller-manager (and possibly other consumers of this code) respecting the --controllers flag
 	genericfs.StringSliceVar(&o.Controllers, "controllers", o.Controllers, fmt.Sprintf(""+
 		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",

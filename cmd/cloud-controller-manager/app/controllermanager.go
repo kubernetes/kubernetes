@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
@@ -72,7 +74,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config()
+			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
@@ -87,7 +89,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags()
+	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
 	cmoptions.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
@@ -296,4 +298,30 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	c.SharedInformers.Start(stop)
 
 	select {}
+}
+
+// initFunc is used to launch a particular controller.  It may run additional "should I activate checks".
+// Any error returned will cause the controller process to `Fatal`
+// The bool indicates whether the controller was enabled.
+type initFunc func(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stop <-chan struct{}) (debuggingHandler http.Handler, enabled bool, err error)
+
+// KnownControllers indicate the default controller we are known.
+func KnownControllers() []string {
+	ret := sets.StringKeySet(newControllerInitializers())
+	return ret.List()
+}
+
+// ControllersDisabledByDefault is the controller disabled default when starting cloud-controller managers.
+var ControllersDisabledByDefault = sets.NewString()
+
+// newControllerInitializers is a private map of named controller groups (you can start more than one in an init func)
+// paired to their initFunc.  This allows for structured downstream composition and subdivision.
+func newControllerInitializers() map[string]initFunc {
+	controllers := map[string]initFunc{}
+	controllers["cloud-node"] = startCloudNodeController
+	controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
+	controllers["persistentvolume-binder"] = startPersistentVolumeLabelController
+	controllers["service"] = startServiceController
+	controllers["route"] = startRouteController
+	return controllers
 }
