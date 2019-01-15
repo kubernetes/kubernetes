@@ -46,7 +46,7 @@ func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
-	hardPodAffinityWeight int32) algorithm.PriorityFunction {
+	hardPodAffinityWeight int32) PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
 		nodeLister:            nodeLister,
