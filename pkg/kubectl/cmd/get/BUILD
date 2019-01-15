@@ -72,7 +72,7 @@ go_test(
         "sorter_test.go",
     ],
     data = [
-        "//api/openapi-spec:swagger-spec",
+        "//api/openapi-spec",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],
