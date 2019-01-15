@@ -19,6 +19,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -73,7 +74,7 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/master/etcdctl/ctlv3/command/ep_command.go#L118
-		_, err := client.Get(ctx, "health")
+		_, err := client.Get(ctx, path.Join(c.Prefix, "health"))
 		if err == nil {
 			return nil
 		}
