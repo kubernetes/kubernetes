@@ -115,7 +115,7 @@ func TestDefaultFlags(t *testing.T) {
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewCloudControllerManagerOptions()
-	for _, f := range s.Flags().FlagSets {
+	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -131,6 +131,7 @@ func TestAddFlags(t *testing.T) {
 		"--configure-cloud-routes=false",
 		"--contention-profiling=true",
 		"--controller-start-interval=2m",
+		"--controllers=foo,bar",
 		"--http2-max-streams-per-connection=47",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
@@ -173,7 +174,7 @@ func TestAddFlags(t *testing.T) {
 			Debugging: &cmoptions.DebuggingOptions{
 				EnableContentionProfiling: true,
 			},
-			Controllers: []string{"*"},
+			Controllers: []string{"foo", "bar"},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
 			CloudProvider: &cmoptions.CloudProviderOptions{
