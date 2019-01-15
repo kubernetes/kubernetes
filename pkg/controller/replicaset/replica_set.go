@@ -69,6 +69,12 @@ const (
 	statusUpdateRetries = 1
 )
 
+var (
+	//ErrUIDNotMatch is returned when the ReplicaSet returned from the cluster doesn't have
+	// the same UID as the ReplicaSet in the cache.
+	ErrUIDNotMatch error = fmt.Errorf("Replicaset was found with new uid than cache")
+)
+
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
 // in the system with actual running pods.
 type ReplicaSetController struct {
@@ -614,6 +620,11 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
 	filteredPods, err = rsc.claimPods(rs, selector, filteredPods)
+	if isNewUIDError(err) {
+		klog.V(4).Infof("%v %v's UID in cache differed from server. This object was deleted.", rsc.Kind, key)
+		rsc.expectations.DeleteExpectations(key)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -650,7 +661,7 @@ func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.
 			return nil, err
 		}
 		if fresh.UID != rs.UID {
-			return nil, fmt.Errorf("original %v %v/%v is gone: got uid %v, wanted %v", rsc.Kind, rs.Namespace, rs.Name, fresh.UID, rs.UID)
+			return nil, ErrUIDNotMatch
 		}
 		return fresh, nil
 	})
