@@ -171,15 +171,15 @@ function guess_built_binary_path {
 GO_OUT=${GO_OUT:-}
 while getopts "ho:O" OPTION
 do
-    case ${OPTION} in
+    case "${OPTION}" in
         o)
             echo "skipping build"
-            GO_OUT="$OPTARG"
-            echo "using source $GO_OUT"
+            GO_OUT="${OPTARG}"
+            echo "using source ${GO_OUT}"
             ;;
         O)
             GO_OUT=$(guess_built_binary_path)
-            if [ "$GO_OUT" == "" ]; then
+            if [ "${GO_OUT}" == "" ]; then
                 echo "Could not guess the correct output directory to use."
                 exit 1
             fi
@@ -195,7 +195,7 @@ do
     esac
 done
 
-if [ "x$GO_OUT" == "x" ]; then
+if [ "x${GO_OUT}" == "x" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
 else
     echo "skipped the build."
@@ -250,7 +250,7 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
-  if [[ -f /var/log/docker.log && ! -f ${LOG_DIR}/docker.log ]]; then
+  if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
     ln -s /var/log/docker.log ${LOG_DIR}/docker.log
   fi
 fi
@@ -337,7 +337,7 @@ function detect_binary {
 
 cleanup_dockerized_kubelet()
 {
-  if [[ -e ${KUBELET_CIDFILE} ]]; then
+  if [[ -e "${KUBELET_CIDFILE}" ]]; then
     docker kill $(<${KUBELET_CIDFILE}) > /dev/null
     rm -f ${KUBELET_CIDFILE}
 
@@ -960,11 +960,11 @@ function create_storage_class {
         CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     fi
 
-    if [ -e ${CLASS_FILE} ]; then
-        echo "Create default storage class for $CLOUD_PROVIDER"
+    if [ -e "${CLASS_FILE}" ]; then
+        echo "Create default storage class for ${CLOUD_PROVIDER}"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${CLASS_FILE}
     else
-        echo "No storage class available for $CLOUD_PROVIDER."
+        echo "No storage class available for ${CLOUD_PROVIDER}."
     fi
 }
 
@@ -1060,11 +1060,11 @@ kube::util::test_openssl_installed
 kube::util::ensure-cfssl
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
-if [ "$GO_OUT" == "" ]; then
+if [ "${GO_OUT}" == "" ]; then
   detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
-echo "Using GO_OUT $GO_OUT"
+echo "Using GO_OUT ${GO_OUT}"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
@@ -1108,7 +1108,7 @@ if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 
-if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
+if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
   create_storage_class
 fi
 

@@ -44,7 +44,7 @@ usage() {
 print_version=false
 
 while getopts ":vh" opt; do
-  case ${opt} in
+  case "${opt}" in
     v)
       print_version="true"
       ;;

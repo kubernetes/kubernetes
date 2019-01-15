@@ -36,7 +36,7 @@ cp ${KUBE_KMS_GRPC_ROOT}/service.pb.go ${KUBE_KMS_GRPC_ROOT}/_tmp/
 ret=0
 KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-kms.sh"
 diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${KUBE_KMS_GRPC_ROOT}/_tmp/service.pb.go ${KUBE_KMS_GRPC_ROOT}/service.pb.go || ret=$?
-if [[ ${ret} -eq 0 ]]; then
+if [[ "${ret}" -eq 0 ]]; then
     echo "Generated KMS gRPC is up to date."
     cp ${KUBE_KMS_GRPC_ROOT}/_tmp/service.pb.go ${KUBE_KMS_GRPC_ROOT}/
 else

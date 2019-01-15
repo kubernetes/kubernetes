@@ -28,10 +28,10 @@ CMD_FLAG=false
 PLUGIN_CMD_FLAG=false
 
 echo "--------------------------------------------------------------------------------"
-for tar in ${ALL_TARGETS}; do
-	for cmdtar in ${CMD_TARGETS}; do
-		if [ ${tar} = ${cmdtar} ]; then
-			if [ ${CMD_FLAG} = true ]; then
+for tar in "${ALL_TARGETS}"; do
+	for cmdtar in "${CMD_TARGETS}"; do
+		if [ "${tar}" = "${cmdtar}" ]; then
+			if [ "${CMD_FLAG}" = "true" ]; then
 				continue 2;
 			fi
 

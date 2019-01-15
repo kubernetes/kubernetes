@@ -168,7 +168,7 @@ kube::test::describe_object_events_assert() {
     else
         local has_events="false"
     fi
-    if [[ ${showevents} == ${has_events} ]]; then
+    if [[ "${showevents}" == "${has_events}" ]]; then
         echo -n ${green}
         echo "$(kube::test::get_caller): Successful describe"
         echo "${result}"
@@ -177,7 +177,7 @@ kube::test::describe_object_events_assert() {
     else
         echo ${bold}${red}
         echo "$(kube::test::get_caller): FAIL"
-        if [[ ${showevents} == "false" ]]; then
+        if [[ "${showevents}" == "false" ]]; then
             echo "  Events information should not be described in:"
         else
             echo "  Events information not found in:"
@@ -229,7 +229,7 @@ kube::test::describe_resource_events_assert() {
     else
         local has_events="false"
     fi
-    if [[ ${showevents} == ${has_events} ]]; then
+    if [[ "${showevents}" == "${has_events}" ]]; then
         echo -n ${green}
         echo "Successful describe"
         echo "${result}"
@@ -238,7 +238,7 @@ kube::test::describe_resource_events_assert() {
     else
         echo ${bold}${red}
         echo "FAIL"
-        if [[ ${showevents} == "false" ]]; then
+        if [[ "${showevents}" == "false" ]]; then
             echo "  Events information should not be described in:"
         else
             echo "  Events information not found in:"
@@ -361,7 +361,7 @@ kube::test::version::diff_assert() {
   local diff_msg=${4:-""}
   local res=""
 
-  if [ ! -f ${original} ]; then
+  if [ ! -f "${original}" ]; then
         echo ${bold}${red}
         echo "FAIL! ${diff_msg}"
         echo "the file '${original}' does not exit"
@@ -371,7 +371,7 @@ kube::test::version::diff_assert() {
         return 1
   fi
 
-  if [ ! -f ${latest} ]; then
+  if [ ! -f "${latest}" ]; then
         echo ${bold}${red}
         echo "FAIL! ${diff_msg}"
         echo "the file '${latest}' does not exit"

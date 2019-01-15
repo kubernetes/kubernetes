@@ -23,7 +23,7 @@ generate_pot="false"
 generate_mo="false"
 
 while getopts "hf:xg" opt; do
-  case ${opt} in
+  case "${opt}" in
     h)
       echo "$0 [-f files] [-x] [-g]"
       echo " -f <file-path>: Files to process"

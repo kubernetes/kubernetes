@@ -143,7 +143,7 @@ isnum() {
 
 PARALLEL="${PARALLEL:-1}"
 while getopts "hp:i:" opt ; do
-  case ${opt} in
+  case "${opt}" in
     h)
       kube::test::usage
       exit 0
@@ -374,7 +374,7 @@ checkFDs() {
   # several unittests panic when httptest cannot open more sockets
   # due to the low default files limit on OS X.  Warn about low limit.
   local fileslimit="$(ulimit -n)"
-  if [[ ${fileslimit} -lt 1000 ]]; then
+  if [[ "${fileslimit}" -lt 1000 ]]; then
     echo "WARNING: ulimit -n (files) should be at least 1000, is ${fileslimit}, may cause test failure";
   fi
 }
