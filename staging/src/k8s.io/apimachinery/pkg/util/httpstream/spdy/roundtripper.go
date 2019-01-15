@@ -31,6 +31,7 @@ import (
 	"net/url"
 	"strings"
 
+	"golang.org/x/net/proxy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -129,6 +130,10 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return s.dialWithoutProxy(req.Context(), req.URL)
 	}
 
+	if proxyURL.Scheme == "socks5" {
+		return s.dialWithSocks5Proxy(proxyURL, req.Context(), req.URL)
+	}
+
 	// ensure we use a canonical host with proxyReq
 	targetHost := netutil.CanonicalAddr(req.URL)
 
@@ -160,6 +165,58 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	if req.URL.Scheme != "https" {
 		return rwc, nil
 	}
+
+	host, _, err := net.SplitHostPort(targetHost)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig := s.tlsConfig
+	switch {
+	case tlsConfig == nil:
+		tlsConfig = &tls.Config{ServerName: host}
+	case len(tlsConfig.ServerName) == 0:
+		tlsConfig = tlsConfig.Clone()
+		tlsConfig.ServerName = host
+	}
+
+	tlsConn := tls.Client(rwc, tlsConfig)
+
+	// need to manually call Handshake() so we can call VerifyHostname() below
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if tlsConfig.InsecureSkipVerify {
+		return tlsConn, nil
+	}
+
+	if err := tlsConn.VerifyHostname(tlsConfig.ServerName); err != nil {
+		return nil, err
+	}
+
+	return tlsConn, nil
+}
+
+
+// dialWithoutProxy dials the host specified by url, using TLS if appropriate.
+func (s *SpdyRoundTripper) dialWithSocks5Proxy(ctx context.Context, requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(requestUrl)
+
+	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
+	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, nil, proxy.Direct)
+
+	proxyConn, err := proxyDialer.Dial("tcp", targetHost)
+
+	if err != nil {
+		return nil, err
+	}
+
+	proxyClientConn := httputil.NewProxyClientConn(proxyConn, nil)
+
+	rwc, _ := proxyClientConn.Hijack()
 
 	host, _, err := net.SplitHostPort(targetHost)
 	if err != nil {
