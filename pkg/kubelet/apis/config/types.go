@@ -289,6 +289,10 @@ type KubeletConfiguration struct {
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
 
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins
+	VolumePluginDir string
+
 	/* the following fields are meant for Node Allocatable */
 
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs

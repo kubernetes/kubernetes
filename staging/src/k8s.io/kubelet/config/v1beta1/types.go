@@ -101,6 +101,12 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	StaticPodURL string `json:"staticPodURL,omitempty"`
+
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	// Defaults: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
+	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may disrupt the ability to read the latest set of static pods from StaticPodURL.
