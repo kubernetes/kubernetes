@@ -573,9 +573,6 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 				// retry in 50 millisecond
 				return false, 50 * time.Millisecond
-			} else {
-				zone := utilnode.GetZoneKey(node)
-				evictionsNumber.WithLabelValues(zone).Inc()
 			}
 			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
@@ -593,7 +590,14 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				return true, 0
 			}
 
-			return nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node), 0
+			result := nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
+			if result {
+				//count the evictionsNumber
+				zone := utilnode.GetZoneKey(node)
+				evictionsNumber.WithLabelValues(zone).Inc()
+			}
+
+			return result, 0
 		})
 	}
 }
@@ -609,9 +613,6 @@ func (nc *Controller) doEvictionPass() {
 				klog.Warningf("Node %v no longer present in nodeLister!", value.Value)
 			} else if err != nil {
 				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
-			} else {
-				zone := utilnode.GetZoneKey(node)
-				evictionsNumber.WithLabelValues(zone).Inc()
 			}
 			nodeUID, _ := value.UID.(string)
 			remaining, err := nodeutil.DeletePods(nc.kubeClient, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
@@ -622,6 +623,13 @@ func (nc *Controller) doEvictionPass() {
 			if remaining {
 				klog.Infof("Pods awaiting deletion due to Controller eviction")
 			}
+
+			//count the evictionsNumber
+			if node != nil {
+				zone := utilnode.GetZoneKey(node)
+				evictionsNumber.WithLabelValues(zone).Inc()
+			}
+
 			return true, 0
 		})
 	}
