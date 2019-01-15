@@ -106,7 +106,7 @@ function is-explicitly-chosen {
   local name="${1#verify-}"
   name="${name%.*}"
   for e in ${WHAT}; do
-    if [[ $e == "$name" ]]; then
+    if [[ ${e} == "$name" ]]; then
       return
     fi
   done

@@ -85,7 +85,7 @@ array_contains () {
       break
     fi
   done
-  return $in
+  return ${in}
 }
 
 # creates the shellcheck container for later user

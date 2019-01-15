@@ -44,7 +44,7 @@ array_contains () {
             break
         fi
     done
-    return $in
+    return ${in}
 }
 
 # Check that the file is in alphabetical order
@@ -68,7 +68,7 @@ all_packages=(
   $(go list -e ./... | egrep -v "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
 )
 failing_packages=(
-  $(cat $failure_file)
+  $(cat ${failure_file})
 )
 unset IFS
 errors=()
@@ -89,7 +89,7 @@ for p in "${all_packages[@]}"; do
     errors+=( "${failedLint}" )
   fi
   if [[ -z "${failedLint}" ]] && [[ "${in_failing}" -eq "0" ]]; then
-    not_failing+=( $p )
+    not_failing+=( ${p} )
   fi
 done
 

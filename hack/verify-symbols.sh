@@ -37,13 +37,13 @@ SYMBOLS="$(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube)"
 
 RESULT=0
 for BADSYMBOL in "${BADSYMBOLS[@]}"; do
-  if FOUND=$(echo "$SYMBOLS" | grep "$BADSYMBOL"); then
+  if FOUND=$(echo "${SYMBOLS}" | grep "${BADSYMBOL}"); then
     echo "Found bad symbol '${BADSYMBOL}':"
     echo "$FOUND"
     RESULT=1
   fi
 done
 
-exit $RESULT
+exit ${RESULT}
 
 # ex: ts=2 sw=2 et filetype=sh

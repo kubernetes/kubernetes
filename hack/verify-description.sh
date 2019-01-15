@@ -54,8 +54,8 @@ else
   versioned_api_files="${*}"
 fi
 
-for file in $versioned_api_files; do
-  $genswaggertypedocs -v -s "${file}" -f - || gen_swagger_result=$?
+for file in ${versioned_api_files}; do
+  ${genswaggertypedocs} -v -s "${file}" -f - || gen_swagger_result=$?
   if [[ "${gen_swagger_result}" -ne "0" ]]; then
     echo "API file: ${file} is missing: ${gen_swagger_result} descriptions"
     result=1
@@ -71,8 +71,8 @@ for file in $versioned_api_files; do
 done
 
 internal_types_files="${KUBE_ROOT}/pkg/apis/core/types.go ${KUBE_ROOT}/pkg/apis/extensions/types.go"
-for internal_types_file in $internal_types_files; do
-  if [[ ! -e $internal_types_file ]]; then
+for internal_types_file in ${internal_types_files}; do
+  if [[ ! -e ${internal_types_file} ]]; then
     echo "Internal types file ${internal_types_file} does not exist"
     result=1
     continue
