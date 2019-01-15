@@ -163,6 +163,11 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
+	//if no thresholds and disable features.LocalStorageCapacityIsolation, we have nothing to do, just return
+	if len(m.config.Thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		return
+	}
+
 	thresholdHandler := func(message string) {
 		klog.Infof(message)
 		m.synchronize(diskInfoProvider, podFunc)
@@ -217,11 +222,7 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
-	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
-	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		return nil
-	}
 
 	klog.V(3).Infof("eviction manager: synchronize housekeeping")
 	// build the ranking functions (if not yet known)
