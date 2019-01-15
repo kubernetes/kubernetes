@@ -20,15 +20,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ ! -z "$WHAT" ]; then #ccheck not empty
-    for pkg in ${WHAT}
-    do 
-      echo ${pkg}
-    done
-fi
-exit 0
-
-
 # Set locale to ensure english responses from kubectl commands
 export LANG=C
 
