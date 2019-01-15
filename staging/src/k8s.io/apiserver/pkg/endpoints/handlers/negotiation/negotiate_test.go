@@ -262,3 +262,105 @@ func TestNegotiate(t *testing.T) {
 		}
 	}
 }
+
+func TestNegotiateOutputStreamSerializer(t *testing.T) {
+	testCases := []struct {
+		req        *http.Request
+		ns         *fakeNegotiater
+		serializer runtime.Serializer
+		errFn      func(error) bool
+	}{
+		{
+			req:        &http.Request{Header: http.Header{"Accept": []string{"application/json"}}},
+			ns:         &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}, streamTypes: []string{"application/json"}},
+			serializer: fakeCodec,
+		},
+		{
+			// Error due to lack of specified streamTypes
+			req: &http.Request{Header: http.Header{"Accept": []string{"application/json"}}},
+			ns:  &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			errFn: func(err error) bool {
+				return err.Error() == "only the following media types are accepted: "
+			},
+		},
+	}
+
+	for i, test := range testCases {
+		s, err := NegotiateOutputStreamSerializer(test.req, test.ns)
+		switch {
+		case err == nil && test.errFn != nil:
+			t.Errorf("%d: failed: expected error", i)
+			continue
+		case err != nil && test.errFn == nil:
+			t.Errorf("%d: failed: %v", i, err)
+			continue
+		case err != nil:
+			if !test.errFn(err) {
+				t.Errorf("%d: failed: %v", i, err)
+			}
+			continue
+		}
+		if s.Serializer != test.serializer {
+			t.Errorf("%d: unexpected %s %s", i, test.serializer, s.Serializer)
+		}
+	}
+}
+
+func TestNegotiateInputSerializer(t *testing.T) {
+	testCases := []struct {
+		req        *http.Request
+		streaming  bool
+		ns         *fakeNegotiater
+		serializer runtime.Serializer
+		errFn      func(error) bool
+	}{
+		{
+			req:        &http.Request{Header: http.Header{"Content-Type": []string{"application/json"}}},
+			streaming:  false,
+			ns:         &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer: fakeCodec,
+		},
+		{
+			req:        &http.Request{Header: http.Header{}},
+			streaming:  false,
+			ns:         &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer: fakeCodec,
+		},
+		{
+			req:       &http.Request{Header: http.Header{"Content-Type": []string{"application/invalid"}}},
+			streaming: false,
+			ns:        &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			errFn: func(err error) bool {
+				return err.Error() == "the body of the request was in an unknown format - accepted media types include: application/json"
+			},
+		},
+		{
+			req:       &http.Request{Header: http.Header{"Content-Type": []string{"application/invalid"}}},
+			streaming: true,
+			ns:        &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			errFn: func(err error) bool {
+				return err.Error() == "the body of the request was in an unknown format - accepted media types include: "
+			},
+		},
+	}
+
+	for i, test := range testCases {
+		s, err := NegotiateInputSerializer(test.req, test.streaming, test.ns)
+		switch {
+		case err == nil && test.errFn != nil:
+			t.Errorf("%d: failed: expected error", i)
+			continue
+		case err != nil && test.errFn == nil:
+			t.Errorf("%d: failed: %v", i, err)
+			continue
+		case err != nil:
+			if !test.errFn(err) {
+				t.Errorf("%d: failed: %v", i, err)
+			}
+			continue
+		}
+		if s.Serializer != test.serializer {
+			t.Errorf("%d: unexpected %s %s", i, test.serializer, s.Serializer)
+		}
+	}
+}
