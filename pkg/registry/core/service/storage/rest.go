@@ -77,6 +77,7 @@ type ServiceStorage interface {
 	rest.Watcher
 	rest.TableConvertor
 	rest.Exporter
+	rest.StorageVersionProvider
 }
 
 type EndpointsStorage interface {
@@ -108,10 +109,15 @@ func NewREST(
 }
 
 var (
-	_ ServiceStorage          = &REST{}
-	_ rest.CategoriesProvider = &REST{}
-	_ rest.ShortNamesProvider = &REST{}
+	_ ServiceStorage              = &REST{}
+	_ rest.CategoriesProvider     = &REST{}
+	_ rest.ShortNamesProvider     = &REST{}
+	_ rest.StorageVersionProvider = &REST{}
 )
+
+func (rs *REST) StorageVersion() runtime.GroupVersioner {
+	return rs.services.StorageVersion()
+}
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (rs *REST) ShortNames() []string {
