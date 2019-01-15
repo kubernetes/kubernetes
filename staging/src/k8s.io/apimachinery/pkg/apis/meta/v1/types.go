@@ -907,7 +907,7 @@ type APIResource struct {
 	// StorageVersionHash feature gate is enabled.
 	// This field will remain optional even if it graduates.
 	// +optional
-	StorageVersionHash string `json:"storageVersionHash,omitempty"`
+	StorageVersionHash string `json:"storageVersionHash,omitempty" protobuf:"bytes,10,opt,name=storageVersionHash"`
 }
 
 // Verbs masks the value so protobuf can generate
