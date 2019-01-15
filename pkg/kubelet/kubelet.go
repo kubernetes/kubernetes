@@ -1303,6 +1303,7 @@ func (kl *Kubelet) initializeModules() error {
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
+	metrics.SetNodeName(kl.nodeName)
 
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
