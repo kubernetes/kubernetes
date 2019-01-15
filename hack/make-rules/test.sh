@@ -317,7 +317,7 @@ runTests() {
   #                            https://github.com/golang/go/issues/16540
   cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
   for path in $(echo ${cover_ignore_dirs} | sed 's/|/ /g'); do
-      echo -e "skipped\tk8s.io/kubernetes/$path"
+      echo -e "skipped\tk8s.io/kubernetes/${path}"
   done
 
   printf "%s\n" "${@}" \

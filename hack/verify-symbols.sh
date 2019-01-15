@@ -39,7 +39,7 @@ RESULT=0
 for BADSYMBOL in "${BADSYMBOLS[@]}"; do
   if FOUND=$(echo "${SYMBOLS}" | grep "${BADSYMBOL}"); then
     echo "Found bad symbol '${BADSYMBOL}':"
-    echo "$FOUND"
+    echo "${FOUND}"
     RESULT=1
   fi
 done

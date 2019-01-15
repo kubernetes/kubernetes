@@ -332,7 +332,7 @@ kube::test::version::object_to_file() {
   name=$1
   flags=${2:-""}
   file=$3
-  kubectl version ${flags} | grep "$name Version:" | sed -e s/"${name} Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > "${file}"
+  kubectl version ${flags} | grep "${name} Version:" | sed -e s/"${name} Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > "${file}"
 }
 
 kube::test::version::json_object_to_file() {

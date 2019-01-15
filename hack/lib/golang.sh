@@ -502,7 +502,7 @@ kube::golang::path_for_coverage_dummy_test() {
   local package="$1"
   local path="${KUBE_GOPATH}/src/${package}"
   local name=$(basename "${package}")
-  echo "$path/zz_generated_${name}_test.go"
+  echo "${path}/zz_generated_${name}_test.go"
 }
 
 # Argument: the name of a Kubernetes package (e.g. k8s.io/kubernetes/cmd/kube-scheduler).
