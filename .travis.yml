@@ -1,0 +1,14 @@
+dist: xenial
+language: go
+go:
+  - 1.10.2
+go_import_path: k8s.io/kubernetes
+services: docker
+install: true
+script:
+  - travis_wait 120 ./hack/travis.sh
+jobs:
+  include:
+  - env: TARGET=verify
+  - env: TARGET=cross
+  - env: TARGET=test
