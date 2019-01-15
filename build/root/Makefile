@@ -291,7 +291,6 @@ test-cmd:
 	@echo "$$TEST_CMD_HELP_INFO"
 else
 test-cmd: generated_files
-	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
 endif
 
