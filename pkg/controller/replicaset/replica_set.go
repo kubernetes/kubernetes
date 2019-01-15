@@ -70,7 +70,7 @@ const (
 )
 
 var (
-	//ErrUIDNotMatch is returned when the ReplicaSet returned from the cluster doesn't have
+	// ErrUIDNotMatch is returned when the ReplicaSet returned from the cluster doesn't have
 	// the same UID as the ReplicaSet in the cache.
 	ErrUIDNotMatch error = fmt.Errorf("Replicaset was found with new uid than cache")
 )
