@@ -316,6 +316,9 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					if err := watcher.Add(f.Name()); err != nil {
 						return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
 					}
+					// If we just created the watcher, try again to read as we might have missed
+					// the event.
+					continue
 				}
 				// Wait until the next log change.
 				if found, err := waitLogs(ctx, containerID, watcher, runtimeService); !found {
