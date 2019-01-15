@@ -24,8 +24,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 

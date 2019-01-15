@@ -2446,6 +2446,11 @@
 			"Rev": "89fcab3d43de07060e4fd4c1547430ed57e87f24"
 		},
 		{
+			"ImportPath": "github.com/lithammer/dedent",
+			"Comment": "v1.1.0",
+			"Rev": "8478954c3bc893cf36c5ee7c822266b993a3b3ee"
+		},
+		{
 			"ImportPath": "github.com/magiconair/properties",
 			"Comment": "v1.7.0-4-g61b492c03cf472",
 			"Rev": "61b492c03cf472e0c6419be5899b8e0dc28b1b88"
@@ -3006,11 +3011,6 @@
 			"ImportPath": "github.com/rancher/go-rancher/client",
 			"Comment": "v0.1.0-196-g09693a8743ba5e",
 			"Rev": "09693a8743ba5ee58c58c1b1e8a4abd17af00d45"
-		},
-		{
-			"ImportPath": "github.com/renstrom/dedent",
-			"Comment": "v1.0.0-3-g020d11c3b9c0c7",
-			"Rev": "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",
