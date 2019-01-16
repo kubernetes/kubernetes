@@ -1,5 +1,4 @@
 ./build/common.sh
-./build/copy-output.sh
 ./build/lib/release.sh
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
