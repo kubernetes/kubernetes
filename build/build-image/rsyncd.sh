@@ -45,7 +45,7 @@ mkdir -p "${CONFDIR}"
 if [[ -f "${PIDFILE}" ]]; then
   PID=$(cat "${PIDFILE}")
   echo "Cleaning up old PID file: ${PIDFILE}"
-  kill $PID &> /dev/null || true
+  kill "${PID}" &> /dev/null || true
   rm "${PIDFILE}"
 fi
 

@@ -1,4 +1,3 @@
-./build/build-image/rsyncd.sh
 ./build/common.sh
 ./build/copy-output.sh
 ./build/lib/release.sh
