@@ -155,7 +155,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		})
 	}
 
-	Context("CSI Topology test using GCE PD driver [Feature: CSINodeInfo]", func() {
+	Context("CSI Topology test using GCE PD driver [Feature:CSINodeInfo]", func() {
 		newConfig := config
 		newConfig.TopologyEnabled = true
 		driver := drivers.InitGcePDCSIDriver(newConfig).(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
