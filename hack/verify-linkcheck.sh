@@ -33,7 +33,7 @@ cleanup() {
 	rm -rf "${OUTPUT}"
 }
 trap "cleanup" EXIT SIGINT
-mkdir -p "$OUTPUT"
+mkdir -p "${OUTPUT}"
 
 APIROOT="${KUBE_ROOT}/pkg/api/"
 APISROOT="${KUBE_ROOT}/pkg/apis/"

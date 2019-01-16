@@ -67,7 +67,7 @@ function assert_clean() {
     true
 }
 
-STAMP=/tmp/stamp.$RANDOM
+STAMP="/tmp/stamp.${RANDOM}"
 
 #
 # Test when we touch a file in a package that needs codegen.
@@ -76,7 +76,7 @@ STAMP=/tmp/stamp.$RANDOM
 assert_clean
 
 DIR=staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
-touch "$DIR/types.go"
+touch "${DIR}/types.go"
 touch "${STAMP}"
 make generated_files >/dev/null
 X=($(newer deepcopy "${STAMP}"))

@@ -49,4 +49,4 @@ if [[ -n "${missing_defers}" ]]; then
   rc=1
 fi
 
-exit $rc
+exit ${rc}

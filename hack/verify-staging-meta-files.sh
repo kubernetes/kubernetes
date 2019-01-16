@@ -47,4 +47,4 @@ for repo in ${staging_repos[@]}; do
   done
 done
 
-exit $RESULT
+exit ${RESULT}

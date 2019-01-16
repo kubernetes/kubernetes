@@ -88,10 +88,10 @@ readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
 if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
-  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
-  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
-  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
-  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
+  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
+  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
+  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
   readonly KUBE_SERVER_PLATFORMS
   readonly KUBE_NODE_PLATFORMS
   readonly KUBE_TEST_PLATFORMS
@@ -458,7 +458,7 @@ kube::golang::place_bins() {
     # The substitution on platform_src below will replace all slashes with
     # underscores.  It'll transform darwin/amd64 -> darwin_amd64.
     local platform_src="/${platform//\//_}"
-    if [[ "$platform" == "$host_platform" ]]; then
+    if [[ "${platform}" == "${host_platform}" ]]; then
       platform_src=""
       rm -f "${THIS_PLATFORM_BIN}"
       ln -s "${KUBE_OUTPUT_BINPATH}/${platform}" "${THIS_PLATFORM_BIN}"
@@ -479,7 +479,7 @@ kube::golang::outfile_for_binary() {
   local binary=$1
   local platform=$2
   local output_path="${KUBE_GOPATH}/bin"
-  if [[ "$platform" != "$host_platform" ]]; then
+  if [[ "${platform}" != "${host_platform}" ]]; then
     output_path="${output_path}/${platform//\//_}"
   fi
   local bin=$(basename "${binary}")

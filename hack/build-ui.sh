@@ -40,7 +40,7 @@ function kube::hack::build_ui() {
   local src="$2"
   local output_file="staging/src/k8s.io/apiserver/pkg/server/routes/data/${pkg}/datafile.go"
 
-  go-bindata -nocompress -o "${output_file}" -prefix ${PWD} -pkg "${pkg}" "${src}"
+  go-bindata -nocompress -o "${output_file}" -prefix "${PWD}" -pkg "${pkg}" "${src}"
 
   local year=$(date +%Y)
   cat hack/boilerplate/boilerplate.generatego.txt > "${TMP_DATAFILE}"

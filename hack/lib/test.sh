@@ -35,8 +35,8 @@ kube::test::clear_all() {
 # Defaults to 2 levels so you can call this to find your own caller
 kube::test::get_caller() {
   local levels=${1:-2}
-  local caller_file="${BASH_SOURCE[$levels]}"
-  local caller_line="${BASH_LINENO[$levels-1]}"
+  local caller_file="${BASH_SOURCE[${levels}]}"
+  local caller_line="${BASH_LINENO[${levels}-1]}"
   echo "$(basename "${caller_file}"):${caller_line}"
 }
 
@@ -197,7 +197,7 @@ kube::test::describe_resource_assert() {
   result=$(eval kubectl describe "${kube_flags[@]}" ${resource})
 
   for match in ${matches}; do
-    if [[ ! $(echo "$result" | grep ${match}) ]]; then
+    if [[ ! $(echo "${result}" | grep ${match}) ]]; then
       echo ${bold}${red}
       echo "FAIL!"
       echo "Describe ${resource}"
@@ -255,10 +255,10 @@ kube::test::if_sort_by_has_correct_order() {
   local array=($(echo "$1" |awk '{if(NR!=1) print $1}'))
   local var
   for i in "${array[@]}"; do
-    var+="$i:"
+    var+="${i}:"
   done
 
-  kube::test::if_has_string "$var" "${@:$#}"
+  kube::test::if_has_string "${var}" "${@:$#}"
 }
 
 kube::test::if_has_string() {

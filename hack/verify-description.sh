@@ -54,7 +54,7 @@ else
   versioned_api_files="${*}"
 fi
 
-for file in "${versioned_api_files}"; do
+for file in ${versioned_api_files}; do
   ${genswaggertypedocs} -v -s "${file}" -f - || gen_swagger_result=$?
   if [[ "${gen_swagger_result}" -ne "0" ]]; then
     echo "API file: ${file} is missing: ${gen_swagger_result} descriptions"

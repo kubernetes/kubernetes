@@ -53,7 +53,7 @@ while getopts ":vh" opt; do
       exit 0
       ;;
     \?)
-      echo "Invalid option: -$OPTARG" >&2
+      echo "Invalid option: -${OPTARG}" >&2
       usage
       exit 1
       ;;

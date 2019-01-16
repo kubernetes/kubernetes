@@ -27,7 +27,7 @@ kube::util::ensure_no_staging_repos_in_gopath
 
 kube::util::ensure_godep_version
 
-BACKUP=_tmp/godep-save.$RANDOM
+BACKUP="_tmp/godep-save.${RANDOM}"
 mkdir -p "${BACKUP}"
 
 function kube::godep_save::cleanup() {

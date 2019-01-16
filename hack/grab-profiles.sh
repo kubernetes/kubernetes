@@ -27,7 +27,7 @@ function grab_profiles_from_component {
   local output_prefix=$6
   local timestamp=$7
 
-  echo "binary: $binary"
+  echo "binary: ${binary}"
 
   for profile in ${requested_profiles}; do
     case ${profile} in
@@ -246,8 +246,8 @@ echo "Waiting for tunnel to be created..."
 kube::util::wait_for_url http://localhost:"${tunnel_port}"/healthz
 
 SSH_PID=$(pgrep -f "/usr/bin/ssh.*${tunnel_port}:localhost:8080")
-kube::util::trap_add "kill $SSH_PID" EXIT
-kube::util::trap_add "kill $SSH_PID" SIGTERM
+kube::util::trap_add "kill ${SSH_PID}" EXIT
+kube::util::trap_add "kill ${SSH_PID}" SIGTERM
 
 requested_profiles=$(echo "${requested_profiles}" | xargs -n1 | LC_ALL=C sort -u | xargs)
 profile_components=$(echo "${profile_components}" | xargs -n1 | LC_ALL=C sort -u | xargs)

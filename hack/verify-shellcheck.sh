@@ -47,7 +47,7 @@ cd "${KUBE_ROOT}"
 # and anything git-ignored
 all_shell_scripts=()
 while IFS=$'\n' read -r script;
-  do git check-ignore -q "$script" || all_shell_scripts+=("$script");
+  do git check-ignore -q "${script}" || all_shell_scripts+=("${script}");
 done < <(find . -name "*.sh" \
   -not \( \
     -path ./_\*      -o \
@@ -71,7 +71,7 @@ fi
 # load known failure files
 failing_files=()
 while IFS=$'\n' read -r script;
-  do failing_files+=("$script");
+  do failing_files+=("${script}");
 done < <(cat "${failure_file}")
 
 # TODO(bentheelder): we should probably move this and the copy in verify-golint.sh
@@ -80,7 +80,7 @@ array_contains () {
   local seeking=$1; shift # shift will iterate through the array
   local in=1 # in holds the exit status for the function
   for element; do
-    if [[ "$element" == "$seeking" ]]; then
+    if [[ "${element}" == "${seeking}" ]]; then
       in=0 # set in to 0 since we found it
       break
     fi
@@ -139,7 +139,7 @@ else
   {
     echo "Errors from shellcheck:"
     for err in "${errors[@]}"; do
-      echo "$err"
+      echo "${err}"
     done
     echo
     echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck"'
@@ -155,7 +155,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     echo "Some packages in hack/.shellcheck_failures are passing shellcheck. Please remove them."
     echo
     for f in "${not_failing[@]}"; do
-      echo "  $f"
+      echo "  ${f}"
     done
     echo
   } >&2
@@ -165,7 +165,7 @@ fi
 # Check that all failing_packages actually still exist
 gone=()
 for f in "${failing_files[@]}"; do
-  array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )
+  array_contains "${f}" "${all_shell_scripts[@]}" || gone+=( "${f}" )
 done
 
 if [[ ${#gone[@]} -gt 0 ]]; then
@@ -173,7 +173,7 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     echo "Some files in hack/.shellcheck_failures do not exist anymore. Please remove them."
     echo
     for f in "${gone[@]}"; do
-      echo "  $f"
+      echo "  ${f}"
     done
     echo
   } >&2

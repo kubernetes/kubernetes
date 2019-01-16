@@ -34,10 +34,10 @@ DRY_RUN=${DRY_RUN:-""}
 REGENERATE_DOCS=${REGENERATE_DOCS:-""}
 UPSTREAM_REMOTE=${UPSTREAM_REMOTE:-upstream}
 FORK_REMOTE=${FORK_REMOTE:-origin}
-MAIN_REPO_ORG=${MAIN_REPO_ORG:-$(git remote get-url "$UPSTREAM_REMOTE" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $3}')}
-MAIN_REPO_NAME=${MAIN_REPO_NAME:-$(git remote get-url "$UPSTREAM_REMOTE" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $4}')}
+MAIN_REPO_ORG=${MAIN_REPO_ORG:-$(git remote get-url "${UPSTREAM_REMOTE}" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $3}')}
+MAIN_REPO_NAME=${MAIN_REPO_NAME:-$(git remote get-url "${UPSTREAM_REMOTE}" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $4}')}
 
-if [[ -z ${GITHUB_USER:-} ]]; then
+if [[ -z "${GITHUB_USER:-}" ]]; then
   echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
   exit 1
 fi
@@ -161,7 +161,7 @@ for pull in "${PULLS[@]}"; do
   echo
   git am -3 "/tmp/${pull}.patch" || {
     conflicts=false
-    while unmerged=$(git status --porcelain | grep ^U) && [[ -n ${unmerged} ]] \
+    while unmerged=$(git status --porcelain | grep ^U) && [[ -n "${unmerged}" ]] \
       || [[ -e "${REBASEMAGIC}" ]]; do
       conflicts=true # <-- We should have detected conflicts once
       echo

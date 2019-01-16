@@ -108,7 +108,7 @@ process_content () {
   index="${package}-${type}"
   if [[ -z "${CONTENT[${index}]-}" ]]; then
     for f in "${local_files[@]-}"; do
-      if [[ -z "$f" ]]; then
+      if [[ -z "${f}" ]]; then
         # Set the default value and then check it to prevent
         # accessing potentially empty array
         continue

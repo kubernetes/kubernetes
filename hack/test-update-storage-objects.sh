@@ -124,7 +124,7 @@ startApiServer ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 # Create object(s)
 for test in ${tests[@]}; do
-  IFS=',' read -ra test_data <<<"$test"
+  IFS=',' read -ra test_data <<<"${test}"
   source_file=${test_data[0]}
 
   kube::log::status "Creating ${source_file}"
@@ -161,7 +161,7 @@ ${UPDATE_ETCD_OBJECTS_SCRIPT}
 
 # Verify that the storage version was changed in etcd
 for test in ${tests[@]}; do
-  IFS=',' read -ra test_data <<<"$test"
+  IFS=',' read -ra test_data <<<"${test}"
   resource=${test_data[1]}
   namespace=${test_data[2]}
   name=${test_data[3]}
@@ -189,7 +189,7 @@ sleep 1
 startApiServer ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_PROTOBUF}
 
 for test in ${tests[@]}; do
-  IFS=',' read -ra test_data <<<"$test"
+  IFS=',' read -ra test_data <<<"${test}"
   resource=${test_data[1]}
   namespace=${test_data[2]}
   name=${test_data[3]}

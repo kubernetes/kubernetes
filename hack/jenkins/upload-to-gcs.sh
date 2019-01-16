@@ -141,7 +141,7 @@ function print_started() {
     local sep=""  # leading commas are easy to track
     for env_var in "${metadata_keys}"; do
       local var_upper="${env_var#BUILD_METADATA_}"
-      echo "        $sep\"${var_upper,,}\": \"${!env_var}\""
+      echo "        ${sep}\"${var_upper,,}\": \"${!env_var}\""
       sep=","
     done
     echo "    },"

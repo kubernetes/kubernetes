@@ -30,7 +30,7 @@ set -o xtrace
 # is an incoming variable Jenkins provides us for this job's scratch
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
-export PATH=$PATH:/usr/local/go/bin
+export PATH=${PATH}:/usr/local/go/bin
 
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
@@ -54,7 +54,7 @@ make clean
 make release
 
 # Push to GCS?
-if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
+if [[ "${KUBE_SKIP_PUSH_GCS:-}" =~ ^[yY]$ ]]; then
   echo "Not pushed to GCS..."
 else
   readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"

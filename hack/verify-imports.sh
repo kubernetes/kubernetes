@@ -28,7 +28,7 @@ make -C "${KUBE_ROOT}" WHAT=cmd/importverifier
 # Find binary
 importverifier=$(kube::util::find-binary "importverifier")
 
-if [[ ! -x "$importverifier" ]]; then
+if [[ ! -x "${importverifier}" ]]; then
   {
     echo "It looks as if you don't have a compiled importverifier binary"
     echo

@@ -139,8 +139,8 @@ function kube::readlinkdashf {
       cd "$(dirname "$1")"
       local f
       f=$(basename "$1")
-      if [[ -L "$f" ]]; then
-        readlink "$f"
+      if [[ -L "${f}" ]]; then
+        readlink "${f}"
       else
         echo "$(pwd -P)/${f}"
       fi

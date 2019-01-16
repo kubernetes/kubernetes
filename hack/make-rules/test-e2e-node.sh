@@ -115,11 +115,11 @@ if [ "${remote}" = "true" ] ; then
   IFS=',' read -ra IM <<< "${images}"
        images=""
        for i in "${IM[@]}"; do
-         if [[ $(gcloud compute instances list "${instance_prefix}-$i" | grep ${i}) ]]; then
+         if [[ $(gcloud compute instances list "${instance_prefix}-${i}" | grep "${i}") ]]; then
            if [[ "${hosts}" != "" ]]; then
              hosts="${hosts},"
            fi
-           echo "Reusing host ${instance_prefix}-$i"
+           echo "Reusing host ${instance_prefix}-${i}"
            hosts="${hosts}${instance_prefix}-${i}"
          else
            if [[ "${images}" != "" ]]; then
@@ -172,6 +172,6 @@ else
     --system-spec-name="${system_spec_name}" --ginkgo-flags="${ginkgoflags}" \
     --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
-    $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
+    ${test_args}" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi

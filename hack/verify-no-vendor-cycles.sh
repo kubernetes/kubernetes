@@ -25,7 +25,7 @@ staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 
 failed=false
 for i in $(find vendor/ -type d); do
-  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./$i 2> /dev/null || echo "")
+  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./${i} 2> /dev/null || echo "")
   deps_on_main=$(echo "${deps}" | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
   if [ -n "${deps_on_main}" ]; then
     echo "Package ${i} has a cyclic dependency on the main repository."
