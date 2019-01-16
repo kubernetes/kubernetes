@@ -818,6 +818,12 @@ AGGREGATOR_CA_KEY: $(yaml-quote ${AGGREGATOR_CA_KEY_BASE64:-})
 REQUESTHEADER_CA_CERT: $(yaml-quote ${REQUESTHEADER_CA_CERT_BASE64:-})
 PROXY_CLIENT_CERT: $(yaml-quote ${PROXY_CLIENT_CERT_BASE64:-})
 PROXY_CLIENT_KEY: $(yaml-quote ${PROXY_CLIENT_KEY_BASE64:-})
+ETCD_APISERVER_CA_KEY: $(yaml-quote ${ETCD_APISERVER_CA_KEY_BASE64:-})
+ETCD_APISERVER_CA_CERT: $(yaml-quote ${ETCD_APISERVER_CA_CERT_BASE64:-})
+ETCD_APISERVER_SERVER_KEY: $(yaml-quote ${ETCD_APISERVER_SERVER_KEY_BASE64:-})
+ETCD_APISERVER_SERVER_CERT: $(yaml-quote ${ETCD_APISERVER_SERVER_CERT_BASE64:-})
+ETCD_APISERVER_CLIENT_KEY: $(yaml-quote ${ETCD_APISERVER_CLIENT_KEY_BASE64:-})
+ETCD_APISERVER_CLIENT_CERT: $(yaml-quote ${ETCD_APISERVER_CLIENT_CERT_BASE64:-})
 EOF
 }
 
@@ -1470,6 +1476,12 @@ function parse-master-env() {
   PROXY_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_CERT")
   PROXY_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_KEY")
   ENABLE_LEGACY_ABAC=$(get-env-val "${master_env}" "ENABLE_LEGACY_ABAC")
+  ETCD_APISERVER_CA_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CA_KEY")
+  ETCD_APISERVER_CA_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CA_CERT")
+  ETCD_APISERVER_SERVER_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_SERVER_KEY")
+  ETCD_APISERVER_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_SERVER_CERT")
+  ETCD_APISERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_KEY")
+  ETCD_APISERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_CERT")
 }
 
 # Update or verify required gcloud components are installed
@@ -2047,11 +2059,10 @@ function delete-subnetworks() {
   fi
 }
 
-# Generates SSL certificates for etcd cluster. Uses cfssl program.
+# Generates SSL certificates for etcd cluster peer to peer communication. Uses cfssl program.
 #
 # Assumed vars:
 #   KUBE_TEMP: temporary directory
-#   NUM_NODES: #nodes in the cluster
 #
 # Args:
 #  $1: host name
@@ -2081,6 +2092,48 @@ function create-etcd-certs {
   ETCD_PEER_CERT_BASE64=$(cat "peer.pem" | gzip | base64 | tr -d '\r\n')
   popd
 }
+
+# Generates SSL certificates for etcd-client and kube-apiserver communication. Uses cfssl program.
+#
+# Assumed vars:
+#   KUBE_TEMP: temporary directory
+#
+# Args:
+#  $1: host server name
+#  $2: host client name
+#  $3: CA certificate
+#  $4: CA key
+#
+# If CA cert/key is empty, the function will also generate certs for CA.
+#
+# Vars set:
+#   ETCD_APISERVER_CA_KEY_BASE64
+#   ETCD_APISERVER_CA_CERT_BASE64
+#   ETCD_APISERVER_SERVER_KEY_BASE64
+#   ETCD_APISERVER_SERVER_CERT_BASE64
+#   ETCD_APISERVER_CLIENT_KEY_BASE64
+#   ETCD_APISERVER_CLIENT_CERT_BASE64
+#
+function create-etcd-apiserver-certs {
+  local hostServer=${1}
+  local hostClient=${2}
+  local etcd_apiserver_ca_cert=${3:-}
+  local etcd_apiserver_ca_key=${4:-}
+
+  GEN_ETCD_CA_CERT="${etcd_apiserver_ca_cert}" GEN_ETCD_CA_KEY="${etcd_apiserver_ca_key}" \
+    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostServer}" "server" "etcd-apiserver-server"
+    generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostClient}" "client" "etcd-apiserver-client"
+
+  pushd "${KUBE_TEMP}/cfssl"
+  ETCD_APISERVER_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_APISERVER_SERVER_KEY_BASE64=$(cat "etcd-apiserver-server-key.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_SERVER_CERT_BASE64=$(cat "etcd-apiserver-server.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CLIENT_KEY_BASE64=$(cat "etcd-apiserver-client-key.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CLIENT_CERT_BASE64=$(cat "etcd-apiserver-client.pem" | gzip | base64 | tr -d '\r\n')
+  popd
+}
+
 
 function create-master() {
   echo "Starting master and configuring firewalls"
@@ -2132,6 +2185,7 @@ function create-master() {
 
   create-certs "${MASTER_RESERVED_IP}"
   create-etcd-certs ${MASTER_NAME}
+  create-etcd-apiserver-certs "etcd-${MASTER_NAME}" ${MASTER_NAME}
 
   if [[ "${NUM_NODES}" -ge "50" ]]; then
     # We block on master creation for large clusters to avoid doing too much
