@@ -80,8 +80,6 @@ FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
-# enable swagger ui
-ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 # enable Pod priority and preemption
 ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
 
@@ -515,11 +513,6 @@ function start_apiserver {
     # Append security_admission plugin
     ENABLE_ADMISSION_PLUGINS="${ENABLE_ADMISSION_PLUGINS}${security_admission}"
 
-    swagger_arg=""
-    if [[ "${ENABLE_SWAGGER_UI}" = true ]]; then
-      swagger_arg="--enable-swagger-ui=true "
-    fi
-
     authorizer_arg=""
     if [[ -n "${AUTHORIZATION_MODE}" ]]; then
       authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
@@ -566,7 +559,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${authorizer_arg} ${priv_arg} ${runtime_config} \
       ${cloud_config_arg} \
       ${advertise_address} \
       ${node_port_range} \

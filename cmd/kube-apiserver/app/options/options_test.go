@@ -96,7 +96,6 @@ func TestAddFlags(t *testing.T) {
 		"--contention-profiling=true",
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
-		"--enable-swagger-ui=true",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
@@ -245,7 +244,6 @@ func TestAddFlags(t *testing.T) {
 			PolicyFile: "/policy",
 		},
 		Features: &apiserveroptions.FeatureOptions{
-			EnableSwaggerUI:           true,
 			EnableProfiling:           true,
 			EnableContentionProfiling: true,
 		},
