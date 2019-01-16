@@ -70,6 +70,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 		patchType := types.PatchType(contentType)
 
+		userAgent := req.Header.Get("user-agent")
+
 		// Ensure the patchType is one we support
 		if !sets.NewString(patchTypes...).Has(contentType) {
 			scope.err(negotiation.NewUnsupportedMediaTypeError(patchTypes), w, req)
@@ -201,6 +203,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patchBytes,
+			userAgent:   userAgent,
 
 			trace: trace,
 		}
@@ -268,6 +271,7 @@ type patcher struct {
 	name        string
 	patchType   types.PatchType
 	patchBytes  []byte
+	userAgent   string
 
 	trace *utiltrace.Trace
 
@@ -309,7 +313,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher"); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, p.buildManagerInfo(objToUpdate.GetObjectKind().GroupVersionKind().Version)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -371,7 +375,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, "smPatcher"); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, p.buildManagerInfo(newObj.GetObjectKind().GroupVersionKind().Version)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -543,6 +547,13 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 		return updateObject, updateErr
 	})
 	return result, wasCreated, err
+}
+
+func (p *patcher) buildManagerInfo(version string) string {
+	userAgent := strings.Split(p.userAgent, "/")[0]
+	timestamp := time.Now().Format("20060102-150405")
+
+	return fmt.Sprintf("%s-%s@%s", userAgent, version, timestamp)
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
