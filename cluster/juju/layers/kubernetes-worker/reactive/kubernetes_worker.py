@@ -721,7 +721,6 @@ def configure_kubelet(dns, ingress_ip):
     kubelet_opts['v'] = '0'
     kubelet_opts['logtostderr'] = 'true'
     kubelet_opts['node-ip'] = ingress_ip
-    kubelet_opts['allow-privileged'] = set_privileged()
 
     if is_state('endpoint.aws.ready'):
         kubelet_opts['cloud-provider'] = 'aws'
@@ -1040,38 +1039,6 @@ def remove_nrpe_config(nagios=None):
 
     for service in services:
         nrpe_setup.remove_check(shortname=service)
-
-
-def set_privileged():
-    """Return 'true' if privileged containers are needed.
-    This is when a) the user requested them
-                 b) user does not care (auto) and GPUs are available in a pre
-                    1.9 era
-    """
-    privileged = hookenv.config('allow-privileged').lower()
-    gpu_needs_privileged = (is_state('kubernetes-worker.gpu.enabled') and
-                            get_version('kubelet') < (1, 9))
-
-    if privileged == 'auto':
-        privileged = 'true' if gpu_needs_privileged else 'false'
-
-    if privileged == 'false' and gpu_needs_privileged:
-        disable_gpu()
-        remove_state('kubernetes-worker.gpu.enabled')
-        # No need to restart kubernetes (set the restart-needed state)
-        # because set-privileged is already in the restart path
-
-    return privileged
-
-
-@when('config.changed.allow-privileged')
-@when('kubernetes-worker.config.created')
-def on_config_allow_privileged_change():
-    """React to changed 'allow-privileged' config value.
-
-    """
-    set_state('kubernetes-worker.restart-needed')
-    remove_state('config.changed.allow-privileged')
 
 
 @when('nvidia-docker.installed')

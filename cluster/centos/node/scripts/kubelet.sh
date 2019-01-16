@@ -54,9 +54,6 @@ NODE_HOSTNAME="--hostname-override=${NODE_ADDRESS}"
 # Path to a kubeconfig file, specifying how to connect to the API server.
 KUBELET_KUBECONFIG="--kubeconfig=${KUBECONFIG_DIR}/kubelet.kubeconfig"
 
-# --allow-privileged=false: If true, allow containers to request privileged mode. [default=false]
-KUBE_ALLOW_PRIV="--allow-privileged=false"
-
 # DNS info
 KUBELET__DNS_IP="--cluster-dns=${DNS_SERVER_IP}"
 KUBELET_DNS_DOMAIN="--cluster-domain=${DNS_DOMAIN}"

@@ -649,7 +649,6 @@ function yaml-map-string-string {
 function construct-kubelet-flags {
   local master=$1
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
-  flags+=" --allow-privileged=true"
   flags+=" --cloud-provider=gce"
   # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
   flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
