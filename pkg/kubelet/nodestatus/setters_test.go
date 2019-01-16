@@ -95,6 +95,8 @@ func TestNodeAddress(t *testing.T) {
 			name:   "InternalIP and ExternalIP are the same",
 			nodeIP: net.ParseIP("55.55.55.55"),
 			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "44.44.44.44"},
+				{Type: v1.NodeExternalIP, Address: "44.44.44.44"},
 				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
 				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
