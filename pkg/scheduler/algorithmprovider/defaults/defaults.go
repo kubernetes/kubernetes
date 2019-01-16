@@ -44,7 +44,6 @@ func defaultPredicates() sets.String {
 		predicates.MaxGCEPDVolumeCountPred,
 		predicates.MaxAzureDiskVolumeCountPred,
 		predicates.MaxCSIVolumeCountPred,
-		predicates.MaxCinderVolumeCountPred,
 		predicates.MatchInterPodAffinityPred,
 		predicates.NoDiskConflictPred,
 		predicates.GeneralPred,

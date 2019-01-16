@@ -568,6 +568,7 @@ var AzureDiskVolumeFilter = VolumeFilter{
 }
 
 // CinderVolumeFilter is a VolumeFilter for filtering Cinder Volumes
+// It will be deprecated once Openstack cloudprovider has been removed from in-tree.
 var CinderVolumeFilter = VolumeFilter{
 	FilterVolume: func(vol *v1.Volume) (string, bool) {
 		if vol.Cinder != nil {

@@ -40,8 +40,8 @@ const (
 	// GCEVolumeLimitKey stores resource name that will store volume limits for GCE node
 	GCEVolumeLimitKey = "attachable-volumes-gce-pd"
 
-	// Volume limit key for Cinder
-	CinderVolumeLimitKey = "attachable-volumes-aws-ebs"
+	// CinderVolumeLimitKey contains Volume limit key for Cinder
+	CinderVolumeLimitKey = "attachable-volumes-cinder"
 	// DefaultMaxCinderVolumes defines the maximum number of PD Volumes for Cinder
 	// For Openstack we are keeping this to a high enough value so as depending on backend
 	// cluster admins can configure it.
