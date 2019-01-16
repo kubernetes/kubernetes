@@ -141,51 +141,6 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	return nil, fmt.Errorf("proxy URL scheme not supported: %s", proxyURL.Scheme)
 }
 
-// dialWithoutProxy dials the host specified by url, using TLS if appropriate.
-func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(url)
-
-	if url.Scheme == "http" {
-		if s.Dialer == nil {
-			var d net.Dialer
-			return d.DialContext(ctx, "tcp", dialAddr)
-		} else {
-			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
-		}
-	}
-
-	// TODO validate the TLSClientConfig is set up?
-	var conn *tls.Conn
-	var err error
-	if s.Dialer == nil {
-		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
-	} else {
-		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Return if we were configured to skip validation
-	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
-		return conn, nil
-	}
-
-	host, _, err := net.SplitHostPort(dialAddr)
-	if err != nil {
-		return nil, err
-	}
-	if s.tlsConfig != nil && len(s.tlsConfig.ServerName) > 0 {
-		host = s.tlsConfig.ServerName
-	}
-	err = conn.VerifyHostname(host)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
-}
-
 // dialWithoutProxy dials the host specified by url through an http or an https proxy.
 func (s *SpdyRoundTripper) dialWithHttpProxy(requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
@@ -278,6 +233,51 @@ func (s *SpdyRoundTripper) tlsConn(requestUrl *url.URL, rwc net.Conn, targetHost
 	}
 
 	return tlsConn, nil
+}
+
+// dialWithoutProxy dials the host specified by url, using TLS if appropriate.
+func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (net.Conn, error) {
+	dialAddr := netutil.CanonicalAddr(url)
+
+	if url.Scheme == "http" {
+		if s.Dialer == nil {
+			var d net.Dialer
+			return d.DialContext(ctx, "tcp", dialAddr)
+		} else {
+			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
+		}
+	}
+
+	// TODO validate the TLSClientConfig is set up?
+	var conn *tls.Conn
+	var err error
+	if s.Dialer == nil {
+		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
+	} else {
+		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return conn, nil
+	}
+
+	host, _, err := net.SplitHostPort(dialAddr)
+	if err != nil {
+		return nil, err
+	}
+	if s.tlsConfig != nil && len(s.tlsConfig.ServerName) > 0 {
+		host = s.tlsConfig.ServerName
+	}
+	err = conn.VerifyHostname(host)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
 }
 
 // proxyAuth returns, for a given proxy URL, the value to be used for the Proxy-Authorization header
