@@ -558,6 +558,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	err := m.killPodFunc(pod, status, &gracePeriodOverride)
 	if err != nil {
+		//the pod's status is set to Failed, and the kubelet will retry the deletion when syncing the pod
 		klog.Errorf("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
 	} else {
 		klog.Infof("eviction manager: pod %s is evicted successfully", format.Pod(pod))
