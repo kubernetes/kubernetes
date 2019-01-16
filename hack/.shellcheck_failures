@@ -2,7 +2,6 @@
 ./build/copy-output.sh
 ./build/lib/release.sh
 ./build/make-build-image.sh
-./build/make-clean.sh
 ./build/util.sh
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
