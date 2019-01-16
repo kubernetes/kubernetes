@@ -160,11 +160,8 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 		if len(provisionedClaims) == 0 {
 			provisionedClaims = nil
 		}
-		// TODO merge into one atomic function
-		// Mark cache with all the matches for each PVC for this node
-		b.podBindingCache.UpdateBindings(pod, node.Name, matchedClaims)
-		// Mark cache with all the PVCs that need provisioning for this node
-		b.podBindingCache.UpdateProvisionedPVCs(pod, node.Name, provisionedClaims)
+		// Mark cache with all matched and provisioned claims for this node
+		b.podBindingCache.UpdateBindings(pod, node.Name, matchedClaims, provisionedClaims)
 	}()
 
 	podName := getPodName(pod)
@@ -318,8 +315,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	// Update cache with the assumed pvcs and pvs
 	// Even if length is zero, update the cache with an empty slice to indicate that no
 	// operations are needed
-	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings)
-	b.podBindingCache.UpdateProvisionedPVCs(assumedPod, nodeName, newProvisionedPVCs)
+	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings, newProvisionedPVCs)
 
 	return
 }
