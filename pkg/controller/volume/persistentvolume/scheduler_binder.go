@@ -182,6 +182,11 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 	)
 	defer func() {
 		// We recreate bindings for each new schedule loop.
+		if len(matchedClaims) == 0 && len(provisionedClaims) == 0 {
+			// Clear cache if no claims to bind or provision for this node.
+			b.podBindingCache.ClearBindings(pod, node.Name)
+			return
+		}
 		// Although we do not distinguish nil from empty in this function, for
 		// easier testing, we normalize empty to nil.
 		if len(matchedClaims) == 0 {

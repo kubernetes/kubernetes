@@ -30,6 +30,9 @@ type PodBindingCache interface {
 	// pod and node.
 	UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim)
 
+	// ClearBindings will clear the cached bindings for the given pod and node.
+	ClearBindings(pod *v1.Pod, node string)
+
 	// GetBindings will return the cached bindings for the given pod and node.
 	// A nil return value means that the entry was not found. An empty slice
 	// means that no binding operations are needed.
@@ -147,4 +150,16 @@ func (c *podBindingCache) GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.Per
 		return nil
 	}
 	return decision.provisionings
+}
+
+func (c *podBindingCache) ClearBindings(pod *v1.Pod, node string) {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	podName := getPodName(pod)
+	decisions, ok := c.bindingDecisions[podName]
+	if !ok {
+		return
+	}
+	delete(decisions, node)
 }
