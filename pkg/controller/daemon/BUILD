@@ -104,6 +104,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/daemon/config:all-srcs",
         "//pkg/controller/daemon/util:all-srcs",
     ],
     tags = ["automanaged"],

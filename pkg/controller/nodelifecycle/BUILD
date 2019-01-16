@@ -56,6 +56,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/nodelifecycle/config:all-srcs",
         "//pkg/controller/nodelifecycle/scheduler:all-srcs",
     ],
     tags = ["automanaged"],

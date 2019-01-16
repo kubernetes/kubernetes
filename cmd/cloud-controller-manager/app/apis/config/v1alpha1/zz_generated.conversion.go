@@ -25,6 +25,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	config "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	configv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
+	serviceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/service/config/v1alpha1"
 )
 
 func init() {
@@ -54,7 +55,7 @@ func autoConvert_v1alpha1_CloudControllerManagerConfiguration_To_config_CloudCon
 	if err := configv1alpha1.Convert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
-	if err := configv1alpha1.Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
+	if err := serviceconfigv1alpha1.Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
 		return err
 	}
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
@@ -73,7 +74,7 @@ func autoConvert_config_CloudControllerManagerConfiguration_To_v1alpha1_CloudCon
 	if err := configv1alpha1.Convert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
-	if err := configv1alpha1.Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
+	if err := serviceconfigv1alpha1.Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
 		return err
 	}
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
