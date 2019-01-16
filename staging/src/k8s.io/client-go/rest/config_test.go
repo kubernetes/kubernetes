@@ -27,12 +27,13 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
 
 	fuzz "github.com/google/gofuzz"
@@ -236,6 +237,9 @@ func TestAnonymousConfig(t *testing.T) {
 		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
 			*fn = fakeWrapperFunc
 		},
+		func(fn *transport.WrapperFunc, f fuzz.Continue) {
+			*fn = fakeWrapperFunc
+		},
 		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
 			serializer := &fakeNegotiatedSerializer{}
 			f.Fuzz(serializer)
@@ -314,6 +318,9 @@ func TestCopyConfig(t *testing.T) {
 			*r = roundTripper
 		},
 		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
+			*fn = fakeWrapperFunc
+		},
+		func(fn *transport.WrapperFunc, f fuzz.Continue) {
 			*fn = fakeWrapperFunc
 		},
 		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {

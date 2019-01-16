@@ -496,25 +496,42 @@ kube::util::ensure_single_dir_gopath() {
   fi
 }
 
-# Checks whether there are any files matching pattern $2 changed between the
-# current branch and upstream branch named by $1.
-# Returns 1 (false) if there are no changes, 0 (true) if there are changes
-# detected.
-kube::util::has_changes_against_upstream_branch() {
+# Find the base commit using:
+# $PULL_BASE_SHA if set (from Prow)
+# current ref from the remote upstream branch
+kube::util::base_ref() {
   local -r git_branch=$1
-  local -r pattern=$2
-  local -r not_pattern=${3:-totallyimpossiblepattern}
-  local full_branch
+
+  if [[ -n ${PULL_BASE_SHA:-} ]]; then
+    echo "${PULL_BASE_SHA}"
+    return
+  fi
 
   full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
-  echo "Checking for '${pattern}' changes against '${full_branch}'"
+  
   # make sure the branch is valid, otherwise the check will pass erroneously.
   if ! git describe "${full_branch}" >/dev/null; then
     # abort!
     exit 1
   fi
+
+  echo "${full_branch}"
+}
+
+# Checks whether there are any files matching pattern $2 changed between the
+# current branch and upstream branch named by $1.
+# Returns 1 (false) if there are no changes
+#         0 (true) if there are changes detected.
+kube::util::has_changes() {
+  local -r git_branch=$1
+  local -r pattern=$2
+  local -r not_pattern=${3:-totallyimpossiblepattern}
+  
+  local base_ref=$(kube::util::base_ref "${git_branch}")
+  echo "Checking for '${pattern}' changes against '${base_ref}'"
+
   # notice this uses ... to find the first shared ancestor
-  if git diff --name-only "${full_branch}...HEAD" | grep -v -E "${not_pattern}" | grep "${pattern}" > /dev/null; then
+  if git diff --name-only "${base_ref}...HEAD" | grep -v -E "${not_pattern}" | grep "${pattern}" > /dev/null; then
     return 0
   fi
   # also check for pending changes

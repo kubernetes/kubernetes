@@ -25,11 +25,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	componentbaseconfig "k8s.io/component-base/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
@@ -128,13 +127,13 @@ func TestAddFlags(t *testing.T) {
 			Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
-			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+			ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 				ContentType: "application/json",
 				QPS:         50.0,
 				Burst:       100,
 			},
 			ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
-			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
+			LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 				ResourceLock:  "configmap",
 				LeaderElect:   false,
 				LeaseDuration: metav1.Duration{Duration: 30 * time.Second},

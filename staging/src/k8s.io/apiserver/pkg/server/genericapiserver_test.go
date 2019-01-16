@@ -517,19 +517,23 @@ func TestGracefulShutdown(t *testing.T) {
 		return handler
 	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		wg.Done()
-		time.Sleep(2 * time.Second)
-		w.WriteHeader(http.StatusOK)
-		graceShutdown = true
-	})
-
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.Handler.NonGoRestfulMux.Handle("/test", handler)
+	twoSecondHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		wg.Done()
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+		graceShutdown = true
+	})
+	okHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Handler.NonGoRestfulMux.Handle("/test", twoSecondHandler)
+	s.Handler.NonGoRestfulMux.Handle("/200", okHandler)
 
 	insecureServer := &http.Server{
 		Addr:    "0.0.0.0:0",
@@ -565,6 +569,12 @@ func TestGracefulShutdown(t *testing.T) {
 	// close stopCh after request sent to server to guarantee request handler is running.
 	wg.Wait()
 	close(stopCh)
+
+	time.Sleep(500 * time.Millisecond)
+	if _, err := http.Get("http://127.0.0.1:" + strconv.Itoa(serverPort) + "/200"); err == nil {
+		t.Errorf("Unexpected http success after stopCh was closed")
+	}
+
 	// wait for wait group handler finish
 	s.HandlerChainWaitGroup.Wait()
 

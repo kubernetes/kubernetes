@@ -20,43 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LeaderElectionConfiguration defines the configuration of leader election
-// clients for components that can run with leader election enabled.
-type LeaderElectionConfiguration struct {
-	// leaderElect enables a leader election client to gain leadership
-	// before executing the main loop. Enable this when running replicated
-	// components for high availability.
-	LeaderElect bool
-	// leaseDuration is the duration that non-leader candidates will wait
-	// after observing a leadership renewal until attempting to acquire
-	// leadership of a led but unrenewed leader slot. This is effectively the
-	// maximum duration that a leader can be stopped before it is replaced
-	// by another candidate. This is only applicable if leader election is
-	// enabled.
-	LeaseDuration metav1.Duration
-	// renewDeadline is the interval between attempts by the acting master to
-	// renew a leadership slot before it stops leading. This must be less
-	// than or equal to the lease duration. This is only applicable if leader
-	// election is enabled.
-	RenewDeadline metav1.Duration
-	// retryPeriod is the duration the clients should wait between attempting
-	// acquisition and renewal of a leadership. This is only applicable if
-	// leader election is enabled.
-	RetryPeriod metav1.Duration
-	// resourceLock indicates the resource object type that will be used to lock
-	// during leader election cycles.
-	ResourceLock string
-}
-
-// DebuggingConfiguration holds configuration for Debugging related features.
-type DebuggingConfiguration struct {
-	// enableProfiling enables profiling via web interface host:port/debug/pprof/
-	EnableProfiling bool
-	// enableContentionProfiling enables lock contention profiling, if
-	// enableProfiling is true.
-	EnableContentionProfiling bool
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EncryptionConfiguration stores the complete configuration for encryption providers.
@@ -123,4 +86,7 @@ type KMSConfiguration struct {
 	CacheSize int32
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string
+	// Timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
+	// +optional
+	Timeout *metav1.Duration
 }

@@ -16,6 +16,12 @@ limitations under the License.
 
 package kubelet
 
+import "errors"
+
 const (
 	NetworkNotReadyErrorMsg = "network is not ready"
+)
+
+var (
+	ErrNetworkUnknown = errors.New("network state unknown")
 )

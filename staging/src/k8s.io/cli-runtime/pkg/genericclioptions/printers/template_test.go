@@ -52,6 +52,14 @@ func TestTemplate(t *testing.T) {
 				return "a base64 decode error", matched
 			},
 		},
+		{
+			name:     "template 'eq' should not throw error for numbers",
+			template: "{{ eq .count 1}}",
+			obj: &v1.Event{
+				Count: 1,
+			},
+			expectOut: "true",
+		},
 	}
 	for _, test := range testCase {
 		t.Run(test.name, func(t *testing.T) {

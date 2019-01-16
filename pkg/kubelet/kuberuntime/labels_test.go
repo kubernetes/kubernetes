@@ -23,9 +23,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -68,90 +65,27 @@ func TestContainerLabels(t *testing.T) {
 	}
 
 	var tests = []struct {
-		description     string
-		featuresCreated bool // Features enabled when container is created
-		featuresStatus  bool // Features enabled when container status is read
-		typeLabel       kubecontainer.ContainerType
-		expected        *labeledContainerInfo
+		description string
+		expected    *labeledContainerInfo
 	}{
 		{
-			"Debug containers disabled",
-			false,
-			false,
-			"ignored",
-			&labeledContainerInfo{
-				PodName:       pod.Name,
-				PodNamespace:  pod.Namespace,
-				PodUID:        pod.UID,
-				ContainerName: container.Name,
-				ContainerType: "",
-			},
-		},
-		{
 			"Regular containers",
-			true,
-			true,
-			kubecontainer.ContainerTypeRegular,
 			&labeledContainerInfo{
 				PodName:       pod.Name,
 				PodNamespace:  pod.Namespace,
 				PodUID:        pod.UID,
 				ContainerName: container.Name,
-				ContainerType: kubecontainer.ContainerTypeRegular,
-			},
-		},
-		{
-			"Init containers",
-			true,
-			true,
-			kubecontainer.ContainerTypeInit,
-			&labeledContainerInfo{
-				PodName:       pod.Name,
-				PodNamespace:  pod.Namespace,
-				PodUID:        pod.UID,
-				ContainerName: container.Name,
-				ContainerType: kubecontainer.ContainerTypeInit,
-			},
-		},
-		{
-			"Created without type label",
-			false,
-			true,
-			"ignored",
-			&labeledContainerInfo{
-				PodName:       pod.Name,
-				PodNamespace:  pod.Namespace,
-				PodUID:        pod.UID,
-				ContainerName: container.Name,
-				ContainerType: "",
-			},
-		},
-		{
-			"Created with type label, subsequently disabled",
-			true,
-			false,
-			kubecontainer.ContainerTypeRegular,
-			&labeledContainerInfo{
-				PodName:       pod.Name,
-				PodNamespace:  pod.Namespace,
-				PodUID:        pod.UID,
-				ContainerName: container.Name,
-				ContainerType: "",
 			},
 		},
 	}
 
 	// Test whether we can get right information from label
 	for _, test := range tests {
-		func() {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DebugContainers, test.featuresCreated)()
-			labels := newContainerLabels(container, pod, test.typeLabel)
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DebugContainers, test.featuresStatus)()
-			containerInfo := getContainerInfoFromLabels(labels)
-			if !reflect.DeepEqual(containerInfo, test.expected) {
-				t.Errorf("%v: expected %v, got %v", test.description, test.expected, containerInfo)
-			}
-		}()
+		labels := newContainerLabels(container, pod)
+		containerInfo := getContainerInfoFromLabels(labels)
+		if !reflect.DeepEqual(containerInfo, test.expected) {
+			t.Errorf("%v: expected %v, got %v", test.description, test.expected, containerInfo)
+		}
 	}
 }
 

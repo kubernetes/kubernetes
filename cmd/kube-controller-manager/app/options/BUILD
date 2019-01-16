@@ -74,15 +74,13 @@ go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
     embed = [":go_default_library"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )

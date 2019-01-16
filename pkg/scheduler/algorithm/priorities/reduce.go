@@ -18,7 +18,6 @@ package priorities
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -26,7 +25,7 @@ import (
 // NormalizeReduce generates a PriorityReduceFunction that can normalize the result
 // scores to [0, maxPriority]. If reverse is set to true, it reverses the scores by
 // subtracting it from maxPriority.
-func NormalizeReduce(maxPriority int, reverse bool) algorithm.PriorityReduceFunction {
+func NormalizeReduce(maxPriority int, reverse bool) PriorityReduceFunction {
 	return func(
 		_ *v1.Pod,
 		_ interface{},

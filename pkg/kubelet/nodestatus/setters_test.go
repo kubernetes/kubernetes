@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -890,8 +891,8 @@ func TestReadyCondition(t *testing.T) {
 	cases := []struct {
 		desc                     string
 		node                     *v1.Node
-		runtimeErrors            []string
-		networkErrors            []string
+		runtimeErrors            error
+		networkErrors            error
 		appArmorValidateHostFunc func() error
 		cmStatus                 cm.Status
 		expectConditions         []v1.NodeCondition
@@ -927,23 +928,11 @@ func TestReadyCondition(t *testing.T) {
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. WARNING: foo", now, now)},
 		},
 		{
-			desc:             "new, not ready: runtime errors",
-			node:             withCapacity.DeepCopy(),
-			runtimeErrors:    []string{"foo", "bar"},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo,bar", now, now)},
-		},
-		{
-			desc:             "new, not ready: network errors",
-			node:             withCapacity.DeepCopy(),
-			networkErrors:    []string{"foo", "bar"},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo,bar", now, now)},
-		},
-		{
 			desc:             "new, not ready: runtime and network errors",
 			node:             withCapacity.DeepCopy(),
-			runtimeErrors:    []string{"runtime"},
-			networkErrors:    []string{"network"},
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "runtime,network", now, now)},
+			runtimeErrors:    errors.New("runtime"),
+			networkErrors:    errors.New("network"),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "[runtime, network]", now, now)},
 		},
 		{
 			desc:             "new, not ready: missing capacities",
@@ -973,7 +962,7 @@ func TestReadyCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(true, "", before, before)}
 				return node
 			}(),
-			runtimeErrors:    []string{"foo"},
+			runtimeErrors:    errors.New("foo"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", now, now)},
 			expectEvents: []testEvent{
 				{
@@ -999,17 +988,17 @@ func TestReadyCondition(t *testing.T) {
 				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
 				return node
 			}(),
-			runtimeErrors:    []string{"foo"},
+			runtimeErrors:    errors.New("foo"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", before, now)},
 			expectEvents:     []testEvent{},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			runtimeErrorsFunc := func() []string {
+			runtimeErrorsFunc := func() error {
 				return tc.runtimeErrors
 			}
-			networkErrorsFunc := func() []string {
+			networkErrorsFunc := func() error {
 				return tc.networkErrors
 			}
 			cmStatusFunc := func() cm.Status {

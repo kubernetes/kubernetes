@@ -669,7 +669,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
 }
 
-// OnServiceSynced is called once all the initial even handlers were called and the state is fully propagated to local cache.
+// OnServiceSynced is called once all the initial event handlers were called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true

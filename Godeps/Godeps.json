@@ -9,8 +9,8 @@
 		"github.com/cloudflare/cfssl/cmd/cfssl",
 		"github.com/cloudflare/cfssl/cmd/cfssljson",
 		"github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
-		"github.com/kubernetes/repo-infra/kazel",
 		"k8s.io/kube-openapi/cmd/openapi-gen",
+		"k8s.io/repo-infra/kazel",
 		"golang.org/x/lint/golint",
 		"./..."
 	],
@@ -2406,10 +2406,6 @@
 			"Rev": "6807e777504f54ad073ecef66747de158294b639"
 		},
 		{
-			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
-			"Rev": "f2459dc75fc429b813d92c0622b408fd7f0d4cac"
-		},
-		{
 			"ImportPath": "github.com/lib/pq",
 			"Rev": "88edab0803230a3898347e77b474f8c1820a1f20"
 		},
@@ -4103,6 +4099,10 @@
 			"Rev": "0317810137be915b9cf888946c6e115c1bfac693"
 		},
 		{
+			"ImportPath": "k8s.io/repo-infra/kazel",
+			"Rev": "00fe14e3d1a3f9a73c4cea62d9c33b29c1e03ac4"
+		},
+		{
 			"ImportPath": "k8s.io/utils/clock",
 			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
 		},
@@ -4117,106 +4117,6 @@
 		{
 			"ImportPath": "k8s.io/utils/pointer",
 			"Rev": "8e7ff06bf0e2d3289061230af203e430a15b6dcc"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/commands/build",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/constants",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/expansion",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/factory",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/fs",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/gvk",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/ifc",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/ifc/transformer",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/internal/error",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/loader",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/patch",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/patch/transformer",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/resid",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/resmap",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/resource",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/target",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers/config",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
-		},
-		{
-			"ImportPath": "sigs.k8s.io/kustomize/pkg/types",
-			"Comment": "v1.0.10-69-gef51cceff55b17",
-			"Rev": "ef51cceff55b17542fc91d6c4e30ea0bbb9641f7"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",

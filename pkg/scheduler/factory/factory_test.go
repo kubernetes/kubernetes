@@ -645,7 +645,7 @@ func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm
 	}
 
 	f := &configFactory{}
-	binderFunc := f.getBinderFunc(extenders)
+	binderFunc := getBinderFunc(f.client, extenders)
 	binder := binderFunc(pod)
 
 	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
