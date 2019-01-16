@@ -6,17 +6,9 @@ approvers:
 - liggitt
 reviewers:
 - lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- caesarxuchao
-- liggitt
-- sttts
-- ncdc
-- tallclair
-- enj
-- hzxuzhonghu
-- CaoShuFeng
+- apelisse
+- jennybuckley
+- kwiesmueller
 labels:
 - sig/api-machinery
 - area/apiserver
