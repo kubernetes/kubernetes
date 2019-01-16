@@ -6,7 +6,6 @@
 ./build/package-tarballs.sh
 ./build/release-images.sh
 ./build/release-in-a-container.sh
-./build/release.sh
 ./build/util.sh
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
