@@ -17,7 +17,6 @@ limitations under the License.
 package csr
 
 import (
-	"context"
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
@@ -85,9 +84,8 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 func WaitForCertificate(client certificatesclient.CertificateSigningRequestInterface, req *certificates.CertificateSigningRequest, timeout time.Duration) (certData []byte, err error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", req.Name).String()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	event, err = watchtools.UntilWithSync(ctx,
+	event, err := watchtools.ListWatchUntil(
+		timeout,
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
@@ -97,7 +95,7 @@ func WaitForCertificate(client certificatesclient.CertificateSigningRequestInter
 				options.FieldSelector = fieldSelector
 				return client.Watch(options)
 			},
-		}, &v1.Secret{}, nil,
+		},
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified, watch.Added:
