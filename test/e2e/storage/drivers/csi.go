@@ -297,6 +297,7 @@ func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,
@@ -409,6 +410,7 @@ func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDri
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,
