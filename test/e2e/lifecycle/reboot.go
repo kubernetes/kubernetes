@@ -59,6 +59,9 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 
 		// Cluster must support node reboot
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+
+		// Should not reboot itself if local provider.
+		framework.SkipIfProviderIs("local")
 	})
 
 	AfterEach(func() {
