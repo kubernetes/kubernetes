@@ -4,7 +4,6 @@
 ./build/make-build-image.sh
 ./build/make-clean.sh
 ./build/package-tarballs.sh
-./build/release-images.sh
 ./build/release-in-a-container.sh
 ./build/util.sh
 ./cluster/addons/addon-manager/kube-addons.sh
