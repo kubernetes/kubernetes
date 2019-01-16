@@ -1,8 +1,12 @@
-/*Copyright 2019 The Kubernetes Authors.
+/*
+Copyright 2019 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -13,7 +17,6 @@ limitations under the License.
 package topologymanager
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -34,12 +37,19 @@ type Manager interface {
 	Store
 }
 
-//Interface to be implemented by Hint Providers
+//HintProvider interface is to be implemented by Hint Providers
 type HintProvider interface {
 	GetTopologyHints(pod v1.Pod, container v1.Container) TopologyHints
 }
 
-//Interface to allow Hint Providers to retrieve pod affinity
+//Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHints
+}
+
+//TopologyHints is a struct containing Sokcet Affinity for a Pod
+//and whether Affinity is true or false
+type TopologyHints struct {
+	SocketAffinity []socketmask.SocketMask
+	Affinity bool
 }
