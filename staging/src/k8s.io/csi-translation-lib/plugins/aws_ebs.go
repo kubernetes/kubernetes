@@ -30,12 +30,19 @@ const (
 	AWSEBSInTreePluginName = "kubernetes.io/aws-ebs"
 )
 
-// AWSEBS handles translation of PV spec from In-tree EBS to CSI EBS and vice versa
-type AWSEBS struct{}
+var _ InTreePlugin = &awsElasticBlockStoreCSITranslator{}
+
+// awsElasticBlockStoreTranslator handles translation of PV spec from In-tree EBS to CSI EBS and vice versa
+type awsElasticBlockStoreCSITranslator struct{}
+
+// NewAWSElasticBlockStoreCSITranslator returns a new instance of awsElasticBlockStoreTranslator
+func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
+	return &awsElasticBlockStoreCSITranslator{}
+}
 
 // TranslateInTreePVToCSI takes a PV with AWSElasticBlockStore set from in-tree
 // and converts the AWSElasticBlockStore source to a CSIPersistentVolumeSource
-func (t *AWSEBS) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.AWSElasticBlockStore == nil {
 		return nil, fmt.Errorf("pv is nil or AWS EBS not defined on pv")
 	}
@@ -59,7 +66,7 @@ func (t *AWSEBS) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.Persistent
 
 // TranslateCSIPVToInTree takes a PV with CSIPersistentVolumeSource set and
 // translates the EBS CSI source to a AWSElasticBlockStore source.
-func (t *AWSEBS) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.CSI == nil {
 		return nil, fmt.Errorf("pv is nil or CSI source not defined on pv")
 	}
@@ -88,11 +95,11 @@ func (t *AWSEBS) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.Persistent
 // CanSupport tests whether the plugin supports a given volume
 // specification from the API.  The spec pointer should be considered
 // const.
-func (t *AWSEBS) CanSupport(pv *v1.PersistentVolume) bool {
+func (t *awsElasticBlockStoreCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.AWSElasticBlockStore != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver
-func (t *AWSEBS) GetInTreePluginName() string {
+func (t *awsElasticBlockStoreCSITranslator) GetInTreePluginName() string {
 	return AWSEBSInTreePluginName
 }
