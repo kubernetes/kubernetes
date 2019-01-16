@@ -643,20 +643,20 @@ func loadCustomResolver() func(service, region string, optFns ...func(*endpoints
 	defaultResolverFn := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 		return defaultResolver.EndpointFor(service, region, optFns...)
 	}
-	if overridesActive {
-		customResolverFn := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-			signature := makeRegionEndpointSignature(service, region)
-			if ep, ok := overrides[signature]; ok {
-				return endpoints.ResolvedEndpoint{
-					URL:           ep.Endpoint,
-					SigningRegion: ep.SigningRegion,
-				}, nil
-			}
-			return defaultResolver.EndpointFor(service, region, optFns...)
-		}
-		return customResolverFn
+	if !overridesActive {
+		return defaultResolverFn
 	}
-	return defaultResolverFn
+	customResolverFn := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		signature := makeRegionEndpointSignature(service, region)
+		if ep, ok := overrides[signature]; ok {
+			return endpoints.ResolvedEndpoint{
+				URL:           ep.Endpoint,
+				SigningRegion: ep.SigningRegion,
+			}, nil
+		}
+		return defaultResolver.EndpointFor(service, region, optFns...)
+	}
+	return customResolverFn
 }
 
 // awsSdkEC2 is an implementation of the EC2 interface, backed by aws-sdk-go
