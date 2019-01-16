@@ -1994,7 +1994,7 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 		MirrorPod:  mirrorPod,
 		UpdateType: syncType,
 		OnCompleteFunc: func(err error) {
-			if err != nil {
+			if err == nil {
 				metrics.PodWorkerLatency.WithLabelValues(syncType.String()).Observe(metrics.SinceInMicroseconds(start))
 			}
 		},
