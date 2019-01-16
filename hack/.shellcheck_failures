@@ -8,7 +8,6 @@
 ./build/release-in-a-container.sh
 ./build/release.sh
 ./build/run.sh
-./build/shell.sh
 ./build/util.sh
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
