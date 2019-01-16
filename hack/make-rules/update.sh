@@ -56,9 +56,7 @@ BASH_TARGETS="
 	update-generated-device-plugin
 	update-generated-docs
 	update-generated-swagger-docs
-	update-swagger-spec
 	update-openapi-spec
-	update-api-reference-docs
 	update-staging-godeps
 	update-bazel"
 

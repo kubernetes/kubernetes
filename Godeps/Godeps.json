@@ -1539,10 +1539,6 @@
 			"Rev": "449fdfce4d962303d702fec724ef0ad181c92528"
 		},
 		{
-			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
-			"Rev": "3dcc96556217539f50599357fb481ac0dc7439b9"
-		},
-		{
 			"ImportPath": "github.com/elazarl/goproxy",
 			"Comment": "v1.0-104-gc4fc26588b6ef8",
 			"Rev": "c4fc26588b6ef8af07a191fcb6476387bdd46711"
@@ -1551,11 +1547,6 @@
 			"ImportPath": "github.com/emicklei/go-restful",
 			"Comment": "2.2.0-4-gff4f55a206334e",
 			"Rev": "ff4f55a206334ef123e4f79bbf348980da81ca46"
-		},
-		{
-			"ImportPath": "github.com/emicklei/go-restful-swagger12",
-			"Comment": "1.0.1",
-			"Rev": "dcef7f55730566d41eae5db10e7d6981829720f6"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/log",

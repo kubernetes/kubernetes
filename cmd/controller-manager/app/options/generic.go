@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -30,29 +29,19 @@ import (
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.
 type GenericControllerManagerConfigurationOptions struct {
-	Port                    int32
-	Address                 string
-	MinResyncPeriod         metav1.Duration
-	ClientConnection        componentbaseconfig.ClientConnectionConfiguration
-	ControllerStartInterval metav1.Duration
-	LeaderElection          componentbaseconfig.LeaderElectionConfiguration
-	Debugging               *DebuggingOptions
-	Controllers             []string
+	*kubectrlmgrconfig.GenericControllerManagerConfiguration
+	Debugging *DebuggingOptions
 }
 
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericControllerManagerConfigurationOptions(cfg kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
+func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
-		Port:                    cfg.Port,
-		Address:                 cfg.Address,
-		MinResyncPeriod:         cfg.MinResyncPeriod,
-		ClientConnection:        cfg.ClientConnection,
-		ControllerStartInterval: cfg.ControllerStartInterval,
-		LeaderElection:          cfg.LeaderElection,
-		Debugging:               &DebuggingOptions{},
-		Controllers:             cfg.Controllers,
+		GenericControllerManagerConfiguration: cfg,
+		Debugging: &DebuggingOptions{
+			DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{},
+		},
 	}
 
 	return o

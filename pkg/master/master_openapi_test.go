@@ -52,7 +52,6 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	master, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
