@@ -113,6 +113,7 @@ type APIAggregator struct {
 	serviceResolver ServiceResolver
 
 	openAPIAggregationController *openapicontroller.AggregationController
+	OpenAPIAggregationManager    openapicontroller.AggregationManager
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -214,6 +215,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 			return nil, err
 		}
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+		s.OpenAPIAggregationManager = openAPIAggregator
 
 		s.GenericAPIServer.AddPostStartHook("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)

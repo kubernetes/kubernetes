@@ -52,6 +52,8 @@ type AggregationManager interface {
 
 	// GetAPIServicesName returns the names of APIServices recorded in AggregationManager.
 	GetAPIServiceNames() []string
+
+	AddUpdateLocalAPIServiceSpec(name string, spec *spec.Swagger, etag string) error
 }
 
 // AggregationController periodically check for changes in OpenAPI specs of APIServices and update/remove

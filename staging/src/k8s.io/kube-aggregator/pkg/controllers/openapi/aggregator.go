@@ -232,6 +232,22 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 			return nil, err
 		}
 	}
+	// TODO(roycaihw): update comments
+	// Add minimum required keys if missing, to properly serve the OpenAPI spec
+	// through apiextensions-apiserver HTTP handler. These keys will not be
+	// aggregated to top-level OpenAPI spec (only paths and definitions will).
+	// However these keys make the OpenAPI->proto serialization happy.
+	if specToReturn.Info == nil {
+		specToReturn.Info = &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes",
+				Version: "v1.1.1",
+			},
+		}
+	}
+	if len(specToReturn.Swagger) == 0 {
+		specToReturn.Swagger = "2.0"
+	}
 	return specToReturn, nil
 }
 
@@ -261,7 +277,14 @@ func (s *specAggregator) updateOpenAPISpec() error {
 // tryUpdatingServiceSpecs tries updating openAPISpecs map with specified specInfo, and keeps the map intact
 // if the update fails.
 func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) error {
+	if specInfo == nil {
+		return fmt.Errorf("invalid input: specInfo must be non-nil")
+	}
 	orgSpecInfo, exists := s.openAPISpecs[specInfo.apiService.Name]
+	// Skip aggregation if OpenAPI spec didn't change
+	if exists && orgSpecInfo != nil && orgSpecInfo.etag == specInfo.etag {
+		return nil
+	}
 	s.openAPISpecs[specInfo.apiService.Name] = specInfo
 	if err := s.updateOpenAPISpec(); err != nil {
 		if exists {
@@ -309,6 +332,22 @@ func (s *specAggregator) UpdateAPIServiceSpec(apiServiceName string, spec *spec.
 		apiService: specInfo.apiService,
 		spec:       spec,
 		handler:    specInfo.handler,
+		etag:       etag,
+	})
+}
+
+// AddUpdateLocalAPIService allows adding/updating local API service with nil handler and
+// nil Spec.Service. This function can be used for local dynamic OpenAPI spec aggregation
+// management (e.g. CRD)
+func (s *specAggregator) AddUpdateLocalAPIServiceSpec(name string, spec *spec.Swagger, etag string) error {
+	s.rwMutex.Lock()
+	defer s.rwMutex.Unlock()
+
+	localAPIService := apiregistration.APIService{}
+	localAPIService.Name = name
+	return s.tryUpdatingServiceSpecs(&openAPISpecInfo{
+		apiService: localAPIService,
+		spec:       spec,
 		etag:       etag,
 	})
 }

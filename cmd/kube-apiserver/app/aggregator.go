@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -132,9 +133,11 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	crdRegistrationController := crdregistration.NewAutoRegistrationController(
 		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		autoRegistrationController)
+	openapiController := openapi.NewOpenAPIController(apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions())
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
 		go crdRegistrationController.Run(5, context.StopCh)
+		go openapiController.Run(context.StopCh, aggregatorServer.OpenAPIAggregationManager)
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.

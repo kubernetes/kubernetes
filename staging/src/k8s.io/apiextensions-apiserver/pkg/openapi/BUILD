@@ -17,10 +17,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/aggregator:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/handler:go_default_library",
     ],
 )
 

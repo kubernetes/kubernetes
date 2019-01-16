@@ -115,7 +115,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			// controller takes time to rotate the queue and resync apiextensions-apiserver's spec
 			By("Waiting for test CRD's Schema to show up in OpenAPI spec")
 			lastMsg := ""
-			if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
+			if err := wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
 				bs, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
 				if err != nil {
 					return false, err
