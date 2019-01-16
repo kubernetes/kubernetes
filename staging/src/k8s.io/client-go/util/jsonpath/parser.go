@@ -325,6 +325,7 @@ Loop:
 			if i == 1 {
 				params[i].Known = true
 				params[i].Value = params[0].Value + 1
+				params[i].Derived = true
 			} else {
 				params[i].Known = false
 				params[i].Value = 0
