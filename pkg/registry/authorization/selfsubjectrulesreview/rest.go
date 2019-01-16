@@ -61,6 +61,12 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return nil, apierrors.NewBadRequest("no user present on request")
 	}
 
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	namespace := selfSRR.Spec.Namespace
 	if namespace == "" {
 		return nil, apierrors.NewBadRequest("no namespace on request")

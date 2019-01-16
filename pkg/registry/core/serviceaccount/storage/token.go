@@ -58,16 +58,16 @@ var gvk = schema.GroupVersionKind{
 }
 
 func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	if createValidation != nil {
-		if err := createValidation(obj.DeepCopyObject()); err != nil {
-			return nil, err
-		}
-	}
-
 	out := obj.(*authenticationapi.TokenRequest)
 
 	if errs := authenticationvalidation.ValidateTokenRequest(out); len(errs) != 0 {
 		return nil, errors.NewInvalid(gvk.GroupKind(), "", errs)
+	}
+
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
 	}
 
 	svcacctObj, err := r.svcaccts.Get(ctx, name, &metav1.GetOptions{})
