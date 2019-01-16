@@ -609,32 +609,32 @@ func makeRegionEndpointSignature(serviceName, region string) string {
 }
 
 func parseOverrides(cfg *CloudConfig) error {
-	if len(cfg.Global.ServiceOverrides) > 0 {
-		if err := setOverridesDefaults(cfg); err != nil {
-			return err
-		}
-		overrides = make(map[string]CustomEndpoint)
-		for _, ovrd := range cfg.Global.ServiceOverrides {
-			tokens := strings.Split(ovrd, cfg.Global.OverrideSeparator)
-			if len(tokens) != 4 {
-				if len(tokens) > 0 {
-					return fmt.Errorf("4 parameters (service, region, url, signing region) are required for [%s] in %s",
-						tokens[0], ovrd)
-				}
-				return fmt.Errorf("4 parameters (service, region, url, signing region) are required in %s",
-					ovrd)
-			}
-			name := strings.TrimSpace(tokens[0])
-			region := strings.TrimSpace(tokens[1])
-			url := strings.TrimSpace(tokens[2])
-			signingRegion := strings.TrimSpace(tokens[3])
-			signature := makeRegionEndpointSignature(name, region)
-			overrides[signature] = CustomEndpoint{Endpoint: url, SigningRegion: signingRegion}
-		}
-		overridesActive = true
-	} else {
-		overridesActive = false
+	overridesActive = false
+	if len(cfg.Global.ServiceOverrides) == 0 {
+		return nil
 	}
+	if err := setOverridesDefaults(cfg); err != nil {
+		return err
+	}
+	overrides = make(map[string]CustomEndpoint)
+	for _, ovrd := range cfg.Global.ServiceOverrides {
+		tokens := strings.Split(ovrd, cfg.Global.OverrideSeparator)
+		if len(tokens) != 4 {
+			if len(tokens) > 0 {
+				return fmt.Errorf("4 parameters (service, region, url, signing region) are required for [%s] in %s",
+					tokens[0], ovrd)
+			}
+			return fmt.Errorf("4 parameters (service, region, url, signing region) are required in %s",
+				ovrd)
+		}
+		name := strings.TrimSpace(tokens[0])
+		region := strings.TrimSpace(tokens[1])
+		url := strings.TrimSpace(tokens[2])
+		signingRegion := strings.TrimSpace(tokens[3])
+		signature := makeRegionEndpointSignature(name, region)
+		overrides[signature] = CustomEndpoint{Endpoint: url, SigningRegion: signingRegion}
+	}
+	overridesActive = true
 	return nil
 }
 
