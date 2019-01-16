@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -115,7 +116,7 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	return &client, nil
 }
 
-// NewFromCluster creates an etcd client for the the etcd endpoints defined in the ClusterStatus value stored in
+// NewFromCluster creates an etcd client for the etcd endpoints defined in the ClusterStatus value stored in
 // the kubeadm-config ConfigMap in kube-system namespace.
 // Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
 func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
@@ -233,7 +234,15 @@ type Member struct {
 }
 
 // AddMember notifies an existing etcd cluster that a new member is joining
-func (c Client) AddMember(name string, peerAddrs string) ([]Member, error) {
+func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
+	// Parse the peer address, required to add the client URL later to the list
+	// of endpoints for this client. Parsing as a first operation to make sure that
+	// if this fails no member addition is performed on the etcd cluster.
+	parsedPeerAddrs, err := url.Parse(peerAddrs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing peer address %s", peerAddrs)
+	}
+
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
 		DialTimeout: 20 * time.Second,
@@ -262,6 +271,9 @@ func (c Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
 		}
 	}
+
+	// Add the new member client address to the list of endpoints
+	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
 
 	return ret, nil
 }
@@ -344,7 +356,7 @@ func (c Client) WaitForClusterAvailable(delay time.Duration, retries int, retryI
 			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)
 		}
-		fmt.Printf("[util/etcd] Attempting to see if all cluster endpoints are available %d/%d\n", i+1, retries)
+		klog.V(2).Infof("attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
 		resp, err := c.ClusterAvailable()
 		if err != nil {
 			switch err {
