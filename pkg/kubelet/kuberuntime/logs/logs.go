@@ -56,6 +56,9 @@ const (
 	// the container log. Kubelet should not keep following the log when the
 	// container is not running.
 	stateCheckPeriod = 5 * time.Second
+
+	// logForceCheckPeriod is the period to check for a new read
+	logForceCheckPeriod = 1 * time.Second
 )
 
 var (
@@ -426,6 +429,8 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 				return false, false, err
 			}
 			errRetry--
+		case <-time.After(logForceCheckPeriod):
+			return true, false, nil
 		case <-time.After(stateCheckPeriod):
 			if running, err := isContainerRunning(id, runtimeService); !running {
 				return false, false, err
