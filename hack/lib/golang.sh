@@ -574,12 +574,14 @@ kube::golang::build_some_binaries() {
     if [[ "${#uncovered[@]}" != 0 ]]; then
       V=2 kube::log::info "Building ${uncovered[@]} without coverage..."
       go install "${build_args[@]}" "${uncovered[@]}"
+      echo go install "${build_args[@]}" "${uncovered[@]}"
     else
       V=2 kube::log::info "Nothing to build without coverage."
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
     go install "${build_args[@]}" "$@"
+    echo go install "${build_args[@]}" "$@"
    fi
 }
 
@@ -601,6 +603,11 @@ kube::golang::build_binaries_for_platform() {
       nonstatics+=($binary)
     fi
   done
+
+  if [[ -n "${GOBUILDTAGS:-}" ]]; then
+    goflags+=("-tags")
+    goflags+=("'${GOBUILDTAGS}'")
+  fi
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then

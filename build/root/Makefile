@@ -73,6 +73,7 @@ define ALL_HELP_INFO
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   GOBUILDTAGS: a space-separated list of build tags used when building.
 #
 # Example:
 #   make
@@ -82,6 +83,7 @@ define ALL_HELP_INFO
 #     Note: Use the -N -l options to disable compiler optimizations an inlining.
 #           Using these build options allows you to subsequently use source
 #           debugging tools like delve.
+#   make all GOBUILDTAGS="nokmem"
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)
@@ -169,6 +171,7 @@ define CHECK_TEST_HELP_INFO
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   GOBUILDTAGS: a space-separated list of build tags used when building.
 #
 # Example:
 #   make check

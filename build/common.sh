@@ -567,6 +567,7 @@ function kube::build::run_build_command_ex() {
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
+    --env "GOBUILDTAGS=${GOBUILDTAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
   )
 
