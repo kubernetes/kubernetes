@@ -133,6 +133,7 @@ go_test(
         "node_container_manager_linux_test.go",
         "pod_container_manager_linux_test.go",
     ],
+    data = [":testdata"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

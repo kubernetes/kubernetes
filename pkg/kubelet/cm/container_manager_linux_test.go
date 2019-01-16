@@ -142,3 +142,20 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 }
+
+// These files exist
+func TestErrorOnSwapOn(t *testing.T) {
+	err := checkSwapOn("testdata/swaps.bad")
+	assert.Error(t, err)
+}
+
+func TestSuccessOnSwapOff(t *testing.T) {
+	err := checkSwapOn("testdata/swaps.good")
+	assert.NoError(t, err)
+}
+
+// This one doesn't
+func TestSuccessOnProcSwapsMissing(t *testing.T) {
+	err := checkSwapOn("testdata/I.do.not.exist")
+	assert.NoError(t, err)
+}

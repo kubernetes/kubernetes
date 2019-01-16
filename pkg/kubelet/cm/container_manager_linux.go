@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -193,6 +194,29 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	return f, nil
 }
 
+// Checks if any swap spaces are on.
+// Passes silently if /proc/swaps does not exist, e.g. on Chromebooks.
+func checkSwapOn(file string) error {
+	swapData, err := ioutil.ReadFile(file)
+	if err != nil {
+		if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOENT {
+			// The file does not exist
+			return nil
+		}
+		return err
+	}
+
+	swapData = bytes.TrimSpace(swapData) // extra trailing \n
+	swapLines := strings.Split(string(swapData), "\n")
+
+	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+	// error out unless --fail-swap-on is set to false.
+	if len(swapLines) > 1 {
+		return fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+	}
+	return nil
+}
+
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
@@ -204,17 +228,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	if failSwapOn {
 		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-		swapData, err := ioutil.ReadFile("/proc/swaps")
+		err = checkSwapOn("/proc/swaps")
 		if err != nil {
 			return nil, err
-		}
-		swapData = bytes.TrimSpace(swapData) // extra trailing \n
-		swapLines := strings.Split(string(swapData), "\n")
-
-		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-		// error out unless --fail-swap-on is set to false.
-		if len(swapLines) > 1 {
-			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
 		}
 	}
 
