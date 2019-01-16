@@ -25,6 +25,7 @@ import (
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
+	"github.com/go-openapi/spec"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -46,6 +47,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/handler"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
@@ -121,6 +123,11 @@ type GenericAPIServer struct {
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
+
+	// Expose the registered OpenAPI Services and built static OpenAPI spec if openAPIConfig is non-nil
+	OpenAPIService          *handler.OpenAPIService // for endpoint /swagger.json
+	OpenAPIVersionedService *handler.OpenAPIService // for endpoint /openapi/v2
+	StaticOpenAPISpec       *spec.Swagger
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
@@ -235,7 +242,7 @@ type preparedGenericAPIServer struct {
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.openAPIConfig != nil {
-		routes.OpenAPI{
+		s.OpenAPIService, s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 	}

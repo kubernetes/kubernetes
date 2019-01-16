@@ -40,7 +40,9 @@ import (
 	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi"
 	"k8s.io/apiextensions-apiserver/pkg/controller/status"
+	openapiaggregator "k8s.io/apiextensions-apiserver/pkg/openapi"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 
 	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -198,16 +200,24 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		crdClient.Apiextensions(),
 		crdHandler,
 	)
+	openapiController := openapi.NewOpenAPIController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions())
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
+		// create OpenAPI aggregation manager in the last step because only now genericapiserver's the OpenAPI services and spec is available (after PrepareRun).
+		crdOpenAPIAggregationManager, err := openapiaggregator.NewAggregationManager(s.GenericAPIServer.OpenAPIService, s.GenericAPIServer.OpenAPIVersionedService, s.GenericAPIServer.StaticOpenAPISpec)
+		if err != nil {
+			return err
+		}
+
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
+		go openapiController.Run(context.StopCh, crdOpenAPIAggregationManager)
 		return nil
 	})
 
