@@ -313,7 +313,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, p.buildManagerInfo(objToUpdate.GetObjectKind().GroupVersionKind().Version)); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, stripUserAgent(p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -375,7 +375,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, p.buildManagerInfo(newObj.GetObjectKind().GroupVersionKind().Version)); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, stripUserAgent(p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -549,13 +549,6 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	return result, wasCreated, err
 }
 
-func (p *patcher) buildManagerInfo(version string) string {
-	userAgent := strings.Split(p.userAgent, "/")[0]
-	timestamp := time.Now().Format("20060102-150405")
-
-	return fmt.Sprintf("%s-%s@%s", userAgent, version, timestamp)
-}
-
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
 // <originalMap> and stores the result in <objToUpdate>.
 // NOTE: <objToUpdate> must be a versioned object.
@@ -601,4 +594,8 @@ func patchToUpdateOptions(po *metav1.PatchOptions) (*metav1.UpdateOptions, error
 	uo := metav1.UpdateOptions{}
 	err = json.Unmarshal(b, &uo)
 	return &uo, err
+}
+
+func stripUserAgent(userAgent string) string {
+	return strings.Split(userAgent, "/")[0]
 }
