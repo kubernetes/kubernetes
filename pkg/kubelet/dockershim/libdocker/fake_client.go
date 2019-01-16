@@ -81,7 +81,7 @@ type FakeDockerClient struct {
 
 const (
 	// Notice that if someday we also have minimum docker version requirement, this should also be updated.
-	fakeDockerVersion = "1.11.2"
+	fakeDockerVersion = "1.13.1"
 
 	fakeImageSize = 1024
 

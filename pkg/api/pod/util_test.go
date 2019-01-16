@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,6 +31,7 @@ import (
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestPodSecrets(t *testing.T) {
@@ -379,7 +381,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -473,7 +475,7 @@ func TestDropSubPath(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -562,7 +564,7 @@ func TestDropRuntimeClass(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -656,7 +658,7 @@ func TestDropProcMount(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -772,7 +774,7 @@ func TestDropPodPriority(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -882,7 +884,7 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -903,6 +905,400 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 						// new pod should not have EmptyDir SizeLimit
 						if !reflect.DeepEqual(newPod, podWithoutEmptyDirSizeLimit()) {
 							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutEmptyDirSizeLimit()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropPodShareProcessNamespace(t *testing.T) {
+	podWithShareProcessNamespace := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					ShareProcessNamespace: &[]bool{true}[0],
+				},
+			},
+		}
+	}
+	podWithoutShareProcessNamespace := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{},
+			},
+		}
+	}
+	podWithoutSecurityContext := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{},
+		}
+	}
+
+	podInfo := []struct {
+		description              string
+		hasShareProcessNamespace bool
+		pod                      func() *api.Pod
+	}{
+		{
+			description:              "has ShareProcessNamespace",
+			hasShareProcessNamespace: true,
+			pod:                      podWithShareProcessNamespace,
+		},
+		{
+			description:              "does not have ShareProcessNamespace",
+			hasShareProcessNamespace: false,
+			pod:                      podWithoutShareProcessNamespace,
+		},
+		{
+			description:              "does not have SecurityContext",
+			hasShareProcessNamespace: false,
+			pod:                      podWithoutSecurityContext,
+		},
+		{
+			description:              "is nil",
+			hasShareProcessNamespace: false,
+			pod:                      func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasShareProcessNamespace, oldPod := oldPodInfo.hasShareProcessNamespace, oldPodInfo.pod()
+				newPodHasShareProcessNamespace, newPod := newPodInfo.hasShareProcessNamespace, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasShareProcessNamespace:
+						// new pod should not be changed if the feature is enabled, or if the old pod had ShareProcessNamespace set
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasShareProcessNamespace:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have ShareProcessNamespace
+						if !reflect.DeepEqual(newPod, podWithoutShareProcessNamespace()) {
+							t.Errorf("new pod had ShareProcessNamespace: %v", diff.ObjectReflectDiff(newPod, podWithoutShareProcessNamespace()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropAppArmor(t *testing.T) {
+	podWithAppArmor := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", apparmor.ContainerAnnotationKeyPrefix + "foo": "default"}},
+			Spec:       api.PodSpec{},
+		}
+	}
+	podWithoutAppArmor := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec:       api.PodSpec{},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasAppArmor bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "has AppArmor",
+			hasAppArmor: true,
+			pod:         podWithAppArmor,
+		},
+		{
+			description: "does not have AppArmor",
+			hasAppArmor: false,
+			pod:         podWithoutAppArmor,
+		},
+		{
+			description: "is nil",
+			hasAppArmor: false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasAppArmor, oldPod := oldPodInfo.hasAppArmor, oldPodInfo.pod()
+				newPodHasAppArmor, newPod := newPodInfo.hasAppArmor, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+
+					DropDisabledPodFields(newPod, oldPod)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasAppArmor:
+						// new pod should not be changed if the feature is enabled, or if the old pod had AppArmor
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasAppArmor:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have AppArmor
+						if !reflect.DeepEqual(newPod, podWithoutAppArmor()) {
+							t.Errorf("new pod had EmptyDir SizeLimit: %v", diff.ObjectReflectDiff(newPod, podWithoutAppArmor()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropReadinessGates(t *testing.T) {
+	podWithoutReadinessGates := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				ReadinessGates: nil,
+			},
+		}
+	}
+	podWithReadinessGates := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				ReadinessGates: []api.PodReadinessGate{
+					{
+						ConditionType: api.PodConditionType("example.com/condition1"),
+					},
+					{
+						ConditionType: api.PodConditionType("example.com/condition2"),
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description          string
+		hasPodReadinessGates bool
+		pod                  func() *api.Pod
+	}{
+		{
+			description:          "has ReadinessGates",
+			hasPodReadinessGates: true,
+			pod:                  podWithReadinessGates,
+		},
+		{
+			description:          "does not have ReadinessGates",
+			hasPodReadinessGates: false,
+			pod:                  podWithoutReadinessGates,
+		},
+		{
+			description:          "is nil",
+			hasPodReadinessGates: false,
+			pod:                  func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasReadinessGates, oldPod := oldPodInfo.hasPodReadinessGates, oldPodInfo.pod()
+				newPodHasReadinessGates, newPod := newPodInfo.hasPodReadinessGates, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("featue enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadinessGates, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasReadinessGates:
+						// new pod should not be changed if the feature is enabled, or if the old pod had ReadinessGates
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasReadinessGates:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have ReadinessGates
+						if !reflect.DeepEqual(newPod, podWithoutReadinessGates()) {
+							t.Errorf("new pod had ReadinessGates: %v",
+								diff.ObjectReflectDiff(newPod, podWithoutReadinessGates()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropTokenRequestProjection(t *testing.T) {
+	podWithoutTRProjection := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{
+								ServiceAccountToken: nil,
+							}},
+						}}},
+				},
+			},
+		}
+	}
+	podWithoutProjectedVolumeSource := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{VolumeSource: api.VolumeSource{
+						ConfigMap: &api.ConfigMapVolumeSource{},
+					}},
+				},
+			},
+		}
+	}
+	podWithTRProjection := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{
+								ServiceAccountToken: &api.ServiceAccountTokenProjection{
+									Audience:          "api",
+									ExpirationSeconds: 3600,
+									Path:              "token",
+								}},
+							}},
+					},
+				},
+				},
+			}}
+	}
+	podInfo := []struct {
+		description     string
+		hasTRProjection bool
+		pod             func() *api.Pod
+	}{
+		{
+			description:     "has TokenRequestProjection",
+			hasTRProjection: true,
+			pod:             podWithTRProjection,
+		},
+		{
+			description:     "does not have TokenRequestProjection",
+			hasTRProjection: false,
+			pod:             podWithoutTRProjection,
+		},
+		{
+			description:     "does not have ProjectedVolumeSource",
+			hasTRProjection: false,
+			pod:             podWithoutProjectedVolumeSource,
+		},
+		{
+			description:     "is nil",
+			hasTRProjection: false,
+			pod:             func() *api.Pod { return nil },
+		},
+	}
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodhasTRProjection, oldPod := oldPodInfo.hasTRProjection, oldPodInfo.pod()
+				newPodhasTRProjection, newPod := newPodInfo.hasTRProjection, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequestProjection, enabled)()
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+					switch {
+					case enabled || oldPodhasTRProjection:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodhasTRProjection:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("%v", oldPod)
+							t.Errorf("%v", newPod)
+							t.Errorf("new pod was not changed")
+						}
+						if !reflect.DeepEqual(newPod, podWithoutTRProjection()) {
+							t.Errorf("new pod had Tokenrequestprojection: %v", diff.ObjectReflectDiff(newPod, podWithoutTRProjection()))
 						}
 					default:
 						// new pod should not need to be changed
@@ -1017,7 +1413,7 @@ func TestDropRunAsGroup(t *testing.T) {
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
 					}
-					DropDisabledFields(&newPod.Spec, oldPodSpec)
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
 
 					// old pod should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
@@ -1040,6 +1436,106 @@ func TestDropRunAsGroup(t *testing.T) {
 						// new pod should not have RunAsGroup
 						if !reflect.DeepEqual(newPod, podWithoutRunAsGroup()) {
 							t.Errorf("new pod had RunAsGroup: %v", diff.ObjectReflectDiff(newPod, podWithoutRunAsGroup()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropPodSysctls(t *testing.T) {
+	podWithSysctls := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					Sysctls: []api.Sysctl{{Name: "test", Value: "value"}},
+				},
+			},
+		}
+	}
+	podWithoutSysctls := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{},
+			},
+		}
+	}
+	podWithoutSecurityContext := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasSysctls  bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "has Sysctls",
+			hasSysctls:  true,
+			pod:         podWithSysctls,
+		},
+		{
+			description: "does not have Sysctls",
+			hasSysctls:  false,
+			pod:         podWithoutSysctls,
+		},
+		{
+			description: "does not have SecurityContext",
+			hasSysctls:  false,
+			pod:         podWithoutSecurityContext,
+		},
+		{
+			description: "is nil",
+			hasSysctls:  false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSysctls, oldPod := oldPodInfo.hasSysctls, oldPodInfo.pod()
+				newPodHasSysctls, newPod := newPodInfo.hasSysctls, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Sysctls, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasSysctls:
+						// new pod should not be changed if the feature is enabled, or if the old pod had Sysctls set
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSysctls:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have Sysctls
+						if !reflect.DeepEqual(newPod, podWithoutSysctls()) {
+							t.Errorf("new pod had Sysctls: %v", diff.ObjectReflectDiff(newPod, podWithoutSysctls()))
 						}
 					default:
 						// new pod should not need to be changed

@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh/terminal"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -172,13 +172,9 @@ type credentials struct {
 // UpdateTransportConfig updates the transport.Config to use credentials
 // returned by the plugin.
 func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
-	wt := c.WrapTransport
-	c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-		if wt != nil {
-			rt = wt(rt)
-		}
+	c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return &roundTripper{a, rt}
-	}
+	})
 
 	if c.TLS.GetCert != nil {
 		return errors.New("can't add TLS certificate callback: transport.Config.TLS.GetCert already set")

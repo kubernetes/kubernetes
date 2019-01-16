@@ -126,6 +126,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
+		// node lifecycle controller uses existing cluster role from node-controller
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
@@ -149,7 +150,8 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
 	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.ClientBuilder.ClientOrDie("cloud-node-lifecycle-controller"),
+		// cloud node lifecycle controller uses existing cluster role from node-controller
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.Cloud,
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 	)
@@ -211,7 +213,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 
 func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
 	// csiClient works with CRDs that support json only

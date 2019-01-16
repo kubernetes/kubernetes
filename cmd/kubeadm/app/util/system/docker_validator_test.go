@@ -92,8 +92,14 @@ func TestValidateDockerInfo(t *testing.T) {
 			warn: false,
 		},
 		{
-			name: "Docker version 18.09.0 is not in the list of validated versions",
-			info: types.Info{Driver: "driver_2", ServerVersion: "18.09.0"},
+			name: "valid Docker version 18.09.1-ce",
+			info: types.Info{Driver: "driver_2", ServerVersion: "18.09.1-ce"},
+			err:  false,
+			warn: false,
+		},
+		{
+			name: "Docker version 19.01.0 is not in the list of validated versions",
+			info: types.Info{Driver: "driver_2", ServerVersion: "19.01.0"},
 			err:  false,
 			warn: true,
 		},

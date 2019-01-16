@@ -132,11 +132,7 @@ func setupScheduler(
 		Interface: cs.CoreV1().Events(""),
 	})
 
-	sched, err := scheduler.NewFromConfigurator(
-		&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
-	if err != nil {
-		t.Fatalf("error creating scheduler: %v", err)
-	}
+	sched := scheduler.NewFromConfig(schedulerConfig)
 
 	algorithmprovider.ApplyFeatureGates()
 

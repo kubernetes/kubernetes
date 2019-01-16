@@ -73,7 +73,7 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
-	pod.DropDisabledFields(&deployment.Spec.Template.Spec, nil)
+	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
 // Validate validates a new deployment.
@@ -97,7 +97,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
-	pod.DropDisabledFields(&newDeployment.Spec.Template.Spec, &oldDeployment.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation

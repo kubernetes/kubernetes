@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -33,7 +32,7 @@ type NodeLabelPrioritizer struct {
 }
 
 // NewNodeLabelPriority creates a NodeLabelPrioritizer.
-func NewNodeLabelPriority(label string, presence bool) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+func NewNodeLabelPriority(label string, presence bool) (PriorityMapFunction, PriorityReduceFunction) {
 	labelPrioritizer := &NodeLabelPrioritizer{
 		label:    label,
 		presence: presence,

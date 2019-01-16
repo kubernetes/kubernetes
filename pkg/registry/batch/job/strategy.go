@@ -80,7 +80,7 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
 
-	pod.DropDisabledFields(&job.Spec.Template.Spec, nil)
+	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -93,7 +93,7 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		newJob.Spec.TTLSecondsAfterFinished = nil
 	}
 
-	pod.DropDisabledFields(&newJob.Spec.Template.Spec, &oldJob.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 }
 
 // Validate validates a new job.

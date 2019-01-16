@@ -3373,10 +3373,6 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	hosts := []string{}
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
-			// Use the first external IP address we find on the node, and
-			// use at most one per node.
-			// TODO(roberthbailey): Use the "preferred" address for the node, once
-			// such a thing is defined (#2462).
 			if addr.Type == addrType {
 				hosts = append(hosts, addr.Address)
 				break
@@ -3386,19 +3382,29 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	return hosts
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this excludes master node.
-// It returns an error if it can't find an external IP for every node, though it still returns all
-// hosts that it found in that case.
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this
+// excludes master node. If it can't find any external IPs, it falls back to
+// looking for internal IPs. If it can't find an internal IP for every node it
+// returns an error, though it still returns all hosts that it found in that
+// case.
 func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(c)
 
-	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
 	hosts := NodeAddresses(nodelist, v1.NodeExternalIP)
+	// If ExternalIPs aren't set, assume the test programs can reach the
+	// InternalIP. Simplified exception logic here assumes that the hosts will
+	// either all have ExternalIP or none will. Simplifies handling here and
+	// should be adequate since the setting of the external IPs is provider
+	// specific: they should either all have them or none of them will.
+	if len(hosts) == 0 {
+		Logf("No external IP address on nodes, falling back to internal IPs")
+		hosts = NodeAddresses(nodelist, v1.NodeInternalIP)
+	}
 
-	// Error if any node didn't have an external IP.
+	// Error if any node didn't have an external/internal IP.
 	if len(hosts) != len(nodelist.Items) {
 		return hosts, fmt.Errorf(
-			"only found %d external IPs on nodes, but found %d nodes. Nodelist: %v",
+			"only found %d IPs on nodes, but found %d nodes. Nodelist: %v",
 			len(hosts), len(nodelist.Items), nodelist)
 	}
 

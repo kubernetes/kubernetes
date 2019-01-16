@@ -68,7 +68,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		newSA := &v1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "node-auth-newSA",
+				Name:      "node-auth-newsa",
 			},
 			AutomountServiceAccountToken: &trueValue,
 		}
@@ -98,7 +98,7 @@ func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
 			Containers: []v1.Container{{
 				Name:    "test-node-authn",
 				Image:   imageutils.GetE2EImage(imageutils.Hostexec),
-				Command: []string{"sleep 3600"},
+				Command: []string{"sleep", "3600"},
 			}},
 			RestartPolicy: v1.RestartPolicyNever,
 		},

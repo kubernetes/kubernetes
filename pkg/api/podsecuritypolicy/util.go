@@ -31,6 +31,10 @@ func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && (oldPSPSpec == nil || oldPSPSpec.RunAsGroup == nil) {
 		pspSpec.RunAsGroup = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPSPSpec) {
+		pspSpec.AllowedUnsafeSysctls = nil
+		pspSpec.ForbiddenSysctls = nil
+	}
 }
 
 func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
@@ -44,4 +48,14 @@ func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
 
 	return false
 
+}
+
+func sysctlsInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
+	if oldPSPSpec == nil {
+		return false
+	}
+	if oldPSPSpec.AllowedUnsafeSysctls != nil || oldPSPSpec.ForbiddenSysctls != nil {
+		return true
+	}
+	return false
 }

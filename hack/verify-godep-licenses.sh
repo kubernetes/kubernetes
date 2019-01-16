@@ -23,8 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/' && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'vendor/'; then
+  ! kube::util::has_changes "${branch}" 'Godeps/' && \
+  ! kube::util::has_changes "${branch}" 'vendor/'; then
   exit 0
 fi
 
