@@ -261,9 +261,11 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					Parameters:   sc.Parameters,
 					ClaimSize:    "1Gi",
 					ExpectedSize: "1Gi",
-					NodeName:     nodeName,
 				}
-				class, claim, pod := startPausePod(cs, scTest, ns.Name)
+				nodeSelection := testsuites.NodeSelection{
+					Name: nodeName,
+				}
+				class, claim, pod := startPausePod(cs, scTest, nodeSelection, ns.Name)
 				if class != nil {
 					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
 				}
@@ -381,16 +383,16 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 					Parameters:   sc.Parameters,
 					ClaimSize:    "1Gi",
 					ExpectedSize: "1Gi",
-					// The mock driver only works when everything runs on a single node.
-					NodeName: nodeName,
 					// Provisioner and storage class name must match what's used in
 					// csi-storageclass.yaml, plus the test-specific suffix.
 					Provisioner:      sc.Provisioner,
 					StorageClassName: "csi-mock-sc-" + f.UniqueName,
-					// Mock driver does not provide any persistency.
-					SkipWriteReadCheck: true,
 				}
-				class, claim, pod := startPausePod(cs, scTest, ns.Name)
+				nodeSelection := testsuites.NodeSelection{
+					// The mock driver only works when everything runs on a single node.
+					Name: nodeName,
+				}
+				class, claim, pod := startPausePod(cs, scTest, nodeSelection, ns.Name)
 				if class != nil {
 					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
 				}
@@ -429,7 +431,7 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 	claim.Spec.StorageClassName = &class.Name
 
 	if delayBinding {
-		_, node := testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class)
+		_, node := testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class, nil /* node selector */, false /* expect unschedulable */)
 		Expect(node).ToNot(BeNil(), "Unexpected nil node found")
 	} else {
 		testsuites.TestDynamicProvisioning(test, cs, claim, class)
@@ -450,16 +452,22 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 
 	test := createGCEPDStorageClassTest()
 	test.DelayBinding = delayBinding
-	test.NodeSelector = map[string]string{v1.LabelZoneFailureDomain: podZone}
-	test.ExpectUnschedulable = true
+	nodeSelector := map[string]string{v1.LabelZoneFailureDomain: podZone}
 
 	class := newStorageClass(test, namespace, suffix)
 	addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, pvZone)
 	claim := newClaim(test, namespace, suffix)
 	claim.Spec.StorageClassName = &class.Name
 	if delayBinding {
-		testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class)
+		testsuites.TestBindingWaitForFirstConsumer(test, cs, claim, class, nodeSelector, true /* expect unschedulable */)
 	} else {
+		test.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+			// Ensure that a pod cannot be scheduled in an unsuitable zone.
+			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
+				testsuites.NodeSelection{Selector: nodeSelector})
+			defer testsuites.StopPod(cs, pod)
+			framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
+		}
 		testsuites.TestDynamicProvisioning(test, cs, claim, class)
 	}
 }
@@ -500,7 +508,7 @@ func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) st
 	return pv.Spec.CSI.VolumeHandle
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node testsuites.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
 	class, err := cs.StorageV1().StorageClasses().Create(class)
 	framework.ExpectNoError(err, "Failed to create class : %v", err)
@@ -514,6 +522,9 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
+			NodeName:     node.Name,
+			NodeSelector: node.Selector,
+			Affinity:     node.Affinity,
 			Containers: []v1.Container{
 				{
 					Name:  "volume-tester",
@@ -541,9 +552,6 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns str
 		},
 	}
 
-	if len(t.NodeName) != 0 {
-		pod.Spec.NodeName = t.NodeName
-	}
 	pod, err = cs.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return class, claim, pod
