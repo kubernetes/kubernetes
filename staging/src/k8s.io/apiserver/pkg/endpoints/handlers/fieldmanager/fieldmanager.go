@@ -98,7 +98,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	manager = f.buildManagerInfo(manager, f.groupVersion.String())
+	manager = f.buildManagerInfo(manager)
 
 	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
@@ -176,7 +176,10 @@ func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error)
 	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
 }
 
-func (f *FieldManager) buildManagerInfo(prefix, version string) string {
-	timestamp := time.Now().Format("20060102-150405")
-	return fmt.Sprintf("%s-%s@%s", prefix, version, timestamp)
+func (f *FieldManager) buildManagerInfo(prefix string) string {
+	timestamp := time.Now().Format("20060102-150405MST")
+	if prefix == "" {
+		prefix = "unknown"
+	}
+	return fmt.Sprintf("%s-%s@%s", prefix, f.groupVersion.String(), timestamp)
 }

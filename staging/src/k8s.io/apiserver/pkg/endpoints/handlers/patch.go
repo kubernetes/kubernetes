@@ -70,8 +70,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 		patchType := types.PatchType(contentType)
 
-		userAgent := req.Header.Get("user-agent")
-
 		// Ensure the patchType is one we support
 		if !sets.NewString(patchTypes...).Has(contentType) {
 			scope.err(negotiation.NewUnsupportedMediaTypeError(patchTypes), w, req)
@@ -203,7 +201,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patchBytes,
-			userAgent:   userAgent,
+			userAgent:   req.UserAgent(),
 
 			trace: trace,
 		}
@@ -313,7 +311,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, stripUserAgent(p.userAgent)); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, p.prefixFromUserAgent()); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -375,7 +373,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, stripUserAgent(p.userAgent)); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, p.prefixFromUserAgent()); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -549,6 +547,10 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	return result, wasCreated, err
 }
 
+func (p *patcher) prefixFromUserAgent() string {
+	return strings.Split(p.userAgent, "/")[0]
+}
+
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
 // <originalMap> and stores the result in <objToUpdate>.
 // NOTE: <objToUpdate> must be a versioned object.
@@ -594,8 +596,4 @@ func patchToUpdateOptions(po *metav1.PatchOptions) (*metav1.UpdateOptions, error
 	uo := metav1.UpdateOptions{}
 	err = json.Unmarshal(b, &uo)
 	return &uo, err
-}
-
-func stripUserAgent(userAgent string) string {
-	return strings.Split(userAgent, "/")[0]
 }
