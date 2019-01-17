@@ -119,107 +119,35 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 
 	Context("CSI attach test using mock driver [Feature:CSIDriverRegistry]", func() {
-		var (
-			err    error
-			driver testsuites.TestDriver
-		)
+		f := framework.NewDefaultFramework("csiworkload")
 
-		tests := []struct {
-			name             string
-			driverAttachable bool
-			deployDriverCRD  bool
-		}{
-			{
-				name:             "should not require VolumeAttach for drivers without attachment",
-				driverAttachable: false,
-				deployDriverCRD:  true,
-			},
-			{
-				name:             "should require VolumeAttach for drivers with attachment",
-				driverAttachable: true,
-				deployDriverCRD:  true,
-			},
-			{
-				name:             "should preserve attachment policy when no CSIDriver present",
-				driverAttachable: true,
-				deployDriverCRD:  false,
-			},
-		}
+		/*
+			Release : v1.14
+			Testname: CSI Attach, Non-attachable volume used in a Pod
+			Description: When CSI driver attach is called on non attachable volumes it should not create a volume attachment.
+		*/
+		It("should not require VolumeAttach for drivers without attachment [StorageValidation]", func() {
+			CSIAttachTest(f, false, true)
+		})
 
-		for _, t := range tests {
-			test := t
-			f := framework.NewDefaultFramework("csiattach")
+		/*
+			Release : v1.14
+			Testname: CSI Attach, Attachable volume used in a Pod
+			Description: When CSI driver attach is called on attachable volume it should not create a volume attachment.
+		*/
+		It("should require VolumeAttach for drivers with attachment [StorageValidation]", func() {
+			CSIAttachTest(f, true, true)
+		})
 
-			It(test.name, func() {
-				cs := f.ClientSet
-				csics := f.CSIClientSet
-				ns := f.Namespace
-
-				driver = drivers.InitMockCSIDriver(test.deployDriverCRD, test.driverAttachable, nil)
-				config, testCleanup := driver.PrepareTest(f)
-				driverName := config.GetUniqueDriverName()
-				defer testCleanup()
-
-				if test.deployDriverCRD {
-					err = waitForCSIDriver(csics, driverName)
-					framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
-					defer destroyCSIDriver(csics, driverName)
-				}
-
-				By("Creating pod")
-				var sc *storagev1.StorageClass
-				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass(config, "")
-				}
-				nodeName := config.ClientNodeName
-				scTest := testsuites.StorageClassTest{
-					Name:         driver.GetDriverInfo().Name,
-					Provisioner:  sc.Provisioner,
-					Parameters:   sc.Parameters,
-					ClaimSize:    "1Gi",
-					ExpectedSize: "1Gi",
-				}
-				nodeSelection := testsuites.NodeSelection{
-					Name: nodeName,
-				}
-				class, claim, pod := startPausePod(cs, scTest, nodeSelection, ns.Name)
-				if class != nil {
-					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
-				}
-				if claim != nil {
-					// Fully delete PV before deleting CSI driver
-					defer deleteVolume(cs, claim)
-				}
-				if pod != nil {
-					// Fully delete (=unmount) the pod before deleting CSI driver
-					defer framework.DeletePodWithWait(f, cs, pod)
-				}
-				if pod == nil {
-					return
-				}
-
-				err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod: %v", err)
-
-				By("Checking if VolumeAttachment was created for the pod")
-				handle := getVolumeHandle(cs, claim)
-				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, scTest.Provisioner, nodeName)))
-				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
-				_, err = cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
-				if err != nil {
-					if errors.IsNotFound(err) {
-						if test.driverAttachable {
-							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
-						}
-					} else {
-						framework.ExpectNoError(err, "Failed to find VolumeAttachment")
-					}
-				}
-				if !test.driverAttachable {
-					Expect(err).To(HaveOccurred(), "Unexpected VolumeAttachment found")
-				}
-			})
-		}
+		/*
+			Release : v1.14
+			Testname: CSI Attach, Attachable volume used in a Pod without CSI driver
+			Description: When a attachable volumes is used in a Pod but a CSI driver is not available,
+			      the volume still needs attachment.
+		*/
+		It("should preserve attachment policy when no CSIDriver present [StorageValidation]", func() {
+			CSIAttachTest(f, true, false)
+		})
 	})
 
 	Context("CSI workload information using mock driver [Feature:CSIDriverRegistry]", func() {
@@ -333,6 +261,81 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		}
 	})
 })
+
+func CSIAttachTest(f *framework.Framework, driverAttachable, deployDriverCRD bool) {
+	var (
+		err    error
+		driver testsuites.TestDriver
+	)
+
+	cs := f.ClientSet
+	csics := f.CSIClientSet
+	ns := f.Namespace
+
+	driver = drivers.InitMockCSIDriver(deployDriverCRD, driverAttachable, nil)
+	config, testCleanup := driver.PrepareTest(f)
+	driverName := config.GetUniqueDriverName()
+	defer testCleanup()
+
+	if deployDriverCRD {
+		err = waitForCSIDriver(csics, driverName)
+		framework.ExpectNoError(err, "Failed to get CSIDriver: %v", err)
+		defer destroyCSIDriver(csics, driverName)
+	}
+
+	By("Creating pod")
+	var sc *storagev1.StorageClass
+	if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
+		sc = dDriver.GetDynamicProvisionStorageClass(config, "")
+	}
+	nodeName := config.ClientNodeName
+	scTest := testsuites.StorageClassTest{
+		Name:         driver.GetDriverInfo().Name,
+		Provisioner:  sc.Provisioner,
+		Parameters:   sc.Parameters,
+		ClaimSize:    "1Gi",
+		ExpectedSize: "1Gi",
+	}
+	nodeSelection := testsuites.NodeSelection{
+		Name: nodeName,
+	}
+	class, claim, pod := startPausePod(cs, scTest, nodeSelection, ns.Name)
+	if class != nil {
+		defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
+	}
+	if claim != nil {
+		// Fully delete PV before deleting CSI driver
+		defer deleteVolume(cs, claim)
+	}
+	if pod != nil {
+		// Fully delete (=unmount) the pod before deleting CSI driver
+		defer framework.DeletePodWithWait(f, cs, pod)
+	}
+	if pod == nil {
+		return
+	}
+
+	err = framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+	framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+	By("Checking if VolumeAttachment was created for the pod")
+	handle := getVolumeHandle(cs, claim)
+	attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, scTest.Provisioner, nodeName)))
+	attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+	_, err = cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			if driverAttachable {
+				framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
+			}
+		} else {
+			framework.ExpectNoError(err, "Failed to find VolumeAttachment")
+		}
+	}
+	if !driverAttachable {
+		Expect(err).To(HaveOccurred(), "Unexpected VolumeAttachment found")
+	}
+}
 
 func testTopologyPositive(cs clientset.Interface, suffix, namespace string, delayBinding, allowedTopologies bool) {
 	test := createGCEPDStorageClassTest()
