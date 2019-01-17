@@ -16,19 +16,41 @@ limitations under the License.
 
 package autoscaling
 
-// MetricSpecsAnnotation is the annotation which holds non-CPU-utilization HPA metric
-// specs when converting the `Metrics` field from autoscaling/v2beta1
-const MetricSpecsAnnotation = "autoscaling.alpha.kubernetes.io/metrics"
+const (
+	// MetricSpecsAnnotation is the annotation which holds non-CPU-utilization HPA metric
+	// specs when converting the `Metrics` field from autoscaling/v2beta1
+	MetricSpecsAnnotation = "autoscaling.alpha.kubernetes.io/metrics"
 
-// MetricStatusesAnnotation is the annotation which holds non-CPU-utilization HPA metric
-// statuses when converting the `CurrentMetrics` field from autoscaling/v2beta1
-const MetricStatusesAnnotation = "autoscaling.alpha.kubernetes.io/current-metrics"
+	// MetricStatusesAnnotation is the annotation which holds non-CPU-utilization HPA metric
+	// statuses when converting the `CurrentMetrics` field from autoscaling/v2beta1
+	MetricStatusesAnnotation = "autoscaling.alpha.kubernetes.io/current-metrics"
 
-// HorizontalPodAutoscalerConditionsAnnotation is the annotation which holds the conditions
-// of an HPA when converting the `Conditions` field from autoscaling/v2beta1
-const HorizontalPodAutoscalerConditionsAnnotation = "autoscaling.alpha.kubernetes.io/conditions"
+	// HorizontalPodAutoscalerConditionsAnnotation is the annotation which holds the conditions
+	// of an HPA when converting the `Conditions` field from autoscaling/v2beta1
+	HorizontalPodAutoscalerConditionsAnnotation = "autoscaling.alpha.kubernetes.io/conditions"
 
-// DefaultCPUUtilization is the default value for CPU utilization, provided no other
-// metrics are present.  This is here because it's used by both the v2beta1 defaulting
-// logic, and the pseudo-defaulting done in v1 conversion.
-const DefaultCPUUtilization = 80
+	// DefaultCPUUtilization is the default value for CPU utilization, provided no other
+	// metrics are present.  This is here because it's used by both the v2beta1 defaulting
+	// logic, and the pseudo-defaulting done in v1 conversion.
+	DefaultCPUUtilization = 80
+
+	// HorizontalPodAutoscalerDownscaleStabilizationWindow is the annotation which holds the
+	// downscaleStabilizationWindow of an HPA ... TODO
+	HorizontalPodAutoscalerDownscaleStabilizationWindow = "autoscaling.alpha.kubernetes.io/downscaleStabilizationWindow"
+
+	// HorizontalPodAutoscalerUpscaleForbiddenWindow is the annotation which holds the
+	// upscaleForbiddenWindow of an HPA ... TODO
+	HorizontalPodAutoscalerUpscaleForbiddenWindow = "autoscaling.alpha.kubernetes.io/upscaleForbiddenWindow"
+
+	// HorizontalPodAutoscalerDownscaleForbiddenWindow is the annotation which holds the
+	// downscaleForbiddenWindow of an HPA ... TODO
+	HorizontalPodAutoscalerDownscaleForbiddenWindow = "autoscaling.alpha.kubernetes.io/downscaleForbiddenWindow"
+
+	// HorizontalPodAutoscalerInitialReadinessDelay is the annotation which holds the
+	// initialReadinessDelay of an HPA ... TODO
+	HorizontalPodAutoscalerInitialReadinessDelay = "autoscaling.alpha.kubernetes.io/initialReadinessDelay"
+
+	// HorizontalPodAutoscalerTolerance is the annotation which holds the tolerance value
+	// of an HPA ... TODO
+	HorizontalPodAutoscalerTolerance = "autoscaling.alpha.kubernetes.io/tolerance"
+)

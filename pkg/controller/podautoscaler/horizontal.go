@@ -117,9 +117,9 @@ func NewHorizontalController(
 		scaleNamespacer:              scaleNamespacer,
 		hpaNamespacer:                hpaNamespacer,
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
-		queue:                        workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
-		mapper:                       mapper,
-		recommendations:              map[string][]timestampedRecommendation{},
+		queue:           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		mapper:          mapper,
+		recommendations: map[string][]timestampedRecommendation{},
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -610,11 +610,15 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 // stabilizeRecommendation:
 // - replaces old recommendation with the newest recommendation,
 // - returns max of recommendations that are not older than downscaleStabilisationWindow.
-func (a *HorizontalController) stabilizeRecommendation(key string, prenormalizedDesiredReplicas int32) int32 {
+func (a *HorizontalController) stabilizeRecommendation(hpa *autoscalingv2.HorizontalPodAutoscaler, key string, prenormalizedDesiredReplicas int32) int32 {
 	maxRecommendation := prenormalizedDesiredReplicas
 	foundOldSample := false
 	oldSampleIndex := 0
-	cutoff := time.Now().Add(-a.downscaleStabilisationWindow)
+	downscaleStabilization, ok := hpa.Annotations[HorizontalPodAutoscalerDownscaleStabilization]
+	if !ok {
+		downscaleStabilization = a.downscaleStabilisationWindow // default to global setting
+	}
+	cutoff := time.Now().Add(downscaleStabilization)
 	for i, rec := range a.recommendations[key] {
 		if rec.timestamp.Before(cutoff) {
 			foundOldSample = true
