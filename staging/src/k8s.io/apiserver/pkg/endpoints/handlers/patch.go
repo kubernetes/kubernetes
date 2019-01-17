@@ -201,6 +201,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patchBytes,
+			userAgent:   req.UserAgent(),
 
 			trace: trace,
 		}
@@ -268,6 +269,7 @@ type patcher struct {
 	name        string
 	patchType   types.PatchType
 	patchBytes  []byte
+	userAgent   string
 
 	trace *utiltrace.Trace
 
@@ -309,7 +311,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, "jsonPatcher"); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, p.prefixFromUserAgent()); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -371,7 +373,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, "smPatcher"); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, p.prefixFromUserAgent()); err != nil {
 			return nil, fmt.Errorf("failed to update object managed fields: %v", err)
 		}
 	}
@@ -543,6 +545,10 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 		return updateObject, updateErr
 	})
 	return result, wasCreated, err
+}
+
+func (p *patcher) prefixFromUserAgent() string {
+	return strings.Split(p.userAgent, "/")[0]
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to

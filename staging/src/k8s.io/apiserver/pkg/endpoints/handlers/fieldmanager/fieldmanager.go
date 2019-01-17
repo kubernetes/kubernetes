@@ -18,6 +18,7 @@ package fieldmanager
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,6 +98,8 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
+	manager = f.buildManagerInfo(manager)
+
 	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
@@ -171,4 +174,12 @@ func (f *FieldManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
 
 func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
 	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
+}
+
+func (f *FieldManager) buildManagerInfo(prefix string) string {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	if prefix == "" {
+		prefix = "unknown"
+	}
+	return fmt.Sprintf("%s-%s@%s", prefix, f.groupVersion.String(), timestamp)
 }
