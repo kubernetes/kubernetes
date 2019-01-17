@@ -28,7 +28,6 @@ import (
 	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -98,7 +97,7 @@ func WaitForCertificate(client certificatesclient.CertificateSigningRequestInter
 				options.FieldSelector = fieldSelector
 				return client.Watch(options)
 			},
-		}, &v1.Secret{}, nil,
+		}, &v1beta1.CertificateSigningRequest{}, nil,
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified, watch.Added:
