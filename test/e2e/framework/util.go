@@ -4226,7 +4226,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create tls config: %v", err)
 	}
-	if tlsConfig != nil {
+	if tlsConfig != nil || url.Scheme == "https" {
 		url.Scheme = "wss"
 		if !strings.Contains(url.Host, ":") {
 			url.Host += ":443"
