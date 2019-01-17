@@ -55,6 +55,7 @@ const (
 	fsckErrorsUncorrected = 4
 
 	// place for subpath mounts
+	// TODO: pass in directory using kubelet_getters instead
 	containerSubPathDirectoryName = "volume-subpaths"
 	// syscall.Openat flags used to traverse directories not following symlinks
 	nofollowFlags = unix.O_RDONLY | unix.O_NOFOLLOW

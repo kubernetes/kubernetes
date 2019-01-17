@@ -162,6 +162,9 @@ go_test(
         "reason_cache_test.go",
         "runonce_test.go",
     ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "kubelet_volumes_linux_test.go",
+        ],
         "@io_bazel_rules_go//go/platform:windows": [
             "kubelet_pods_windows_test.go",
         ],
