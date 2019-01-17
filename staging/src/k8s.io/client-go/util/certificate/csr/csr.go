@@ -97,7 +97,7 @@ func WaitForCertificate(client certificatesclient.CertificateSigningRequestInter
 				options.FieldSelector = fieldSelector
 				return client.Watch(options)
 			},
-		}, &v1beta1.CertificateSigningRequest{}, nil,
+		}, &certificates.CertificateSigningRequest{}, nil,
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified, watch.Added:
