@@ -244,7 +244,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case len(subresource) == 0:
 		handler = r.serveResource(w, req, requestInfo, crdInfo, terminating, supportedTypes)
 	default:
-		http.Error(w, "the server could not find the requested resource", http.StatusNotFound)
+		subresourceString := ""
+		if len(subresource) > 0 {
+			subresourceString = " " + subresource
+		}
+		http.Error(w, fmt.Sprintf("the server could not find the requested resource type: %s.%s.%s%s", requestInfo.Resource, requestInfo.APIVersion, requestInfo.APIGroup, subresourceString), http.StatusNotFound)
 	}
 
 	if handler != nil {
