@@ -258,6 +258,10 @@ var fakeWrapperFunc = func(http.RoundTripper) http.RoundTripper {
 	return &fakeRoundTripper{}
 }
 
+type fakeWarningHandler struct{}
+
+func (f fakeWarningHandler) HandleWarningHeader(code int, agent string, message string) {}
+
 type fakeNegotiatedSerializer struct{}
 
 func (n *fakeNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -318,6 +322,9 @@ func TestAnonymousConfig(t *testing.T) {
 			limiter := &fakeLimiter{}
 			f.Fuzz(limiter)
 			*r = limiter
+		},
+		func(h *WarningHandler, f fuzz.Continue) {
+			*h = &fakeWarningHandler{}
 		},
 		// Authentication does not require fuzzer
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {},
@@ -408,6 +415,9 @@ func TestCopyConfig(t *testing.T) {
 			limiter := &fakeLimiter{}
 			f.Fuzz(limiter)
 			*r = limiter
+		},
+		func(h *WarningHandler, f fuzz.Continue) {
+			*h = &fakeWarningHandler{}
 		},
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {
 			*r = fakeAuthProviderConfigPersister{}
@@ -589,18 +599,19 @@ func TestConfigSprint(t *testing.T) {
 			KeyData:    []byte("fake key"),
 			NextProtos: []string{"h2", "http/1.1"},
 		},
-		UserAgent:     "gobot",
-		Transport:     &fakeRoundTripper{},
-		WrapTransport: fakeWrapperFunc,
-		QPS:           1,
-		Burst:         2,
-		RateLimiter:   &fakeLimiter{},
-		Timeout:       3 * time.Second,
-		Dial:          fakeDialFunc,
-		Proxy:         fakeProxyFunc,
+		UserAgent:      "gobot",
+		Transport:      &fakeRoundTripper{},
+		WrapTransport:  fakeWrapperFunc,
+		QPS:            1,
+		Burst:          2,
+		RateLimiter:    &fakeLimiter{},
+		WarningHandler: fakeWarningHandler{},
+		Timeout:        3 * time.Second,
+		Dial:           fakeDialFunc,
+		Proxy:          fakeProxyFunc,
 	}
 	want := fmt.Sprintf(
-		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.AuthProviderConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: ""}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil), NextProtos:[]string{"h2", "http/1.1"}}, UserAgent:"gobot", DisableCompression:false, Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p), Proxy:(func(*http.Request) (*url.URL, error))(%p)}`,
+		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.AuthProviderConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: ""}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil), NextProtos:[]string{"h2", "http/1.1"}}, UserAgent:"gobot", DisableCompression:false, Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), WarningHandler:rest.fakeWarningHandler{}, Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p), Proxy:(func(*http.Request) (*url.URL, error))(%p)}`,
 		c.Transport, fakeWrapperFunc, c.RateLimiter, fakeDialFunc, fakeProxyFunc,
 	)
 
