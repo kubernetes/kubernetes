@@ -34,9 +34,9 @@ function kube::protoc::generate_proto() {
 
   kube::protoc::check_protoc
 
-  local package=${1}
-  kube::protoc::protoc ${package}
-  kube::protoc::format ${package}
+  local package="${1}"
+  kube::protoc::protoc "${package}"
+  kube::protoc::format "${package}"
 }
 
 # Checks that the current protoc version is at least version 3.0.0-beta1
@@ -56,7 +56,7 @@ function kube::protoc::check_protoc() {
 # Generates $1/api.pb.go from the protobuf file $1/api.proto
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::protoc() {
-  local package=${1}
+  local package="${1}"
   gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
 
   PATH="${gogopath}:${PATH}" protoc \
@@ -68,7 +68,7 @@ function kube::protoc::protoc() {
 # Formats $1/api.pb.go, adds the boilerplate comments and run gofmt on it
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::format() {
-  local package=${1}
+  local package="${1}"
 
   # Update boilerplate for the generated file.
   echo "$(cat hack/boilerplate/boilerplate.generatego.txt ${package}/api.pb.go)" > ${package}/api.pb.go
@@ -82,9 +82,9 @@ function kube::protoc::format() {
 # Echo's $3 in case of error and exits 1
 function kube::protoc::diff() {
   local ret=0
-  diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${1} ${2} || ret=$?
+  diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr "${1}" "${2}" || ret="$?"
   if [[ "${ret}" -ne 0 ]]; then
-    echo ${3}
+    echo "${3}"
     exit 1
   fi
 }

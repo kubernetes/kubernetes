@@ -16,9 +16,9 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.3.10}
-ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-2379}
+ETCD_VERSION="${ETCD_VERSION:-3.3.10}"
+ETCD_HOST="${ETCD_HOST:-127.0.0.1}"
+ETCD_PORT="${ETCD_PORT:-2379}"
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
 
 kube::etcd::validate() {
@@ -47,12 +47,12 @@ kube::etcd::validate() {
 
   # validate installed version is at least equal to minimum
   version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
-  if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
+  if [[ "$(kube::etcd::version ${ETCD_VERSION})" -gt "$(kube::etcd::version ${version})" ]]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
    echo "${PATH}"
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
-   if [[ $(kube::etcd::version ${ETCD_VERSION}) -gt $(kube::etcd::version ${version}) ]]; then
+   if [[ "$(kube::etcd::version ${ETCD_VERSION})" -gt "$(kube::etcd::version ${version})" ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
@@ -73,10 +73,10 @@ kube::etcd::start() {
   if [[ -d "${ARTIFACTS:-}" ]]; then
     ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
-    ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
+    ETCD_LOGFILE="${ETCD_LOGFILE:-/dev/null}"
   fi
   kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls ${KUBE_INTEGRATION_ETCD_URL} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
@@ -110,7 +110,7 @@ kube::etcd::install() {
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
       return  # already installed
     fi
-    if [[ ${os} == "darwin" ]]; then
+    if [[ "${os}" == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
       url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"

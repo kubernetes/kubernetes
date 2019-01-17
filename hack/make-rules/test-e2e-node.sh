@@ -17,23 +17,23 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-focus=${FOCUS:-""}
-skip=${SKIP-"\[Flaky\]|\[Slow\]|\[Serial\]"}
+focus="${FOCUS:-""}"
+skip="${SKIP:-"\[Flaky\]|\[Slow\]|\[Serial\]"}"
 # The number of tests that can run in parallel depends on what tests
 # are running and on the size of the node. Too many, and tests will
 # fail due to resource contention. 8 is a reasonable default for a
 # n1-standard-1 node.
 # Currently, parallelism only affects when REMOTE=true. For local test,
 # ginkgo default parallelism (cores - 1) is used.
-parallelism=${PARALLELISM:-8}
-artifacts=${ARTIFACTS:-"/tmp/_artifacts/`date +%y%m%dT%H%M%S`"}
-remote=${REMOTE:-"false"}
-runtime=${RUNTIME:-"docker"}
-container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-""}
-image_service_endpoint=${IMAGE_SERVICE_ENDPOINT:-""}
-run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
-test_args=${TEST_ARGS:-""}
-system_spec_name=${SYSTEM_SPEC_NAME:-}
+parallelism="${PARALLELISM:-8}"
+artifacts="${ARTIFACTS:-"/tmp/_artifacts/`date +%y%m%dT%H%M%S`"}"
+remote="${REMOTE:-"false"}"
+runtime="${RUNTIME:-"docker"}"
+container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-""}"
+image_service_endpoint="${IMAGE_SERVICE_ENDPOINT:-""}"
+run_until_failure="${RUN_UNTIL_FAILURE:-"false"}"
+test_args="${TEST_ARGS:-""}"
+system_spec_name="${SYSTEM_SPEC_NAME:-}"
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -56,7 +56,7 @@ fi
 # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
 if [ ! -d "${artifacts}" ]; then
   echo "Creating artifacts directory at ${artifacts}"
-  mkdir -p ${artifacts}
+  mkdir -p "${artifacts}"
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
@@ -72,38 +72,38 @@ fi
 
 if [ "${remote}" = "true" ] ; then
   # The following options are only valid in remote run.
-  images=${IMAGES:-""}
-  hosts=${HOSTS:-""}
-  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
-  metadata=${INSTANCE_METADATA:-""}
-  list_images=${LIST_IMAGES:-false}
-  if  [[ ${list_images} == "true" ]]; then
+  images="${IMAGES:-""}"
+  hosts="${HOSTS:-""}"
+  image_project="${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}"
+  metadata="${INSTANCE_METADATA:-""}"
+  list_images="${LIST_IMAGES:-false}"
+  if  [[ "${list_images}" == "true" ]]; then
     gcloud compute images list --project="${image_project}" | grep "e2e-node"
     exit 0
   fi
-  gubernator=${GUBERNATOR:-"false"}
-  image_config_file=${IMAGE_CONFIG_FILE:-""}
+  gubernator="${GUBERNATOR:-"false"}"
+  image_config_file="${IMAGE_CONFIG_FILE:-""}"
   if [[ "${hosts}" == "" && "${images}" == "" && "${image_config_file}" == "" ]]; then
-    image_project=${IMAGE_PROJECT:-"cos-cloud"}
-    gci_image=$(gcloud compute images list --project ${image_project} \
+    image_project="${IMAGE_PROJECT:-"cos-cloud"}"
+    gci_image=$(gcloud compute images list --project "${image_project}" \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
-    images=${gci_image}
+    images="${gci_image}"
     metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
   fi
-  instance_prefix=${INSTANCE_PREFIX:-"test"}
-  cleanup=${CLEANUP:-"true"}
-  delete_instances=${DELETE_INSTANCES:-"false"}
-  test_suite=${TEST_SUITE:-"default"}
+  instance_prefix="${INSTANCE_PREFIX:-"test"}"
+  cleanup="${CLEANUP:-"true"}"
+  delete_instances="${DELETE_INSTANCES:-"false"}"
+  test_suite="${TEST_SUITE:-"default"}"
 
   # Get the compute zone
-  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}
+  zone="${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}"
   if [[ "${zone}" == "" ]]; then
     echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
     exit 1
   fi
 
   # Get the compute project
-  project=$(gcloud info --format='value(config.project)')
+  project="$(gcloud info --format='value(config.project)')"
   if [[ "${project}" == "" ]]; then
     echo "Could not find gcloud project when running: \`gcloud info --format='value(config.project)'\`"
     exit 1
@@ -150,7 +150,7 @@ if [ "${remote}" = "true" ] ; then
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
     --test-suite="${test_suite}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
-  exit $?
+  exit "$?"
 
 else
   # Refresh sudo credentials for local run
@@ -173,5 +173,5 @@ else
     --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     ${test_args}" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
-  exit $?
+  exit "$?"
 fi

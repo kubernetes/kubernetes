@@ -28,7 +28,7 @@ CLEAN_PATTERNS=(
   "test/e2e/generated/bindata.go"
 )
 
-for pattern in ${CLEAN_PATTERNS[@]}; do
+for pattern in "${CLEAN_PATTERNS[@]}"; do
   for match in $(find "${KUBE_ROOT}" -iregex "^${KUBE_ROOT}/${pattern}$"); do
     echo "Removing ${match#${KUBE_ROOT}\/} .."
     rm -rf "${match#${KUBE_ROOT}\/}"

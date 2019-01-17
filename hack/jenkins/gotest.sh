@@ -26,7 +26,7 @@ set -o xtrace
 # global across jobs. We change $HOME instead to ${WORKSPACE}, which
 # is an incoming variable Jenkins provides us for this job's scratch
 # space.
-export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
+export HOME="${WORKSPACE}" # Nothing should want Jenkins $HOME
 export GOPATH=${HOME}/_gopath
 export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:${PATH}
 

@@ -36,7 +36,7 @@ for tar in "${ALL_TARGETS}"; do
 			fi
 
 			echo -e "${red}${CMD_TARGETS}${reset}"
-			make -C "${KUBE_ROOT}" ${tar} PRINT_HELP=y
+			make -C "${KUBE_ROOT}" "${tar}" PRINT_HELP=y
 			echo "---------------------------------------------------------------------------------"
 
 			CMD_FLAG=true
@@ -45,6 +45,6 @@ for tar in "${ALL_TARGETS}"; do
 	done
 
 	echo -e "${red}${tar}${reset}"
-	make -C "${KUBE_ROOT}" ${tar} PRINT_HELP=y
+	make -C "${KUBE_ROOT}" "${tar}" PRINT_HELP=y
 	echo "---------------------------------------------------------------------------------"
 done

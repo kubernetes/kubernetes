@@ -29,7 +29,7 @@ set -o xtrace
 # global across jobs. We change $HOME instead to ${WORKSPACE}, which
 # is an incoming variable Jenkins provides us for this job's scratch
 # space.
-export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
+export HOME="${WORKSPACE}" # Nothing should want Jenkins $HOME
 export PATH=${PATH}:/usr/local/go/bin
 
 # Skip gcloud update checking
@@ -59,7 +59,7 @@ if [[ "${KUBE_SKIP_PUSH_GCS:-}" =~ ^[yY]$ ]]; then
 else
   readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
   mkdir -p ${WORKSPACE}/_tmp
-  git clone https://github.com/kubernetes/release ${release_infra_clone}
+  git clone https://github.com/kubernetes/release "${release_infra_clone}"
 
   push_build=${release_infra_clone}/push-build.sh
 
@@ -67,7 +67,7 @@ else
     && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
   [[ -n "${KUBE_GCS_RELEASE_SUFFIX-}" ]] \
     && gcs_suffix_flag="--gcs-suffix=${KUBE_GCS_RELEASE_SUFFIX-}"
-  ${push_build} ${bucket_flag-} ${gcs_suffix_flag-} \
+  ${push_build} "${bucket_flag-}" "${gcs_suffix_flag-}" \
     --nomock --verbose --ci
 fi
 

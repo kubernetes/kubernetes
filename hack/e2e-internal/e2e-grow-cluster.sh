@@ -29,7 +29,7 @@ if [[ ! -z "${4:-}" ]]; then
   export KUBE_USE_EXISTING_MASTER="${4}"
 fi
 if [[ -z "${NUM_NODES:-}" ]]; then
-  export NUM_NODES=3
+  export NUM_NODES="3"
 fi
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"

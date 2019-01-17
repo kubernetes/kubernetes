@@ -19,80 +19,80 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 # This command builds and runs a local kubernetes cluster.
 # You may need to run this as root to allow kubelet to open docker's socket,
 # and to write the test CA in /var/run/kubernetes.
-DOCKER_OPTS=${DOCKER_OPTS:-""}
-DOCKER=(docker ${DOCKER_OPTS})
-DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
-DOCKER_ROOT=${DOCKER_ROOT:-""}
-ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
-DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
-PSP_ADMISSION=${PSP_ADMISSION:-""}
-NODE_ADMISSION=${NODE_ADMISSION:-""}
-RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
-KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
-KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
-POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
-KUBELET_FLAGS=${KUBELET_FLAGS:-""}
-KUBELET_IMAGE=${KUBELET_IMAGE:-""}
+DOCKER_OPTS="${DOCKER_OPTS:-""}"
+DOCKER=(docker "${DOCKER_OPTS}")
+DOCKERIZE_KUBELET="${DOCKERIZE_KUBELET:-""}"
+DOCKER_ROOT="${DOCKER_ROOT:-""}"
+ALLOW_PRIVILEGED="${ALLOW_PRIVILEGED:-""}"
+DENY_SECURITY_CONTEXT_ADMISSION="${DENY_SECURITY_CONTEXT_ADMISSION:-""}"
+PSP_ADMISSION="${PSP_ADMISSION:-""}"
+NODE_ADMISSION="${NODE_ADMISSION:-""}"
+RUNTIME_CONFIG="${RUNTIME_CONFIG:-""}"
+KUBELET_AUTHORIZATION_WEBHOOK="${KUBELET_AUTHORIZATION_WEBHOOK:-""}"
+KUBELET_AUTHENTICATION_WEBHOOK="${KUBELET_AUTHENTICATION_WEBHOOK:-""}"
+POD_MANIFEST_PATH="${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}"
+KUBELET_FLAGS="${KUBELET_FLAGS:-""}"
+KUBELET_IMAGE="${KUBELET_IMAGE:-""}"
 # many dev environments run with swap on, so we don't fail in this env
-FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
+FAIL_SWAP_ON="${FAIL_SWAP_ON:-"false"}"
 # Name of the network plugin, eg: "kubenet"
-NET_PLUGIN=${NET_PLUGIN:-""}
+NET_PLUGIN="${NET_PLUGIN:-""}"
 # Place the config files and binaries required by NET_PLUGIN in these directory,
 # eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
-CNI_CONF_DIR=${CNI_CONF_DIR:-""}
-CNI_BIN_DIR=${CNI_BIN_DIR:-""}
-SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
-FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
+CNI_CONF_DIR="${CNI_CONF_DIR:-""}"
+CNI_BIN_DIR="${CNI_BIN_DIR:-""}"
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}"
+FIRST_SERVICE_CLUSTER_IP="${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}"
 # if enabled, must set CGROUP_ROOT
-CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
+CGROUPS_PER_QOS="${CGROUPS_PER_QOS:-true}"
 # name of the cgroup driver, i.e. cgroupfs or systemd
-CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+CGROUP_DRIVER="${CGROUP_DRIVER:-""}"
 # if cgroups per qos is enabled, optionally change cgroup root
-CGROUP_ROOT=${CGROUP_ROOT:-""}
+CGROUP_ROOT="${CGROUP_ROOT:-""}"
 # owner of client certs, default to current user if not specified
-USER=${USER:-$(whoami)}
+USER="${USER:-$(whoami)}"
 
 # enables testing eviction scenarios locally.
-EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
-EVICTION_SOFT=${EVICTION_SOFT:-""}
-EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
+EVICTION_HARD="${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}"
+EVICTION_SOFT="${EVICTION_SOFT:-""}"
+EVICTION_PRESSURE_TRANSITION_PERIOD="${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}"
 
 # This script uses docker0 (or whatever container bridge docker is currently using)
 # and we don't know the IP of the DNS pod to pass in as --cluster-dns.
 # To set this up by hand, set this flag and change DNS_SERVER_IP.
 # Note also that you need API_HOST (defined above) for correct DNS.
-KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-""}
-ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
-ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
-DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
-LOCAL_DNS_IP=${KUBE_LOCAL_DNS_IP:-169.254.20.10}
-DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
-KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
-WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
-MAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}
-ENABLE_DAEMON=${ENABLE_DAEMON:-false}
-HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
-EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
-EXTERNAL_CLOUD_PROVIDER_BINARY=${EXTERNAL_CLOUD_PROVIDER_BINARY:-""}
-CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
-CLOUD_CONFIG=${CLOUD_CONFIG:-""}
-FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
-STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
+KUBE_PROXY_MODE="${KUBE_PROXY_MODE:-""}"
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
+ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
+DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
+LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
+DNS_DOMAIN="${KUBE_DNS_NAME:-"cluster.local"}"
+KUBECTL="${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}"
+WAIT_FOR_URL_API_SERVER="${WAIT_FOR_URL_API_SERVER:-60}"
+MAX_TIME_FOR_URL_API_SERVER="${MAX_TIME_FOR_URL_API_SERVER:-1}"
+ENABLE_DAEMON="${ENABLE_DAEMON:-false}"
+HOSTNAME_OVERRIDE="${HOSTNAME_OVERRIDE:-"127.0.0.1"}"
+EXTERNAL_CLOUD_PROVIDER="${EXTERNAL_CLOUD_PROVIDER:-false}"
+EXTERNAL_CLOUD_PROVIDER_BINARY="${EXTERNAL_CLOUD_PROVIDER_BINARY:-""}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-""}"
+CLOUD_CONFIG="${CLOUD_CONFIG:-""}"
+FEATURE_GATES="${FEATURE_GATES:-"AllAlpha=false"}"
+STORAGE_BACKEND="${STORAGE_BACKEND:-"etcd3"}"
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable Pod priority and preemption
-ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
+ENABLE_POD_PRIORITY_PREEMPTION="${ENABLE_POD_PRIORITY_PREEMPTION:-""}"
 
 # enable kubernetes dashboard
-ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
+ENABLE_CLUSTER_DASHBOARD="${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}"
 
 # RBAC Mode options
-AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
-KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
-AUTH_ARGS=${AUTH_ARGS:-""}
+AUTHORIZATION_MODE="${AUTHORIZATION_MODE:-"Node,RBAC"}"
+KUBECONFIG_TOKEN="${KUBECONFIG_TOKEN:-""}"
+AUTH_ARGS="${AUTH_ARGS:-""}"
 
 # Install a default storage class (enabled by default)
-DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
+DEFAULT_STORAGE_CLASS="${KUBE_DEFAULT_STORAGE_CLASS:-true}"
 
 # Do not run the mutation detector by default on a local cluster.
 # It is intended for a specific type of testing and inherently leaks memory.
@@ -105,12 +105,12 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 # Default list of admission Controllers to invoke prior to persisting objects in cluster
 # The order defined here does not matter.
-ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
-DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
-ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
+ENABLE_ADMISSION_PLUGINS="${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}"
+DISABLE_ADMISSION_PLUGINS="${DISABLE_ADMISSION_PLUGINS:-""}"
+ADMISSION_CONTROL_CONFIG_FILE="${ADMISSION_CONTROL_CONFIG_FILE:-""}"
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
-START_MODE=${START_MODE:-"all"}
+START_MODE="${START_MODE:-"all"}"
 
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
@@ -166,7 +166,7 @@ function guess_built_binary_path {
 }
 
 ### Allow user to supply the source directory.
-GO_OUT=${GO_OUT:-}
+GO_OUT="${GO_OUT:-}"
 while getopts "ho:O" OPTION
 do
     case "${OPTION}" in
@@ -176,7 +176,7 @@ do
             echo "using source ${GO_OUT}"
             ;;
         O)
-            GO_OUT=$(guess_built_binary_path)
+            GO_OUT="$(guess_built_binary_path)"
             if [ "${GO_OUT}" == "" ]; then
                 echo "Could not guess the correct output directory to use."
                 exit 1
@@ -202,48 +202,48 @@ fi
 # Shut down anyway if there's an error.
 set +e
 
-API_PORT=${API_PORT:-8080}
-API_SECURE_PORT=${API_SECURE_PORT:-6443}
+API_PORT="${API_PORT:-8080}"
+API_SECURE_PORT="${API_SECURE_PORT:-6443}"
 
 # WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
-API_HOST=${API_HOST:-localhost}
-API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
-ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
-NODE_PORT_RANGE=${NODE_PORT_RANGE:-""}
-API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
-EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
+API_HOST="${API_HOST:-localhost}"
+API_HOST_IP="${API_HOST_IP:-"127.0.0.1"}"
+ADVERTISE_ADDRESS="${ADVERTISE_ADDRESS:-""}"
+NODE_PORT_RANGE="${NODE_PORT_RANGE:-""}"
+API_BIND_ADDR="${API_BIND_ADDR:-"0.0.0.0"}"
+EXTERNAL_HOSTNAME="${EXTERNAL_HOSTNAME:-localhost}"
 
-KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
+KUBELET_HOST="${KUBELET_HOST:-"127.0.0.1"}"
 # By default only allow CORS for requests on localhost
-API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
-KUBELET_PORT=${KUBELET_PORT:-10250}
-LOG_LEVEL=${LOG_LEVEL:-3}
+API_CORS_ALLOWED_ORIGINS="${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}"
+KUBELET_PORT="${KUBELET_PORT:-10250}"
+LOG_LEVEL="${LOG_LEVEL:-3}"
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
-LOG_SPEC=${LOG_SPEC:-""}
-LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
-CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
-IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
-CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
-CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
-ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
-CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
-ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+LOG_SPEC="${LOG_SPEC:-""}"
+LOG_DIR="${LOG_DIR:-"/tmp"}"
+CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-"docker"}"
+CONTAINER_RUNTIME_ENDPOINT="${CONTAINER_RUNTIME_ENDPOINT:-""}"
+IMAGE_SERVICE_ENDPOINT="${IMAGE_SERVICE_ENDPOINT:-""}"
+CHAOS_CHANCE="${CHAOS_CHANCE:-0.0}"
+CPU_CFS_QUOTA="${CPU_CFS_QUOTA:-true}"
+ENABLE_HOSTPATH_PROVISIONER="${ENABLE_HOSTPATH_PROVISIONER:-"false"}"
+CLAIM_BINDER_SYNC_PERIOD="${CLAIM_BINDER_SYNC_PERIOD:-"15s"}" # current k8s default
+ENABLE_CONTROLLER_ATTACH_DETACH="${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"}" # current default
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
-CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
+CERT_DIR="${CERT_DIR:-"/var/run/kubernetes"}"
 ROOT_CA_FILE=${CERT_DIR}/server-ca.crt
 ROOT_CA_KEY=${CERT_DIR}/server-ca.key
-CLUSTER_SIGNING_CERT_FILE=${CLUSTER_SIGNING_CERT_FILE:-"${ROOT_CA_FILE}"}
-CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}
+CLUSTER_SIGNING_CERT_FILE="${CLUSTER_SIGNING_CERT_FILE:-"${ROOT_CA_FILE}"}"
+CLUSTER_SIGNING_KEY_FILE="${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}"
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
-REUSE_CERTS=${REUSE_CERTS:-false}
+REUSE_CERTS="${REUSE_CERTS:-false}"
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
-if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
+if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
   # default cgroup driver to match what is reported by docker to simplify local development
-  if [[ -z ${CGROUP_DRIVER} ]]; then
+  if [[ -z "${CGROUP_DRIVER}" ]]; then
     # match driver with docker runtime reported value (they must match)
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
@@ -264,7 +264,7 @@ function test_apiserver_off {
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
     if [[ "${API_PORT}" -gt "0" ]]; then
         curl --silent -g ${API_HOST}:${API_PORT}
-        if [ ! $? -eq 0 ]; then
+        if [ ! "$?" -eq 0 ]; then
             echo "API SERVER insecure port is free, proceeding..."
         else
             echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_PORT}"
@@ -273,7 +273,7 @@ function test_apiserver_off {
     fi
 
     curl --silent -k -g ${API_HOST}:${API_SECURE_PORT}
-    if [ ! $? -eq 0 ]; then
+    if [ ! "$?" -eq 0 ]; then
         echo "API SERVER secure port is free, proceeding..."
     else
         echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_SECURE_PORT}"
@@ -336,8 +336,8 @@ function detect_binary {
 cleanup_dockerized_kubelet()
 {
   if [[ -e "${KUBELET_CIDFILE}" ]]; then
-    docker kill $(<${KUBELET_CIDFILE}) > /dev/null
-    rm -f ${KUBELET_CIDFILE}
+    docker kill "$(<${KUBELET_CIDFILE})" > /dev/null
+    rm -f "${KUBELET_CIDFILE}"
 
     # Save the docker logs
     if [[ -f /var/log/docker.log ]]; then
@@ -394,12 +394,12 @@ cleanup()
 # Check if all processes are still running. Prints a warning once each time
 # a process dies unexpectedly.
 function healthcheck {
-  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 ${APISERVER_PID} 2>/dev/null; then
+  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 "${APISERVER_PID}" 2>/dev/null; then
     warning_log "API server terminated unexpectedly, see ${APISERVER_LOG}"
     APISERVER_PID=
   fi
 
-  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 ${CTLRMGR_PID} 2>/dev/null; then
+  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 "${CTLRMGR_PID}" 2>/dev/null; then
     warning_log "kube-controller-manager terminated unexpectedly, see ${CTLRMGR_LOG}"
     CTLRMGR_PID=
   fi
@@ -407,31 +407,31 @@ function healthcheck {
   if [[ -n "${DOCKERIZE_KUBELET}" ]]; then
     # TODO (https://github.com/kubernetes/kubernetes/issues/62474): check health also in this case
     :
-  elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
+  elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 "${KUBELET_PID}" 2>/dev/null; then
     warning_log "kubelet terminated unexpectedly, see ${KUBELET_LOG}"
     KUBELET_PID=
   fi
 
-  if [[ -n "${PROXY_PID-}" ]] && ! sudo kill -0 ${PROXY_PID} 2>/dev/null; then
+  if [[ -n "${PROXY_PID-}" ]] && ! sudo kill -0 "${PROXY_PID}" 2>/dev/null; then
     warning_log "kube-proxy terminated unexpectedly, see ${PROXY_LOG}"
     PROXY_PID=
   fi
 
-  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 ${SCHEDULER_PID} 2>/dev/null; then
+  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 "${SCHEDULER_PID}" 2>/dev/null; then
     warning_log "scheduler terminated unexpectedly, see ${SCHEDULER_LOG}"
     SCHEDULER_PID=
   fi
 
-  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 ${ETCD_PID} 2>/dev/null; then
+  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 "${ETCD_PID}" 2>/dev/null; then
     warning_log "etcd terminated unexpectedly"
     ETCD_PID=
   fi
 }
 
 function print_color {
-  message=$1
-  prefix=${2:+$2: } # add colon only if defined
-  color=${3:-1}     # default is red
+  message="$1"
+  prefix="${2:+$2: }" # add colon only if defined
+  color="${3:-1}"     # default is red
   echo -n $(tput bold)$(tput setaf ${color})
   echo "${prefix}${message}"
   echo -n $(tput sgr0)
@@ -448,11 +448,11 @@ function start_etcd {
 }
 
 function set_service_accounts {
-    SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
-    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+    SERVICE_ACCOUNT_LOOKUP="${SERVICE_ACCOUNT_LOOKUP:-true}"
+    SERVICE_ACCOUNT_KEY="${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}"
     # Generate ServiceAccount key if needed
     if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
-      mkdir -p "$(dirname ${SERVICE_ACCOUNT_KEY})"
+      mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
       openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
     fi
 }
@@ -473,7 +473,7 @@ function generate_certs {
     kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
 
     # serving cert for kube-apiserver
-    kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-apiserver kubernetes.default kubernetes.default.svc "localhost" ${API_HOST_IP} ${API_HOST} ${FIRST_SERVICE_CLUSTER_IP}
+    kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-apiserver kubernetes.default kubernetes.default.svc "localhost" "${API_HOST_IP}" "${API_HOST}" "${FIRST_SERVICE_CLUSTER_IP}"
 
     # Create client certs signed with client-ca, given id, given CN and a number of groups
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
@@ -484,7 +484,7 @@ function generate_certs {
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-apiserver kube-apiserver
 
     # Create matching certificates for kube-aggregator
-    kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-aggregator api.kube-public.svc "localhost" ${API_HOST_IP}
+    kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-aggregator api.kube-public.svc "localhost" "${API_HOST_IP}"
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header-ca auth-proxy system:auth-proxy
     # TODO remove masters and add rolebinding
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
@@ -522,7 +522,7 @@ function start_apiserver {
       priv_arg="--allow-privileged=${ALLOW_PRIVILEGED} "
     fi
 
-    if [[ ${ENABLE_ADMISSION_PLUGINS} == *"Initializers"* ]]; then
+    if [[ "${ENABLE_ADMISSION_PLUGINS}" == *"Initializers"* ]]; then
         if [[ -n "${RUNTIME_CONFIG}" ]]; then
           RUNTIME_CONFIG+=","
         fi
@@ -559,10 +559,10 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${authorizer_arg} ${priv_arg} ${runtime_config} \
-      ${cloud_config_arg} \
-      ${advertise_address} \
-      ${node_port_range} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver "${authorizer_arg}" "${priv_arg}" "${runtime_config}" \
+      "${cloud_config_arg}" \
+      "${advertise_address}" \
+      "${node_port_range}" \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
       --cert-dir="${CERT_DIR}" \
@@ -593,11 +593,11 @@ function start_apiserver {
       --proxy-client-cert-file="${CERT_DIR}/client-auth-proxy.crt" \
       --proxy-client-key-file="${CERT_DIR}/client-auth-proxy.key" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
-    APISERVER_PID=$!
+    APISERVER_PID="$!"
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} ${MAX_TIME_FOR_URL_API_SERVER} \
+    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 "${WAIT_FOR_URL_API_SERVER}" "${MAX_TIME_FOR_URL_API_SERVER}" \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
@@ -644,17 +644,17 @@ function start_controller_manager {
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
-      ${node_cidr_args} \
+      "${node_cidr_args}" \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
-      ${cloud_config_arg} \
+      "${cloud_config_arg}" \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
       --leader-elect=false \
       --cert-dir="${CERT_DIR}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
-    CTLRMGR_PID=$!
+    CTLRMGR_PID="$!"
 }
 
 function start_cloud_controller_manager {
@@ -672,11 +672,11 @@ function start_cloud_controller_manager {
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
     fi
 
-    CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
-    ${CONTROLPLANE_SUDO} ${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/hyperkube" cloud-controller-manager} \
+    CLOUD_CTLRMGR_LOG="${LOG_DIR}/cloud-controller-manager.log"
+    ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/hyperkube" cloud-controller-manager}" \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
-      ${node_cidr_args} \
+      "${node_cidr_args}" \
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider=${CLOUD_PROVIDER} \
       --cloud-config=${CLOUD_CONFIG} \
@@ -684,7 +684,7 @@ function start_cloud_controller_manager {
       --use-service-account-credentials \
       --leader-elect=false \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
-    CLOUD_CTLRMGR_PID=$!
+    CLOUD_CTLRMGR_PID="$!"
 }
 
 function start_kubelet {
@@ -755,13 +755,13 @@ function start_kubelet {
     fi
 
     all_kubelet_flags=(
-      ${priv_arg}
+      "${priv_arg}"
       --v="${LOG_LEVEL}"
       --vmodule="${LOG_SPEC}"
       --chaos-chance="${CHAOS_CHANCE}"
       --container-runtime="${CONTAINER_RUNTIME}"
       --hostname-override="${HOSTNAME_OVERRIDE}"
-      ${cloud_config_arg}
+      "${cloud_config_arg}"
       --address="${KUBELET_HOST}"
       --kubeconfig "${CERT_DIR}"/kubelet.kubeconfig
       --feature-gates="${FEATURE_GATES}"
@@ -775,20 +775,20 @@ function start_kubelet {
       --eviction-pressure-transition-period="${EVICTION_PRESSURE_TRANSITION_PERIOD}"
       --pod-manifest-path="${POD_MANIFEST_PATH}"
       --fail-swap-on="${FAIL_SWAP_ON}"
-      ${auth_args}
-      ${dns_args}
-      ${cni_conf_dir_args}
-      ${cni_bin_dir_args}
-      ${net_plugin_args}
-      ${container_runtime_endpoint_args}
-      ${image_service_endpoint_args}
+      "${auth_args}"
+      "${dns_args}"
+      "${cni_conf_dir_args}"
+      "${cni_bin_dir_args}"
+      "${net_plugin_args}"
+      "${container_runtime_endpoint_args}"
+      "${image_service_endpoint_args}"
       --port="${KUBELET_PORT}"
-      ${KUBELET_FLAGS}
+      "${KUBELET_FLAGS}"
     )
 
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
-      KUBELET_PID=$!
+      KUBELET_PID="$!"
     else
 
       # Build the hyperkube container image if necessary
@@ -836,7 +836,7 @@ function start_kubelet {
 
       docker run --rm --name kubelet \
         "${all_kubelet_volumes[@]}" \
-        ${cred_bind} \
+        "${cred_bind}" \
         --net=host \
         --pid=host \
         --privileged=true \
@@ -845,10 +845,10 @@ function start_kubelet {
         "${KUBELET_IMAGE}" \
         /kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
       # Get PID of kubelet container.
-      for i in {1..3}; do
+      for i in "{1..3}"; do
         echo -n "Trying to get PID of kubelet container..."
         KUBELET_PID=$(docker inspect kubelet -f '{{.State.Pid}}' 2>/dev/null || true)
-        if [[ -n ${KUBELET_PID} && ${KUBELET_PID} -gt 0 ]]; then
+        if [[ -n "${KUBELET_PID}" && "${KUBELET_PID}" -gt 0 ]]; then
             echo " ok, ${KUBELET_PID}."
             break
         else
@@ -858,10 +858,10 @@ function start_kubelet {
       done
     fi
     # Quick check that kubelet is running.
-    if [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null; then
+    if [ -n "${KUBELET_PID}" ] && ps -p "${KUBELET_PID}" > /dev/null; then
       echo "kubelet ( ${KUBELET_PID} ) is running."
     else
-      cat ${KUBELET_LOG} ; exit 1
+      cat "${KUBELET_LOG}" ; exit 1
     fi
 }
 
@@ -876,13 +876,13 @@ clientConnection:
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
 EOF
-    if [[ -n ${FEATURE_GATES} ]]; then
+    if [[ -n "${FEATURE_GATES}" ]]; then
       echo "featureGates:"
       # Convert from foo=true,bar=false to
       #   foo: true
       #   bar: false
       for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
-        echo ${gate} | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
+        echo "${gate}" | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
       done
     fi >>/tmp/kube-proxy.yaml
 
@@ -890,7 +890,7 @@ EOF
       --v=${LOG_LEVEL} \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
-    PROXY_PID=$!
+    PROXY_PID="$!"
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
@@ -899,7 +899,7 @@ EOF
       --kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --feature-gates="${FEATURE_GATES}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
-    SCHEDULER_PID=$!
+    SCHEDULER_PID="$!"
 }
 
 function start_kubedns {
@@ -955,7 +955,7 @@ function create_storage_class {
 
     if [ -e "${CLASS_FILE}" ]; then
         echo "Create default storage class for ${CLOUD_PROVIDER}"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${CLASS_FILE}
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${CLASS_FILE}"
     else
         echo "No storage class available for ${CLOUD_PROVIDER}."
     fi

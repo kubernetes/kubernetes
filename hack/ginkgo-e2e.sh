@@ -23,30 +23,30 @@ source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Find the ginkgo binary build as part of the release.
-ginkgo=$(kube::util::find-binary "ginkgo")
-e2e_test=$(kube::util::find-binary "e2e.test")
+ginkgo="$(kube::util::find-binary "ginkgo")"
+e2e_test="$(kube::util::find-binary "e2e.test")"
 
 # --- Setup some env vars.
 
-GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
-CLOUD_CONFIG=${CLOUD_CONFIG:-""}
+GINKGO_PARALLEL="${GINKGO_PARALLEL:-n}" # set to 'y' to run tests in parallel
+CLOUD_CONFIG="${CLOUD_CONFIG:-}"
 
 # If 'y', Ginkgo's reporter will not print out in color when tests are run
 # in parallel
-GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-n}
+GINKGO_NO_COLOR="${GINKGO_NO_COLOR:-n}"
 
 # If 'y', will rerun failed tests once to give them a second chance.
-GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
+GINKGO_TOLERATE_FLAKES="${GINKGO_TOLERATE_FLAKES:-n}"
 
-: ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: "${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}"
+: "${KUBE_CONFIG_FILE:=config-test.sh}"
 
 export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function detect-master-from-kubeconfig() {
-    export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+    export KUBECONFIG="${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
 
     local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
     if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
@@ -59,7 +59,7 @@ function detect-master-from-kubeconfig() {
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
-    KUBERNETES_PROVIDER=${KUBERNETES_CONFORMANCE_PROVIDER:-"skeleton"}
+    KUBERNETES_PROVIDER="${KUBERNETES_CONFORMANCE_PROVIDER:-skeleton}"
 
     detect-master-from-kubeconfig
 
@@ -105,7 +105,7 @@ if [[ -z "${NODE_INSTANCE_GROUP:-}" ]] && [[ "${KUBERNETES_PROVIDER}" == "gke" ]
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "azure" ]]; then
-    if [[ ${CLOUD_CONFIG} == "" ]]; then
+    if [[ "${CLOUD_CONFIG}" == "" ]]; then
         echo "Missing azure cloud config"
         exit 1
     fi
@@ -118,7 +118,7 @@ if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
 fi
 if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
   ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
-elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
+elif [[ "${GINKGO_PARALLEL}" =~ ^[yY]$ ]]; then
   ginkgo_args+=("--nodes=25")
 fi
 

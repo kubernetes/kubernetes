@@ -72,9 +72,9 @@ if [[ "${print_version}" == "true" ]]; then
   echo "${KUBE_VERSION}"
 else
   echo "Using version at ${1}: ${KUBE_VERSION}" >&2
-  if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+  if [[ "${KUBE_VERSION}" =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     curl --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_RELEASE_BUCKET_URL}/release/${KUBE_VERSION}/${KUBE_TAR_NAME}"
-  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+  elif [[ "${KUBE_VERSION}" =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     curl --fail -o "kubernetes-${KUBE_VERSION}.tar.gz" "${KUBE_DEV_RELEASE_BUCKET_URL}/ci/${KUBE_VERSION}/${KUBE_TAR_NAME}"
   else
     echo "Version doesn't match regexp" >&2

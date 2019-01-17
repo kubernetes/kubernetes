@@ -27,8 +27,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 make -f ${KUBE_ROOT}/Makefile quick-release
 
 if [ "$?" != "0" ]; then
-        echo "Building the release failed!"
-        exit 1
+    echo "Building the release failed!"
+    exit 1
 fi
 
 # Now bring a new cluster up with that release.

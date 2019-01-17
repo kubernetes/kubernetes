@@ -28,8 +28,8 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 # $2: Path to the directory where types.go for that group version exists. This
 # is the directory where the file will be generated.
 kube::swagger::gen_types_swagger_doc() {
-  local group_version=$1
-  local gv_dir=$2
+  local group_version="$1"
+  local gv_dir="$2"
   local TMPFILE="${TMPDIR:-/tmp}/types_swagger_doc_generated.$(date +%s).go"
 
   echo "Generating swagger type docs for ${group_version} at ${gv_dir}"

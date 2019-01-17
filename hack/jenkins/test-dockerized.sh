@@ -40,7 +40,7 @@ export KUBE_RACE=-race
 # Disable coverage report
 export KUBE_COVER="n"
 # Set artifacts directory
-export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
+export ARTIFACTS="${ARTIFACTS:-"${WORKSPACE}/artifacts"}"
 # Produce a JUnit-style XML test report
 export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
 # Save the verbose stdout as well.
