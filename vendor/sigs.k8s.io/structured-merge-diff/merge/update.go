@@ -85,6 +85,9 @@ func (s *Updater) update(oldObject, newObject typed.TypedValue, version fieldpat
 
 	for manager, conflictSet := range conflicts {
 		managers[manager].Set = managers[manager].Set.Difference(conflictSet.Set)
+		if managers[manager].Set.Empty() {
+			delete(managers, manager)
+		}
 	}
 
 	return managers, nil
@@ -112,6 +115,9 @@ func (s *Updater) Update(liveObject, newObject typed.TypedValue, version fieldpa
 	}
 	managers[manager].Set = managers[manager].Set.Union(compare.Modified).Union(compare.Added).Difference(compare.Removed)
 	managers[manager].APIVersion = version
+	if managers[manager].Set.Empty() {
+		delete(managers, manager)
+	}
 	return managers, nil
 }
 
@@ -137,6 +143,9 @@ func (s *Updater) Apply(liveObject, configObject typed.TypedValue, version field
 	managers[manager] = &fieldpath.VersionedSet{
 		Set:        set,
 		APIVersion: version,
+	}
+	if managers[manager].Set.Empty() {
+		delete(managers, manager)
 	}
 	return newObject, managers, nil
 }
