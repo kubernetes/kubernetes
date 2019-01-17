@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
@@ -75,11 +76,11 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 	blkUtil volumepathhandler.BlockVolumePathHandler) OperationGenerator {
 
 	return &operationGenerator{
-		kubeClient:                       kubeClient,
-		volumePluginMgr:                  volumePluginMgr,
-		recorder:                         recorder,
+		kubeClient:      kubeClient,
+		volumePluginMgr: volumePluginMgr,
+		recorder:        recorder,
 		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
-		blkUtil:                          blkUtil,
+		blkUtil: blkUtil,
 	}
 }
 
@@ -1436,4 +1437,33 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 		}
 	}
 	return deviceOpened, nil
+}
+
+// TODO(dyzz): need to also add logic to check CSINodeInfo for Kubelet migration status
+func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
+	if csilib.IsPVMigratable(spec.PersistentVolume) || csilib.IsInlineMigratable(spec.Volume) {
+		migratable, err := vpm.IsPluginMigratableBySpec(spec)
+		if err == nil && migratable {
+			return true
+		}
+	}
+	return false
+}
+
+func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
+	if spec.PersistentVolume != nil {
+		// TranslateInTreePVToCSI will create a new PV
+		csiPV, err := csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
+		if err != nil {
+			return nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
+		}
+		return &volume.Spec{
+			PersistentVolume: csiPV,
+			ReadOnly:         spec.ReadOnly,
+		}, nil
+	} else if spec.Volume != nil {
+		return &volume.Spec{}, fmt.Errorf("translation is not supported for in-line volumes yet")
+	} else {
+		return &volume.Spec{}, fmt.Errorf("not a valid volume spec")
+	}
 }
