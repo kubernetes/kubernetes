@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -198,24 +198,37 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	}
 }
 
+// UpdateCloudNode handles initialized nodes that still have the cloud taint.
 func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
-	if _, ok := newObj.(*v1.Node); !ok {
+	newNode, ok := newObj.(*v1.Node)
+	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
 	}
-	cnc.AddCloudNode(newObj)
+	cloudTaint := getCloudTaint(newNode.Spec.Taints)
+	if cloudTaint != nil {
+		cnc.initializeCloudNode(newNode)
+		return
+	}
+}
+
+// AddCloudNode handles initializing new nodes registered with the cloud taint.
+func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
+	newNode, ok := obj.(*v1.Node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		return
+	}
+	cloudTaint := getCloudTaint(newNode.Spec.Taints)
+	if cloudTaint == nil {
+		klog.Errorf("This node %s is registered without the cloud taint. Will not process.", newNode.Name)
+		return
+	}
+	cnc.initializeCloudNode(newNode)
 }
 
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
-func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
-	node := obj.(*v1.Node)
-
-	cloudTaint := getCloudTaint(node.Spec.Taints)
-	if cloudTaint == nil {
-		klog.V(2).Infof("This node %s is registered without the cloud taint. Will not process.", node.Name)
-		return
-	}
-
+func (cnc *CloudNodeController) initializeCloudNode(node *v1.Node) {
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
@@ -290,7 +303,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 			}
 		}
 
-		curNode.Spec.Taints = excludeTaintFromList(curNode.Spec.Taints, *cloudTaint)
+		curNode.Spec.Taints = excludeCloudTaint(curNode.Spec.Taints)
 
 		_, err = cnc.kubeClient.CoreV1().Nodes().Update(curNode)
 		if err != nil {
@@ -318,10 +331,10 @@ func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	return nil
 }
 
-func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
+func excludeCloudTaint(taints []v1.Taint) []v1.Taint {
 	newTaints := []v1.Taint{}
 	for _, taint := range taints {
-		if toExclude.MatchTaint(&taint) {
+		if taint.Key == schedulerapi.TaintExternalCloudProvider {
 			continue
 		}
 		newTaints = append(newTaints, taint)
