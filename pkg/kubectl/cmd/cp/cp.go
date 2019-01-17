@@ -451,7 +451,7 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 				return err
 			}
 		} else {
-			outFile, err := os.Create(outFileName)
+			outFile, err := os.OpenFile(outFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
 			if err != nil {
 				return err
 			}
