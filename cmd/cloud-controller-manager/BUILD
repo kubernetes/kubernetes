@@ -23,7 +23,7 @@ go_library(
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/util/prometheusclientgo:go_default_library",
         "//pkg/version/prometheus:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
     ],
 )
 
