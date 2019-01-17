@@ -258,6 +258,9 @@ type ObjectMeta struct {
 	// controller's name, or the name of a specific apply path like
 	// "ci-cd". The set of fields is always in the version that the
 	// workflow used when modifying the object.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
 	// +optional
 	ManagedFields map[string]VersionedFields `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
