@@ -177,7 +177,7 @@ func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error)
 }
 
 func (f *FieldManager) buildManagerInfo(prefix string) string {
-	timestamp := time.Now().Format("20060102-150405MST")
+	timestamp := time.Now().UTC().Format(time.RFC3339)
 	if prefix == "" {
 		prefix = "unknown"
 	}
