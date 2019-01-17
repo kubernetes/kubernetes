@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -54,8 +55,9 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
 	// we may want to set memory capacity.
 	machineInfo := &cadvisorapi.MachineInfo{}
+	fakeCadvisor := &cadvisortest.Fake{Info: machineInfo}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
+	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, fakeCadvisor, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 

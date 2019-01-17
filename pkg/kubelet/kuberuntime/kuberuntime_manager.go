@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +37,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -81,8 +81,8 @@ type kubeGenericRuntimeManager struct {
 	osInterface         kubecontainer.OSInterface
 	containerRefManager *kubecontainer.RefManager
 
-	// machineInfo contains the machine information.
-	machineInfo *cadvisorapi.MachineInfo
+	// cAdvisor used for machine information.
+	cadvisor cadvisor.Interface
 
 	// Container GC manager
 	containerGC *containerGC
@@ -154,7 +154,7 @@ func NewKubeGenericRuntimeManager(
 	livenessManager proberesults.Manager,
 	seccompProfileRoot string,
 	containerRefManager *kubecontainer.RefManager,
-	machineInfo *cadvisorapi.MachineInfo,
+	cadvisor cadvisor.Interface,
 	podStateProvider podStateProvider,
 	osInterface kubecontainer.OSInterface,
 	runtimeHelper kubecontainer.RuntimeHelper,
@@ -178,7 +178,7 @@ func NewKubeGenericRuntimeManager(
 		seccompProfileRoot:  seccompProfileRoot,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
-		machineInfo:         machineInfo,
+		cadvisor:            cadvisor,
 		osInterface:         osInterface,
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      newInstrumentedRuntimeService(runtimeService),
@@ -277,7 +277,11 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 // runtime. Implementation is expected to update this cache periodically.
 // This may be different from the runtime engine's version.
 func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) {
-	versionObject, err := m.versionCache.Get(m.machineInfo.MachineID)
+	machineInfo, err := m.cadvisor.MachineInfo()
+	if err != nil {
+		return nil, err
+	}
+	versionObject, err := m.versionCache.Get(machineInfo.MachineID)
 	if err != nil {
 		return nil, err
 	}

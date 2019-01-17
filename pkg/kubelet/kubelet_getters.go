@@ -340,7 +340,7 @@ func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
 	return kl.cadvisor.VersionInfo()
 }
 
-// GetCachedMachineInfo assumes that the machine info can't change without a reboot
+// GetCachedMachineInfo returns cached machine info from cAdvisor.
 func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapiv1.MachineInfo, error) {
-	return kl.machineInfo, nil
+	return kl.cadvisor.MachineInfo()
 }

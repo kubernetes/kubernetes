@@ -20,13 +20,13 @@ import (
 	"net/http"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -70,7 +70,7 @@ func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
 	return !found
 }
 
-func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
+func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, cadvisor cadvisor.Interface, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -78,7 +78,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		cpuCFSQuotaPeriod:   metav1.Duration{Duration: time.Microsecond * 100},
 		livenessManager:     proberesults.NewManager(),
 		containerRefManager: kubecontainer.NewRefManager(),
-		machineInfo:         machineInfo,
+		cadvisor:            cadvisor,
 		osInterface:         osInterface,
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      runtimeService,

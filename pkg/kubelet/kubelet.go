@@ -31,7 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -566,12 +566,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klog.Infof("Experimental host user namespace defaulting is enabled.")
 	}
 
-	machineInfo, err := klet.cadvisor.MachineInfo()
-	if err != nil {
-		return nil, err
-	}
-	klet.machineInfo = machineInfo
-
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
@@ -664,7 +658,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.livenessManager,
 		seccompProfileRoot,
 		containerRefManager,
-		machineInfo,
+		klet.cadvisor,
 		klet,
 		kubeDeps.OSInterface,
 		klet,
@@ -987,8 +981,8 @@ type Kubelet struct {
 	// ConfigMap manager.
 	configMapManager configmap.Manager
 
-	// Cached MachineInfo returned by cadvisor.
-	machineInfo *cadvisorapi.MachineInfo
+	//Cached RootFsInfo returned by cadvisor
+	rootfsInfo *cadvisorapiv2.FsInfo
 
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -30,15 +31,25 @@ import (
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string) error {
-	config.Linux = m.generateLinuxContainerConfig(container, pod, uid, username)
+	lc, err := m.generateLinuxContainerConfig(container, pod, uid, username)
+	if err != nil {
+		return err
+	}
+	config.Linux = lc
 	return nil
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) *runtimeapi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.LinuxContainerConfig, error) {
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
+	}
+
+	machineInfo, err := m.cadvisor.MachineInfo()
+	if err != nil {
+		klog.Errorf("Could not get machine info: %v", err)
+		return nil, err
 	}
 
 	// set linux container resources
@@ -46,8 +57,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
-	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
-		int64(m.machineInfo.MemoryCapacity)))
+	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container, int64(machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
@@ -78,5 +88,5 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		lc.Resources.CpuPeriod = cpuPeriod
 	}
 
-	return lc
+	return lc, nil
 }

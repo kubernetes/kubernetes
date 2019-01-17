@@ -298,7 +298,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cm.cpuManager, err = cpumanager.NewManager(
 			nodeConfig.ExperimentalCPUManagerPolicy,
 			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
-			machineInfo,
+			cadvisorInterface,
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 		)
@@ -498,6 +498,21 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	}
 
 	cm.systemContainers = systemContainers
+
+	cm.periodicTasks = append(cm.periodicTasks, func () {
+		mi, err := cm.cadvisorInterface.MachineInfo()
+		if err != nil {
+			klog.Errorf("failed to get machine info - %v", err)
+			return
+		}
+
+		for rName, rCap := range cadvisor.CapacityFromMachineInfo(mi) {
+			cm.Lock()
+			cm.capacity[rName] = rCap
+			cm.Unlock()
+		}
+	})
+
 	return nil
 }
 
@@ -887,6 +902,9 @@ func isKernelPid(pid int) bool {
 }
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
+	cm.RLock()
+	defer cm.RUnlock()
+
 	return cm.capacity
 }
 

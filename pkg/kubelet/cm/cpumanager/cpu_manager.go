@@ -22,12 +22,12 @@ import (
 	"sync"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -89,15 +89,13 @@ type manager struct {
 	// and the containerID of their containers
 	podStatusProvider status.PodStatusProvider
 
-	machineInfo *cadvisorapi.MachineInfo
-
 	nodeAllocatableReservation v1.ResourceList
 }
 
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string) (Manager, error) {
+func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, cadvisor cadvisor.Interface, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string) (Manager, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
@@ -106,6 +104,10 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy = NewNonePolicy()
 
 	case PolicyStatic:
+		machineInfo, err := cadvisor.MachineInfo()
+		if err != nil {
+			return nil, err
+		}
 		topo, err := topology.Discover(machineInfo)
 		if err != nil {
 			return nil, err
@@ -145,7 +147,6 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
 		state:                      stateImpl,
-		machineInfo:                machineInfo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 	}
 	return manager, nil

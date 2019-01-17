@@ -202,9 +202,9 @@ func (cm *containerManagerImpl) getNodeAllocatableInternalAbsolute() v1.Resource
 
 // GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
-	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
+	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.GetCapacity())
 	result := make(v1.ResourceList)
-	for k := range cm.capacity {
+	for k := range cm.GetCapacity() {
 		value := resource.NewQuantity(0, resource.DecimalSI)
 		if cm.NodeConfig.SystemReserved != nil {
 			value.Add(cm.NodeConfig.SystemReserved[k])
