@@ -123,6 +123,10 @@ type Config struct {
 	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
 	RateLimiter flowcontrol.RateLimiter
 
+	// WarningHandler handles warnings in server responses.
+	// If not set, the default warning handler is used.
+	WarningHandler WarningHandler
+
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
@@ -339,7 +343,11 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	if err == nil && config.WarningHandler != nil {
+		restClient.warningHandler = config.WarningHandler
+	}
+	return restClient, err
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -393,7 +401,11 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	if err == nil && config.WarningHandler != nil {
+		restClient.warningHandler = config.WarningHandler
+	}
+	return restClient, err
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
@@ -562,6 +574,7 @@ func AnonymousClientConfig(config *Config) *Config {
 			NextProtos: config.TLSClientConfig.NextProtos,
 		},
 		RateLimiter:        config.RateLimiter,
+		WarningHandler:     config.WarningHandler,
 		UserAgent:          config.UserAgent,
 		DisableCompression: config.DisableCompression,
 		QPS:                config.QPS,
@@ -608,6 +621,7 @@ func CopyConfig(config *Config) *Config {
 		QPS:                config.QPS,
 		Burst:              config.Burst,
 		RateLimiter:        config.RateLimiter,
+		WarningHandler:     config.WarningHandler,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
 		Proxy:              config.Proxy,
