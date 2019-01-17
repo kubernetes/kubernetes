@@ -98,12 +98,8 @@ kube::util::ensure-temp-dir() {
   fi
 }
 
-# This figures out the host platform without relying on golang.  We need this as
-# we don't want a golang install to be a prerequisite to building yet we need
-# this info to figure out where the final binaries are placed.
-kube::util::host_platform() {
+kube::util::host_os() {
   local host_os
-  local host_arch
   case "$(uname -s)" in
     Darwin)
       host_os=darwin
@@ -116,7 +112,11 @@ kube::util::host_platform() {
       exit 1
       ;;
   esac
+  echo "${host_os}"
+}
 
+kube::util::host_arch() {
+  local host_arch
   case "$(uname -m)" in
     x86_64*)
       host_arch=amd64
@@ -150,7 +150,14 @@ kube::util::host_platform() {
       exit 1
       ;;
   esac
-  echo "${host_os}/${host_arch}"
+  echo "${host_arch}"
+}
+
+# This figures out the host platform without relying on golang.  We need this as
+# we don't want a golang install to be a prerequisite to building yet we need
+# this info to figure out where the final binaries are placed.
+kube::util::host_platform() {
+  echo "$(kube::util::host_os)/$(kube::util::host_arch)"
 }
 
 kube::util::find-binary-for-platform() {
