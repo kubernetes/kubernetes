@@ -87,7 +87,7 @@ func WaitForCertificate(client certificatesclient.CertificateSigningRequestInter
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	event, err = watchtools.UntilWithSync(ctx,
+	event, err := watchtools.UntilWithSync(ctx,
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
