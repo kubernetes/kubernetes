@@ -90,7 +90,8 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
 	}
 
-		objectMeta.SetInitializers(nil)
+	// Initializers are a deprecated alpha field and should not be saved
+	objectMeta.SetInitializers(nil)
 	// ClusterName is ignored and should not be saved
 	if len(objectMeta.GetClusterName()) > 0 {
 		objectMeta.SetClusterName("")

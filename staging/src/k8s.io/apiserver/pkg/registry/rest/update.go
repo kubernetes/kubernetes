@@ -102,8 +102,10 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-		oldMeta.SetInitializers(nil)
-		objectMeta.SetInitializers(nil)
+	// Initializers are a deprecated alpha field and should not be saved
+	oldMeta.SetInitializers(nil)
+	objectMeta.SetInitializers(nil)
+
 	strategy.PrepareForUpdate(ctx, obj, old)
 
 	// ClusterName is ignored and should not be saved

@@ -235,6 +235,8 @@ type ObjectMeta struct {
 	// When an object is created, the system will populate this list with the current set of initializers.
 	// Only privileged users may set or modify this list. Once it is empty, it may not be modified further
 	// by any user.
+	//
+	// DEPRECATED - initializers are an alpha field and will be removed in v1.15.
 	Initializers *Initializers `json:"initializers,omitempty" protobuf:"bytes,16,opt,name=initializers"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
