@@ -281,6 +281,12 @@ const (
 	// to the API server.
 	BoundServiceAccountTokenVolume featuregate.Feature = "BoundServiceAccountTokenVolume"
 
+	// owner: @micahhausler
+	// alpha: v1.16
+	//
+	// External signing of projected service account tokens
+	ExternalKeyService featuregate.Feature = "ExternalKeyService"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -491,6 +497,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TokenRequest:                                {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: featuregate.Alpha},
+	ExternalKeyService:                          {Default: false, PreRelease: featuregate.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: featuregate.Beta},
 	deprecatedGCERegionalPersistentDisk:         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
 	CSIMigration:                                {Default: false, PreRelease: featuregate.Alpha},

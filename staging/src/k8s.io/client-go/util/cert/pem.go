@@ -29,6 +29,11 @@ const (
 	CertificateRequestBlockType = "CERTIFICATE REQUEST"
 )
 
+var (
+	// ErrNoCerts is a signal error returned when an x509 Certificate is empty
+	ErrNoCerts = errors.New("data does not contain any valid RSA or ECDSA certificates")
+)
+
 // ParseCertsPEM returns the x509.Certificates contained in the given PEM-encoded byte array
 // Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
 func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
@@ -55,7 +60,7 @@ func ParseCertsPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	}
 
 	if !ok {
-		return certs, errors.New("data does not contain any valid RSA or ECDSA certificates")
+		return certs, ErrNoCerts
 	}
 	return certs, nil
 }

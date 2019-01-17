@@ -54,7 +54,7 @@ type TokenGenerator interface {
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
 // privateKey is a PEM-encoded byte array of a private RSA key.
 // JWTTokenAuthenticator()
-func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, error) {
+func JWTTokenGenerator(iss, keyID string, privateKey interface{}) (TokenGenerator, error) {
 	var alg jose.SignatureAlgorithm
 	switch pk := privateKey.(type) {
 	case *rsa.PrivateKey:
@@ -81,7 +81,11 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 			Algorithm: alg,
 			Key:       privateKey,
 		},
-		nil,
+		&jose.SignerOptions{
+			ExtraHeaders: map[jose.HeaderKey]interface{}{
+				jose.HeaderKey("kid"): keyID,
+			},
+		},
 	)
 	if err != nil {
 		return nil, err

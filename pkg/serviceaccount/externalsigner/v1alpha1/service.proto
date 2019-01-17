@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package v1alpha1;
+
+service KeyService {
+  // Sign an incoming payload
+  rpc SignPayload(SignPayloadRequest) returns (SignPayloadResponse) {}
+  // List all active public keys
+  rpc ListPublicKeys(ListPublicKeysRequest) returns (ListPublicKeysResponse) {}
+}
+
+message SignPayloadRequest {
+  // payload is the content to be signed
+  bytes payload = 1;
+  // algorithm specifies which algorithm to sign with
+  string algorithm = 2;
+}
+message SignPayloadResponse {
+  // content returns the signed payload
+  bytes content = 1;
+}
+
+message PublicKey {
+  // public_key is a PEM encoded public key
+  bytes public_key = 1;
+  // certificate is a concatenated list of PEM encoded x509 certificates
+  bytes certificates = 2;
+  // key_id is the key's ID
+  string key_id = 3;
+  // algorithm states the algorithm the key uses
+  string algorithm = 4;
+}
+
+message ListPublicKeysRequest {}
+message ListPublicKeysResponse {
+  // active_key_id is the active signing key's ID
+  string active_key_id = 1;
+  // public_keys is a list of public verifying keys
+  repeated PublicKey public_keys = 2;
+}

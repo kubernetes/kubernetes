@@ -455,7 +455,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		apiServer.Close()
 	}
 
-	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, "", serviceAccountKey)
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}

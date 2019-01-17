@@ -35,7 +35,7 @@ type Expected struct {
 	Audience Audience
 	// ID matches the "jti" claim exactly.
 	ID string
-	// Time matches the "exp" and "ebf" claims with leeway.
+	// Time matches the "exp" and "nbf" claims with leeway.
 	Time time.Time
 }
 

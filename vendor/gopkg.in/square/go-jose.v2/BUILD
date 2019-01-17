@@ -37,6 +37,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/gopkg.in/square/go-jose.v2/cipher:all-srcs",
+        "//vendor/gopkg.in/square/go-jose.v2/cryptosigner:all-srcs",
         "//vendor/gopkg.in/square/go-jose.v2/json:all-srcs",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:all-srcs",
     ],

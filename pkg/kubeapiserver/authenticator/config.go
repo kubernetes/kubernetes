@@ -66,6 +66,7 @@ type Config struct {
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	ServiceAccountIssuer        string
+	KeyServiceURL               string
 	APIAudiences                authenticator.Audiences
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
@@ -144,7 +145,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) && config.ServiceAccountIssuer != "" {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuer, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.KeyServiceURL, config.ServiceAccountIssuer, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -293,7 +294,11 @@ func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAud
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Token or an error
-func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newServiceAccountAuthenticator(keyServerURL string, iss string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalKeyService) && keyServerURL != "" {
+		return serviceaccount.ExternalJWTTokenAuthenticator(keyServerURL, iss, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
+	}
+
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
@@ -302,9 +307,7 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 		}
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
-
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(iss, allPublicKeys, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
-	return tokenAuthenticator, nil
+	return serviceaccount.JWTTokenAuthenticator(iss, allPublicKeys, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter)), nil
 }
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error

@@ -98,6 +98,7 @@
         "github.com/evanphx/json-patch",
         "github.com/golang/groupcache/lru",
         "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud",
+        "github.com/gogo/protobuf/proto",
         "github.com/google/gofuzz",
         "github.com/prometheus/client_golang/prometheus",
         "github.com/robfig/cron",
@@ -159,6 +160,7 @@
         "k8s.io/client-go/tools/watch",
         "k8s.io/client-go/util/cert",
         "k8s.io/client-go/util/flowcontrol",
+        "k8s.io/client-go/util/keyutil",
         "k8s.io/client-go/util/retry",
         "k8s.io/client-go/util/workqueue",
 	"k8s.io/client-go/transport"

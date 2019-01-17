@@ -206,7 +206,7 @@ func (parsed rawHeader) set(k HeaderKey, v interface{}) error {
 // getString gets a string from the raw JSON, defaulting to "".
 func (parsed rawHeader) getString(k HeaderKey) string {
 	v, ok := parsed[k]
-	if !ok {
+	if !ok || v == nil {
 		return ""
 	}
 	var s string

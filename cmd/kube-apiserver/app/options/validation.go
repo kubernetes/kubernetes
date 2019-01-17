@@ -83,6 +83,32 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 	return errs
 }
 
+func validateExternalKeyServer(options *ServerRunOptions) []error {
+	var errs []error
+
+	enableAttempted := options.Authentication.ServiceAccounts.KeyServiceURL != ""
+	requiredTokenFlagsSet := options.Authentication.ServiceAccounts.Issuer != ""
+
+	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(features.ExternalKeyService) {
+		errs = append(errs, errors.New("the ExternalKeyService feature is not enabled but --key-service-url flag was passed"))
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalKeyService) && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		errs = append(errs, errors.New("the ExternalKeyService feature depends on the TokenRequest feature, but the TokenRequest feature is not enabled"))
+	}
+
+	// TODO: @micahhausler validate url format of --key-service-url
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		errs = append(errs, errors.New("the BoundServiceAccountTokenVolume feature depends on the TokenRequest feature, but the TokenRequest features is not enabled"))
+	}
+
+	if enableAttempted && !requiredTokenFlagsSet {
+		errs = append(errs, errors.New("the --key-service-url flag requires --service-account-issuer"))
+	}
+	return errs
+}
+
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s *ServerRunOptions) Validate() []error {
 	var errs []error
@@ -99,7 +125,11 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.Admission.Validate()...)
 	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
-	errs = append(errs, validateTokenRequest(s)...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalKeyService) {
+		errs = append(errs, validateExternalKeyServer(s)...)
+	} else {
+		errs = append(errs, validateTokenRequest(s)...)
+	}
 
 	return errs
 }

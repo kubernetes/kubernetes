@@ -1015,9 +1015,10 @@ gopkg.in/gcfg.v1/types
 gopkg.in/inf.v0
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/square/go-jose.v2 v2.0.0-20180411045311-89060dee6a84 => gopkg.in/square/go-jose.v2 v2.0.0-20180411045311-89060dee6a84
+# gopkg.in/square/go-jose.v2 v2.1.7 => gopkg.in/square/go-jose.v2 v2.1.7
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
+gopkg.in/square/go-jose.v2/cryptosigner
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7

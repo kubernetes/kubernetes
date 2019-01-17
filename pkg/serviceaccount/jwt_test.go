@@ -18,6 +18,7 @@ package serviceaccount_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -30,8 +31,10 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	externalsigner "k8s.io/kubernetes/pkg/serviceaccount/externalsigner/v1alpha1"
 )
 
 const otherPublicKey = `-----BEGIN PUBLIC KEY-----
@@ -106,12 +109,21 @@ func getPublicKey(data string) interface{} {
 	keys, _ := keyutil.ParsePublicKeysPEM([]byte(data))
 	return keys[0]
 }
+
 func TestTokenGenerateAndValidate(t *testing.T) {
+	newIssuer := "https://kubernetes.default.svc"
 	expectedUserName := "system:serviceaccount:test:my-service-account"
 	expectedUserUID := "12345"
 
 	// Related API objects
 	serviceAccount := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-service-account",
+			UID:       "12345",
+			Namespace: "test",
+		},
+	}
+	coreSa := core.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-service-account",
 			UID:       "12345",
@@ -132,7 +144,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the RSA token
-	rsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(rsaPrivateKey))
+	rsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, "", getPrivateKey(rsaPrivateKey))
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
@@ -148,7 +160,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the ECDSA token
-	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
+	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, "", getPrivateKey(ecdsaPrivateKey))
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
@@ -163,8 +175,23 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		"token": []byte(ecdsaToken),
 	}
 
+	// Generate the remote RSA token
+	remoteRsaGenerator := serviceaccount.ExternalTokenGenerator{
+		Iss:    newIssuer,
+		Client: newMockKeyServiceClient(getPrivateKey(rsaPrivateKey)),
+	}
+	remoteRsaToken, err := remoteRsaGenerator.GenerateToken(
+		serviceaccount.Claims(coreSa, nil, nil, 60*60*24, []string{"kubernetes"}),
+	)
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+	if len(remoteRsaToken) == 0 {
+		t.Fatalf("no token generated")
+	}
+
 	// Generate signer with same keys as RSA signer but different issuer
-	badIssuerGenerator, err := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
+	badIssuerGenerator, err := serviceaccount.JWTTokenGenerator("foo", "", getPrivateKey(rsaPrivateKey))
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
@@ -178,11 +205,14 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		Keys   []interface{}
 		Token  string
 
-		ExpectedErr      bool
-		ExpectedOK       bool
-		ExpectedUserName string
-		ExpectedUserUID  string
-		ExpectedGroups   []string
+		ExpectedErr           bool
+		ExpectedOK            bool
+		ExpectedUserName      string
+		ExpectedUserUID       string
+		ExpectedGroups        []string
+		Authenticator         authenticator.Token
+		ExternalServiceClient externalsigner.KeyServiceClient
+		Issuer                string
 	}{
 		"no keys": {
 			Token:       rsaToken,
@@ -276,58 +306,94 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
+		"valid (external rsa)": {
+			Token:                 remoteRsaToken,
+			Client:                fake.NewSimpleClientset(serviceAccount),
+			Keys:                  nil,
+			ExpectedErr:           false,
+			ExpectedOK:            true,
+			ExpectedUserName:      expectedUserName,
+			ExpectedUserUID:       expectedUserUID,
+			ExpectedGroups:        []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+			ExternalServiceClient: newMockKeyServiceClient(getPrivateKey(rsaPrivateKey)),
+			Issuer:                newIssuer,
+		},
+		"invalid key (external)": {
+			Token:                 remoteRsaToken,
+			Client:                fake.NewSimpleClientset(serviceAccount),
+			Keys:                  nil,
+			ExpectedErr:           true,
+			ExpectedOK:            false,
+			ExpectedUserName:      expectedUserName,
+			ExpectedUserUID:       expectedUserUID,
+			ExpectedGroups:        []string{"system:serviceaccounts", "system:serviceaccounts:test"},
+			ExternalServiceClient: newMockKeyServiceClient(getPrivateKey(ecdsaPrivateKey)),
+			Issuer:                newIssuer,
+		},
 	}
 
 	for k, tc := range testCases {
-		auds := authenticator.Audiences{"api"}
-		getter := serviceaccountcontroller.NewGetterFromClient(
-			tc.Client,
-			v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
-				return tc.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
-			})),
-			v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
-				return tc.Client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
-			})),
-			v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
-				return tc.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
-			})),
-		)
-		authn := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		t.Run(fmt.Sprintf("case %s", k), func(t *testing.T) {
+			auds := authenticator.Audiences{"api"}
+			getter := serviceaccountcontroller.NewGetterFromClient(
+				tc.Client,
+				v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return tc.Client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+				})),
+				v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return tc.Client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+				})),
+				v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
+					return tc.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+				})),
+			)
+			var authn authenticator.Token
+			if tc.ExternalServiceClient != nil {
+				authn = &serviceaccount.ExternalTokenAuthenticator{
+					Client:       tc.ExternalServiceClient,
+					Iss:          tc.Issuer,
+					ImplicitAuds: nil,
+					Validator:    serviceaccount.NewValidator(getter),
+				}
+			} else {
+				authn = serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+			}
 
-		// An invalid, non-JWT token should always fail
-		ctx := authenticator.WithAudiences(context.Background(), auds)
-		if _, ok, err := authn.AuthenticateToken(ctx, "invalid token"); err != nil || ok {
-			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
-			continue
-		}
+			// An invalid, non-JWT token should always fail
+			ctx := authenticator.WithAudiences(context.Background(), auds)
+			if _, ok, err := authn.AuthenticateToken(ctx, "invalid token"); err != nil || ok {
+				t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
+				return
+			}
 
-		resp, ok, err := authn.AuthenticateToken(ctx, tc.Token)
-		if (err != nil) != tc.ExpectedErr {
-			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
-			continue
-		}
+			resp, ok, err := authn.AuthenticateToken(ctx, tc.Token)
+			if (err != nil) != tc.ExpectedErr {
+				t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
+				return
+			}
 
-		if ok != tc.ExpectedOK {
-			t.Errorf("%s: Expected ok=%v, got %v", k, tc.ExpectedOK, ok)
-			continue
-		}
+			if ok != tc.ExpectedOK {
+				t.Errorf("%s: Expected ok=%v, got %v", k, tc.ExpectedOK, ok)
+				return
+			}
 
-		if err != nil || !ok {
-			continue
-		}
+			if err != nil || !ok {
+				return
+			}
 
-		if resp.User.GetName() != tc.ExpectedUserName {
-			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, resp.User.GetName())
-			continue
-		}
-		if resp.User.GetUID() != tc.ExpectedUserUID {
-			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, resp.User.GetUID())
-			continue
-		}
-		if !reflect.DeepEqual(resp.User.GetGroups(), tc.ExpectedGroups) {
-			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, resp.User.GetGroups())
-			continue
-		}
+			if resp.User.GetName() != tc.ExpectedUserName {
+				t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, resp.User.GetName())
+				return
+			}
+			if resp.User.GetUID() != tc.ExpectedUserUID {
+				t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, resp.User.GetUID())
+				return
+			}
+			if !reflect.DeepEqual(resp.User.GetGroups(), tc.ExpectedGroups) {
+				t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, resp.User.GetGroups())
+				return
+			}
+		})
 	}
 }
 

@@ -11,17 +11,22 @@ go_library(
     srcs = [
         "claims.go",
         "jwt.go",
+        "jwt_external.go",
         "legacy.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/serviceaccount",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/serviceaccount/externalsigner/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
@@ -37,7 +42,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/serviceaccount/externalsigner/v1alpha1:all-srcs",
+    ],
     tags = ["automanaged"],
 )
 
@@ -45,6 +53,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "claims_test.go",
+        "jwt_external_test.go",
         "jwt_test.go",
         "util_test.go",
     ],
@@ -52,6 +61,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
+        "//pkg/serviceaccount/externalsigner/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
@@ -60,6 +70,9 @@ go_test(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2/cryptosigner:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
     ],
 )
