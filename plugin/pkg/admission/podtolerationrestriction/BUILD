@@ -40,7 +40,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper/qos:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
-        "//pkg/kubeapiserver/admission/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/util/tolerations:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",

@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "doc.go",
         "fake_admissionregistration_client.go",
-        "fake_initializerconfiguration.go",
         "fake_mutatingwebhookconfiguration.go",
         "fake_validatingwebhookconfiguration.go",
     ],
