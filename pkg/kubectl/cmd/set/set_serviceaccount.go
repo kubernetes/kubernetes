@@ -151,14 +151,12 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 	o.serviceAccountName = args[len(args)-1]
 	resources := args[:len(args)-1]
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileNameOptions).
-		IncludeUninitialized(includeUninitialized).
 		Flatten()
 	if !o.local {
 		builder.ResourceTypeOrNameArgs(o.all, resources...).

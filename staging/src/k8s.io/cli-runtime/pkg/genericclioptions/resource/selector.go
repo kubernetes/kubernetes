@@ -27,27 +27,25 @@ import (
 
 // Selector is a Visitor for resources that match a label selector.
 type Selector struct {
-	Client               RESTClient
-	Mapping              *meta.RESTMapping
-	Namespace            string
-	LabelSelector        string
-	FieldSelector        string
-	Export               bool
-	IncludeUninitialized bool
-	LimitChunks          int64
+	Client        RESTClient
+	Mapping       *meta.RESTMapping
+	Namespace     string
+	LabelSelector string
+	FieldSelector string
+	Export        bool
+	LimitChunks   int64
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export bool, limitChunks int64) *Selector {
 	return &Selector{
-		Client:               client,
-		Mapping:              mapping,
-		Namespace:            namespace,
-		LabelSelector:        labelSelector,
-		FieldSelector:        fieldSelector,
-		Export:               export,
-		IncludeUninitialized: includeUninitialized,
-		LimitChunks:          limitChunks,
+		Client:        client,
+		Mapping:       mapping,
+		Namespace:     namespace,
+		LabelSelector: labelSelector,
+		FieldSelector: fieldSelector,
+		Export:        export,
+		LimitChunks:   limitChunks,
 	}
 }
 
@@ -60,11 +58,10 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 			r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
 			r.Export,
 			&metav1.ListOptions{
-				LabelSelector:        r.LabelSelector,
-				FieldSelector:        r.FieldSelector,
-				IncludeUninitialized: r.IncludeUninitialized,
-				Limit:                r.LimitChunks,
-				Continue:             continueToken,
+				LabelSelector: r.LabelSelector,
+				FieldSelector: r.FieldSelector,
+				Limit:         r.LimitChunks,
+				Continue:      continueToken,
 			},
 		)
 		if err != nil {

@@ -118,12 +118,12 @@ func (apiServerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runt
 	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*apiregistration.APIService)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a APIService.")
+		return nil, nil, fmt.Errorf("given object is not a APIService.")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), APIServiceToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), APIServiceToSelectableFields(apiserver), nil
 }
 
 // MatchAPIService is the filter used by the generic etcd backend to watch events

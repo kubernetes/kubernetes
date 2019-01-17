@@ -69,7 +69,6 @@ type AnnotateOptions struct {
 	enforceNamespace             bool
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	includeUninitialized         bool
 
 	genericclioptions.IOStreams
 }
@@ -183,7 +182,6 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
@@ -227,7 +225,6 @@ func (o AnnotateOptions) RunAnnotate() error {
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(o.includeUninitialized).
 		Flatten()
 
 	if !o.local {

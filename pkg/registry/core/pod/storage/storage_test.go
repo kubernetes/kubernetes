@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -40,8 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -726,76 +723,6 @@ func TestEtcdCreateBinding(t *testing.T) {
 		}
 		storage.Store.DestroyFunc()
 		server.Terminate(t)
-	}
-}
-
-func TestEtcdUpdateUninitialized(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
-	storage, _, _, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
-
-	pod := validNewPod()
-	// add pending initializers to the pod
-	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{IncludeUninitialized: true}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	podIn := *pod
-	// only uninitialized pod is allowed to add containers via update
-	podIn.Spec.Containers = append(podIn.Spec.Containers, api.Container{
-		Name:                     "foo2",
-		Image:                    "test",
-		ImagePullPolicy:          api.PullAlways,
-		TerminationMessagePath:   api.TerminationMessagePathDefault,
-		TerminationMessagePolicy: api.TerminationMessageReadFile,
-		SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
-	})
-	podIn.ObjectMeta.Initializers = nil
-
-	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	obj, err := storage.Get(ctx, podIn.ObjectMeta.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	podOut := obj.(*api.Pod)
-	if podOut.GetInitializers() != nil {
-		t.Errorf("expect nil initializers, got %v", podOut.ObjectMeta.Initializers)
-	}
-	if !apiequality.Semantic.DeepEqual(podIn.Spec.Containers, podOut.Spec.Containers) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, &podIn))
-	}
-}
-
-func TestEtcdStatusUpdateUninitialized(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
-	storage, _, statusStorage, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
-
-	pod := validNewPod()
-	// add pending initializers to the pod
-	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{IncludeUninitialized: true}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	podIn := *pod
-	// only uninitialized pod is allowed to add containers via update
-	podIn.Status.Phase = api.PodRunning
-	podIn.ObjectMeta.Initializers = nil
-
-	_, _, err := statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	expected := "Forbidden: must not update status when the object is uninitialized"
-	if err == nil {
-		t.Fatalf("Unexpected no err, expected %q", expected)
-	}
-	if !strings.Contains(err.Error(), expected) {
-		t.Errorf("unexpected error: %v, expected %q", err, expected)
 	}
 }
 
