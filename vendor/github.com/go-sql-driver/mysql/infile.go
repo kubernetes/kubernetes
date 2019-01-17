@@ -102,7 +102,7 @@ func (mc *mysqlConn) handleInFileRequest(name string) (err error) {
 	}
 
 	if idx := strings.Index(name, "Reader::"); idx == 0 || (idx > 0 && name[idx-1] == '/') { // io.Reader
-		// The server might return an an absolute path. See issue #355.
+		// The server might return an absolute path. See issue #355.
 		name = name[idx+8:]
 
 		readerRegisterLock.RLock()

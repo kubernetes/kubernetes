@@ -172,7 +172,7 @@ when the mfa_serial configuration field is set in the shared config
 (~/.aws/config) or shared credentials (~/.aws/credentials) file.
 
 If mfa_serial is set in the configuration, the SDK will assume the role, and
-the AssumeRoleTokenProvider session option is not set an an error will
+the AssumeRoleTokenProvider session option is not set an error will
 be returned when creating the session.
 
     sess := session.Must(session.NewSessionWithOptions(session.Options{
