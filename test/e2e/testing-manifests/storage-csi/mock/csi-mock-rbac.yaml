@@ -32,6 +32,20 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-controller-cluster-driver-registrar-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-mock
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-driver-registrar-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
 # priviledged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
