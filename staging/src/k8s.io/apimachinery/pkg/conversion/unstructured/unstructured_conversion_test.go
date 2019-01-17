@@ -245,6 +245,36 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 				return strings.HasPrefix(err.Error(), "converting (v1.Carp) to (v1.CreateOptions):")
 			},
 		},
+		{
+			name:                  "convert nil unstructured to versioned object will panic",
+			unstructuredToConvert: nil,
+			convertingObject:      &testapigroupv1.Carp{},
+
+			expectPanic: false,
+		},
+		{
+			name: "convert valid hub-typed unstructured to internal object should fail but it's working and ignoring type meta and object meta",
+			unstructuredToConvert: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "__internal",
+					"kind":       "Carp",
+					"metadata": map[string]interface{}{
+						"creationTimestamp": nil,
+						"name":              "noxu",
+					},
+					"spec": map[string]interface{}{
+						"hostname": "example.com",
+					},
+					"status": map[string]interface{}{},
+				},
+			},
+			convertingObject: &testapigroup.Carp{},
+			expectedErrFunc: func(err error) bool {
+				// TODO: check err reflect type equality
+				return err != nil
+			},
+			expectedConvertedObject: nil,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -429,6 +459,21 @@ func TestUnstructuredToGVConversion(t *testing.T) {
 					schema.GroupVersionKind{Group: "", Version: "v9", Kind: "Carp"},
 					nil,
 				))
+			},
+			expectedConvertedObject: nil,
+		},
+		{
+			name: "convert hub-versioned unstructured to mismatching external version should fail",
+			unstructuredToConvert: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "__internal",
+					"kind":       "Carp",
+				},
+			},
+			targetGV: schema.GroupVersion{Group: "foo", Version: "v1beta1"},
+			expectedErrFunc: func(err error) bool {
+				// TODO: check err reflect type equality
+				return err != nil
 			},
 			expectedConvertedObject: nil,
 		},
