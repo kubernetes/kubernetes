@@ -43,7 +43,10 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -56,6 +59,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
+
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func DeleteCinderVolume(name string) error {
@@ -117,6 +122,19 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 			framework.TestVolumeClient(cs, config, nil, tests)
+		})
+
+		It("should allow exec of files on the volume", func() {
+			config, _, serverIP := framework.NewNFSServer(cs, namespace.Name, []string{})
+			defer framework.VolumeTestCleanup(f, config)
+
+			volume := &v1.VolumeSource{
+				NFS: &v1.NFSVolumeSource{
+					Server: serverIP,
+					Path:   "/",
+				},
+			}
+			testScriptInPod(f, volume)
 		})
 	})
 
@@ -565,4 +583,50 @@ func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs cli
 
 	fsGroup := int64(1234)
 	framework.TestVolumeClient(cs, config, &fsGroup, tests)
+}
+
+func testScriptInPod(f *framework.Framework, source *v1.VolumeSource) {
+	const (
+		volPath = "/vol1"
+		volName = "vol1"
+	)
+	suffix := rand.String(4)
+	scriptName := fmt.Sprintf("test-%s.sh", suffix)
+	fullPath := filepath.Join(volPath, scriptName)
+	cmd := fmt.Sprintf("echo \"ls %s\" > %s; chmod u+x %s; %s", volPath, fullPath, fullPath, fullPath)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("exec-volume-test-%s", suffix),
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    fmt.Sprintf("exec-container-%s", suffix),
+					Image:   imageutils.GetE2EImage(imageutils.NginxSlim),
+					Command: []string{"/bin/sh", "-ec", cmd},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volName,
+							MountPath: volPath,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name:         volName,
+					VolumeSource: *source,
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	f.TestContainerOutput("exec-volume-test", pod, 0, []string{scriptName})
+
+	By(fmt.Sprintf("Deleting pod %s", pod.Name))
+	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
 }
