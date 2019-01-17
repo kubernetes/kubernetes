@@ -29,8 +29,6 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +42,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -400,6 +399,11 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+func AddServerSideApplyFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
+	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
+}
+
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
 	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
@@ -471,6 +475,14 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 		}
 	}
 	return nil
+}
+
+func GetServerSideApplyFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "server-side")
+}
+
+func GetForceConflictsFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "force-conflicts")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {

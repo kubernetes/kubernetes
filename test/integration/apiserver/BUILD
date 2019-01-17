@@ -68,6 +68,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/integration/apiserver/apply:all-srcs",
+    ],
     tags = ["automanaged"],
 )

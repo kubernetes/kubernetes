@@ -18,9 +18,8 @@ package persistentvolume
 
 import (
 	"reflect"
-	"testing"
-
 	"strings"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -248,6 +247,9 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	case reflect.Ptr:
 		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
+		if name == "ObjectMeta" {
+			break
+		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
 			secretPaths.Insert(collectSecretPaths(t, path.Child(field.Name), field.Name, field.Type).List()...)

@@ -1,0 +1,143 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package internal
+
+import (
+	"reflect"
+	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/yaml"
+)
+
+// TestRoundTripManagedFields will roundtrip ManagedFields from the format used by
+// sigs.k8s.io/structured-merge-diff to the wire format (api format) and back
+func TestRoundTripManagedFields(t *testing.T) {
+	tests := []string{
+		`foo:
+  apiVersion: v1
+  fields:
+    i:5:
+      f:i: {}
+    v:3:
+      f:alsoPi: {}
+    v:3.1415:
+      f:pi: {}
+    v:false:
+      f:notTrue: {}
+`,
+		`foo:
+  apiVersion: v1
+  fields:
+    f:spec:
+      f:containers:
+        k:{"name":"c"}:
+          f:image: {}
+          f:name: {}
+`,
+		`foo:
+  apiVersion: v1
+  fields:
+    f:apiVersion: {}
+    f:kind: {}
+    f:metadata:
+      f:labels:
+        f:app: {}
+      f:name: {}
+    f:spec:
+      f:replicas: {}
+      f:selector:
+        f:matchLabels:
+          f:app: {}
+      f:template:
+        f:medatada:
+          f:labels:
+            f:app: {}
+        f:spec:
+          f:containers:
+            k:{"name":"nginx"}:
+              .: {}
+              f:image: {}
+              f:name: {}
+              f:ports:
+                i:0:
+                  f:containerPort: {}
+`,
+		`foo:
+  apiVersion: v1
+  fields:
+    f:allowVolumeExpansion: {}
+    f:apiVersion: {}
+    f:kind: {}
+    f:metadata:
+      f:name: {}
+      f:parameters:
+        f:resturl: {}
+        f:restuser: {}
+        f:secretName: {}
+        f:secretNamespace: {}
+    f:provisioner: {}
+`,
+		`foo:
+  apiVersion: v1
+  fields:
+    f:apiVersion: {}
+    f:kind: {}
+    f:metadata:
+      f:name: {}
+    f:spec:
+      f:group: {}
+      f:names:
+        f:kind: {}
+        f:plural: {}
+        f:shortNames:
+          i:0: {}
+        f:singular: {}
+      f:scope: {}
+      f:versions:
+        k:{"name":"v1"}:
+          f:name: {}
+          f:served: {}
+          f:storage: {}
+`,
+	}
+
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			var unmarshaled map[string]metav1.VersionedFields
+			if err := yaml.Unmarshal([]byte(test), &unmarshaled); err != nil {
+				t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+			}
+			decoded, err := decodeManagedFields(unmarshaled)
+			if err != nil {
+				t.Fatalf("did not expect decoding error but got: %v", err)
+			}
+			encoded, err := encodeManagedFields(decoded)
+			if err != nil {
+				t.Fatalf("did not expect encoding error but got: %v", err)
+			}
+			marshaled, err := yaml.Marshal(&encoded)
+			if err != nil {
+				t.Fatalf("did not expect yaml marshalling error but got: %v", err)
+			}
+			if !reflect.DeepEqual(string(marshaled), test) {
+				t.Fatalf("expected:\n%v\nbut got:\n%v", test, string(marshaled))
+			}
+		})
+	}
+}

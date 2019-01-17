@@ -121,7 +121,15 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		var transformers []rest.TransformFunc
+		transformers := []rest.TransformFunc{}
+		if scope.FieldManager != nil {
+			transformers = append(transformers, func(_ context.Context, liveObj, newObj runtime.Object) (runtime.Object, error) {
+				if obj, err = scope.FieldManager.Update(liveObj, newObj, "update"); err != nil {
+					return nil, fmt.Errorf("failed to update object managed fields: %v", err)
+				}
+				return obj, nil
+			})
+		}
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)

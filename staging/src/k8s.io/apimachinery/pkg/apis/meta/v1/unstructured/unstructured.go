@@ -450,3 +450,28 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 	}
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }
+
+func (u *Unstructured) GetManagedFields() map[string]metav1.VersionedFields {
+	m, found, err := nestedMapNoCopy(u.Object, "metadata", "managedFields")
+	if !found || err != nil {
+		return nil
+	}
+	out := &map[string]metav1.VersionedFields{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, out); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve managedFields for object: %v", err))
+		return nil
+	}
+	return *out
+}
+
+func (u *Unstructured) SetManagedFields(managedFields map[string]metav1.VersionedFields) {
+	if managedFields == nil {
+		RemoveNestedField(u.Object, "metadata", "managedFields")
+		return
+	}
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&managedFields)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve managedFields for object: %v", err))
+	}
+	u.setNestedField(out, "metadata", "managedFields")
+}

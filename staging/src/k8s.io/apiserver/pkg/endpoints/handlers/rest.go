@@ -27,8 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,11 +35,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -61,7 +60,7 @@ type RequestScope struct {
 	Trace           *utiltrace.Trace
 
 	TableConvertor rest.TableConvertor
-	OpenAPIModels  openapiproto.Models
+	FieldManager   *fieldmanager.FieldManager
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
