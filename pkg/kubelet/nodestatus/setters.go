@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"crypto/tls"
 	"fmt"
 	"math"
 	"net"
@@ -26,7 +27,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -442,6 +443,7 @@ func ReadyCondition(
 	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
+	servingCertStatusFunc func() *tls.Certificate, // typically Kubelet.serverCertificateManager.Current
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
 	return func(node *v1.Node) error {
@@ -469,6 +471,17 @@ func ReadyCondition(
 		}
 		if len(missingCapacities) > 0 {
 			errs = append(errs, fmt.Errorf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
+		}
+		if servingCertStatusFunc != nil {
+			crt := servingCertStatusFunc()
+			switch {
+			case crt == nil:
+				errs = append(errs, fmt.Errorf("no serving certificate available for the kubelet"))
+			case time.Now().Before(crt.Leaf.NotBefore):
+				errs = append(errs, fmt.Errorf("serving certificate for the kubelet not valid yet"))
+			case time.Now().After(crt.Leaf.NotAfter):
+				errs = append(errs, fmt.Errorf("serving certificate for the kubelet expired"))
+			}
 		}
 		if aggregatedErr := errors.NewAggregate(errs); aggregatedErr != nil {
 			newNodeReadyCondition = v1.NodeCondition{

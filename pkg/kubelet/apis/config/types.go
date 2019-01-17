@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -109,6 +109,8 @@ type KubeletConfiguration struct {
 	// the certificates.k8s.io API. This requires an approver to approve the
 	// certificate signing requests. The RotateKubeletServerCertificate feature
 	// must be enabled.
+	// When enabled, Node will report NotReady status until serving certificate
+	// is provisioned.
 	ServerTLSBootstrap bool
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication

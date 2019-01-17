@@ -17,6 +17,8 @@ limitations under the License.
 package nodestatus
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
@@ -27,7 +29,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -897,6 +899,7 @@ func TestReadyCondition(t *testing.T) {
 		networkErrors            error
 		appArmorValidateHostFunc func() error
 		cmStatus                 cm.Status
+		servingCert              func() *tls.Certificate
 		expectConditions         []v1.NodeCondition
 		expectEvents             []testEvent
 	}{
@@ -994,6 +997,47 @@ func TestReadyCondition(t *testing.T) {
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", before, now)},
 			expectEvents:     []testEvent{},
 		},
+		{
+			desc:             "ready with valid serving cert",
+			node:             withCapacity.DeepCopy(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
+			servingCert: func() *tls.Certificate {
+				return &tls.Certificate{Leaf: &x509.Certificate{
+					NotBefore: time.Now().Add(-1 * time.Hour),
+					NotAfter:  time.Now().Add(time.Hour),
+				}}
+			},
+		},
+		{
+			desc:             "not ready with missing serving cert",
+			node:             withCapacity.DeepCopy(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "no serving certificate available for the kubelet", now, now)},
+			servingCert: func() *tls.Certificate {
+				return nil
+			},
+		},
+		{
+			desc:             "not ready with expired serving cert",
+			node:             withCapacity.DeepCopy(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "serving certificate for the kubelet expired", now, now)},
+			servingCert: func() *tls.Certificate {
+				return &tls.Certificate{Leaf: &x509.Certificate{
+					NotBefore: time.Now().Add(-2 * time.Hour),
+					NotAfter:  time.Now().Add(-1 * time.Hour),
+				}}
+			},
+		},
+		{
+			desc:             "not ready with not yet valid serving cert",
+			node:             withCapacity.DeepCopy(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "serving certificate for the kubelet not valid yet", now, now)},
+			servingCert: func() *tls.Certificate {
+				return &tls.Certificate{Leaf: &x509.Certificate{
+					NotBefore: time.Now().Add(1 * time.Hour),
+					NotAfter:  time.Now().Add(2 * time.Hour),
+				}}
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1014,7 +1058,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, tc.servingCert, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
