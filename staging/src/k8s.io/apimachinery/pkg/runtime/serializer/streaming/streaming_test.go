@@ -51,7 +51,7 @@ func TestDecoder(t *testing.T) {
 	frames := [][]byte{
 		make([]byte, 1025),
 		make([]byte, 1024*5),
-		make([]byte, 1024*1024*5),
+		make([]byte, 1024*1024*17),
 		make([]byte, 1025),
 	}
 	pr, pw := io.Pipe()
