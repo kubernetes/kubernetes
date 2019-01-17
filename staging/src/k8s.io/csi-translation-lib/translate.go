@@ -27,6 +27,7 @@ var (
 	inTreePlugins = map[string]plugins.InTreePlugin{
 		plugins.GCEPDDriverName:  &plugins.GCEPD{},
 		plugins.AWSEBSDriverName: &plugins.AWSEBS{},
+		plugins.CinderDriverName: plugins.NewOpenStackCinderCSITranslator(),
 	}
 )
 
