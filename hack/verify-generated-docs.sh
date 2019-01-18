@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -43,7 +43,7 @@ fi
 
 # Verify the files in the repo all contain the boilerplate instead of the actual
 # content.
-while read file; do
+while read -r file; do
   # Ignore docs/.generated_docs-- it should not have the boilerplate!
   [[ "${file}" == "docs/.generated_docs" ]] && continue
 

@@ -136,7 +136,6 @@
 ./hack/update-staging-godeps.sh
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
-./hack/verify-generated-docs.sh
 ./hack/verify-generated-files-remake.sh
 ./hack/verify-generated-files.sh
 ./hack/verify-generated-kms.sh
