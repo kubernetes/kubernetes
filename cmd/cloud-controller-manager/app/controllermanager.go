@@ -213,6 +213,10 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan st
 	if cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
 		cloud.Initialize(c.ClientBuilder, stopCh)
+		// Set the informer on the user cloud object
+		if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+			informerUserCloud.SetInformers(c.SharedInformers)
+		}
 	}
 
 	for controllerName, initFn := range controllers {
