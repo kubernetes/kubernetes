@@ -446,6 +446,19 @@ function append_or_replace_prefixed_line {
   mv "${tmpfile}" "${file}"
 }
 
+# write_extra_known_tokens assumes that EXTRA_KNOWN_TOKENS is formatted like:
+# $token1,system:$user1,uid:$user1 $token2...
+#
+# $1: is the known tokens file
+#
+# Assumes vars (supplied via kube-env):
+# EXTRA_KNOWN_TOKENS
+function write_extra_known_tokens {
+  for line in ${EXTRA_KNOWN_TOKENS[@]}; do
+    append_or_replace_prefixed_line $1 line
+  done
+}
+
 function write-pki-data {
   local data="${1}"
   local path="${2}"
@@ -578,6 +591,9 @@ function create-master-auth {
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+  fi
+  if [[ -n "${EXTRA_KNOWN_TOKENS:-}" ]]; then
+    write_extra_known_tokens "${known_tokens_csv}"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
