@@ -435,7 +435,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 					err)
 				continue
 			}
-			if adc.actualStateOfWorld.VolumeNodeExists(volumeName, nodeName) {
+			if adc.actualStateOfWorld.IsVolumeAttachedToNode(volumeName, nodeName) {
 				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
 				if err != nil {
 					klog.Errorf("Failed to find device path: %v", err)
