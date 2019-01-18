@@ -73,7 +73,7 @@ var (
 	matchInterPodAffinitySet      = sets.NewString(predicates.MatchInterPodAffinityPred)
 	generalPredicatesSets         = sets.NewString(predicates.GeneralPred)
 	noDiskConflictSet             = sets.NewString(predicates.NoDiskConflictPred)
-	maxPDVolumeCountPredicateKeys = []string{predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred, predicates.MaxEBSVolumeCountPred}
+	maxPDVolumeCountPredicateKeys = []string{predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred, predicates.MaxEBSVolumeCountPred, predicates.MaxCinderVolumeCountPred}
 )
 
 // Binder knows how to write a binding.

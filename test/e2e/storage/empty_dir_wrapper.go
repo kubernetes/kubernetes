@@ -342,6 +342,8 @@ func makeConfigMapVolumes(configMapNames []string) (volumes []v1.Volume, volumeM
 }
 
 func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volumeMounts []v1.VolumeMount, podCount int32) {
+	const nodeHostnameLabelKey = "kubernetes.io/hostname"
+
 	rcName := wrappedVolumeRaceRCNamePrefix + string(uuid.NewUUID())
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
@@ -355,9 +357,9 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 					{
 						MatchExpressions: []v1.NodeSelectorRequirement{
 							{
-								Key:      "kubernetes.io/hostname",
+								Key:      nodeHostnameLabelKey,
 								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{targetNode.Name},
+								Values:   []string{targetNode.Labels[nodeHostnameLabelKey]},
 							},
 						},
 					},

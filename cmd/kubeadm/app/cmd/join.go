@@ -419,6 +419,10 @@ func (j *joinData) Run() error {
 		fmt.Println("[join] Running pre-flight checks before initializing the new control plane instance")
 		preflight.RunInitMasterChecks(utilsexec.New(), initCfg, j.ignorePreflightErrors)
 
+		fmt.Println("[join] Pulling control-plane images")
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, j.ignorePreflightErrors); err != nil {
+			return err
+		}
 		// Prepares the node for hosting a new control plane instance by writing necessary
 		// kubeconfig files, and static pod manifests
 		if err := j.PrepareForHostingControlPlane(initCfg); err != nil {

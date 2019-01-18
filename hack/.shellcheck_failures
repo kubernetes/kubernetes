@@ -69,7 +69,6 @@
 ./hack/benchmark-go.sh
 ./hack/build-cross.sh
 ./hack/build-go.sh
-./hack/build-ui.sh
 ./hack/cherry_pick_pull.sh
 ./hack/dev-build-and-push.sh
 ./hack/dev-build-and-up.sh
@@ -125,7 +124,6 @@
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
 ./hack/update-all.sh
-./hack/update-api-reference-docs.sh
 ./hack/update-bazel.sh
 ./hack/update-codegen.sh
 ./hack/update-generated-device-plugin-dockerized.sh
@@ -147,12 +145,10 @@
 ./hack/update-openapi-spec.sh
 ./hack/update-staging-godeps-dockerized.sh
 ./hack/update-staging-godeps.sh
-./hack/update-swagger-spec.sh
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
 ./hack/verify-all.sh
 ./hack/verify-api-groups.sh
-./hack/verify-api-reference-docs.sh
 ./hack/verify-bazel.sh
 ./hack/verify-boilerplate.sh
 ./hack/verify-cli-conventions.sh
@@ -183,7 +179,6 @@
 ./hack/verify-spelling.sh
 ./hack/verify-staging-godeps.sh
 ./hack/verify-staging-meta-files.sh
-./hack/verify-swagger-spec.sh
 ./hack/verify-symbols.sh
 ./hack/verify-test-featuregates.sh
 ./hack/verify-test-images.sh

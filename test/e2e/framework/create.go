@@ -31,8 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -397,27 +395,9 @@ func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, er
 		return nil, ItemNotSupported
 	}
 
-	// Impersonation is required for Kubernetes < 1.12, see
-	// https://github.com/kubernetes/kubernetes/issues/62237#issuecomment-429315111
-	//
-	// This code is kept even for more recent Kubernetes, because users of
-	// the framework outside of Kubernetes might run against an older version
-	// of Kubernetes. It will be deprecated eventually.
-	//
-	// TODO: is this only needed for a ClusterRole or also for other non-namespaced
-	// items?
-	Logf("Creating an impersonating superuser kubernetes clientset to define cluster role")
-	rc, err := LoadConfig()
-	ExpectNoError(err)
-	rc.Impersonate = restclient.ImpersonationConfig{
-		UserName: "superuser",
-		Groups:   []string{"system:masters"},
-	}
-	superuserClientset, err := clientset.NewForConfig(rc)
-	ExpectNoError(err, "create superuser clientset")
-
-	client := superuserClientset.RbacV1().ClusterRoles()
-	if _, err = client.Create(item); err != nil {
+	Logf("Define cluster role %v", item.GetName())
+	client := f.ClientSet.RbacV1().ClusterRoles()
+	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRole")
 	}
 	return func() error {

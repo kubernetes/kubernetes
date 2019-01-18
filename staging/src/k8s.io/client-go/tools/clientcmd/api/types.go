@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -150,6 +152,25 @@ type AuthProviderConfig struct {
 	Config map[string]string `json:"config,omitempty"`
 }
 
+var _ fmt.Stringer = new(AuthProviderConfig)
+var _ fmt.GoStringer = new(AuthProviderConfig)
+
+// GoString implements fmt.GoStringer and sanitizes sensitive fields of
+// AuthProviderConfig to prevent accidental leaking via logs.
+func (c AuthProviderConfig) GoString() string {
+	return c.String()
+}
+
+// String implements fmt.Stringer and sanitizes sensitive fields of
+// AuthProviderConfig to prevent accidental leaking via logs.
+func (c AuthProviderConfig) String() string {
+	cfg := "<nil>"
+	if c.Config != nil {
+		cfg = "--- REDACTED ---"
+	}
+	return fmt.Sprintf("api.AuthProviderConfig{Name: %q, Config: map[string]string{%s}}", c.Name, cfg)
+}
+
 // ExecConfig specifies a command to provide client credentials. The command is exec'd
 // and outputs structured stdout holding credentials.
 //
@@ -170,6 +191,29 @@ type ExecConfig struct {
 	// Preferred input version of the ExecInfo. The returned ExecCredentials MUST use
 	// the same encoding version as the input.
 	APIVersion string `json:"apiVersion,omitempty"`
+}
+
+var _ fmt.Stringer = new(ExecConfig)
+var _ fmt.GoStringer = new(ExecConfig)
+
+// GoString implements fmt.GoStringer and sanitizes sensitive fields of
+// ExecConfig to prevent accidental leaking via logs.
+func (c ExecConfig) GoString() string {
+	return c.String()
+}
+
+// String implements fmt.Stringer and sanitizes sensitive fields of ExecConfig
+// to prevent accidental leaking via logs.
+func (c ExecConfig) String() string {
+	var args []string
+	if len(c.Args) > 0 {
+		args = []string{"--- REDACTED ---"}
+	}
+	env := "[]ExecEnvVar(nil)"
+	if len(c.Env) > 0 {
+		env = "[]ExecEnvVar{--- REDACTED ---}"
+	}
+	return fmt.Sprintf("api.AuthProviderConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q}", c.Command, args, env, c.APIVersion)
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based

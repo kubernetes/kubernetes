@@ -328,8 +328,6 @@ func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, 
 		}
 	}
 
-	env.internalBinder.podBindingCache.UpdateBindings(pod, node, bindings)
-
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range provisionings {
 		if err := pvcCache.Assume(pvc); err != nil {
@@ -337,14 +335,12 @@ func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, 
 		}
 	}
 
-	env.internalBinder.podBindingCache.UpdateProvisionedPVCs(pod, node, provisionings)
+	env.internalBinder.podBindingCache.UpdateBindings(pod, node, bindings, provisionings)
 }
 
 func (env *testEnv) initPodCache(pod *v1.Pod, node string, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
 	cache := env.internalBinder.podBindingCache
-	cache.UpdateBindings(pod, node, bindings)
-
-	cache.UpdateProvisionedPVCs(pod, node, provisionings)
+	cache.UpdateBindings(pod, node, bindings, provisionings)
 }
 
 func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Pod, expectedBindings []*bindingInfo, expectedProvisionings []*v1.PersistentVolumeClaim) {
