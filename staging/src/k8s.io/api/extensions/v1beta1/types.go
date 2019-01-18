@@ -168,8 +168,8 @@ type DeploymentSpec struct {
 	// is considered to be failed. The deployment controller will continue to
 	// process failed deployments and a condition with a ProgressDeadlineExceeded
 	// reason will be surfaced in the deployment status. Note that progress will
-	// not be estimated during the time a deployment is paused. This is not set
-	// by default.
+	// not be estimated during the time a deployment is paused. This is set to
+	// the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
 	// +optional
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }

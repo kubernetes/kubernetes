@@ -36,7 +36,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
-	if d.Spec.ProgressDeadlineSeconds == nil {
+	if !util.HasProgressDeadline(d) {
 		util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
 	}
 
@@ -47,7 +47,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 	isCompleteDeployment := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
 	// Check for progress only if there is a progress deadline set and the latest rollout
 	// hasn't completed yet.
-	if d.Spec.ProgressDeadlineSeconds != nil && !isCompleteDeployment {
+	if util.HasProgressDeadline(d) && !isCompleteDeployment {
 		switch {
 		case util.DeploymentComplete(d, &newStatus):
 			// Update the deployment conditions with a message for the new replica set that
@@ -159,7 +159,7 @@ var nowFn = func() time.Time { return time.Now() }
 func (dc *DeploymentController) requeueStuckDeployment(d *apps.Deployment, newStatus apps.DeploymentStatus) time.Duration {
 	currentCond := util.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
 	// Can't estimate progress if there is no deadline in the spec or progressing condition in the current status.
-	if d.Spec.ProgressDeadlineSeconds == nil || currentCond == nil {
+	if !util.HasProgressDeadline(d) || currentCond == nil {
 		return time.Duration(-1)
 	}
 	// No need to estimate progress if the rollout is complete or already timed out.
