@@ -539,9 +539,9 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// get port
 	serverPort := ln.Addr().(*net.TCPAddr).Port
-	err = RunServer(insecureServer, ln, 10*time.Second, stopCh)
+	stoppedCh, err := RunServer(insecureServer, ln, 10*time.Second, stopCh)
 	if err != nil {
-		t.Errorf("RunServer err: %v", err)
+		t.Fatalf("RunServer err: %v", err)
 	}
 
 	graceCh := make(chan struct{})
@@ -568,6 +568,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// wait for wait group handler finish
 	s.HandlerChainWaitGroup.Wait()
+	<-stoppedCh
 
 	// check server all handlers finished.
 	if !graceShutdown {
