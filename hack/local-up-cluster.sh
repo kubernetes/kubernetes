@@ -129,7 +129,7 @@ fi
 
 # set feature gates if enable Pod priority and preemption
 if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
-    FEATURE_GATES="$FEATURE_GATES,PodPriority=true"
+    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
 fi
 
 # warn if users are running with swap allowed
@@ -172,12 +172,12 @@ do
     case ${OPTION} in
         o)
             echo "skipping build"
-            GO_OUT="$OPTARG"
-            echo "using source $GO_OUT"
+            GO_OUT="${OPTARG}"
+            echo "using source ${GO_OUT}"
             ;;
         O)
             GO_OUT=$(guess_built_binary_path)
-            if [ "$GO_OUT" == "" ]; then
+            if [ "${GO_OUT}" == "" ]; then
                 echo "Could not guess the correct output directory to use."
                 exit 1
             fi
@@ -193,7 +193,7 @@ do
     esac
 done
 
-if [ "x$GO_OUT" == "x" ]; then
+if [ "x${GO_OUT}" == "x" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
 else
     echo "skipped the build."
@@ -367,7 +367,7 @@ cleanup()
   [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
   [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS} 2>/dev/null
 
-  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+  if [[ -n "${DOCKERIZE_KUBELET}" ]]; then
     cleanup_dockerized_kubelet
   else
     # Check if the kubelet is still running
@@ -404,7 +404,7 @@ function healthcheck {
     CTLRMGR_PID=
   fi
 
-  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+  if [[ -n "${DOCKERIZE_KUBELET}" ]]; then
     # TODO (https://github.com/kubernetes/kubernetes/issues/62474): check health also in this case
     :
   elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
@@ -648,11 +648,11 @@ function start_controller_manager {
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       ${cloud_config_arg} \
-      --kubeconfig "$CERT_DIR"/controller.kubeconfig \
+      --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
       --leader-elect=false \
-      --cert-dir="$CERT_DIR" \
+      --cert-dir="${CERT_DIR}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -680,7 +680,7 @@ function start_cloud_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider=${CLOUD_PROVIDER} \
       --cloud-config=${CLOUD_CONFIG} \
-      --kubeconfig "$CERT_DIR"/controller.kubeconfig \
+      --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --leader-elect=false \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
@@ -763,7 +763,7 @@ function start_kubelet {
       --hostname-override="${HOSTNAME_OVERRIDE}"
       ${cloud_config_arg}
       --address="${KUBELET_HOST}"
-      --kubeconfig "$CERT_DIR"/kubelet.kubeconfig
+      --kubeconfig "${CERT_DIR}"/kubelet.kubeconfig
       --feature-gates="${FEATURE_GATES}"
       --cpu-cfs-quota="${CPU_CFS_QUOTA}"
       --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
@@ -782,7 +782,7 @@ function start_kubelet {
       ${net_plugin_args}
       ${container_runtime_endpoint_args}
       ${image_service_endpoint_args}
-      --port="$KUBELET_PORT"
+      --port="${KUBELET_PORT}"
       ${KUBELET_FLAGS}
     )
 
@@ -792,7 +792,7 @@ function start_kubelet {
     else
 
       # Build the hyperkube container image if necessary
-      if [[ -z "$KUBELET_IMAGE" && -n "$DOCKERIZE_KUBELET" ]]; then
+      if [[ -z "${KUBELET_IMAGE}" && -n "${DOCKERIZE_KUBELET}" ]]; then
         HYPERKUBE_BIN="${GO_OUT}/hyperkube" REGISTRY="k8s.gcr.io" VERSION="latest" make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
         KUBELET_IMAGE="k8s.gcr.io/hyperkube-amd64:latest"
       fi
@@ -849,7 +849,7 @@ function start_kubelet {
         echo -n "Trying to get PID of kubelet container..."
         KUBELET_PID=$(docker inspect kubelet -f '{{.State.Pid}}' 2>/dev/null || true)
         if [[ -n ${KUBELET_PID} && ${KUBELET_PID} -gt 0 ]]; then
-            echo " ok, $KUBELET_PID."
+            echo " ok, ${KUBELET_PID}."
             break
         else
             echo " failed, retry in 1 second."
@@ -858,8 +858,8 @@ function start_kubelet {
       done
     fi
     # Quick check that kubelet is running.
-    if [ -n "$KUBELET_PID" ] && ps -p ${KUBELET_PID} > /dev/null; then
-      echo "kubelet ( $KUBELET_PID ) is running."
+    if [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null; then
+      echo "kubelet ( ${KUBELET_PID} ) is running."
     else
       cat ${KUBELET_LOG} ; exit 1
     fi
@@ -896,7 +896,7 @@ EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
       --leader-elect=false \
-      --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
+      --kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --feature-gates="${FEATURE_GATES}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
@@ -947,17 +947,17 @@ function create_psp_policy {
 }
 
 function create_storage_class {
-    if [ -z "$CLOUD_PROVIDER" ]; then
+    if [ -z "${CLOUD_PROVIDER}" ]; then
         CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/local/default.yaml
     else
         CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     fi
 
     if [ -e ${CLASS_FILE} ]; then
-        echo "Create default storage class for $CLOUD_PROVIDER"
+        echo "Create default storage class for ${CLOUD_PROVIDER}"
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${CLASS_FILE}
     else
-        echo "No storage class available for $CLOUD_PROVIDER."
+        echo "No storage class available for ${CLOUD_PROVIDER}."
     fi
 }
 
@@ -1053,11 +1053,11 @@ kube::util::test_openssl_installed
 kube::util::ensure-cfssl
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
-if [ "$GO_OUT" == "" ]; then
+if [ "${GO_OUT}" == "" ]; then
   detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
-echo "Using GO_OUT $GO_OUT"
+echo "Using GO_OUT ${GO_OUT}"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
@@ -1101,7 +1101,7 @@ if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 
-if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
+if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
   create_storage_class
 fi
 
