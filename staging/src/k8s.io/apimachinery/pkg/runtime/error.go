@@ -120,3 +120,43 @@ func IsMissingVersion(err error) bool {
 	_, ok := err.(*missingVersionErr)
 	return ok
 }
+
+// strictDecoderError is a base error type that is returned by a strict Decoder such
+// as UniversalStrictDecoder.
+type strictDecoderError struct {
+	message      string
+	gvk          schema.GroupVersionKind
+	originalData []byte
+}
+
+// NewStrictDecoderError creates a new strictDecoderError object
+func NewStrictDecoderError(message string, gvk schema.GroupVersionKind, originalData []byte) error {
+	return &strictDecoderError{
+		message:      message,
+		gvk:          gvk,
+		originalData: originalData,
+	}
+}
+
+func (e *strictDecoderError) Error() string {
+	return fmt.Sprintf("strict decoder error for %#v: %s", e.gvk, e.message)
+}
+
+// GVK returns the GVK that was extracted when Decoding using a strict Decoder.
+func (e *strictDecoderError) GVK() schema.GroupVersionKind {
+	return e.gvk
+}
+
+// OriginalData returns the original byte slice input that was passed to a strict Decoder.
+func (e *strictDecoderError) OriginalData() []byte {
+	return e.originalData
+}
+
+// IsStrictDecoderError returns true if the error is a result of a strict Decoder.
+func IsStrictDecoderError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*strictDecoderError)
+	return ok
+}

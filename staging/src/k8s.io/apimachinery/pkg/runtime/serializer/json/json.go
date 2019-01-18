@@ -45,6 +45,20 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 	}
 }
 
+// NewStrictSerializer is the same as NewSerializer except that it creates a strict JSON serializer
+// that can also return errors of type strictDecoderError.
+// Note that this serializer is not as performant as the non-strict variant, and should not be used in fast paths.
+func NewStrictSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
+	return &Serializer{
+		meta:    meta,
+		creater: creater,
+		typer:   typer,
+		yaml:    false,
+		pretty:  pretty,
+		strict:  true,
+	}
+}
+
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
 // is not nil, the object has the group, version, and kind fields set. This serializer supports only the subset of YAML that
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
@@ -57,12 +71,26 @@ func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer ru
 	}
 }
 
+// NewStrictYAMLSerializer is the same as NewYAMLSerializer except that it creates a strict YAML serializer
+// that can also return errors of type strictDecoderError.
+// Note that this serializer is not as performant as the non-strict variant, and should not be used in fast paths.
+func NewStrictYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
+	return &Serializer{
+		meta:    meta,
+		creater: creater,
+		typer:   typer,
+		yaml:    true,
+		strict:  true,
+	}
+}
+
 type Serializer struct {
 	meta    MetaFactory
 	creater runtime.ObjectCreater
 	typer   runtime.ObjectTyper
 	yaml    bool
 	pretty  bool
+	strict  bool
 }
 
 // Serializer implements Serializer
@@ -119,11 +147,28 @@ func CaseSensitiveJsonIterator() jsoniter.API {
 	return config
 }
 
-// Private copy of jsoniter to try to shield against possible mutations
+// StrictCaseSensitiveJsonIterator returns a jsoniterator API that's configured to be
+// case-sensitive, but also disallows unknown fields when unmarshalling. It is compatible with
+// the encoding/json standard library.
+func StrictCaseSensitiveJsonIterator() jsoniter.API {
+	config := jsoniter.Config{
+		EscapeHTML:             true,
+		SortMapKeys:            true,
+		ValidateJsonRawMessage: true,
+		CaseSensitive:          true,
+		DisallowUnknownFields:  true,
+	}.Froze()
+	// Force jsoniter to decode number to interface{} via int64/float64, if possible.
+	config.RegisterExtension(&customNumberExtension{})
+	return config
+}
+
+// Private copies of jsoniter to try to shield against possible mutations
 // from outside. Still does not protect from package level jsoniter.Register*() functions - someone calling them
 // in some other library will mess with every usage of the jsoniter library in the whole program.
 // See https://github.com/json-iterator/go/issues/265
 var caseSensitiveJsonIterator = CaseSensitiveJsonIterator()
+var strictCaseSensitiveJsonIterator = StrictCaseSensitiveJsonIterator()
 
 // gvkWithDefaults returns group kind and version defaulting from provided default
 func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVersionKind {
@@ -216,6 +261,32 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	if err := caseSensitiveJsonIterator.Unmarshal(data, obj); err != nil {
 		return nil, actual, err
 	}
+
+	// If the deserializer is non-strict, return successfully here.
+	if !s.strict {
+		return obj, actual, nil
+	}
+
+	// In strict mode pass the data trough the YAMLToJSONStrict converter.
+	// This is done to catch duplicate fields regardless of encoding (JSON or YAML). For JSON data,
+	// the output would equal the input, unless there is a parsing error such as duplicate fields.
+	// As we know this was successful in the non-strict case, the only error that may be returned here
+	// is because of the newly-added strictness. hence we know we can return the typed strictDecoderError
+	// the actual error is that the object contains duplicate fields.
+	altered, err := yaml.YAMLToJSONStrict(originalData)
+	if err != nil {
+		return nil, actual, runtime.NewStrictDecoderError(err.Error(), *actual, originalData)
+	}
+	// As performance is not an issue for now for the strict deserializer (one has regardless to do
+	// the unmarshal twice), we take the sanitized, altered data that is guaranteed to have no duplicated
+	// fields, and unmarshal this into a copy of the already-populated obj. Any error that occurs here is
+	// due to that a matching field doesn't exist in the object. hence we can return a typed strictDecoderError,
+	// the actual error is that the object contains unknown field.
+	strictObj := obj.DeepCopyObject()
+	if err := strictCaseSensitiveJsonIterator.Unmarshal(altered, strictObj); err != nil {
+		return nil, actual, runtime.NewStrictDecoderError(err.Error(), *actual, originalData)
+	}
+	// Always return the same object as the non-strict serializer to avoid any deviations.
 	return obj, actual, nil
 }
 
