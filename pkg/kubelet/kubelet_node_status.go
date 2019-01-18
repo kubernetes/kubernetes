@@ -151,6 +151,8 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		kubeletapis.LabelInstanceType,
 		kubeletapis.LabelOS,
 		kubeletapis.LabelArch,
+		kubeletapis.LegacyLabelOS,
+		kubeletapis.LegacyLabelArch,
 	}
 
 	needsUpdate := false
@@ -213,9 +215,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				kubeletapis.LabelHostname: kl.hostname,
-				kubeletapis.LabelOS:       goruntime.GOOS,
-				kubeletapis.LabelArch:     goruntime.GOARCH,
+				kubeletapis.LabelHostname:   kl.hostname,
+				kubeletapis.LabelOS:         goruntime.GOOS,
+				kubeletapis.LabelArch:       goruntime.GOARCH,
+				kubeletapis.LegacyLabelOS:   goruntime.GOOS,
+				kubeletapis.LegacyLabelArch: goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
