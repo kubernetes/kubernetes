@@ -20,8 +20,6 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/quota/v1:go_default_library",
         "//pkg/quota/v1/generic:go_default_library",
-        "//pkg/util/reflector/prometheus:go_default_library",
-        "//pkg/util/workqueue/prometheus:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/install:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1:go_default_library",

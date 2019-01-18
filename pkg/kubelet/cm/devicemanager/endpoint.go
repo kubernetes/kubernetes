@@ -54,7 +54,7 @@ type endpointImpl struct {
 	cb    monitorCallback
 }
 
-// newEndpoint creates a new endpoint for the given resourceName.
+// newEndpointImpl creates a new endpoint for the given resourceName.
 // This is to be used during normal device plugin registration.
 func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)

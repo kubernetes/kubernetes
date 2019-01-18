@@ -24,9 +24,7 @@ import (
 
 // SAControllerOptions holds the ServiceAccountController options.
 type SAControllerOptions struct {
-	ServiceAccountKeyFile  string
-	ConcurrentSATokenSyncs int32
-	RootCAFile             string
+	*kubectrlmgrconfig.SAControllerConfiguration
 }
 
 // AddFlags adds flags related to ServiceAccountController for controller manager to the specified FlagSet

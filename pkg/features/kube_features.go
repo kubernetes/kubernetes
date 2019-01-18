@@ -236,8 +236,9 @@ const (
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
 
-	// owner: @dims
+	// owner: @dims, @derekwaynecarr
 	// alpha: v1.10
+	// beta: v1.14
 	//
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit utilfeature.Feature = "SupportPodPidsLimit"
@@ -389,6 +390,24 @@ const (
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the in-tree storage to CSI Plugin migration feature.
+	CSIMigration utilfeature.Feature = "CSIMigration"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
+	CSIMigrationGCE utilfeature.Feature = "CSIMigrationGCE"
+
+	// owner: @leakingtapan
+	// alpha: v1.14
+	//
+	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
+	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
 )
 
 func init() {
@@ -433,7 +452,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
-	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
+	SupportPodPidsLimit:                         {Default: true, PreRelease: utilfeature.Beta},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
@@ -441,6 +460,9 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
+	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},

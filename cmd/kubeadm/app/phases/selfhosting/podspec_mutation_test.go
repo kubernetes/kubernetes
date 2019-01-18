@@ -414,6 +414,8 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/controller-manager.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/controller-manager.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/controller-manager.conf",
 							"--foo=bar",
 						},
 					},
@@ -467,6 +469,8 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
 							"--foo=bar",
 						},
 					},

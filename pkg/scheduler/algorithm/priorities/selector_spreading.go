@@ -46,7 +46,7 @@ func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
 	replicaSetLister algorithm.ReplicaSetLister,
-	statefulSetLister algorithm.StatefulSetLister) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+	statefulSetLister algorithm.StatefulSetLister) (PriorityMapFunction, PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
@@ -84,29 +84,11 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 		}, nil
 	}
 
-	count := int(0)
-	for _, nodePod := range nodeInfo.Pods() {
-		if pod.Namespace != nodePod.Namespace {
-			continue
-		}
-		// When we are replacing a failed pod, we often see the previous
-		// deleted version while scheduling the replacement.
-		// Ignore the previous deleted version for spreading purposes
-		// (it can still be considered for resource restrictions etc.)
-		if nodePod.DeletionTimestamp != nil {
-			klog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
-			continue
-		}
-		for _, selector := range selectors {
-			if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
-				count++
-				break
-			}
-		}
-	}
+	count := countMatchingPods(pod.Namespace, selectors, nodeInfo)
+
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: int(count),
+		Score: count,
 	}, nil
 }
 
@@ -177,7 +159,7 @@ type ServiceAntiAffinity struct {
 }
 
 // NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
-func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
 	antiAffinity := &ServiceAntiAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,
@@ -201,19 +183,29 @@ func (s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (m
 	return labeledNodes, nonLabeledNodes
 }
 
-// filteredPod get pods based on namespace and selector
-func filteredPod(namespace string, selector labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) (pods []*v1.Pod) {
-	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || selector == nil {
-		return []*v1.Pod{}
+// countMatchingPods cout pods based on namespace and matching all selectors
+func countMatchingPods(namespace string, selectors []labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
+	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || len(selectors) == 0 {
+		return 0
 	}
+	count := 0
 	for _, pod := range nodeInfo.Pods() {
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
-		if namespace == pod.Namespace && pod.DeletionTimestamp == nil && selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
+		if namespace == pod.Namespace && pod.DeletionTimestamp == nil {
+			matches := true
+			for _, selector := range selectors {
+				if !selector.Matches(labels.Set(pod.Labels)) {
+					matches = false
+					break
+				}
+			}
+			if matches {
+				count++
+			}
 		}
 	}
-	return
+	return count
 }
 
 // CalculateAntiAffinityPriorityMap spreads pods by minimizing the number of pods belonging to the same service
@@ -232,11 +224,15 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 		firstServiceSelector = getFirstServiceSelector(pod, s.serviceLister)
 	}
 	//pods matched namespace,selector on current node
-	matchedPodsOfNode := filteredPod(pod.Namespace, firstServiceSelector, nodeInfo)
+	var selectors []labels.Selector
+	if firstServiceSelector != nil {
+		selectors = append(selectors, firstServiceSelector)
+	}
+	score := countMatchingPods(pod.Namespace, selectors, nodeInfo)
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: int(len(matchedPodsOfNode)),
+		Score: score,
 	}, nil
 }
 

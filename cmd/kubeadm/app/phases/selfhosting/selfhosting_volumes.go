@@ -202,6 +202,19 @@ func controllerManagerCertificatesVolumeSource() v1.VolumeSource {
 						},
 					},
 				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.FrontProxyCACertName,
+							},
+						},
+					},
+				},
 			},
 		},
 	}

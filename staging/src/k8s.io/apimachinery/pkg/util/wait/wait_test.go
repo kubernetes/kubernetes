@@ -456,11 +456,42 @@ func TestWaitFor(t *testing.T) {
 	}
 }
 
+// TestWaitForWithEarlyClosingWaitFunc tests WaitFor when the WaitFunc closes its channel. The WaitFor should
+// always return ErrWaitTimeout.
+func TestWaitForWithEarlyClosingWaitFunc(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	start := time.Now()
+	err := WaitFor(func(done <-chan struct{}) <-chan struct{} {
+		c := make(chan struct{})
+		close(c)
+		return c
+	}, func() (bool, error) {
+		return false, nil
+	}, stopCh)
+	duration := time.Now().Sub(start)
+
+	// The WaitFor should return immediately, so the duration is close to 0s.
+	if duration >= ForeverTestTimeout/2 {
+		t.Errorf("expected short timeout duration")
+	}
+	if err != ErrWaitTimeout {
+		t.Errorf("expected ErrWaitTimeout from WaitFunc")
+	}
+}
+
+// TestWaitForWithClosedChannel tests WaitFor when it receives a closed channel. The WaitFor should
+// always return ErrWaitTimeout.
 func TestWaitForWithClosedChannel(t *testing.T) {
 	stopCh := make(chan struct{})
 	close(stopCh)
+	c := make(chan struct{})
+	defer close(c)
 	start := time.Now()
-	err := WaitFor(poller(ForeverTestTimeout, ForeverTestTimeout), func() (bool, error) {
+	err := WaitFor(func(done <-chan struct{}) <-chan struct{} {
+		return c
+	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
 	duration := time.Now().Sub(start)

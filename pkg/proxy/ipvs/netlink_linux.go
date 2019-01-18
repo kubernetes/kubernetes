@@ -33,7 +33,7 @@ type netlinkHandle struct {
 	isIPv6 bool
 }
 
-// NewNetLinkHandle will crate a new NetLinkHandle
+// NewNetLinkHandle will create a new NetLinkHandle
 func NewNetLinkHandle(isIPv6 bool) NetLinkHandle {
 	return &netlinkHandle{netlink.Handle{}, isIPv6}
 }

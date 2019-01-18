@@ -28,6 +28,9 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeModeInUse(oldPVCSpec) {
 		pvcSpec.VolumeMode = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) && !volumeSnapshotDataSourceInUse(oldPVCSpec) {
+		pvcSpec.DataSource = nil
+	}
 }
 
 func volumeModeInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
@@ -35,6 +38,16 @@ func volumeModeInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 		return false
 	}
 	if oldPVCSpec.VolumeMode != nil {
+		return true
+	}
+	return false
+}
+
+func volumeSnapshotDataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
+	if oldPVCSpec == nil {
+		return false
+	}
+	if oldPVCSpec.DataSource != nil {
 		return true
 	}
 	return false

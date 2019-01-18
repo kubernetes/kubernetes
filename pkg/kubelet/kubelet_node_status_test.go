@@ -1046,9 +1046,11 @@ func TestRegisterWithApiServer(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testKubeletHostname,
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: testKubeletHostname,
-					kubeletapis.LabelOS:       goruntime.GOOS,
-					kubeletapis.LabelArch:     goruntime.GOARCH,
+					kubeletapis.LabelHostname:   testKubeletHostname,
+					kubeletapis.LabelOS:         goruntime.GOOS,
+					kubeletapis.LabelArch:       goruntime.GOARCH,
+					kubeletapis.LegacyLabelOS:   goruntime.GOOS,
+					kubeletapis.LegacyLabelArch: goruntime.GOARCH,
 				},
 			},
 		}, nil
@@ -1091,9 +1093,11 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: testKubeletHostname,
-					kubeletapis.LabelOS:       goruntime.GOOS,
-					kubeletapis.LabelArch:     goruntime.GOARCH,
+					kubeletapis.LabelHostname:   testKubeletHostname,
+					kubeletapis.LabelOS:         goruntime.GOOS,
+					kubeletapis.LabelArch:       goruntime.GOARCH,
+					kubeletapis.LegacyLabelOS:   goruntime.GOOS,
+					kubeletapis.LegacyLabelArch: goruntime.GOARCH,
 				},
 			},
 		}
