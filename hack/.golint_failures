@@ -102,7 +102,6 @@ pkg/controller/clusterroleaggregation
 pkg/controller/cronjob
 pkg/controller/daemon
 pkg/controller/deployment
-pkg/controller/deployment/util
 pkg/controller/disruption
 pkg/controller/endpoint
 pkg/controller/garbagecollector

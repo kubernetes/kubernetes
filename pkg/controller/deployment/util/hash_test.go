@@ -23,12 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-var podSpec string = `
+var podSpec = `
 {
     "metadata": {
         "creationTimestamp": null,
@@ -108,9 +108,9 @@ func TestPodTemplateSpecHash(t *testing.T) {
 	seenHashes := make(map[string]int)
 
 	for i := 0; i < 1000; i++ {
-		specJson := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
+		specJSON := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
 		spec := v1.PodTemplateSpec{}
-		json.Unmarshal([]byte(specJson), &spec)
+		json.Unmarshal([]byte(specJSON), &spec)
 		hash := controller.ComputeHash(&spec, nil)
 		if v, ok := seenHashes[hash]; ok {
 			t.Errorf("Hash collision, old: %d new: %d", v, i)
