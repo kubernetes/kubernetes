@@ -91,6 +91,10 @@ func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
 }
 
+func (plugin *storageosPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *storageosPlugin) RequiresRemount() bool {
 	return false
 }
