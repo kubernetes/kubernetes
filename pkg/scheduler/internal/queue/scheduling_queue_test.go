@@ -95,6 +95,18 @@ var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.
 		},
 	}
 
+func addOrUpdateUnschedulablePod(p *PriorityQueue, pod *v1.Pod) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.unschedulableQ.addOrUpdate(pod)
+}
+
+func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.unschedulableQ.get(pod)
+}
+
 func TestPriorityQueue_Add(t *testing.T) {
 	q := NewPriorityQueue(nil)
 	if err := q.Add(&medPriorityPod); err != nil {
@@ -134,7 +146,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 
 func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 	q := NewPriorityQueue(nil)
-	q.unschedulableQ.addOrUpdate(&highPriNominatedPod)
+	addOrUpdateUnschedulablePod(q, &highPriNominatedPod)
 	q.AddIfNotPresent(&highPriNominatedPod) // Must not add anything.
 	q.AddIfNotPresent(&medPriorityPod)
 	q.AddIfNotPresent(&unschedulablePod)
@@ -159,7 +171,7 @@ func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 	if len(q.nominatedPods.nominatedPods["node1"]) != 2 {
 		t.Errorf("Expected medPriorityPod and unschedulablePod to be still present in nomindatePods: %v", q.nominatedPods.nominatedPods["node1"])
 	}
-	if q.unschedulableQ.get(&highPriNominatedPod) != &highPriNominatedPod {
+	if getUnschedulablePod(q, &highPriNominatedPod) != &highPriNominatedPod {
 		t.Errorf("Pod %v was not found in the unschedulableQ.", highPriNominatedPod.Name)
 	}
 }
@@ -192,7 +204,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	if len(q.nominatedPods.nominatedPods) != 1 {
 		t.Errorf("Expected nomindatePods to have one element: %v", q.nominatedPods)
 	}
-	if q.unschedulableQ.get(&unschedulablePod) != &unschedulablePod {
+	if getUnschedulablePod(q, &unschedulablePod) != &unschedulablePod {
 		t.Errorf("Pod %v was not found in the unschedulableQ.", unschedulablePod.Name)
 	}
 }
@@ -277,8 +289,8 @@ func TestPriorityQueue_Delete(t *testing.T) {
 func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
 	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
-	q.unschedulableQ.addOrUpdate(&unschedulablePod)
-	q.unschedulableQ.addOrUpdate(&highPriorityPod)
+	addOrUpdateUnschedulablePod(q, &unschedulablePod)
+	addOrUpdateUnschedulablePod(q, &highPriorityPod)
 	q.MoveAllToActiveQueue()
 	if q.activeQ.Len() != 3 {
 		t.Error("Expected all items to be in activeQ.")
@@ -324,19 +336,19 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
 	// Add a couple of pods to the unschedulableQ.
-	q.unschedulableQ.addOrUpdate(&unschedulablePod)
-	q.unschedulableQ.addOrUpdate(affinityPod)
+	addOrUpdateUnschedulablePod(q, &unschedulablePod)
+	addOrUpdateUnschedulablePod(q, affinityPod)
 	// Simulate addition of an assigned pod. The pod has matching labels for
 	// affinityPod. So, affinityPod should go to activeQ.
 	q.AssignedPodAdded(&labelPod)
-	if q.unschedulableQ.get(affinityPod) != nil {
+	if getUnschedulablePod(q, affinityPod) != nil {
 		t.Error("affinityPod is still in the unschedulableQ.")
 	}
 	if _, exists, _ := q.activeQ.Get(affinityPod); !exists {
 		t.Error("affinityPod is not moved to activeQ.")
 	}
 	// Check that the other pod is still in the unschedulableQ.
-	if q.unschedulableQ.get(&unschedulablePod) == nil {
+	if getUnschedulablePod(q, &unschedulablePod) == nil {
 		t.Error("unschedulablePod is not in the unschedulableQ.")
 	}
 }
@@ -361,8 +373,8 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 func TestPriorityQueue_PendingPods(t *testing.T) {
 	q := NewPriorityQueue(nil)
 	q.Add(&medPriorityPod)
-	q.unschedulableQ.addOrUpdate(&unschedulablePod)
-	q.unschedulableQ.addOrUpdate(&highPriorityPod)
+	addOrUpdateUnschedulablePod(q, &unschedulablePod)
+	addOrUpdateUnschedulablePod(q, &highPriorityPod)
 	expectedList := []*v1.Pod{&medPriorityPod, &unschedulablePod, &highPriorityPod}
 	if !reflect.DeepEqual(expectedList, q.PendingPods()) {
 		t.Error("Unexpected list of pending Pods for node.")
