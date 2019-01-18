@@ -21,8 +21,6 @@ import (
 	"os/exec"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
