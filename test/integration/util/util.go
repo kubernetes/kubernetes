@@ -26,6 +26,7 @@ import (
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -59,10 +60,6 @@ func StartApiserver() (string, ShutdownFunc) {
 func StartScheduler(clientSet clientset.Interface) (factory.Configurator, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	evtBroadcaster := record.NewBroadcaster()
-	evtWatch := evtBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
-		Interface: clientSet.CoreV1().Events("")})
-
 	stopCh := make(chan struct{})
 	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
 
@@ -70,6 +67,11 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
+
+	evtBroadcaster := record.NewBroadcaster()
+	config.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
+	evtWatch := evtBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
+		Interface: clientSet.CoreV1().Events("")})
 
 	sched := scheduler.NewFromConfig(config)
 	informerFactory.Start(stopCh)
