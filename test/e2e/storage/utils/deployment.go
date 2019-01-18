@@ -88,7 +88,7 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			// value.
 			switch container.Name {
 			case o.DriverContainerName:
-				container.Args = append(container.Args, o.DriverContainerArguments...)
+				container.Args = append(container.Args, "--drivername="+o.NewDriverName)
 			case o.ProvisionerContainerName:
 				// Driver name is expected to be the same
 				// as the provisioner here.
@@ -135,12 +135,9 @@ type PatchCSIOptions struct {
 	// in existing fields).
 	NewDriverName string
 	// The name of the container which has the CSI driver binary.
-	// If non-empty, DriverContainerArguments are added to argument
-	// list in container with that name.
+	// If non-empty, --drivername with the new name will be
+	// appended to the argument list.
 	DriverContainerName string
-	// List of arguments to add to container with
-	// DriverContainerName.
-	DriverContainerArguments []string
 	// The name of the container which has the provisioner binary.
 	// If non-empty, --provisioner with new name will be appended
 	// to the argument list.

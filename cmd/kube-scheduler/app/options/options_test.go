@@ -28,10 +28,11 @@ import (
 	"testing"
 	"time"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	componentbaseconfig "k8s.io/component-base/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -208,7 +209,7 @@ users:
 				MetricsBindAddress:             "0.0.0.0:10251",
 				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
 						LeaderElect:   true,
 						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
 						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
@@ -218,7 +219,7 @@ users:
 					LockObjectNamespace: "kube-system",
 					LockObjectName:      "kube-scheduler",
 				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+				ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 					Kubeconfig:  configKubeconfig,
 					QPS:         50,
 					Burst:       100,
@@ -288,7 +289,7 @@ users:
 				MetricsBindAddress:             "", // defaults empty when not running from config file
 				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
 				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
 						LeaderElect:   true,
 						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
 						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
@@ -298,7 +299,7 @@ users:
 					LockObjectNamespace: "kube-system",
 					LockObjectName:      "kube-scheduler",
 				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+				ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 					Kubeconfig:  flagKubeconfig,
 					QPS:         50,
 					Burst:       100,

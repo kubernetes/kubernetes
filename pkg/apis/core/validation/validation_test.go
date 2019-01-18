@@ -553,6 +553,32 @@ func TestValidateLocalVolumes(t *testing.T) {
 	}
 }
 
+func TestValidateLocalVolumesDisabled(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *core.PersistentVolume
+	}{
+		"feature disabled valid local volume": {
+			isExpectedFailure: true,
+			volume: testVolume("valid-local-volume", "",
+				testLocalVolume("/foo", simpleVolumeNodeAffinity("foo", "bar"))),
+		},
+	}
+
+	for name, scenario := range scenarios {
+		t.Run(name+" PersistentLocalVolumes disabled", func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, false)()
+			errs := ValidatePersistentVolume(scenario.volume)
+			if len(errs) == 0 && scenario.isExpectedFailure {
+				t.Errorf("Unexpected success for scenario: %s", name)
+			}
+			if len(errs) > 0 && !scenario.isExpectedFailure {
+				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+		})
+	}
+}
+
 func testVolumeWithNodeAffinity(affinity *core.VolumeNodeAffinity) *core.PersistentVolume {
 	return testVolume("test-affinity-volume", "",
 		core.PersistentVolumeSpec{
@@ -723,12 +749,21 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
 	}
 
+	// Enable alpha feature VolumeSnapshotDataSource
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSnapshotDataSource, true)()
 	for _, tc := range successTestCases {
 		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 	for _, tc := range failedTestCases {
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
+			t.Errorf("expected failure: %v", errs)
+		}
+	}
+	// Disable alpha feature VolumeSnapshotDataSource
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSnapshotDataSource, false)()
+	for _, tc := range successTestCases {
 		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
@@ -5739,6 +5774,8 @@ func TestValidatePodDNSConfig(t *testing.T) {
 }
 
 func TestValidatePodReadinessGates(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadinessGates, true)()
+
 	successCases := []struct {
 		desc           string
 		readinessGates []core.PodReadinessGate
@@ -5880,6 +5917,7 @@ func TestValidatePodSpec(t *testing.T) {
 	maxGroupID := int64(2147483647)
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 
 	successCases := []core.PodSpec{
@@ -6212,6 +6250,25 @@ func TestValidatePodSpec(t *testing.T) {
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)()
+
+	featuregatedCases := map[string]core.PodSpec{
+		"set ShareProcessNamespace": {
+			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			SecurityContext: &core.PodSecurityContext{
+				ShareProcessNamespace: &[]bool{true}[0],
+			},
+		},
+	}
+	for k, v := range featuregatedCases {
+		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
 }
@@ -11274,6 +11331,12 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		newClaim          *core.PersistentVolumeClaim
 		enableResize      bool
 	}{
+		"condition-update-with-disabled-feature-gate": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      false,
+		},
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
@@ -11284,6 +11347,8 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
@@ -11463,11 +11528,13 @@ func TestValidateResourceQuota(t *testing.T) {
 			Spec: nonBestEffortSpec,
 		},
 	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, true)()
 	for _, successCase := range successCases {
 		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, false)()
 
 	errorCases := map[string]struct {
 		R core.ResourceQuota
@@ -11512,6 +11579,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
+		},
+		"forbidden-quota-scope-selector": {
+			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: scopeSelectorSpec},
+			"feature-gate is disabled",
 		},
 	}
 	for k, v := range errorCases {

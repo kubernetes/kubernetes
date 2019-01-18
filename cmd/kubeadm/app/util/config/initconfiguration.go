@@ -214,7 +214,8 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 		// Try to get the registration for the ComponentConfig based on the kind
 		regKind := componentconfigs.RegistrationKind(gvk.Kind)
-		if registration, found := componentconfigs.Known[regKind]; found {
+		registration, found := componentconfigs.Known[regKind]
+		if found {
 			// Unmarshal the bytes from the YAML document into a runtime.Object containing the ComponentConfiguration struct
 			obj, err := registration.Unmarshal(fileContent)
 			if err != nil {
@@ -268,7 +269,8 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 	// Save the loaded ComponentConfig objects in the initcfg object
 	for kind, obj := range decodedComponentConfigObjects {
-		if registration, found := componentconfigs.Known[kind]; found {
+		registration, found := componentconfigs.Known[kind]
+		if found {
 			if ok := registration.SetToInternalConfig(obj, &initcfg.ClusterConfiguration); !ok {
 				return nil, errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 			}

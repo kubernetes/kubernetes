@@ -12,7 +12,6 @@ go_test(
     srcs = [
         "audit_test.go",
         "crd_test.go",
-        "graceful_shutdown_test.go",
         "kms_transformation_test.go",
         "kube_apiserver_test.go",
         "main_test.go",

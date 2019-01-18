@@ -83,8 +83,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	if err != nil {
 		return TestServer{}, err
 	}
-	all, disabled := app.KnownControllers(), app.ControllersDisabledByDefault.List()
-	namedFlagSets := s.Flags(all, disabled)
+	namedFlagSets := s.Flags()
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -109,7 +108,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("cloud-controller-manager will listen insecurely on port %d...", s.InsecureServing.BindPort)
 	}
 
-	config, err := s.Config(all, disabled)
+	config, err := s.Config()
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}

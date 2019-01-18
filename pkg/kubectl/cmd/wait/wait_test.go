@@ -41,14 +41,6 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 )
 
-func newUnstructuredList(items ...*unstructured.Unstructured) *unstructured.UnstructuredList {
-	list := &unstructured.UnstructuredList{}
-	for i := range items {
-		list.Items = append(list.Items, *items[i])
-	}
-	return list
-}
-
 func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -116,7 +108,7 @@ func TestWaitForDeletion(t *testing.T) {
 				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 			},
@@ -149,8 +141,8 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				count := 0
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
@@ -178,7 +170,7 @@ func TestWaitForDeletion(t *testing.T) {
 				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 			},
@@ -196,8 +188,8 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				return fakeClient
 			},
@@ -208,7 +200,7 @@ func TestWaitForDeletion(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
@@ -229,12 +221,8 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					unstructuredObj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
-					unstructuredObj.SetResourceVersion("123")
-					unstructuredList := newUnstructuredList(unstructuredObj)
-					unstructuredList.SetResourceVersion("234")
-					return true, unstructuredList, nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				count := 0
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
@@ -259,16 +247,16 @@ func TestWaitForDeletion(t *testing.T) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[1].Matches("watch", "theresource") || actions[1].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
+				if !actions[1].Matches("watch", "theresource") {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[2].Matches("get", "theresource") || actions[2].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[3].Matches("watch", "theresource") || actions[3].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
+				if !actions[3].Matches("watch", "theresource") {
 					t.Error(spew.Sdump(actions))
 				}
 			},
@@ -286,8 +274,8 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
 					fakeWatch := watch.NewRaceFreeFake()
@@ -302,7 +290,7 @@ func TestWaitForDeletion(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
@@ -323,8 +311,8 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				count := 0
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
@@ -351,13 +339,13 @@ func TestWaitForDeletion(t *testing.T) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[2].Matches("get", "theresource") || actions[2].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[3].Matches("watch", "theresource") {
@@ -423,11 +411,11 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(addCondition(
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, addCondition(
 						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 						"the-condition", "status-value",
-					)), nil
+					), nil
 				})
 				return fakeClient
 			},
@@ -437,7 +425,7 @@ func TestWaitForCondition(t *testing.T) {
 				if len(actions) != 1 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 			},
@@ -492,7 +480,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, addCondition(
 						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 						"some-other-condition", "status-value",
@@ -507,7 +495,7 @@ func TestWaitForCondition(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
@@ -528,12 +516,8 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					unstructuredObj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
-					unstructuredObj.SetResourceVersion("123")
-					unstructuredList := newUnstructuredList(unstructuredObj)
-					unstructuredList.SetResourceVersion("234")
-					return true, unstructuredList, nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				count := 0
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
@@ -558,16 +542,16 @@ func TestWaitForCondition(t *testing.T) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[1].Matches("watch", "theresource") || actions[1].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
+				if !actions[1].Matches("watch", "theresource") {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[2].Matches("get", "theresource") || actions[2].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[3].Matches("watch", "theresource") || actions[3].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
+				if !actions[3].Matches("watch", "theresource") {
 					t.Error(spew.Sdump(actions))
 				}
 			},
@@ -585,8 +569,8 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
 					fakeWatch := watch.NewRaceFreeFake()
@@ -604,7 +588,7 @@ func TestWaitForCondition(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
@@ -641,7 +625,7 @@ func TestWaitForCondition(t *testing.T) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
@@ -662,8 +646,8 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
 				})
 				count := 0
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
@@ -693,13 +677,13 @@ func TestWaitForCondition(t *testing.T) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))
 				}
-				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
 					t.Error(spew.Sdump(actions))
 				}
-				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+				if !actions[2].Matches("get", "theresource") || actions[2].(clienttesting.GetAction).GetName() != "name-foo" {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[3].Matches("watch", "theresource") {

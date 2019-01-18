@@ -23,7 +23,6 @@ package v1
 import (
 	unsafe "unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	config "k8s.io/apiserver/pkg/apis/config"
@@ -181,7 +180,6 @@ func autoConvert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfigura
 	out.Name = in.Name
 	out.CacheSize = in.CacheSize
 	out.Endpoint = in.Endpoint
-	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
@@ -194,7 +192,6 @@ func autoConvert_config_KMSConfiguration_To_v1_KMSConfiguration(in *config.KMSCo
 	out.Name = in.Name
 	out.CacheSize = in.CacheSize
 	out.Endpoint = in.Endpoint
-	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 

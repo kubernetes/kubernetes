@@ -17,8 +17,9 @@ limitations under the License.
 package config
 
 import (
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfig "k8s.io/component-base/config"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
 
 const (
@@ -57,7 +58,7 @@ type KubeSchedulerConfiguration struct {
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfig.ClientConnectionConfiguration
+	ClientConnection apimachineryconfig.ClientConnectionConfiguration
 	// HealthzBindAddress is the IP address and port for the health check server to serve on,
 	// defaulting to 0.0.0.0:10251
 	HealthzBindAddress string
@@ -66,8 +67,8 @@ type KubeSchedulerConfiguration struct {
 	MetricsBindAddress string
 
 	// DebuggingConfiguration holds configuration for Debugging related features
-	// TODO: We might wanna make this a substruct like Debugging componentbaseconfig.DebuggingConfiguration
-	componentbaseconfig.DebuggingConfiguration
+	// TODO: We might wanna make this a substruct like Debugging apiserverconfig.DebuggingConfiguration
+	apiserverconfig.DebuggingConfiguration
 
 	// DisablePreemption disables the pod preemption feature.
 	DisablePreemption bool
@@ -129,7 +130,7 @@ type SchedulerPolicyConfigMapSource struct {
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
-	componentbaseconfig.LeaderElectionConfiguration
+	apiserverconfig.LeaderElectionConfiguration
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string
 	// LockObjectName defines the lock object name

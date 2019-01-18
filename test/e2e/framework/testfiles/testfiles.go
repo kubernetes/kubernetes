@@ -129,16 +129,9 @@ type RootFileSource struct {
 }
 
 // ReadTestFile looks for the file relative to the configured
-// root directory. If the path is already absolute, for example
-// in a test that has its own method of determining where
-// files are, then the path will be used directly.
+// root directory.
 func (r RootFileSource) ReadTestFile(filePath string) ([]byte, error) {
-	var fullPath string
-	if path.IsAbs(filePath) {
-		fullPath = filePath
-	} else {
-		fullPath = filepath.Join(r.Root, filePath)
-	}
+	fullPath := filepath.Join(r.Root, filePath)
 	data, err := ioutil.ReadFile(fullPath)
 	if os.IsNotExist(err) {
 		// Not an error (yet), some other provider may have the file.

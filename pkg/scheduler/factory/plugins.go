@@ -51,7 +51,7 @@ type PluginFactoryArgs struct {
 }
 
 // PriorityMetadataProducerFactory produces PriorityMetadataProducer from the given args.
-type PriorityMetadataProducerFactory func(PluginFactoryArgs) priorities.PriorityMetadataProducer
+type PriorityMetadataProducerFactory func(PluginFactoryArgs) algorithm.PriorityMetadataProducer
 
 // PredicateMetadataProducerFactory produces PredicateMetadataProducer from the given args.
 type PredicateMetadataProducerFactory func(PluginFactoryArgs) predicates.PredicateMetadataProducer
@@ -62,12 +62,12 @@ type FitPredicateFactory func(PluginFactoryArgs) predicates.FitPredicate
 // PriorityFunctionFactory produces a PriorityConfig from the given args.
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
-type PriorityFunctionFactory func(PluginFactoryArgs) priorities.PriorityFunction
+type PriorityFunctionFactory func(PluginFactoryArgs) algorithm.PriorityFunction
 
 // PriorityFunctionFactory2 produces map & reduce priority functions
 // from a given args.
 // FIXME: Rename to PriorityFunctionFactory.
-type PriorityFunctionFactory2 func(PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction)
+type PriorityFunctionFactory2 func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction)
 
 // PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
@@ -270,9 +270,9 @@ func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerF
 // with which the function was registered.
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
-func RegisterPriorityFunction(name string, function priorities.PriorityFunction, weight int) string {
+func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
 	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		Function: func(PluginFactoryArgs) priorities.PriorityFunction {
+		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
 			return function
 		},
 		Weight: weight,
@@ -284,11 +284,11 @@ func RegisterPriorityFunction(name string, function priorities.PriorityFunction,
 // FIXME: Rename to PriorityFunctionFactory.
 func RegisterPriorityFunction2(
 	name string,
-	mapFunction priorities.PriorityMapFunction,
-	reduceFunction priorities.PriorityReduceFunction,
+	mapFunction algorithm.PriorityMapFunction,
+	reduceFunction algorithm.PriorityReduceFunction,
 	weight int) string {
 	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		MapReduceFunction: func(PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+		MapReduceFunction: func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 			return mapFunction, reduceFunction
 		},
 		Weight: weight,
@@ -315,7 +315,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAntiAffinity != nil {
 			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+				MapReduceFunction: func(args PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 					return priorities.NewServiceAntiAffinityPriority(
 						args.PodLister,
 						args.ServiceLister,
@@ -326,7 +326,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			}
 		} else if policy.Argument.LabelPreference != nil {
 			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+				MapReduceFunction: func(args PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 					return priorities.NewNodeLabelPriority(
 						policy.Argument.LabelPreference.Label,
 						policy.Argument.LabelPreference.Presence,
@@ -336,7 +336,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			}
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+				MapReduceFunction: func(args PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 					scoringFunctionShape := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
 					p := priorities.RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape)
 					return p.PriorityMap, nil
@@ -431,12 +431,12 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	return predicates, nil
 }
 
-func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMetadataProducer, error) {
+func getPriorityMetadataProducer(args PluginFactoryArgs) (algorithm.PriorityMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	if priorityMetadataProducer == nil {
-		return priorities.EmptyPriorityMetadataProducer, nil
+		return algorithm.EmptyPriorityMetadataProducer, nil
 	}
 	return priorityMetadataProducer(args), nil
 }
@@ -451,25 +451,25 @@ func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateM
 	return predicateMetadataProducer(args), nil
 }
 
-func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
+func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	configs := []priorities.PriorityConfig{}
+	configs := []algorithm.PriorityConfig{}
 	for _, name := range names.List() {
 		factory, ok := priorityFunctionMap[name]
 		if !ok {
 			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
 		if factory.Function != nil {
-			configs = append(configs, priorities.PriorityConfig{
+			configs = append(configs, algorithm.PriorityConfig{
 				Name:     name,
 				Function: factory.Function(args),
 				Weight:   factory.Weight,
 			})
 		} else {
 			mapFunction, reduceFunction := factory.MapReduceFunction(args)
-			configs = append(configs, priorities.PriorityConfig{
+			configs = append(configs, algorithm.PriorityConfig{
 				Name:   name,
 				Map:    mapFunction,
 				Reduce: reduceFunction,
@@ -484,7 +484,7 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]pr
 }
 
 // validateSelectedConfigs validates the config weights to avoid the overflow.
-func validateSelectedConfigs(configs []priorities.PriorityConfig) error {
+func validateSelectedConfigs(configs []algorithm.PriorityConfig) error {
 	var totalPriority int
 	for _, config := range configs {
 		// Checks totalPriority against MaxTotalPriority to avoid overflow

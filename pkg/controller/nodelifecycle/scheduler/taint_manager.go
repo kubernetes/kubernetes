@@ -185,8 +185,8 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 		getNode:      getNode,
 		taintedNodes: make(map[string][]v1.Taint),
 
-		nodeUpdateQueue: workqueue.NewNamed("noexec_taint_node"),
-		podUpdateQueue:  workqueue.NewNamed("noexec_taint_pod"),
+		nodeUpdateQueue: workqueue.New(),
+		podUpdateQueue:  workqueue.New(),
 	}
 	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent))
 

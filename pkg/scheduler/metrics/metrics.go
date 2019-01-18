@@ -73,96 +73,48 @@ var (
 	E2eSchedulingLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "e2e_scheduling_latency_seconds",
-			Help:      "E2e scheduling latency in seconds (scheduling algorithm + binding)",
-			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
-		},
-	)
-	DeprecatedE2eSchedulingLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
-			Help:      "(Deprecated) E2e scheduling latency in microseconds (scheduling algorithm + binding)",
+			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
 	SchedulingAlgorithmLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "scheduling_algorithm_latency_seconds",
-			Help:      "Scheduling algorithm latency in seconds",
-			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
-		},
-	)
-	DeprecatedSchedulingAlgorithmLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_latency_microseconds",
-			Help:      "(Deprecated) Scheduling algorithm latency in microseconds",
+			Help:      "Scheduling algorithm latency",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
 	SchedulingAlgorithmPredicateEvaluationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "scheduling_algorithm_predicate_evaluation_seconds",
-			Help:      "Scheduling algorithm predicate evaluation duration in seconds",
-			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
-		},
-	)
-	DeprecatedSchedulingAlgorithmPredicateEvaluationDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_predicate_evaluation",
-			Help:      "(Deprecated) Scheduling algorithm predicate evaluation duration in microseconds",
+			Help:      "Scheduling algorithm predicate evaluation duration",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
 	SchedulingAlgorithmPriorityEvaluationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "scheduling_algorithm_priority_evaluation_seconds",
-			Help:      "Scheduling algorithm priority evaluation duration in seconds",
-			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
-		},
-	)
-	DeprecatedSchedulingAlgorithmPriorityEvaluationDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_priority_evaluation",
-			Help:      "(Deprecated) Scheduling algorithm priority evaluation duration in microseconds",
+			Help:      "Scheduling algorithm priority evaluation duration",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
 	SchedulingAlgorithmPremptionEvaluationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "scheduling_algorithm_preemption_evaluation_seconds",
-			Help:      "Scheduling algorithm preemption evaluation duration in seconds",
-			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
-		},
-	)
-	DeprecatedSchedulingAlgorithmPremptionEvaluationDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_preemption_evaluation",
-			Help:      "(Deprecated) Scheduling algorithm preemption evaluation duration in microseconds",
+			Help:      "Scheduling algorithm preemption evaluation duration",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
 	BindingLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "binding_latency_seconds",
-			Help:      "Binding latency in seconds",
-			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
-		},
-	)
-	DeprecatedBindingLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
 			Name:      "binding_latency_microseconds",
-			Help:      "(Deprecated) Binding latency in microseconds",
+			Help:      "Binding latency",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
@@ -183,17 +135,11 @@ var (
 		scheduleAttempts,
 		SchedulingLatency,
 		E2eSchedulingLatency,
-		DeprecatedE2eSchedulingLatency,
 		SchedulingAlgorithmLatency,
-		DeprecatedSchedulingAlgorithmLatency,
 		BindingLatency,
-		DeprecatedBindingLatency,
 		SchedulingAlgorithmPredicateEvaluationDuration,
-		DeprecatedSchedulingAlgorithmPredicateEvaluationDuration,
 		SchedulingAlgorithmPriorityEvaluationDuration,
-		DeprecatedSchedulingAlgorithmPriorityEvaluationDuration,
 		SchedulingAlgorithmPremptionEvaluationDuration,
-		DeprecatedSchedulingAlgorithmPremptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
 	}

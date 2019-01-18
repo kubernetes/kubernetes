@@ -24,10 +24,11 @@ import (
 
 	"github.com/spf13/pflag"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	componentbaseconfig "k8s.io/component-base/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 )
 
@@ -39,13 +40,13 @@ func TestDefaultFlags(t *testing.T) {
 			Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			MinResyncPeriod: metav1.Duration{Duration: 12 * time.Hour},
-			ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 				ContentType: "application/vnd.kubernetes.protobuf",
 				QPS:         20.0,
 				Burst:       30,
 			},
 			ControllerStartInterval: metav1.Duration{Duration: 0},
-			LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
 				ResourceLock:  "endpoints",
 				LeaderElect:   true,
 				LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
@@ -115,7 +116,7 @@ func TestDefaultFlags(t *testing.T) {
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewCloudControllerManagerOptions()
-	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
 
@@ -131,7 +132,6 @@ func TestAddFlags(t *testing.T) {
 		"--configure-cloud-routes=false",
 		"--contention-profiling=true",
 		"--controller-start-interval=2m",
-		"--controllers=foo,bar",
 		"--http2-max-streams-per-connection=47",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
@@ -158,13 +158,13 @@ func TestAddFlags(t *testing.T) {
 			Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
-			ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 				ContentType: "application/vnd.kubernetes.protobuf",
 				QPS:         50.0,
 				Burst:       100,
 			},
 			ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
-			LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
 				ResourceLock:  "configmap",
 				LeaderElect:   false,
 				LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
@@ -174,7 +174,7 @@ func TestAddFlags(t *testing.T) {
 			Debugging: &cmoptions.DebuggingOptions{
 				EnableContentionProfiling: true,
 			},
-			Controllers: []string{"foo", "bar"},
+			Controllers: []string{"*"},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
 			CloudProvider: &cmoptions.CloudProviderOptions{

@@ -75,7 +75,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 				flags.newK8sVersionStr = args[0]
 			}
 
-			err = runPlan(flags)
+			err = RunPlan(flags)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -85,8 +85,8 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 	return cmd
 }
 
-// runPlan takes care of outputting available versions to upgrade to for the user
-func runPlan(flags *planFlags) error {
+// RunPlan takes care of outputting available versions to upgrade to for the user
+func RunPlan(flags *planFlags) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infof("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")

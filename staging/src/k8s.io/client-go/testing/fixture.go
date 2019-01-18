@@ -131,7 +131,8 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 		case PatchActionImpl:
 			obj, err := tracker.Get(gvr, ns, action.GetName())
 			if err != nil {
-				return true, nil, err
+				// object is not registered
+				return false, nil, err
 			}
 
 			old, err := json.Marshal(obj)

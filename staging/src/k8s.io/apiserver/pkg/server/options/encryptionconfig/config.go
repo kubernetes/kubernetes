@@ -173,16 +173,8 @@ func GetPrefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]val
 				return nil, fmt.Errorf("remote KMS provider can't use empty string as endpoint")
 			}
 
-			timeout := kmsPluginConnectionTimeout
-			if provider.KMS.Timeout != nil {
-				if provider.KMS.Timeout.Duration <= 0 {
-					return nil, fmt.Errorf("could not configure KMS plugin %q, timeout should be a positive value", provider.KMS.Name)
-				}
-				timeout = provider.KMS.Timeout.Duration
-			}
-
 			// Get gRPC client service with endpoint.
-			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, timeout)
+			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, kmsPluginConnectionTimeout)
 			if err != nil {
 				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}

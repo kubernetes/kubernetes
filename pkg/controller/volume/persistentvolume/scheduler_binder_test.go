@@ -17,7 +17,6 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -29,13 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
@@ -79,6 +75,14 @@ var (
 	pvBoundImmediate           = makeTestPV("pv-bound-immediate", "node1", "1G", "1", immediateBoundPVC, immediateClass)
 	pvBoundImmediateNode2      = makeTestPV("pv-bound-immediate", "node2", "1G", "1", immediateBoundPVC, immediateClass)
 
+	// PVC/PV bindings for manual binding
+	binding1a      = makeBinding(unboundPVC, pvNode1a)
+	binding1b      = makeBinding(unboundPVC2, pvNode1b)
+	bindingNoNode  = makeBinding(unboundPVC, pvNoNode)
+	bindingBad     = makeBinding(badPVC, pvNode1b)
+	binding1aBound = makeBinding(unboundPVC, pvNode1aBound)
+	binding1bBound = makeBinding(unboundPVC2, pvNode1bBound)
+
 	// storage class names
 	waitClass                = "waitClass"
 	immediateClass           = "immediateClass"
@@ -105,24 +109,15 @@ type testEnv struct {
 	internalPVCCache     *pvcAssumeCache
 }
 
-func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
+func newTestBinder(t *testing.T) *testEnv {
 	client := &fake.Clientset{}
 	reactor := newVolumeReactor(client, nil, nil, nil, nil)
-	// TODO refactor all tests to use real watch mechanism, see #72327
-	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := reactor.Watch(gvr, ns)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
-	})
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	nodeInformer := informerFactory.Core().V1().Nodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
+
 	binder := NewVolumeBinder(
 		client,
 		nodeInformer,
@@ -130,14 +125,6 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
 		10*time.Second)
-
-	// Wait for informers cache sync
-	informerFactory.Start(stopCh)
-	for v, synced := range informerFactory.WaitForCacheSync(stopCh) {
-		if !synced {
-			klog.Fatalf("Error syncing informer for %v", v)
-		}
-	}
 
 	// Add storageclasses
 	waitMode := storagev1.VolumeBindingWaitForFirstConsumer
@@ -258,66 +245,6 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 		env.reactor.volumes[pv.Name] = pv
 	}
 
-}
-
-func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, waitCache bool) {
-	for _, pv := range pvs {
-		if _, err := env.client.CoreV1().PersistentVolumes().Update(pv); err != nil {
-			t.Fatalf("failed to update PV %q", pv.Name)
-		}
-	}
-	if waitCache {
-		wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
-			for _, pv := range pvs {
-				obj, err := env.internalPVCache.GetAPIObj(pv.Name)
-				if obj == nil || err != nil {
-					return false, nil
-				}
-				pvInCache, ok := obj.(*v1.PersistentVolume)
-				if !ok {
-					return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
-				}
-				return versioner.CompareResourceVersion(pvInCache, pv) == 0, nil
-			}
-			return true, nil
-		})
-	}
-}
-
-func (env *testEnv) updateClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim, waitCache bool) {
-	for _, pvc := range pvcs {
-		if _, err := env.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc); err != nil {
-			t.Fatalf("failed to update PVC %q", getPVCName(pvc))
-		}
-	}
-	if waitCache {
-		wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
-			for _, pvc := range pvcs {
-				obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
-				if obj == nil || err != nil {
-					return false, nil
-				}
-				pvcInCache, ok := obj.(*v1.PersistentVolumeClaim)
-				if !ok {
-					return false, fmt.Errorf("PVC %s invalid object", pvcInCache.Name)
-				}
-				return versioner.CompareResourceVersion(pvcInCache, pvc) == 0, nil
-			}
-			return true, nil
-		})
-	}
-}
-
-func (env *testEnv) deleteVolumes(pvs []*v1.PersistentVolume) {
-	for _, pv := range pvs {
-		env.internalPVCache.delete(pv)
-	}
-}
-
-func (env *testEnv) deleteClaims(pvcs []*v1.PersistentVolumeClaim) {
-	for _, pvc := range pvcs {
-		env.internalPVCCache.delete(pvc)
-	}
 }
 
 func (env *testEnv) assumeVolumes(t *testing.T, name, node string, pod *v1.Pod, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
@@ -613,7 +540,7 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 
 func pvcSetSelectedNode(pvc *v1.PersistentVolumeClaim, node string) *v1.PersistentVolumeClaim {
 	newPVC := pvc.DeepCopy()
-	metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annSelectedNode, node)
+	metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, annSelectedNode, node)
 	return newPVC
 }
 
@@ -749,7 +676,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		"unbound-pvc,pv-same-node": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC},
 			pvs:              []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			expectedBindings: []*bindingInfo{binding1a},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
@@ -762,28 +689,28 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		"two-unbound-pvcs": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
 			pvs:              []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(unboundPVC2, pvNode1b)},
+			expectedBindings: []*bindingInfo{binding1a, binding1b},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
 		"two-unbound-pvcs,order-by-size": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC2, unboundPVC},
 			pvs:              []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(unboundPVC2, pvNode1b)},
+			expectedBindings: []*bindingInfo{binding1a, binding1b},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
 		"two-unbound-pvcs,partial-match": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
 			pvs:              []*v1.PersistentVolume{pvNode1a},
-			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			expectedBindings: []*bindingInfo{binding1a},
 			expectedUnbound:  false,
 			expectedBound:    true,
 		},
 		"one-bound,one-unbound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, boundPVC},
 			pvs:              []*v1.PersistentVolume{pvBound, pvNode1a},
-			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			expectedBindings: []*bindingInfo{binding1a},
 			expectedUnbound:  true,
 			expectedBound:    true,
 		},
@@ -840,14 +767,11 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	for name, scenario := range scenarios {
 		klog.V(5).Infof("Running test case %q", name)
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		// a. Init pvc cache
@@ -909,7 +833,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		"two-unbound-pvcs,one-matched,one-provisioned": {
 			podPVCs:            []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVC},
 			pvs:                []*v1.PersistentVolume{pvNode1a},
-			expectedBindings:   []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			expectedBindings:   []*bindingInfo{binding1a},
 			expectedProvisions: []*v1.PersistentVolumeClaim{provisionedPVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
@@ -918,13 +842,6 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			podPVCs:            []*v1.PersistentVolumeClaim{boundPVC, provisionedPVC},
 			pvs:                []*v1.PersistentVolume{pvBound},
 			expectedProvisions: []*v1.PersistentVolumeClaim{provisionedPVC},
-			expectedUnbound:    true,
-			expectedBound:      true,
-		},
-		"one-binding,one-selected-node": {
-			podPVCs:            []*v1.PersistentVolumeClaim{boundPVC, selectedNodePVC},
-			pvs:                []*v1.PersistentVolume{pvBound},
-			expectedProvisions: []*v1.PersistentVolumeClaim{selectedNodePVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
 		},
@@ -962,12 +879,9 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	for name, scenario := range scenarios {
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		// a. Init pvc cache
@@ -1023,62 +937,59 @@ func TestAssumePodVolumes(t *testing.T) {
 		},
 		"one-binding": {
 			podPVCs:               []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:              []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			bindings:              []*bindingInfo{binding1a},
 			pvs:                   []*v1.PersistentVolume{pvNode1a},
-			expectedBindings:      []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			expectedBindings:      []*bindingInfo{binding1aBound},
 			expectedProvisionings: []*v1.PersistentVolumeClaim{},
 		},
 		"two-bindings": {
 			podPVCs:               []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
-			bindings:              []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(unboundPVC2, pvNode1b)},
+			bindings:              []*bindingInfo{binding1a, binding1b},
 			pvs:                   []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			expectedBindings:      []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
+			expectedBindings:      []*bindingInfo{binding1aBound, binding1bBound},
 			expectedProvisionings: []*v1.PersistentVolumeClaim{},
 		},
 		"pv-already-bound": {
 			podPVCs:               []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:              []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:              []*bindingInfo{binding1aBound},
 			pvs:                   []*v1.PersistentVolume{pvNode1aBound},
-			expectedBindings:      []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			expectedBindings:      []*bindingInfo{binding1aBound},
 			expectedProvisionings: []*v1.PersistentVolumeClaim{},
 		},
 		"claimref-failed": {
 			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:   []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(badPVC, pvNode1b)},
+			bindings:   []*bindingInfo{binding1a, bindingBad},
 			pvs:        []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			shouldFail: true,
 		},
 		"tmpupdate-failed": {
 			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC},
-			bindings:   []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(unboundPVC2, pvNode1b)},
+			bindings:   []*bindingInfo{binding1a, binding1b},
 			pvs:        []*v1.PersistentVolume{pvNode1a},
 			shouldFail: true,
 		},
 		"one-binding, one-pvc-provisioned": {
 			podPVCs:               []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVC},
-			bindings:              []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			bindings:              []*bindingInfo{binding1a},
 			pvs:                   []*v1.PersistentVolume{pvNode1a},
 			provisionedPVCs:       []*v1.PersistentVolumeClaim{provisionedPVC},
-			expectedBindings:      []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			expectedBindings:      []*bindingInfo{binding1aBound},
 			expectedProvisionings: []*v1.PersistentVolumeClaim{selectedNodePVC},
 		},
 		"one-binding, one-provision-tmpupdate-failed": {
 			podPVCs:         []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVCHigherVersion},
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			bindings:        []*bindingInfo{binding1a},
 			pvs:             []*v1.PersistentVolume{pvNode1a},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{provisionedPVC2},
 			shouldFail:      true,
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	for name, scenario := range scenarios {
 		klog.V(5).Infof("Running test case %q", name)
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t)
 		testEnv.initClaims(scenario.podPVCs, scenario.podPVCs)
 		pod := makePod(scenario.podPVCs)
 		testEnv.initPodCache(pod, "node1", scenario.bindings, scenario.provisionedPVCs)
@@ -1151,25 +1062,25 @@ func TestBindAPIUpdate(t *testing.T) {
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"one-binding": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1a},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"two-bindings": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
+			bindings:        []*bindingInfo{binding1aBound, binding1bBound},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound, pvNode1bBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"api-already-updated": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"api-update-failed": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
+			bindings:        []*bindingInfo{binding1aBound, binding1bBound},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode1b},
 			apiPVs:          []*v1.PersistentVolume{pvNode1a, pvNode1bBoundHigherVersion},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound, pvNode1b},
@@ -1193,7 +1104,7 @@ func TestBindAPIUpdate(t *testing.T) {
 			shouldFail:      true,
 		},
 		"binding-succeed, provision-api-update-failed": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1a},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), addProvisionAnn(provisionedPVC2)},
@@ -1204,15 +1115,11 @@ func TestBindAPIUpdate(t *testing.T) {
 			shouldFail:      true,
 		},
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	for name, scenario := range scenarios {
 		klog.V(4).Infof("Running test case %q", name)
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t)
 		pod := makePod(nil)
 		if scenario.apiPVs == nil {
 			scenario.apiPVs = scenario.cachedPVs
@@ -1248,19 +1155,11 @@ func TestBindAPIUpdate(t *testing.T) {
 func TestCheckBindings(t *testing.T) {
 	scenarios := map[string]struct {
 		// Inputs
-		initPVs  []*v1.PersistentVolume
-		initPVCs []*v1.PersistentVolumeClaim
+		bindings  []*bindingInfo
+		cachedPVs []*v1.PersistentVolume
 
-		bindings        []*bindingInfo
 		provisionedPVCs []*v1.PersistentVolumeClaim
-
-		// api updates before checking
-		apiPVs  []*v1.PersistentVolume
-		apiPVCs []*v1.PersistentVolumeClaim
-
-		// delete objects before checking
-		deletePVs  bool
-		deletePVCs bool
+		cachedPVCs      []*v1.PersistentVolumeClaim
 
 		// Expected return values
 		shouldFail    bool
@@ -1283,144 +1182,108 @@ func TestCheckBindings(t *testing.T) {
 			expectedBound:   true,
 		},
 		"binding-bound": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{boundPVCNode1a},
+			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{boundPVCNode1a},
 			expectedBound:   true,
 		},
 		"binding-prebound": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{preboundPVCNode1a},
+			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{preboundPVCNode1a},
 		},
 		"binding-unbound": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
+			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{unboundPVC},
 		},
 		"binding-pvc-not-exists": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
 			shouldFail:      true,
 		},
 		"binding-pv-not-exists": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{boundPVCNode1a},
-			deletePVs:       true,
+			cachedPVCs:      []*v1.PersistentVolumeClaim{boundPVCNode1a},
 			shouldFail:      true,
 		},
 		"binding-claimref-nil": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1a},
-			initPVCs:        []*v1.PersistentVolumeClaim{boundPVCNode1a},
-			apiPVs:          []*v1.PersistentVolume{pvNode1a},
-			apiPVCs:         []*v1.PersistentVolumeClaim{boundPVCNode1a},
+			cachedPVs:       []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{boundPVCNode1a},
 			shouldFail:      true,
 		},
 		"binding-claimref-uid-empty": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{boundPVCNode1a},
-			apiPVs:          []*v1.PersistentVolume{pvRemoveClaimUID(pvNode1aBound)},
-			apiPVCs:         []*v1.PersistentVolumeClaim{boundPVCNode1a},
+			cachedPVs:       []*v1.PersistentVolume{pvRemoveClaimUID(pvNode1aBound)},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{boundPVCNode1a},
 			shouldFail:      true,
 		},
 		"binding-one-bound,one-unbound": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
+			bindings:        []*bindingInfo{binding1aBound, binding1bBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound, pvNode1bBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{boundPVCNode1a, unboundPVC2},
+			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound, pvNode1bBound},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{boundPVCNode1a, unboundPVC2},
 		},
 		"provisioning-pvc-bound": {
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			initPVs:         []*v1.PersistentVolume{pvBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{provisionedPVCBound},
-			apiPVCs:         []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVCBound)},
+			cachedPVs:       []*v1.PersistentVolume{pvBound},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVCBound)},
 			expectedBound:   true,
 		},
 		"provisioning-pvc-unbound": {
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			initPVCs:        []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
 		},
 		"provisioning-pvc-not-exists": {
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			initPVCs:        []*v1.PersistentVolumeClaim{provisionedPVC},
-			deletePVCs:      true,
 			shouldFail:      true,
 		},
 		"provisioning-pvc-annotations-nil": {
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			initPVCs:        []*v1.PersistentVolumeClaim{provisionedPVC},
-			apiPVCs:         []*v1.PersistentVolumeClaim{provisionedPVC},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{provisionedPVC},
 			shouldFail:      true,
 		},
 		"provisioning-pvc-selected-node-dropped": {
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			initPVCs:        []*v1.PersistentVolumeClaim{provisionedPVC},
-			apiPVCs:         []*v1.PersistentVolumeClaim{pvcSetEmptyAnnotations(provisionedPVC)},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{pvcSetEmptyAnnotations(provisionedPVC)},
 			shouldFail:      true,
 		},
 		"provisioning-pvc-selected-node-wrong-node": {
-			initPVCs:        []*v1.PersistentVolumeClaim{provisionedPVC},
 			bindings:        []*bindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			apiPVCs:         []*v1.PersistentVolumeClaim{pvcSetSelectedNode(provisionedPVC, "wrong-node")},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{pvcSetSelectedNode(provisionedPVC, "wrong-node")},
 			shouldFail:      true,
 		},
 		"binding-bound-provisioning-unbound": {
-			bindings:        []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			bindings:        []*bindingInfo{binding1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			initPVs:         []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:        []*v1.PersistentVolumeClaim{boundPVCNode1a, addProvisionAnn(provisionedPVC)},
-		},
-		"tolerate-provisioning-pvc-bound-pv-not-found": {
-			initPVs:         []*v1.PersistentVolume{pvNode1a},
-			initPVCs:        []*v1.PersistentVolumeClaim{provisionedPVC},
-			bindings:        []*bindingInfo{},
-			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
-			apiPVCs:         []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVCBound)},
-			deletePVs:       true,
+			cachedPVs:       []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{boundPVCNode1a, addProvisionAnn(provisionedPVC)},
 		},
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	for name, scenario := range scenarios {
 		klog.V(4).Infof("Running test case %q", name)
 
 		// Setup
 		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t)
 		testEnv.initNodes([]*v1.Node{node1})
-		testEnv.initVolumes(scenario.initPVs, nil)
-		testEnv.initClaims(scenario.initPVCs, nil)
-		testEnv.assumeVolumes(t, name, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
-
-		// Before execute
-		if scenario.deletePVs {
-			testEnv.deleteVolumes(scenario.initPVs)
-		} else {
-			testEnv.updateVolumes(t, scenario.apiPVs, true)
-		}
-		if scenario.deletePVCs {
-			testEnv.deleteClaims(scenario.initPVCs)
-		} else {
-			testEnv.updateClaims(t, scenario.apiPVCs, true)
-		}
+		testEnv.initVolumes(scenario.cachedPVs, nil)
+		testEnv.initClaims(scenario.cachedPVCs, nil)
 
 		// Execute
 		allBound, err := testEnv.internalBinder.checkBindings(pod, scenario.bindings, scenario.provisionedPVCs)
@@ -1439,96 +1302,63 @@ func TestCheckBindings(t *testing.T) {
 }
 
 func TestBindPodVolumes(t *testing.T) {
-	type scenarioType struct {
+	scenarios := map[string]struct {
 		// Inputs
-		bindingsNil bool // Pass in nil bindings slice
-
-		nodes []*v1.Node
-
-		// before assume
-		initPVs  []*v1.PersistentVolume
-		initPVCs []*v1.PersistentVolumeClaim
-
-		// assume PV & PVC with these binding results
-		binding          *bindingInfo
-		claimToProvision *v1.PersistentVolumeClaim
-
-		// API updates after assume before bind
-		apiPV  *v1.PersistentVolume
-		apiPVC *v1.PersistentVolumeClaim
+		// These tests only support a single pv and pvc and static binding
+		bindingsNil     bool // Pass in nil bindings slice
+		binding         *bindingInfo
+		cachedPVs       []*v1.PersistentVolume
+		cachedPVCs      []*v1.PersistentVolumeClaim
+		provisionedPVCs []*v1.PersistentVolumeClaim
+		apiPVs          []*v1.PersistentVolume
+		nodes           []*v1.Node
 
 		// This function runs with a delay of 5 seconds
-		delayFunc func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim)
+		delayFunc func(*testing.T, *testEnv, *v1.Pod, *bindingInfo, []*v1.PersistentVolumeClaim)
 
 		// Expected return values
 		shouldFail bool
-	}
-
-	scenarios := map[string]scenarioType{
+	}{
 		"nothing-to-bind-nil": {
 			bindingsNil: true,
 			shouldFail:  true,
 		},
 		"nothing-to-bind-empty": {},
 		"already-bound": {
-			binding:  makeBinding(unboundPVC, pvNode1aBound),
-			initPVs:  []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs: []*v1.PersistentVolumeClaim{boundPVCNode1a},
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs: []*v1.PersistentVolumeClaim{boundPVCNode1a},
 		},
-		"binding-static-pv-succeeds-after-time": {
-			initPVs:    []*v1.PersistentVolume{pvNode1a},
-			initPVCs:   []*v1.PersistentVolumeClaim{unboundPVC},
-			binding:    makeBinding(unboundPVC, pvNode1aBound),
-			shouldFail: false, // Will succeed after PVC is fully bound to this PV by pv controller.
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
-				pvc := pvcs[0]
-				pv := pvs[0]
+		"binding-succeeds-after-time": {
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
 				// Update PVC to be fully bound to PV
-				newPVC := pvc.DeepCopy()
-				newPVC.Spec.VolumeName = pv.Name
+				newPVC := binding.pvc.DeepCopy()
+				newPVC.ResourceVersion = "100"
+				newPVC.Spec.VolumeName = binding.pv.Name
 				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
-				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(newPVC); err != nil {
-					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
+
+				// Update pvc cache, fake client doesn't invoke informers
+				internalBinder, ok := testEnv.binder.(*volumeBinder)
+				if !ok {
+					t.Fatalf("Failed to convert to internal binder")
 				}
+
+				pvcCache := internalBinder.pvcCache
+				internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
+				if !ok {
+					t.Fatalf("Failed to convert to internal PVC cache")
+				}
+				internalPVCCache.add(newPVC)
 			},
-		},
-		"binding-dynamic-pv-succeeds-after-time": {
-			claimToProvision: pvcSetSelectedNode(provisionedPVC, "node1"),
-			initPVCs:         []*v1.PersistentVolumeClaim{provisionedPVC},
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
-				pvc := pvcs[0]
-				// Update PVC to be fully bound to PV
-				newPVC, err := testEnv.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
-				if err != nil {
-					t.Errorf("failed to get PVC %q: %v", pvc.Name, err)
-					return
-				}
-				dynamicPV := makeTestPV("dynamic-pv", "node1", "1G", "1", newPVC, waitClass)
-				dynamicPV, err = testEnv.client.CoreV1().PersistentVolumes().Create(dynamicPV)
-				if err != nil {
-					t.Errorf("failed to create PV %q: %v", dynamicPV.Name, err)
-					return
-				}
-				newPVC.Spec.VolumeName = dynamicPV.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
-				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(newPVC); err != nil {
-					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
-				}
-			},
-		},
-		"bound-by-pv-controller-before-bind": {
-			initPVs:    []*v1.PersistentVolume{pvNode1a},
-			initPVCs:   []*v1.PersistentVolumeClaim{unboundPVC},
-			binding:    makeBinding(unboundPVC, pvNode1aBound),
-			apiPV:      pvNode1aBound,
-			apiPVC:     boundPVCNode1a,
-			shouldFail: true, // bindAPIUpdate will fail because API conflict
 		},
 		"pod-deleted-after-time": {
-			binding:  makeBinding(unboundPVC, pvNode1aBound),
-			initPVs:  []*v1.PersistentVolume{pvNode1a},
-			initPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
 				bindingsCache := testEnv.binder.GetBindingsCache()
 				if bindingsCache == nil {
 					t.Fatalf("Failed to get bindings cache")
@@ -1546,103 +1376,107 @@ func TestBindPodVolumes(t *testing.T) {
 			shouldFail: true,
 		},
 		"binding-times-out": {
-			binding:    makeBinding(unboundPVC, pvNode1aBound),
-			initPVs:    []*v1.PersistentVolume{pvNode1a},
-			initPVCs:   []*v1.PersistentVolumeClaim{unboundPVC},
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
 			shouldFail: true,
 		},
 		"binding-fails": {
-			binding:    makeBinding(unboundPVC2, pvNode1bBound),
-			initPVs:    []*v1.PersistentVolume{pvNode1b},
-			initPVCs:   []*v1.PersistentVolumeClaim{unboundPVC2},
+			binding:    binding1bBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1b},
+			apiPVs:     []*v1.PersistentVolume{pvNode1bBoundHigherVersion},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC2},
 			shouldFail: true,
 		},
 		"check-fails": {
-			binding:  makeBinding(unboundPVC, pvNode1aBound),
-			initPVs:  []*v1.PersistentVolume{pvNode1a},
-			initPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
-				pvc := pvcs[0]
-				// Delete PVC will fail check
-				if err := testEnv.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, &metav1.DeleteOptions{}); err != nil {
-					t.Errorf("failed to delete PVC %q: %v", pvc.Name, err)
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1a},
+			cachedPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
+				// Delete PVC
+				// Update pvc cache, fake client doesn't invoke informers
+				internalBinder, ok := testEnv.binder.(*volumeBinder)
+				if !ok {
+					t.Fatalf("Failed to convert to internal binder")
 				}
+
+				pvcCache := internalBinder.pvcCache
+				internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
+				if !ok {
+					t.Fatalf("Failed to convert to internal PVC cache")
+				}
+				internalPVCCache.delete(binding.pvc)
 			},
 			shouldFail: true,
 		},
 		"node-affinity-fails": {
-			binding:    makeBinding(unboundPVC, pvNode1aBound),
-			initPVs:    []*v1.PersistentVolume{pvNode1aBound},
-			initPVCs:   []*v1.PersistentVolumeClaim{boundPVCNode1a},
+			binding:    binding1aBound,
+			cachedPVs:  []*v1.PersistentVolume{pvNode1aBound},
+			cachedPVCs: []*v1.PersistentVolumeClaim{boundPVCNode1a},
 			nodes:      []*v1.Node{node1NoLabels},
 			shouldFail: true,
 		},
 		"node-affinity-fails-dynamic-provisioning": {
-			initPVs:          []*v1.PersistentVolume{pvNode1a, pvNode2},
-			initPVCs:         []*v1.PersistentVolumeClaim{selectedNodePVC},
-			claimToProvision: selectedNodePVC,
-			nodes:            []*v1.Node{node1, node2},
-			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
+			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode2},
+			cachedPVCs:      []*v1.PersistentVolumeClaim{selectedNodePVC},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{selectedNodePVC},
+			nodes:           []*v1.Node{node1, node2},
+			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, binding *bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
 				// Update PVC to be fully bound to a PV with a different node
 				newPVC := pvcs[0].DeepCopy()
+				newPVC.ResourceVersion = "100"
 				newPVC.Spec.VolumeName = pvNode2.Name
 				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
-				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(newPVC); err != nil {
-					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
+
+				// Update PVC cache, fake client doesn't invoke informers
+				internalBinder, ok := testEnv.binder.(*volumeBinder)
+				if !ok {
+					t.Fatalf("Failed to convert to internal binder")
 				}
+
+				pvcCache := internalBinder.pvcCache
+				internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
+				if !ok {
+					t.Fatalf("Failed to convert to internal PVC cache")
+				}
+				internalPVCCache.add(newPVC)
 			},
 			shouldFail: true,
 		},
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	for name, scenario := range scenarios {
 		klog.V(4).Infof("Running test case %q", name)
 
 		// Setup
 		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		if scenario.apiPVs == nil {
+			scenario.apiPVs = scenario.cachedPVs
+		}
 		if scenario.nodes == nil {
 			scenario.nodes = []*v1.Node{node1}
 		}
+		if scenario.provisionedPVCs == nil {
+			scenario.provisionedPVCs = []*v1.PersistentVolumeClaim{}
+		}
+		testEnv := newTestBinder(t)
 		if !scenario.bindingsNil {
 			bindings := []*bindingInfo{}
 			if scenario.binding != nil {
 				bindings = []*bindingInfo{scenario.binding}
 			}
-			claimsToProvision := []*v1.PersistentVolumeClaim{}
-			if scenario.claimToProvision != nil {
-				claimsToProvision = []*v1.PersistentVolumeClaim{scenario.claimToProvision}
-			}
 			testEnv.initNodes(scenario.nodes)
-			testEnv.initVolumes(scenario.initPVs, scenario.initPVs)
-			testEnv.initClaims(scenario.initPVCs, scenario.initPVCs)
-			testEnv.assumeVolumes(t, name, "node1", pod, bindings, claimsToProvision)
-		}
-
-		// Before Execute
-		if scenario.apiPV != nil {
-			_, err := testEnv.client.CoreV1().PersistentVolumes().Update(scenario.apiPV)
-			if err != nil {
-				t.Fatalf("Test %q failed: failed to update PV %q", name, scenario.apiPV.Name)
-			}
-		}
-		if scenario.apiPVC != nil {
-			_, err := testEnv.client.CoreV1().PersistentVolumeClaims(scenario.apiPVC.Namespace).Update(scenario.apiPVC)
-			if err != nil {
-				t.Fatalf("Test %q failed: failed to update PVC %q", name, getPVCName(scenario.apiPVC))
-			}
+			testEnv.initVolumes(scenario.cachedPVs, scenario.apiPVs)
+			testEnv.initClaims(scenario.cachedPVCs, nil)
+			testEnv.assumeVolumes(t, name, "node1", pod, bindings, scenario.provisionedPVCs)
 		}
 
 		if scenario.delayFunc != nil {
-			go func(scenario scenarioType) {
+			go func() {
 				time.Sleep(5 * time.Second)
-				// Sleep a while to run after bindAPIUpdate in BindPodVolumes
 				klog.V(5).Infof("Running delay function")
-				scenario.delayFunc(t, testEnv, pod, scenario.initPVs, scenario.initPVCs)
-			}(scenario)
+				scenario.delayFunc(t, testEnv, pod, scenario.binding, scenario.provisionedPVCs)
+			}()
 		}
 
 		// Execute
@@ -1664,9 +1498,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	pvs := []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1c}
 
 	// Setup
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	testEnv := newTestBinder(t, ctx.Done())
+	testEnv := newTestBinder(t)
 	testEnv.initVolumes(pvs, pvs)
 	testEnv.initClaims(podPVCs, podPVCs)
 	pod := makePod(podPVCs)
@@ -1716,6 +1548,6 @@ func TestFindAssumeVolumes(t *testing.T) {
 		if !unboundSatisfied {
 			t.Errorf("Test failed: couldn't find PVs for all PVCs")
 		}
-		testEnv.validatePodCache(t, "after-assume", testNode.Name, pod, expectedBindings, nil)
+		testEnv.validatePodCache(t, "after-assume", testNode.Name, pod, expectedBindings, []*v1.PersistentVolumeClaim{})
 	}
 }

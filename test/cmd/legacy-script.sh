@@ -523,7 +523,7 @@ runTests() {
   #####################################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    run_recursive_resources_tests
+    record_command run_recursive_resources_tests
   fi
 
 

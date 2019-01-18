@@ -13,6 +13,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/util",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/api:go_default_library",

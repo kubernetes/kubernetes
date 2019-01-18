@@ -234,6 +234,25 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 	return nil
 }
 
+// NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
+// Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
+func NewFromConfigurator(c factory.Configurator, modifiers ...func(c *factory.Config)) (*Scheduler, error) {
+	cfg, err := c.Create()
+	if err != nil {
+		return nil, err
+	}
+	// Mutate it if any functions were provided, changes might be required for certain types of tests (i.e. change the recorder).
+	for _, modifier := range modifiers {
+		modifier(cfg)
+	}
+	// From this point on the config is immutable to the outside.
+	s := &Scheduler{
+		config: cfg,
+	}
+	metrics.Register()
+	return s, nil
+}
+
 // NewFromConfig returns a new scheduler using the provided Config.
 func NewFromConfig(config *factory.Config) *Scheduler {
 	metrics.Register()
@@ -263,11 +282,10 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 	sched.config.Error(pod, err)
 	sched.config.Recorder.Event(pod, v1.EventTypeWarning, "FailedScheduling", message)
 	sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-		Type:          v1.PodScheduled,
-		Status:        v1.ConditionFalse,
-		LastProbeTime: metav1.Now(),
-		Reason:        reason,
-		Message:       err.Error(),
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  reason,
+		Message: err.Error(),
 	})
 }
 
@@ -365,6 +383,10 @@ func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 			klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
 		}
 
+		// Volumes may be bound by PV controller asynchronously, we must clear
+		// stale pod binding cache.
+		sched.config.VolumeBinder.DeletePodBindings(assumed)
+
 		sched.recordSchedulingFailure(assumed, err, "VolumeBindingFailed", err.Error())
 		return err
 	}
@@ -422,8 +444,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 		return err
 	}
 
-	metrics.BindingLatency.Observe(metrics.SinceInSeconds(bindingStart))
-	metrics.DeprecatedBindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
+	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
 	return nil
@@ -466,8 +487,7 @@ func (sched *Scheduler) scheduleOne() {
 				preemptionStartTime := time.Now()
 				sched.preempt(pod, fitError)
 				metrics.PreemptionAttempts.Inc()
-				metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
-				metrics.DeprecatedSchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
+				metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
 				metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
 			}
 			// Pod did not fit anywhere, so it is counted as a failure. If preemption
@@ -480,8 +500,7 @@ func (sched *Scheduler) scheduleOne() {
 		}
 		return
 	}
-	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
-	metrics.DeprecatedSchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
+	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPod := pod.DeepCopy()
@@ -560,8 +579,7 @@ func (sched *Scheduler) scheduleOne() {
 				Name: scheduleResult.SuggestedHost,
 			},
 		})
-		metrics.E2eSchedulingLatency.Observe(metrics.SinceInSeconds(start))
-		metrics.DeprecatedE2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
 			klog.Errorf("error binding pod: %v", err)
 			metrics.PodScheduleErrors.Inc()

@@ -236,9 +236,8 @@ const (
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
 
-	// owner: @dims, @derekwaynecarr
+	// owner: @dims
 	// alpha: v1.10
-	// beta: v1.14
 	//
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit utilfeature.Feature = "SupportPodPidsLimit"
@@ -434,7 +433,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
-	SupportPodPidsLimit:                         {Default: true, PreRelease: utilfeature.Beta},
+	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},

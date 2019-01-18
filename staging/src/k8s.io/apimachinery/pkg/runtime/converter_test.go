@@ -44,7 +44,7 @@ var simpleEquality = conversion.EqualitiesOrDie(
 	},
 )
 
-// Define a number of test types.
+// Definte a number of test types.
 type A struct {
 	A int    `json:"aa,omitempty"`
 	B string `json:"ab,omitempty"`

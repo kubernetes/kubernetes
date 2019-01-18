@@ -83,12 +83,10 @@ def file_passes(filename, refs, regexs):
     generated = is_generated_file(filename, data, regexs)
 
     basename = os.path.basename(filename)
-    extension = file_extension(filename)
     if generated:
-        if extension == "go":
-            extension = "generatego"
-        elif extension == "bzl":
-            extension = "generatebzl"
+        extension = "generatego"
+    else:
+        extension = file_extension(filename)
 
     if extension != "":
         ref = refs[extension]

@@ -15,6 +15,5 @@ reviewers:
 - gnufied
 - verult
 - davidz627
-- humblec
 labels:
 - sig/storage

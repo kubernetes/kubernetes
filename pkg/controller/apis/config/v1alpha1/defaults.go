@@ -19,9 +19,10 @@ package v1alpha1
 import (
 	"time"
 
+	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -51,7 +52,7 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 		obj.TTLAfterFinishedController.ConcurrentTTLSyncs = 5
 	}
 
-	// These defaults override the recommended defaults from the componentbaseconfigv1alpha1 package that are applied automatically
+	// These defaults override the recommended defaults from the apimachineryconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the kube-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0.0 {
 		obj.Generic.ClientConnection.QPS = 20.0
@@ -80,8 +81,8 @@ func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrcon
 	}
 
 	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
-	componentbaseconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
-	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
+	apimachineryconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
+	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 }
 
 func SetDefaults_KubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration) {

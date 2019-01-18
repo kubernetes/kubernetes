@@ -17,8 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 )
 
 const (
@@ -53,7 +54,7 @@ type KubeSchedulerConfiguration struct {
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
+	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
 	// HealthzBindAddress is the IP address and port for the health check server to serve on,
 	// defaulting to 0.0.0.0:10251
 	HealthzBindAddress string `json:"healthzBindAddress"`
@@ -62,8 +63,8 @@ type KubeSchedulerConfiguration struct {
 	MetricsBindAddress string `json:"metricsBindAddress"`
 
 	// DebuggingConfiguration holds configuration for Debugging related features
-	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
-	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
+	// TODO: We might wanna make this a substruct like Debugging apiserverconfig.DebuggingConfiguration
+	apiserverconfigv1alpha1.DebuggingConfiguration `json:",inline"`
 
 	// DisablePreemption disables the pod preemption feature.
 	DisablePreemption bool `json:"disablePreemption"`
@@ -125,7 +126,7 @@ type SchedulerPolicyConfigMapSource struct {
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
-	componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
+	apiserverconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string `json:"lockObjectNamespace"`
 	// LockObjectName defines the lock object name

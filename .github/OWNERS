@@ -2,7 +2,6 @@ reviewers:
   - castrojo
   - cblecker
   - grodrigues3
-  - nikhita
   - parispittman
   - Phillels
 approvers:
@@ -11,5 +10,3 @@ approvers:
   - grodrigues3
   - parispittman
   - Phillels
-labels:
-  - sig/contributor-experience

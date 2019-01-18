@@ -288,7 +288,7 @@ func NewNodeLifecycleController(
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 		taintNodeByCondition:        taintNodeByCondition,
-		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
+		nodeUpdateQueue:             workqueue.New(),
 	}
 	if useTaintBasedEvictions {
 		klog.Infof("Controller is using taint based evictions.")

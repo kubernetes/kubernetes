@@ -236,10 +236,7 @@ func podTimestamp(pod *v1.Pod) *metav1.Time {
 	if condition == nil {
 		return &pod.CreationTimestamp
 	}
-	if condition.LastProbeTime.IsZero() {
-		return &condition.LastTransitionTime
-	}
-	return &condition.LastProbeTime
+	return &condition.LastTransitionTime
 }
 
 // activeQComp is the function used by the activeQ heap algorithm to sort pods.
@@ -809,19 +806,5 @@ func newNominatedPodMap() *nominatedPodMap {
 	return &nominatedPodMap{
 		nominatedPods:      make(map[string][]*v1.Pod),
 		nominatedPodToNode: make(map[ktypes.UID]string),
-	}
-}
-
-// MakeNextPodFunc returns a function to retrieve the next pod from a given
-// scheduling queue
-func MakeNextPodFunc(queue SchedulingQueue) func() *v1.Pod {
-	return func() *v1.Pod {
-		pod, err := queue.Pop()
-		if err == nil {
-			klog.V(4).Infof("About to try and schedule pod %v/%v", pod.Namespace, pod.Name)
-			return pod
-		}
-		klog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
-		return nil
 	}
 }

@@ -103,15 +103,14 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		conf.Wrap(provider.WrapTransport)
+		wt := conf.WrapTransport
+		if wt != nil {
+			conf.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+				return provider.WrapTransport(wt(rt))
+			}
+		} else {
+			conf.WrapTransport = provider.WrapTransport
+		}
 	}
 	return conf, nil
-}
-
-// Wrap adds a transport middleware function that will give the caller
-// an opportunity to wrap the underlying http.RoundTripper prior to the
-// first API call being made. The provided function is invoked after any
-// existing transport wrappers are invoked.
-func (c *Config) Wrap(fn transport.WrapperFunc) {
-	c.WrapTransport = transport.Wrappers(c.WrapTransport, fn)
 }

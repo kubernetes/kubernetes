@@ -43,7 +43,7 @@ func (lp *LocalPort) String() string {
 	return fmt.Sprintf("%q (%s/%s)", lp.Description, ipPort, lp.Protocol)
 }
 
-// Closeable is an interface around closing a port.
+// Closeable is an interface around closing an port.
 type Closeable interface {
 	Close() error
 }

@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -116,7 +115,7 @@ type ScheduleAlgorithm interface {
 	Predicates() map[string]predicates.FitPredicate
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
-	Prioritizers() []priorities.PriorityConfig
+	Prioritizers() []algorithm.PriorityConfig
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -134,9 +133,9 @@ type genericScheduler struct {
 	cache                    schedulerinternalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
-	priorityMetaProducer     priorities.PriorityMetadataProducer
+	priorityMetaProducer     algorithm.PriorityMetadataProducer
 	predicateMetaProducer    predicates.PredicateMetadataProducer
-	prioritizers             []priorities.PriorityConfig
+	prioritizers             []algorithm.PriorityConfig
 	pluginSet                pluginsv1alpha1.PluginSet
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndex            uint64
@@ -193,16 +192,14 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 			FailedPredicates: failedPredicateMap,
 		}
 	}
-	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
-	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
+	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 
 	trace.Step("Prioritizing")
 	startPriorityEvalTime := time.Now()
 	// When only one node after predicate, just use it.
 	if len(filteredNodes) == 1 {
-		metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
-		metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
+		metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 		return ScheduleResult{
 			SuggestedHost:  filteredNodes[0].Name,
 			EvaluatedNodes: 1 + len(failedPredicateMap),
@@ -215,8 +212,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	if err != nil {
 		return result, err
 	}
-	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
-	metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
+	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 
 	trace.Step("Selecting host")
@@ -231,7 +227,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 // Prioritizers returns a slice containing all the scheduler's priority
 // functions and their config. It is exposed for testing only.
-func (g *genericScheduler) Prioritizers() []priorities.PriorityConfig {
+func (g *genericScheduler) Prioritizers() []algorithm.PriorityConfig {
 	return g.prioritizers
 }
 
@@ -276,19 +272,16 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // returns 1) the node, 2) the list of preempted pods if such a node is found,
 // 3) A list of pods whose nominated node name should be cleared, and 4) any
 // possible error.
-// Preempt does not update its snapshot. It uses the same snapshot used in the
-// scheduling cycle. This is to avoid a scenario where preempt finds feasible
-// nodes without preempting any pod. When there are many pending pods in the
-// scheduling queue a nominated pod will go back to the queue and behind
-// other pods with the same priority. The nominated pod prevents other pods from
-// using the nominated resources and the nominated pod could take a long time
-// before it is retried after many other pending pods.
 func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.
 	fitError, ok := scheduleErr.(*FitError)
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
+	}
+	err := g.snapshot()
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
@@ -644,7 +637,7 @@ func PrioritizeNodes(
 	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	meta interface{},
-	priorityConfigs []priorities.PriorityConfig,
+	priorityConfigs []algorithm.PriorityConfig,
 	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
@@ -1080,7 +1073,7 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 	potentialNodes := []*v1.Node{}
 	for _, node := range nodes {
 		unresolvableReasonExist := false
-		failedPredicates, _ := failedPredicatesMap[node.Name]
+		failedPredicates, found := failedPredicatesMap[node.Name]
 		// If we assume that scheduler looks at all nodes and populates the failedPredicateMap
 		// (which is the case today), the !found case should never happen, but we'd prefer
 		// to rely less on such assumptions in the code when checking does not impose
@@ -1111,7 +1104,7 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 				break
 			}
 		}
-		if !unresolvableReasonExist {
+		if !found || !unresolvableReasonExist {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
 			potentialNodes = append(potentialNodes, node)
 		}
@@ -1172,8 +1165,8 @@ func NewGenericScheduler(
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
 	predicateMetaProducer predicates.PredicateMetadataProducer,
-	prioritizers []priorities.PriorityConfig,
-	priorityMetaProducer priorities.PriorityMetadataProducer,
+	prioritizers []algorithm.PriorityConfig,
+	priorityMetaProducer algorithm.PriorityMetadataProducer,
 	pluginSet pluginsv1alpha1.PluginSet,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,

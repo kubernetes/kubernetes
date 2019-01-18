@@ -72,7 +72,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 
 	statefulSet.Generation = 1
 
-	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
+	pod.DropDisabledFields(&statefulSet.Spec.Template.Spec, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -82,7 +82,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	// Update is not allowed to set status
 	newStatefulSet.Status = oldStatefulSet.Status
 
-	pod.DropDisabledTemplateFields(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
+	pod.DropDisabledFields(&newStatefulSet.Spec.Template.Spec, &oldStatefulSet.Spec.Template.Spec)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.

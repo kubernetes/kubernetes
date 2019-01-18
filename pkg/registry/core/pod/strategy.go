@@ -73,7 +73,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		QOSClass: qos.GetPodQOS(pod),
 	}
 
-	podutil.DropDisabledPodFields(pod, nil)
+	podutil.DropDisabledFields(&pod.Spec, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -82,7 +82,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	podutil.DropDisabledPodFields(newPod, oldPod)
+	podutil.DropDisabledFields(&newPod.Spec, &oldPod.Spec)
 }
 
 // Validate validates a new pod.

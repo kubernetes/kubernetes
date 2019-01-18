@@ -248,11 +248,11 @@ __custom_func() {
             __kubectl_get_resource
             return
             ;;
-        kubectl_logs)
+        kubectl_logs | kubectl_attach)
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec | kubectl_port-forward | kubectl_top_pod | kubectl_attach)
+        kubectl_exec | kubectl_port-forward | kubectl_top_pod)
             __kubectl_get_resource_pod
             return
             ;;
