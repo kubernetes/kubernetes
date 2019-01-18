@@ -136,7 +136,6 @@
 ./hack/update-staging-godeps.sh
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
-./hack/verify-cli-conventions.sh
 ./hack/verify-codegen.sh
 ./hack/verify-description.sh
 ./hack/verify-generated-device-plugin.sh
