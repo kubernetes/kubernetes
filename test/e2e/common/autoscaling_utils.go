@@ -387,6 +387,9 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, max
 			framework.Logf("Error getting HPA: %s", err)
 		} else {
 			framework.Logf("HPA status: %+v", as.Status)
+			if as.Status.CurrentCPUUtilizationPercentage != nil {
+				framework.Logf("CurrentCPUUtilizationPercentage: %d", *as.Status.CurrentCPUUtilizationPercentage)
+			}
 		}
 		if replicas < minDesiredReplicas {
 			return false, fmt.Errorf("number of replicas below target")
