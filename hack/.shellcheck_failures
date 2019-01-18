@@ -137,7 +137,6 @@
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
 ./hack/verify-generated-files-remake.sh
-./hack/verify-generated-pod-resources.sh
 ./hack/verify-generated-protobuf.sh
 ./hack/verify-generated-runtime.sh
 ./hack/verify-generated-swagger-docs.sh
