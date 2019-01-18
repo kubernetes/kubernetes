@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -34,6 +35,9 @@ import (
 
 const (
 	getReleaseVersionTimeout = time.Duration(10 * time.Second)
+	// Max number of attempts allowed to resolve recursive version labels
+	// like "stable" -> "stable-1" -> parsable version.
+	maxVersionLabelResolveAttempts = 5
 )
 
 var (
@@ -60,58 +64,60 @@ var (
 //  latest      (latest release, including alpha/beta)
 //  latest-1    (latest release in 1.x, including alpha/beta)
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
+//
+// Also the names and versions can be prefixed with a bucket; valid formats include
+// ci/1.13.0 or ci/v1.13.0 or ci/stable. Valid prefixes are release, ci, ci-cross.
 func KubernetesReleaseVersion(version string) (string, error) {
-	ver := normalizedBuildVersion(version)
-	if len(ver) != 0 {
-		return ver, nil
-	}
-
 	bucketURL, versionLabel, err := splitVersion(version)
 	if err != nil {
 		return "", err
 	}
 
-	// revalidate, if exact build from e.g. CI bucket requested.
-	ver = normalizedBuildVersion(versionLabel)
-	if len(ver) != 0 {
+	// if versionLabel is a semantic version, use it; valid formats include
+	//  - 1.13.0 or v1.13.0 (version with or without initial v)
+	if ver, ok := normalizeBuildVersion(versionLabel); ok {
 		return ver, nil
 	}
 
 	// kubeReleaseLabelRegex matches labels such as: latest, latest-1, latest-1.10
-	if kubeReleaseLabelRegex.MatchString(versionLabel) {
-		// Try to obtain a client version.
-		// pkgversion.Get().String() should always return a correct version added by the golang
-		// linker and the build system. The version can still be missing when doing unit tests
-		// on individual packages.
-		clientVersion, clientVersionErr := kubeadmVersion(pkgversion.Get().String())
-		// Fetch version from the internet.
-		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
-		body, err := fetchFromURL(url, getReleaseVersionTimeout)
-		if err != nil {
-			// If the network operaton was successful but the server did not reply with StatusOK
-			if body != "" {
-				return "", err
-			}
-			// Handle air-gapped environments by falling back to the client version.
-			klog.Infof("could not fetch a Kubernetes version from the internet: %v", err)
-			klog.Infof("falling back to the local client version: %s", clientVersion)
-			return KubernetesReleaseVersion(clientVersion)
-		}
-
-		if clientVersionErr != nil {
-			klog.Warningf("could not obtain client version; using remote version: %s", body)
-			return KubernetesReleaseVersion(body)
-		}
-
-		// both the client and the remote version are obtained; validate them and pick a stable version
-		body, err = validateStableVersion(body, clientVersion)
-		if err != nil {
-			return "", err
-		}
-		// Re-validate received version and return.
-		return KubernetesReleaseVersion(body)
+	if !kubeReleaseLabelRegex.MatchString(versionLabel) {
+		return "", errors.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
 	}
-	return "", errors.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+
+	// Try to obtain a client version.
+	// pkgversion.Get().String() should always return a correct version added by the golang
+	// linker and the build system. The version can still be missing when doing unit tests
+	// on individual packages.
+	clientVersion, clientVersionErr := kubeadmVersion(pkgversion.Get().String())
+	// Fetch version from the internet.
+	remoteVersion, err := resolveVersionLabel(bucketURL, versionLabel)
+	if err != nil {
+		if urlErr, ok := errors.Cause(err).(*url.Error); !(ok && urlErr.Timeout()) {
+			return "", errors.Wrapf(err, "failed to resolve version label while having good connectivity")
+		}
+
+		// Handle air-gapped environments by falling back to the client version.
+		klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
+		klog.Warningf("falling back to the local client version: %s", clientVersion)
+		return clientVersion, nil
+	}
+
+	if clientVersionErr != nil {
+		klog.Warningf("could not obtain client version; using remote version: %s", remoteVersion)
+		return remoteVersion, nil
+	}
+
+	// both the client and the remote version are obtained; validate them and pick a stable version
+	ver, err := validateStableVersion(remoteVersion, clientVersion)
+	if err != nil {
+		return "", err
+	}
+
+	if kubeReleaseLabelRegex.MatchString(ver) {
+		return resolveVersionLabel(bucketURL, ver)
+	}
+
+	return ver, nil
 }
 
 // KubernetesVersionToImageTag is helper function that replaces all
@@ -134,16 +140,16 @@ func KubernetesIsCIVersion(version string) bool {
 	return false
 }
 
-// Internal helper: returns normalized build version (with "v" prefix if needed)
-// If input doesn't match known version pattern, returns empty string.
-func normalizedBuildVersion(version string) string {
-	if kubeReleaseRegex.MatchString(version) {
-		if strings.HasPrefix(version, "v") {
-			return version
-		}
-		return "v" + version
+// normalizeBuildVersion adds the "v" prefix to version string if it's missing
+// If input doesn't match known version pattern returns empty string and false.
+func normalizeBuildVersion(version string) (string, bool) {
+	if !kubeReleaseRegex.MatchString(version) {
+		return "", false
 	}
-	return ""
+	if strings.HasPrefix(version, "v") {
+		return version, true
+	}
+	return "v" + version, true
 }
 
 // Internal helper: split version parts,
@@ -162,30 +168,46 @@ func splitVersion(version string) (string, string, error) {
 	default:
 		urlSuffix = "release"
 	}
-	url := fmt.Sprintf("%s/%s", kubeReleaseBucketURL, urlSuffix)
-	return url, subs[0][3], nil
+	baseURL := fmt.Sprintf("%s/%s", kubeReleaseBucketURL, urlSuffix)
+	return baseURL, subs[0][3], nil
 }
 
-// Internal helper: return content of URL
-func fetchFromURL(url string, timeout time.Duration) (string, error) {
-	klog.V(2).Infof("fetching Kubernetes version from URL: %s", url)
-	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
-	resp, err := client.Get(url)
-	if err != nil {
-		return "", errors.Errorf("unable to get URL %q: %s", url, err.Error())
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", errors.Errorf("unable to read content of URL %q: %s", url, err.Error())
-	}
-	bodyString := strings.TrimSpace(string(body))
+// resolveVersionLabel resolves version label into normalized version string
+func resolveVersionLabel(bucketURL, ver string) (string, error) {
+	client := &http.Client{Timeout: getReleaseVersionTimeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+	resolutionSequence := make([]string, 0, maxVersionLabelResolveAttempts)
 
-	if resp.StatusCode != http.StatusOK {
-		msg := fmt.Sprintf("unable to fetch file. URL: %q, status: %v", url, resp.Status)
-		return bodyString, errors.New(msg)
+	// try to resolve recursive labels like "stable" -> "stable-1" -> parsable version
+	for attempts := 0; attempts < maxVersionLabelResolveAttempts; attempts++ {
+		resolutionSequence = append(resolutionSequence, ver)
+		versionURL := fmt.Sprintf("%s/%s.txt", bucketURL, ver)
+		klog.V(2).Infof("fetching Kubernetes version from URL: %s", versionURL)
+		resp, err := client.Get(versionURL)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to get URL %q", versionURL)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return "", errors.Errorf("unable to fetch file. URL: %q, status: %v", versionURL, resp.Status)
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to read content of URL %q", versionURL)
+		}
+		ver = strings.TrimSpace(string(body))
+
+		if remoteVer, ok := normalizeBuildVersion(ver); ok {
+			return remoteVer, nil
+		}
+
+		if !kubeReleaseLabelRegex.MatchString(ver) {
+			return "", errors.Errorf("server returned unrecognizable string: %s", ver)
+		}
 	}
-	return bodyString, nil
+
+	return "", errors.Errorf("exhausted all attempts to resolve recursive remote version. Resolution sequence was %s", strings.Join(resolutionSequence, " -> "))
 }
 
 // kubeadmVersion returns the version of the client without metadata.

@@ -120,6 +120,8 @@ func TestVersionFromNetwork(t *testing.T) {
 		"empty":      {"", http.StatusOK, "", true},
 		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", http.StatusOK, "", true},
 		"unknown":    {"The requested URL was not found on this server.", http.StatusNotFound, "", true},
+		"stable-2":   {"stable-3", http.StatusOK, "", true}, // reaches recursion limit
+		"stable-3":   {"stable-2", http.StatusOK, "", true}, // reaches recursion limit
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := strings.TrimSuffix(path.Base(r.URL.Path), ".txt")
@@ -286,23 +288,27 @@ func TestCIBuildVersion(t *testing.T) {
 	}
 }
 
-func TestNormalizedBuildVersionVersion(t *testing.T) {
+func TestNormalizeBuildVersionVersion(t *testing.T) {
 	type T struct {
-		input    string
-		expected string
+		input           string
+		expected        string
+		expectedFailure bool
 	}
 	cases := []T{
-		{"v1.7.0", "v1.7.0"},
-		{"v1.8.0-alpha.2.1231+afabd012389d53a", "v1.8.0-alpha.2.1231+afabd012389d53a"},
-		{"1.7.0", "v1.7.0"},
-		{"unknown-1", ""},
+		{"v1.7.0", "v1.7.0", false},
+		{"v1.8.0-alpha.2.1231+afabd012389d53a", "v1.8.0-alpha.2.1231+afabd012389d53a", false},
+		{"1.7.0", "v1.7.0", false},
+		{"unknown-1", "", true},
 	}
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/expected:%s", tc.input, tc.expected), func(t *testing.T) {
-			output := normalizedBuildVersion(tc.input)
+			output, ok := normalizeBuildVersion(tc.input)
+			if ok && tc.expectedFailure {
+				t.Errorf("normalizeBuildVersion: expected error was not triggered for %q", tc.input)
+			}
 			if output != tc.expected {
-				t.Errorf("normalizedBuildVersion: unexpected output %q for input %q. Expected: %q", output, tc.input, tc.expected)
+				t.Errorf("normalizeBuildVersion: unexpected output %q for input %q. Expected: %q", output, tc.input, tc.expected)
 			}
 		})
 	}
