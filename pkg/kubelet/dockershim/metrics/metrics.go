@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -141,14 +140,4 @@ func Register() {
 		prometheus.MustRegister(DeprecatedDockerOperationsErrors)
 		prometheus.MustRegister(DeprecatedDockerOperationsTimeout)
 	})
-}
-
-// SinceInMicroseconds gets the time since the specified start in microseconds.
-func SinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
-}
-
-// SinceInSeconds gets the time since the specified start in seconds.
-func SinceInSeconds(start time.Time) float64 {
-	return time.Since(start).Seconds()
 }

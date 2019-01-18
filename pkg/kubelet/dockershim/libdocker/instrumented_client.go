@@ -24,6 +24,7 @@ import (
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
+	genericmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // instrumentedInterface wraps the Interface and records the operations
@@ -43,8 +44,8 @@ func NewInstrumentedInterface(dockerClient Interface) Interface {
 func recordOperation(operation string, start time.Time) {
 	metrics.DockerOperations.WithLabelValues(operation).Inc()
 	metrics.DeprecatedDockerOperations.WithLabelValues(operation).Inc()
-	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
-	metrics.DeprecatedDockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(genericmetrics.SinceInSeconds(start))
+	metrics.DeprecatedDockerOperationsLatency.WithLabelValues(operation).Observe(genericmetrics.SinceInMicroseconds(start))
 }
 
 // recordError records error for metric if an error occurred.

@@ -13,6 +13,7 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/network/hostport:go_default_library",
         "//pkg/kubelet/dockershim/network/metrics:go_default_library",
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
