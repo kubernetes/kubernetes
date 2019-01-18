@@ -120,7 +120,7 @@ func TestApiserverMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkForExpectedMetrics(t, metrics, []string{
-		"apiserver_request_count",
-		"apiserver_request_latencies",
+		"apiserver_request_total",
+		"apiserver_request_latency_seconds",
 	})
 }
