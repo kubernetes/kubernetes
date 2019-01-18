@@ -137,7 +137,6 @@
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
 ./hack/verify-generated-files-remake.sh
-./hack/verify-generated-swagger-docs.sh
 ./hack/verify-godep-licenses.sh
 ./hack/verify-godeps.sh
 ./hack/verify-gofmt.sh
