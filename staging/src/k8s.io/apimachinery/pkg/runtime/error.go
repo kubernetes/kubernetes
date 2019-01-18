@@ -120,3 +120,77 @@ func IsMissingVersion(err error) bool {
 	_, ok := err.(*missingVersionErr)
 	return ok
 }
+
+// StrictDecoderError is a base error type that is returned by a strict Decoder such
+// as UniversalStrictDecoder.
+type StrictDecoderError struct {
+	message      string
+	gvk          schema.GroupVersionKind
+	originalData []byte
+}
+
+// UnknownFieldError is an error type that is returned in cases where the input
+// JSON or YAML contains unknown fields.
+// UnknownFieldError embeds StrictDecoderError.
+type UnknownFieldError struct {
+	StrictDecoderError
+}
+
+// DuplicateFieldError is an error type that is returned in cases where the input
+// JSON or YAML contains duplicate fields under the same parent field.
+// DuplicateFieldError embeds StrictDecoderError.
+type DuplicateFieldError struct {
+	StrictDecoderError
+}
+
+// NewStrictDecoderError creates a new NewStrictDecoderError object
+func NewStrictDecoderError(message string, gvk schema.GroupVersionKind, originalData []byte) *StrictDecoderError {
+	return &StrictDecoderError{
+		message:      message,
+		gvk:          gvk,
+		originalData: originalData,
+	}
+}
+
+func (e *StrictDecoderError) Error() string {
+	return fmt.Sprintf("strict decoder error for %#v: %s", e.gvk, e.message)
+}
+
+// GVK returns the GVK that was extacted when Decoding using a strict Decoder.
+func (e *StrictDecoderError) GVK() schema.GroupVersionKind {
+	return e.gvk
+}
+
+// OriginalData returns the original byte slice input that was passed to a strict Decoder.
+func (e *StrictDecoderError) OriginalData() []byte {
+	return e.originalData
+}
+
+// IsStrictDecoderError returns true if the error is a result of a strict Decoder.
+func IsStrictDecoderError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*StrictDecoderError)
+	return ok
+}
+
+// IsUnknownFieldError returns true if the error is a result of a strict Decoder failing
+// due to a unknown field.
+func IsUnknownFieldError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*UnknownFieldError)
+	return ok
+}
+
+// IsDuplicateFieldError returns true if the error is a result of a strict Decoder failing
+// due to a duplicate field.
+func IsDuplicateFieldError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*DuplicateFieldError)
+	return ok
+}
