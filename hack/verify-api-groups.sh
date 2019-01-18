@@ -88,36 +88,6 @@ for group_dirname in "${group_dirnames[@]}"; do
 	fi
 done
 
-# import_known_versions checks to be sure we'll get installed
-# groups_without_codegen is the list of group we EXPECT to not have the client generated for
-# them.  This happens for types that aren't served from the API server
-packages_without_install=(
-	"k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/apis/admission"
-	"k8s.io/kubernetes/pkg/apis/componentconfig" # TODO: Remove this package completely and from this list
-)
-known_version_files=(
-	"pkg/master/import_known_versions.go"
-	"pkg/client/clientset_generated/internal_clientset/import_known_versions.go"
-)
-for expected_install_package in "${expected_install_packages[@]}"; do
-	found=0
-	for package_without_install in "${packages_without_install[@]}"; do
-		if [ "${package_without_install}" == "${expected_install_package}" ]; then
-			found=1
-		fi
-	done
-	if [[ "${found}" -eq "1" ]] ; then
-		continue
-	fi
-
-	for known_version_file in "${known_version_files[@]}"; do
-		if ! grep -q "${expected_install_package}/install" "${known_version_file}" ; then
-			echo "missing ${expected_install_package}/install from ${known_version_file}"
-			exit 1
-		fi
-	done
-done
 
 # check all groupversions to make sure they're in the init.sh file.  This isn't perfect, but its slightly
 # better than nothing
