@@ -373,3 +373,198 @@ bar    bar                bar
 		t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", expectedOutput, buffer.String())
 	}
 }
+
+func TestSliceColumnPrint(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "fake-name",
+			Namespace: "fake-namespace",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "fake0",
+				},
+				{
+					Name: "fake1",
+				},
+				{
+					Name: "fake2",
+				},
+				{
+					Name: "fake3",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		spec           string
+		expectedOutput string
+		expectErr      bool
+	}{
+		{
+			name: "containers[0]",
+			spec: "CONTAINER:.spec.containers[0].name",
+			expectedOutput: `CONTAINER
+fake0
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[3]",
+			spec: "CONTAINER:.spec.containers[3].name",
+			expectedOutput: `CONTAINER
+fake3
+`,
+			expectErr: false,
+		},
+		{
+			name:           "containers[5], illegal expression because it is out of bounds",
+			spec:           "CONTAINER:.spec.containers[5].name",
+			expectedOutput: "",
+			expectErr:      true,
+		},
+		{
+			name: "containers[-1], it equals containers[3]",
+			spec: "CONTAINER:.spec.containers[-1].name",
+			expectedOutput: `CONTAINER
+fake3
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[-2], it equals containers[2]",
+			spec: "CONTAINER:.spec.containers[-2].name",
+			expectedOutput: `CONTAINER
+fake2
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[-4], it equals containers[0]",
+			spec: "CONTAINER:.spec.containers[-4].name",
+			expectedOutput: `CONTAINER
+fake0
+`,
+			expectErr: false,
+		},
+		{
+			name:           "containers[-5], illegal expression because it is out of bounds",
+			spec:           "CONTAINER:.spec.containers[-5].name",
+			expectedOutput: "",
+			expectErr:      true,
+		},
+		{
+			name: "containers[0:0], it equals empty set",
+			spec: "CONTAINER:.spec.containers[0:0].name",
+			expectedOutput: `CONTAINER
+<none>
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[0:3]",
+			spec: "CONTAINER:.spec.containers[0:3].name",
+			expectedOutput: `CONTAINER
+fake0,fake1,fake2
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[1:]",
+			spec: "CONTAINER:.spec.containers[1:].name",
+			expectedOutput: `CONTAINER
+fake1,fake2,fake3
+`,
+			expectErr: false,
+		},
+		{
+			name:           "containers[3:1], illegal expression because start index is greater than end index",
+			spec:           "CONTAINER:.spec.containers[3:1].name",
+			expectedOutput: "",
+			expectErr:      true,
+		},
+
+		{
+			name: "containers[0:-1], it equals containers[0:3]",
+			spec: "CONTAINER:.spec.containers[0:-1].name",
+			expectedOutput: `CONTAINER
+fake0,fake1,fake2
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[-1:], it equals containers[3:]",
+			spec: "CONTAINER:.spec.containers[-1:].name",
+			expectedOutput: `CONTAINER
+fake3
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[-4:], it equals containers[0:]",
+			spec: "CONTAINER:.spec.containers[-4:].name",
+			expectedOutput: `CONTAINER
+fake0,fake1,fake2,fake3
+`,
+			expectErr: false,
+		},
+
+		{
+			name: "containers[-3:-1], it equasl containers[1:3]",
+			spec: "CONTAINER:.spec.containers[-3:-1].name",
+			expectedOutput: `CONTAINER
+fake1,fake2
+`,
+			expectErr: false,
+		},
+		{
+			name:           "containers[-2:-3], it equals containers[2:1], illegal expression because start index is greater than end index",
+			spec:           "CONTAINER:.spec.containers[-2:-3].name",
+			expectedOutput: "",
+			expectErr:      true,
+		},
+		{
+			name: "containers[4:4], it equals empty set",
+			spec: "CONTAINER:.spec.containers[4:4].name",
+			expectedOutput: `CONTAINER
+<none>
+`,
+			expectErr: false,
+		},
+		{
+			name: "containers[-5:-5], it equals empty set",
+			spec: "CONTAINER:.spec.containers[-5:-5].name",
+			expectedOutput: `CONTAINER
+<none>
+`,
+			expectErr: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			printer, err := NewCustomColumnsPrinterFromSpec(test.spec, decoder, false)
+			if err != nil {
+				t.Errorf("test %s has unexpected error: %v", test.name, err)
+			}
+
+			buffer := &bytes.Buffer{}
+			err = printer.PrintObj(pod, buffer)
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("test %s has unexpected error: %v", test.name, err)
+
+				}
+			} else {
+				if err != nil {
+					t.Errorf("test %s has unexpected error: %v", test.name, err)
+				} else if buffer.String() != test.expectedOutput {
+					t.Errorf("test %s has unexpected output:\nexpected: %s\nsaw: %s", test.name, test.expectedOutput, buffer.String())
+				}
+			}
+		})
+	}
+}
