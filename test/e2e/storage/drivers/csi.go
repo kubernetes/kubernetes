@@ -48,6 +48,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
+const (
+	GCEPDCSIProvisionerName = "pd.csi.storage.gke.io"
+	GCEPDCSIZoneTopologyKey = "topology.gke.io/zone"
+)
+
 // hostpathCSI
 type hostpathCSIDriver struct {
 	cleanup    func()
@@ -265,7 +270,7 @@ var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
 func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "pd.csi.storage.gke.io",
+			Name:        GCEPDCSIProvisionerName,
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -293,7 +298,12 @@ func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	f := g.driverInfo.Config.Framework
 	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(f.ClientSet)
+	if !g.driverInfo.Config.TopologyEnabled {
+		// Topology is disabled in external-provisioner, so in a multizone cluster, a pod could be
+		// scheduled in a different zone from the provisioned volume, causing basic provisioning
+		// tests to fail.
+		framework.SkipIfMultizone(f.ClientSet)
+	}
 }
 
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
@@ -326,14 +336,20 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	// }
 	createGCESecrets(g.driverInfo.Config.Framework.ClientSet, g.driverInfo.Config.Framework.Namespace.Name)
 
-	cleanup, err := g.driverInfo.Config.Framework.CreateFromManifests(nil,
+	manifests := []string{
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml",
-		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
-	)
+	}
+
+	if g.driverInfo.Config.TopologyEnabled {
+		manifests = append(manifests, "test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss_alpha.yaml")
+	} else {
+		manifests = append(manifests, "test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml")
+	}
+	cleanup, err := g.driverInfo.Config.Framework.CreateFromManifests(nil, manifests...)
 	g.cleanup = cleanup
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
@@ -359,8 +375,7 @@ var _ testsuites.DynamicPVTestDriver = &gcePDExternalCSIDriver{}
 func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 	return &gcePDExternalCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name: "pd.csi.storage.gke.io",
-
+			Name: GCEPDCSIProvisionerName,
 			// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
 			FeatureTag:  "[Feature: gcePD-external]",
 			MaxFileSize: testpatterns.FileSizeMedium,

@@ -24,7 +24,7 @@ import (
 
 // ReplicationControllerOptions holds the ReplicationController options.
 type ReplicationControllerOptions struct {
-	ConcurrentRCSyncs int32
+	*kubectrlmgrconfig.ReplicationControllerConfiguration
 }
 
 // AddFlags adds flags related to ReplicationController for controller manager to the specified FlagSet.

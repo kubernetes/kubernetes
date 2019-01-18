@@ -301,32 +301,7 @@ type ControllerContext struct {
 }
 
 func (c ControllerContext) IsControllerEnabled(name string) bool {
-	return IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers...)
-}
-
-func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
-	hasStar := false
-	for _, ctrl := range controllers {
-		if ctrl == name {
-			return true
-		}
-		if ctrl == "-"+name {
-			return false
-		}
-		if ctrl == "*" {
-			hasStar = true
-		}
-	}
-	// if we get here, there was no explicit choice
-	if !hasStar {
-		// nothing on by default
-		return false
-	}
-	if disabledByDefaultControllers.Has(name) {
-		return false
-	}
-
-	return true
+	return genericcontrollermanager.IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
@@ -387,7 +362,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	if loopMode == IncludeCloudLoops {
 		controllers["service"] = startServiceController
 		controllers["route"] = startRouteController
-		controllers["cloudnodelifecycle"] = startCloudNodeLifecycleController
+		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
 		// TODO: volume controller into the IncludeCloudLoops only set.
 	}
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController

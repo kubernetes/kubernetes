@@ -31,12 +31,9 @@ import (
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
@@ -399,10 +396,6 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 
 	if len(sysctls) == 0 {
 		return allErrs
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
-		return append(allErrs, field.Forbidden(fldPath, "Sysctls are disabled by Sysctls feature-gate"))
 	}
 
 	coversAll := false

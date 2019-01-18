@@ -31,8 +31,8 @@ go_test(
         "utils_test.go",
     ],
     data = [
-        ":swagger-spec",
-        "//api/openapi-spec:swagger-spec",
+        ":openapi-spec",
+        "//api/openapi-spec",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -64,7 +64,7 @@ filegroup(
 )
 
 filegroup(
-    name = "swagger-spec",
+    name = "openapi-spec",
     srcs = glob([
         "**/*.json",
     ]),

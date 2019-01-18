@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -30,29 +29,19 @@ import (
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.
 type GenericControllerManagerConfigurationOptions struct {
-	Port                    int32
-	Address                 string
-	MinResyncPeriod         metav1.Duration
-	ClientConnection        componentbaseconfig.ClientConnectionConfiguration
-	ControllerStartInterval metav1.Duration
-	LeaderElection          componentbaseconfig.LeaderElectionConfiguration
-	Debugging               *DebuggingOptions
-	Controllers             []string
+	*kubectrlmgrconfig.GenericControllerManagerConfiguration
+	Debugging *DebuggingOptions
 }
 
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericControllerManagerConfigurationOptions(cfg kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
+func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
-		Port:                    cfg.Port,
-		Address:                 cfg.Address,
-		MinResyncPeriod:         cfg.MinResyncPeriod,
-		ClientConnection:        cfg.ClientConnection,
-		ControllerStartInterval: cfg.ControllerStartInterval,
-		LeaderElection:          cfg.LeaderElection,
-		Debugging:               &DebuggingOptions{},
-		Controllers:             cfg.Controllers,
+		GenericControllerManagerConfiguration: cfg,
+		Debugging: &DebuggingOptions{
+			DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{},
+		},
 	}
 
 	return o
@@ -71,7 +60,6 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverfl
 	genericfs.Float32Var(&o.ClientConnection.QPS, "kube-api-qps", o.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver.")
 	genericfs.Int32Var(&o.ClientConnection.Burst, "kube-api-burst", o.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
 	genericfs.DurationVar(&o.ControllerStartInterval.Duration, "controller-start-interval", o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
-	// TODO: complete the work of the cloud-controller-manager (and possibly other consumers of this code) respecting the --controllers flag
 	genericfs.StringSliceVar(&o.Controllers, "controllers", o.Controllers, fmt.Sprintf(""+
 		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",

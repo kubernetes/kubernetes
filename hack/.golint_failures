@@ -568,7 +568,6 @@ staging/src/k8s.io/apiserver/pkg/server
 staging/src/k8s.io/apiserver/pkg/server/healthz
 staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
-staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
 staging/src/k8s.io/apiserver/pkg/storage/errors
@@ -732,6 +731,7 @@ test/e2e/ui
 test/e2e/upgrades
 test/e2e/upgrades/apps
 test/e2e/upgrades/storage
+test/e2e/windows
 test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/builder

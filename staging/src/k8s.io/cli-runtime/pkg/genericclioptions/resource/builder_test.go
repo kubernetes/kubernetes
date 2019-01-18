@@ -465,48 +465,27 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 }
 
 func TestDirectoryBuilder(t *testing.T) {
-	tests := []struct {
-		directories   []string
-		singleItem    bool
-		number        int
-		expectedNames []string
-	}{
-		{[]string{"../../../artifacts/guestbook"}, false, 3, []string{"redis-master"}},
-		{[]string{"../../../artifacts/kustomization"}, true, 3, []string{"test-the-deployment"}},
-		{[]string{"../../../artifacts/guestbook", "../../../artifacts/kustomization"}, false, 6, []string{"redis-master", "test-the-deployment"}},
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../artifacts/guestbook"}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) < 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 
-	for _, tt := range tests {
-		b := newDefaultBuilder().
-			FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: tt.directories}).
-			NamespaceParam("test").DefaultNamespace()
-
-		test := &testVisitor{}
-		singleItemImplied := false
-
-		err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
-		if err != nil || singleItemImplied != tt.singleItem || len(test.Infos) < tt.number {
-			t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
+	found := false
+	for _, info := range test.Infos {
+		if info.Name == "redis-master" && info.Namespace == "test" && info.Object != nil {
+			found = true
+			break
 		}
-
-		contained := func(name string) bool {
-			for _, info := range test.Infos {
-				if info.Name == name && info.Namespace == "test" && info.Object != nil {
-					return true
-				}
-			}
-			return false
-		}
-
-		allFound := true
-		for _, name := range tt.expectedNames {
-			if !contained(name) {
-				allFound = false
-			}
-		}
-		if !allFound {
-			t.Errorf("unexpected responses: %#v", test.Infos)
-		}
+	}
+	if !found {
+		t.Errorf("unexpected responses: %#v", test.Infos)
 	}
 }
 

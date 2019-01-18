@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "swagger-spec",
+    name = "openapi-spec",
     srcs = glob([
         "**/*.json",
     ]),

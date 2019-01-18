@@ -21,7 +21,7 @@ go_library(
     importpath = "k8s.io/kube-aggregator",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/install:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/validation:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset:go_default_library",

@@ -11,7 +11,6 @@ go_test(
     srcs = [
         "apiserver_test.go",
         "main_test.go",
-        "setup_test.go",
         "webhook_test.go",
     ],
     tags = ["integration"],
@@ -43,7 +42,6 @@ go_test(
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/cmd/server:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -285,15 +285,16 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentVolumeClaim) (bool, error) {
+func (ctrl *PersistentVolumeController) isDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
 	// When feature VolumeScheduling enabled,
 	// Scheduler signal to the PV controller to start dynamic
 	// provisioning by setting the "annSelectedNode" annotation
 	// in the PVC
-	if _, ok := claim.Annotations[annSelectedNode]; ok {
-		return false, nil
-	}
+	_, ok := claim.Annotations[annSelectedNode]
+	return ok
+}
 
+func (ctrl *PersistentVolumeController) isDelayBindingMode(claim *v1.PersistentVolumeClaim) (bool, error) {
 	className := v1helper.GetPersistentVolumeClaimClass(claim)
 	if className == "" {
 		return false, nil
@@ -309,6 +310,18 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 	}
 
 	return *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer, nil
+}
+
+// shouldDelayBinding returns true if binding of claim should be delayed, false otherwise.
+// If binding of claim should be delayed, only claims pbound by scheduler
+func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentVolumeClaim) (bool, error) {
+	// If claim has already been assigned a node by scheduler for dynamic provisioning.
+	if ctrl.isDelayBindingProvisioning(claim) {
+		return false, nil
+	}
+
+	// If claim is in delay binding mode.
+	return ctrl.isDelayBindingMode(claim)
 }
 
 // syncUnboundClaim is the main controller method to decide what to do with an

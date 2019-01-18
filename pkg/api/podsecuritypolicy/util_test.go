@@ -187,3 +187,92 @@ func TestDropRunAsGroup(t *testing.T) {
 		}
 	}
 }
+
+func TestDropSysctls(t *testing.T) {
+	scWithSysctls := func() *policy.PodSecurityPolicySpec {
+		return &policy.PodSecurityPolicySpec{
+			AllowedUnsafeSysctls: []string{"foo/*"},
+			ForbiddenSysctls:     []string{"bar.*"},
+		}
+	}
+	scWithOneSysctls := func() *policy.PodSecurityPolicySpec {
+		return &policy.PodSecurityPolicySpec{
+			AllowedUnsafeSysctls: []string{"foo/*"},
+		}
+	}
+	scWithoutSysctls := func() *policy.PodSecurityPolicySpec {
+		return &policy.PodSecurityPolicySpec{}
+	}
+
+	scInfo := []struct {
+		description string
+		hasSysctls  bool
+		sc          func() *policy.PodSecurityPolicySpec
+	}{
+		{
+			description: "has Sysctls",
+			hasSysctls:  true,
+			sc:          scWithSysctls,
+		},
+		{
+			description: "has one Sysctl",
+			hasSysctls:  true,
+			sc:          scWithOneSysctls,
+		},
+		{
+			description: "does not have Sysctls",
+			hasSysctls:  false,
+			sc:          scWithoutSysctls,
+		},
+		{
+			description: "is nil",
+			hasSysctls:  false,
+			sc:          func() *policy.PodSecurityPolicySpec { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPSPSpecInfo := range scInfo {
+			for _, newPSPSpecInfo := range scInfo {
+				oldPSPSpecHasSysctls, oldPSPSpec := oldPSPSpecInfo.hasSysctls, oldPSPSpecInfo.sc()
+				newPSPSpecHasSysctls, newPSPSpec := newPSPSpecInfo.hasSysctls, newPSPSpecInfo.sc()
+				if newPSPSpec == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", enabled, oldPSPSpecInfo.description, newPSPSpecInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Sysctls, enabled)()
+
+					DropDisabledFields(newPSPSpec, oldPSPSpec)
+
+					// old PodSecurityPolicySpec should never be changed
+					if !reflect.DeepEqual(oldPSPSpec, oldPSPSpecInfo.sc()) {
+						t.Errorf("old PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(oldPSPSpec, oldPSPSpecInfo.sc()))
+					}
+
+					switch {
+					case enabled || oldPSPSpecHasSysctls:
+						// new PodSecurityPolicySpec should not be changed if the feature is enabled, or if the old PodSecurityPolicySpec had Sysctls
+						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
+							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+						}
+					case newPSPSpecHasSysctls:
+						// new PodSecurityPolicySpec should be changed
+						if reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
+							t.Errorf("new PodSecurityPolicySpec was not changed")
+						}
+						// new PodSecurityPolicySpec should not have Sysctls
+						if !reflect.DeepEqual(newPSPSpec, scWithoutSysctls()) {
+							t.Errorf("new PodSecurityPolicySpec had Sysctls: %v", diff.ObjectReflectDiff(newPSPSpec, scWithoutSysctls()))
+						}
+					default:
+						// new PodSecurityPolicySpec should not need to be changed
+						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
+							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

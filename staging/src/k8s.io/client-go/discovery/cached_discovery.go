@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -266,13 +266,10 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCache
 	if len(httpCacheDir) > 0 {
 		// update the given restconfig with a custom roundtripper that
 		// understands how to handle cache responses.
-		wt := config.WrapTransport
-		config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			if wt != nil {
-				rt = wt(rt)
-			}
+		config = restclient.CopyConfig(config)
+		config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 			return newCacheRoundTripper(httpCacheDir, rt)
-		}
+		})
 	}
 
 	discoveryClient, err := NewDiscoveryClientForConfig(config)
