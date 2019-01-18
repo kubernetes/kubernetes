@@ -173,6 +173,8 @@ else
     echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck"'
     echo 'If the above warnings do not make sense, you can exempt this package from shellcheck'
     echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
+    echo 'NOTE: please strongly consider NOT adding any more files to hack/.shellcheck_failures,'
+    echo 'since we ignore _all_ failures for files listed there. See issue #72956.'
     echo
   } >&2
   false
