@@ -169,7 +169,7 @@ function guess_built_binary_path {
 GO_OUT=${GO_OUT:-}
 while getopts "ho:O" OPTION
 do
-    case $OPTION in
+    case ${OPTION} in
         o)
             echo "skipping build"
             GO_OUT="$OPTARG"
@@ -263,20 +263,20 @@ function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
     if [[ "${API_PORT}" -gt "0" ]]; then
-        curl --silent -g $API_HOST:$API_PORT
+        curl --silent -g ${API_HOST}:${API_PORT}
         if [ ! $? -eq 0 ]; then
             echo "API SERVER insecure port is free, proceeding..."
         else
-            echo "ERROR starting API SERVER, exiting. Some process on $API_HOST is serving already on $API_PORT"
+            echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_PORT}"
             exit 1
         fi
     fi
 
-    curl --silent -k -g $API_HOST:$API_SECURE_PORT
+    curl --silent -k -g ${API_HOST}:${API_SECURE_PORT}
     if [ ! $? -eq 0 ]; then
         echo "API SERVER secure port is free, proceeding..."
     else
-        echo "ERROR starting API SERVER, exiting. Some process on $API_HOST is serving already on $API_SECURE_PORT"
+        echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_SECURE_PORT}"
         exit 1
     fi
 }
@@ -335,9 +335,9 @@ function detect_binary {
 
 cleanup_dockerized_kubelet()
 {
-  if [[ -e $KUBELET_CIDFILE ]]; then
-    docker kill $(<$KUBELET_CIDFILE) > /dev/null
-    rm -f $KUBELET_CIDFILE
+  if [[ -e ${KUBELET_CIDFILE} ]]; then
+    docker kill $(<${KUBELET_CIDFILE}) > /dev/null
+    rm -f ${KUBELET_CIDFILE}
 
     # Save the docker logs
     if [[ -f /var/log/docker.log ]]; then
@@ -841,7 +841,7 @@ function start_kubelet {
         --pid=host \
         --privileged=true \
         -i \
-        --cidfile=$KUBELET_CIDFILE \
+        --cidfile=${KUBELET_CIDFILE} \
         "${KUBELET_IMAGE}" \
         /kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
       # Get PID of kubelet container.
@@ -858,7 +858,7 @@ function start_kubelet {
       done
     fi
     # Quick check that kubelet is running.
-    if [ -n "$KUBELET_PID" ] && ps -p $KUBELET_PID > /dev/null; then
+    if [ -n "$KUBELET_PID" ] && ps -p ${KUBELET_PID} > /dev/null; then
       echo "kubelet ( $KUBELET_PID ) is running."
     else
       cat ${KUBELET_LOG} ; exit 1
@@ -882,7 +882,7 @@ EOF
       #   foo: true
       #   bar: false
       for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
-        echo $gate | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
+        echo ${gate} | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
       done
     fi >>/tmp/kube-proxy.yaml
 
@@ -953,9 +953,9 @@ function create_storage_class {
         CLASS_FILE=${KUBE_ROOT}/cluster/addons/storage-class/${CLOUD_PROVIDER}/default.yaml
     fi
 
-    if [ -e $CLASS_FILE ]; then
+    if [ -e ${CLASS_FILE} ]; then
         echo "Create default storage class for $CLOUD_PROVIDER"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $CLASS_FILE
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${CLASS_FILE}
     else
         echo "No storage class available for $CLOUD_PROVIDER."
     fi

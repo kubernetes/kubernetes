@@ -35,7 +35,7 @@ top_level_models=$(grep '&[A-Za-z]*{},' /register.go | sed 's/.*&//;s/{},//')
 # check if the top level models exist in the definitions.adoc. If they exist,
 # their name will be <version>.<model_name>
 VERSION="${1#*_}"
-for m in $top_level_models
+for m in ${top_level_models}
 do
   if grep -xq "=== ${VERSION}.$m" ./definitions.adoc
   then
