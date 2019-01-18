@@ -17,18 +17,17 @@ limitations under the License.
 package label
 
 import (
-	"testing"
-
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
+	"testing"
 
-	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	cloudprovider "k8s.io/cloud-provider"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -38,45 +37,10 @@ type mockVolumes struct {
 	volumeLabelsError error
 }
 
-var _ aws.Volumes = &mockVolumes{}
+var _ cloudprovider.PVLabeler = &mockVolumes{}
 
-func (v *mockVolumes) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) DetachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName aws.KubernetesVolumeID, err error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) DeleteDisk(volumeName aws.KubernetesVolumeID) (bool, error) {
-	return false, fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (map[string]string, error) {
+func (v *mockVolumes) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	return v.volumeLabels, v.volumeLabelsError
-}
-
-func (v *mockVolumes) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	return false, fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) ResizeDisk(
-	diskName aws.KubernetesVolumeID,
-	oldSize resource.Quantity,
-	newSize resource.Quantity) (resource.Quantity, error) {
-	return oldSize, nil
 }
 
 func mockVolumeFailure(err error) *mockVolumes {
@@ -135,7 +99,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// Errors from the cloudprovider block creation of the volume
-	pvHandler.ebsVolumes = mockVolumeFailure(fmt.Errorf("invalid volume"))
+	pvHandler.awsPVLabeler = mockVolumeFailure(fmt.Errorf("invalid volume"))
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil))
 	if err == nil {
 		t.Errorf("Expected error when aws pv info fails")
@@ -143,7 +107,7 @@ func TestAdmission(t *testing.T) {
 
 	// Don't add labels if the cloudprovider doesn't return any
 	labels := make(map[string]string)
-	pvHandler.ebsVolumes = mockVolumeLabels(labels)
+	pvHandler.awsPVLabeler = mockVolumeLabels(labels)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Expected no error when creating aws pv")
@@ -156,7 +120,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// Don't panic if the cloudprovider returns nil, nil
-	pvHandler.ebsVolumes = mockVolumeFailure(nil)
+	pvHandler.awsPVLabeler = mockVolumeFailure(nil)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Expected no error when cloud provider returns empty labels")
@@ -168,7 +132,7 @@ func TestAdmission(t *testing.T) {
 	labels["b"] = "2"
 	zones, _ := volumeutil.ZonesToSet("1,2,3")
 	labels[kubeletapis.LabelZoneFailureDomain] = volumeutil.ZonesSetToLabelValue(zones)
-	pvHandler.ebsVolumes = mockVolumeLabels(labels)
+	pvHandler.awsPVLabeler = mockVolumeLabels(labels)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Expected no error when creating aws pv")
@@ -223,7 +187,7 @@ func TestAdmission(t *testing.T) {
 	labels["a"] = "1"
 	labels["b"] = "2"
 	labels["c"] = "3"
-	pvHandler.ebsVolumes = mockVolumeLabels(labels)
+	pvHandler.awsPVLabeler = mockVolumeLabels(labels)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Expected no error when creating aws pv")
@@ -244,7 +208,7 @@ func TestAdmission(t *testing.T) {
 	labels["e"] = "1"
 	labels["f"] = "2"
 	labels["g"] = "3"
-	pvHandler.ebsVolumes = mockVolumeLabels(labels)
+	pvHandler.awsPVLabeler = mockVolumeLabels(labels)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Expected no error when creating aws pv")
