@@ -137,7 +137,6 @@
 ./hack/update-translations.sh
 ./hack/update-workspace-mirror.sh
 ./hack/verify-generated-files-remake.sh
-./hack/verify-gofmt.sh
 ./hack/verify-golint.sh
 ./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
