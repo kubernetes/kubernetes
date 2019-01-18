@@ -1,16 +1,5 @@
-./build/build-image/rsyncd.sh
 ./build/common.sh
-./build/copy-output.sh
 ./build/lib/release.sh
-./build/make-build-image.sh
-./build/make-clean.sh
-./build/package-tarballs.sh
-./build/release-images.sh
-./build/release-in-a-container.sh
-./build/release.sh
-./build/run.sh
-./build/shell.sh
-./build/util.sh
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
 ./cluster/addons/fluentd-elasticsearch/fluentd-es-image/run.sh
