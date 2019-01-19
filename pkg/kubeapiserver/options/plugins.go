@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
+	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -73,6 +74,7 @@ var AllOrderedPlugins = []string{
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
 	noderestriction.PluginName,              // NodeRestriction
+	nodetaint.PluginName,                    // TaintNodesByCondition
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
 	podsecuritypolicy.PluginName,            // PodSecurityPolicy
@@ -113,6 +115,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	autoprovision.Register(plugins)
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
+	nodetaint.Register(plugins)
 	label.Register(plugins) // DEPRECATED in favor of NewPersistentVolumeLabelController in CCM
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
@@ -143,6 +146,10 @@ func DefaultOffAdmissionPlugins() sets.String {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		defaultOnPlugins.Insert(podpriority.PluginName) //PodPriority
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
+		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition
 	}
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
