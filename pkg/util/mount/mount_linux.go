@@ -229,7 +229,7 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 }
 
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return IsNotMountPoint(mounter, dir)
+	return isNotMountPoint(mounter, dir)
 }
 
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
@@ -757,7 +757,7 @@ func safeOpenSubPath(mounter Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := IsNotMountPoint(mounter, bindPathTarget)
+	notMount, err := mounter.IsNotMountPoint(bindPathTarget)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
