@@ -18,6 +18,7 @@ go_library(
         "//pkg/apis/policy:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/features:go_default_library",
+        "//plugin/pkg/admission/nodetaint:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
