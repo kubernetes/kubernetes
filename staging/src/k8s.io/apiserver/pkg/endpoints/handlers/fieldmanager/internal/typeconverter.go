@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/typed"
 	"sigs.k8s.io/yaml"
@@ -30,7 +29,6 @@ import (
 // TypeConverter allows you to convert from runtime.Object to
 // typed.TypedValue and the other way around.
 type TypeConverter interface {
-	NewTyped(schema.GroupVersionKind) (typed.TypedValue, error)
 	ObjectToTyped(runtime.Object) (typed.TypedValue, error)
 	YAMLToTyped([]byte) (typed.TypedValue, error)
 	TypedToObject(typed.TypedValue) (runtime.Object, error)
@@ -51,19 +49,6 @@ func NewTypeConverter(models proto.Models) (TypeConverter, error) {
 		return nil, err
 	}
 	return &typeConverter{parser: parser}, nil
-}
-
-func (c *typeConverter) NewTyped(gvk schema.GroupVersionKind) (typed.TypedValue, error) {
-	t := c.parser.Type(gvk)
-	if t == nil {
-		return typed.TypedValue{}, fmt.Errorf("no corresponding type for %v", gvk)
-	}
-
-	u, err := t.New()
-	if err != nil {
-		return typed.TypedValue{}, fmt.Errorf("new typed: %v", err)
-	}
-	return u, nil
 }
 
 func (c *typeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {

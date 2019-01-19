@@ -7,6 +7,10 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
+		},
+		{
 			"ImportPath": "github.com/evanphx/json-patch",
 			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
 		},
@@ -580,23 +584,23 @@
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/fieldpath",
-			"Rev": "6e488066a1c47f8c285006360b1b39fb3fa8bbbc"
+			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/merge",
-			"Rev": "6e488066a1c47f8c285006360b1b39fb3fa8bbbc"
+			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/schema",
-			"Rev": "6e488066a1c47f8c285006360b1b39fb3fa8bbbc"
+			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/typed",
-			"Rev": "6e488066a1c47f8c285006360b1b39fb3fa8bbbc"
+			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/structured-merge-diff/value",
-			"Rev": "6e488066a1c47f8c285006360b1b39fb3fa8bbbc"
+			"Rev": "3e9f406ec0132f60af296ad1fbd1ca05bdc0138d"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",

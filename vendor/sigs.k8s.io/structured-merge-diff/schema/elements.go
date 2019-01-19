@@ -207,7 +207,7 @@ func (s Schema) FindNamedType(name string) (TypeDef, bool) {
 //
 // This allows callers to not care about the difference between a (possibly
 // inlined) reference and a definition.
-func (s Schema) Resolve(tr TypeRef) (Atom, bool) {
+func (s *Schema) Resolve(tr TypeRef) (Atom, bool) {
 	if tr.NamedType != nil {
 		t, ok := s.FindNamedType(*tr.NamedType)
 		if !ok {

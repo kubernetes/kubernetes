@@ -98,12 +98,8 @@ kube::util::ensure-temp-dir() {
   fi
 }
 
-# This figures out the host platform without relying on golang.  We need this as
-# we don't want a golang install to be a prerequisite to building yet we need
-# this info to figure out where the final binaries are placed.
-kube::util::host_platform() {
+kube::util::host_os() {
   local host_os
-  local host_arch
   case "$(uname -s)" in
     Darwin)
       host_os=darwin
@@ -116,7 +112,11 @@ kube::util::host_platform() {
       exit 1
       ;;
   esac
+  echo "${host_os}"
+}
 
+kube::util::host_arch() {
+  local host_arch
   case "$(uname -m)" in
     x86_64*)
       host_arch=amd64
@@ -150,7 +150,14 @@ kube::util::host_platform() {
       exit 1
       ;;
   esac
-  echo "${host_os}/${host_arch}"
+  echo "${host_arch}"
+}
+
+# This figures out the host platform without relying on golang.  We need this as
+# we don't want a golang install to be a prerequisite to building yet we need
+# this info to figure out where the final binaries are placed.
+kube::util::host_platform() {
+  echo "$(kube::util::host_os)/$(kube::util::host_arch)"
 }
 
 kube::util::find-binary-for-platform() {
@@ -315,45 +322,6 @@ kube::util::gv-to-swagger-name() {
       echo "${group_version%/*}_${group_version#*/}"
       ;;
   esac
-}
-
-
-# Fetches swagger spec from apiserver.
-# Assumed vars:
-# SWAGGER_API_PATH: Base path for swaggerapi on apiserver. Ex:
-# http://localhost:8080/swaggerapi.
-# SWAGGER_ROOT_DIR: Root dir where we want to save the fetched spec.
-# VERSIONS: Array of group versions to include in swagger spec.
-kube::util::fetch-swagger-spec() {
-  for ver in ${VERSIONS}; do
-    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${ver} "* ]]; then
-      continue
-    fi
-    # fetch the swagger spec for each group version.
-    if [[ ${ver} == "v1" ]]; then
-      SUBPATH="api"
-    else
-      SUBPATH="apis"
-    fi
-    SUBPATH="${SUBPATH}/${ver}"
-    SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name ${ver}).json"
-    curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
-
-    # fetch the swagger spec for the discovery mechanism at group level.
-    if [[ ${ver} == "v1" ]]; then
-      continue
-    fi
-    SUBPATH="apis/"${ver%/*}
-    SWAGGER_JSON_NAME="${ver%/*}.json"
-    curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
-  done
-
-  # fetch swagger specs for other discovery mechanism.
-  curl -w "\n" -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
-  curl -w "\n" -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
-  curl -w "\n" -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
-  curl -w "\n" -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
-  curl -w "\n" -fs "${SWAGGER_API_PATH}logs" > "${SWAGGER_ROOT_DIR}/logs.json"
 }
 
 # Returns the name of the upstream remote repository name for the local git

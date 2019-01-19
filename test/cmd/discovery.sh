@@ -119,8 +119,8 @@ run_swagger_tests() {
   kube::log::status "Testing swagger"
 
   # Verify schema
-  file="${KUBE_TEMP}/schema-v1.json"
-  curl -s "http://127.0.0.1:${API_PORT}/swaggerapi/api/v1" > "${file}"
+  file="${KUBE_TEMP}/schema.json"
+  curl -s "http://127.0.0.1:${API_PORT}/openapi/v2" > "${file}"
   [[ "$(grep "list of returned" "${file}")" ]]
   [[ "$(grep "List of services" "${file}")" ]]
   [[ "$(grep "Watch for changes to the described resources" "${file}")" ]]

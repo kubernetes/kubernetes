@@ -47,6 +47,17 @@ func AsTyped(v value.Value, s *schema.Schema, typeName string) (TypedValue, erro
 	return tv, nil
 }
 
+// AsTypedDeduced is going to generate it's own type definition based on
+// the content of the object. This is useful for CRDs that don't have a
+// validation field.
+func AsTypedDeduced(v value.Value) TypedValue {
+	return TypedValue{
+		value: v,
+		typeRef: schema.TypeRefFromValue(v),
+		schema: nil,
+	}
+}
+
 // AsValue removes the type from the TypedValue and only keeps the value.
 func (tv TypedValue) AsValue() *value.Value {
 	return &tv.value

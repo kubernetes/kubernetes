@@ -83,10 +83,10 @@ write_files:
     owner: root
     content: |
       [Unit]
-      Description=Hourly kube-logrotate invocation
+      Description=kube-logrotate invocation
 
       [Timer]
-      OnCalendar=hourly
+      OnCalendar=*-*-* *:00/5:00
 
       [Install]
       WantedBy=kubernetes.target

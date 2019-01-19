@@ -6,6 +6,4 @@ test/test_owners.csv merge=union
 **/generated.pb.go linguist-generated=true
 **/generated.proto
 **/types_swagger_doc_generated.go linguist-generated=true
-docs/api-reference/** linguist-generated=true
-api/swagger-spec/*.json linguist-generated=true
 api/openapi-spec/*.json linguist-generated=true

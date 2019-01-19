@@ -142,31 +142,19 @@ func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 	return b.podBindingCache
 }
 
+func podHasClaims(pod *v1.Pod) bool {
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache.
 // This method intentionally takes in a *v1.Node object instead of using volumebinder.nodeInformer.
 // That's necessary because some operations will need to pass in to the predicate fake node objects.
 func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatisfied bool, err error) {
-	var (
-		matchedClaims     []*bindingInfo
-		provisionedClaims []*v1.PersistentVolumeClaim
-	)
-	defer func() {
-		// We recreate bindings for each new schedule loop.
-		// Although we do not distinguish nil from empty in this function, for
-		// easier testing, we normalize empty to nil.
-		if len(matchedClaims) == 0 {
-			matchedClaims = nil
-		}
-		if len(provisionedClaims) == 0 {
-			provisionedClaims = nil
-		}
-		// TODO merge into one atomic function
-		// Mark cache with all the matches for each PVC for this node
-		b.podBindingCache.UpdateBindings(pod, node.Name, matchedClaims)
-		// Mark cache with all the PVCs that need provisioning for this node
-		b.podBindingCache.UpdateProvisionedPVCs(pod, node.Name, provisionedClaims)
-	}()
-
 	podName := getPodName(pod)
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
@@ -181,6 +169,34 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 		if err != nil {
 			VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
 		}
+	}()
+
+	if !podHasClaims(pod) {
+		// Fast path
+		return unboundVolumesSatisfied, boundVolumesSatisfied, nil
+	}
+
+	var (
+		matchedClaims     []*bindingInfo
+		provisionedClaims []*v1.PersistentVolumeClaim
+	)
+	defer func() {
+		// We recreate bindings for each new schedule loop.
+		if len(matchedClaims) == 0 && len(provisionedClaims) == 0 {
+			// Clear cache if no claims to bind or provision for this node.
+			b.podBindingCache.ClearBindings(pod, node.Name)
+			return
+		}
+		// Although we do not distinguish nil from empty in this function, for
+		// easier testing, we normalize empty to nil.
+		if len(matchedClaims) == 0 {
+			matchedClaims = nil
+		}
+		if len(provisionedClaims) == 0 {
+			provisionedClaims = nil
+		}
+		// Mark cache with all matched and provisioned claims for this node
+		b.podBindingCache.UpdateBindings(pod, node.Name, matchedClaims, provisionedClaims)
 	}()
 
 	// The pod's volumes need to be processed in one call to avoid the race condition where
@@ -318,8 +334,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	// Update cache with the assumed pvcs and pvs
 	// Even if length is zero, update the cache with an empty slice to indicate that no
 	// operations are needed
-	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings)
-	b.podBindingCache.UpdateProvisionedPVCs(assumedPod, nodeName, newProvisionedPVCs)
+	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings, newProvisionedPVCs)
 
 	return
 }

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -835,5 +836,65 @@ func TestHighProirotyBackoff(t *testing.T) {
 	}
 	if p != &midPod {
 		t.Errorf("Expected to get mid prority pod, got: %v", p)
+	}
+}
+
+// TestHighProirotyFlushUnschedulableQLeftover tests that pods will be moved to
+// activeQ after one minutes if it is in unschedulableQ
+func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
+	q := NewPriorityQueue(nil)
+	midPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-midpod",
+			Namespace: "ns1",
+			UID:       types.UID("tp-mid"),
+		},
+		Spec: v1.PodSpec{
+			Priority: &midPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+	highPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-highpod",
+			Namespace: "ns1",
+			UID:       types.UID("tp-high"),
+		},
+		Spec: v1.PodSpec{
+			Priority: &highPriority,
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+
+	q.unschedulableQ.addOrUpdate(&highPod)
+	q.unschedulableQ.addOrUpdate(&midPod)
+
+	// Update pod condition to highPod.
+	podutil.UpdatePodCondition(&highPod.Status, &v1.PodCondition{
+		Type:          v1.PodScheduled,
+		Status:        v1.ConditionFalse,
+		Reason:        v1.PodReasonUnschedulable,
+		Message:       "fake scheduling failure",
+		LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * unschedulableQTimeInterval)},
+	})
+
+	// Update pod condition to midPod.
+	podutil.UpdatePodCondition(&midPod.Status, &v1.PodCondition{
+		Type:          v1.PodScheduled,
+		Status:        v1.ConditionFalse,
+		Reason:        v1.PodReasonUnschedulable,
+		Message:       "fake scheduling failure",
+		LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * unschedulableQTimeInterval)},
+	})
+
+	if p, err := q.Pop(); err != nil || p != &highPod {
+		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Name)
+	}
+	if p, err := q.Pop(); err != nil || p != &midPod {
+		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPod.Name, p.Name)
 	}
 }
