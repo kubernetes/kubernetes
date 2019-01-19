@@ -76,7 +76,7 @@ func SetForTests(c Capabilities) {
 	capInstance.capabilities = &c
 }
 
-// Returns a read-only copy of the system capabilities.
+// Get returns a read-only copy of the system capabilities.
 func Get() Capabilities {
 	capInstance.lock.Lock()
 	defer capInstance.lock.Unlock()
