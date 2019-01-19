@@ -1,0 +1,7 @@
+{
+	"num": 17,
+	"map": {
+		"enableFoo": false,
+		"enableBar": true
+	}
+}

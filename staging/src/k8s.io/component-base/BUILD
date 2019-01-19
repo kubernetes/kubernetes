@@ -12,6 +12,7 @@ filegroup(
         "//staging/src/k8s.io/component-base/cli/flag:all-srcs",
         "//staging/src/k8s.io/component-base/cli/globalflag:all-srcs",
         "//staging/src/k8s.io/component-base/config:all-srcs",
+        "//staging/src/k8s.io/component-base/experimental/cli/kflag:all-srcs",
         "//staging/src/k8s.io/component-base/logs:all-srcs",
     ],
     tags = ["automanaged"],
