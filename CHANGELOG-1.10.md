@@ -1561,7 +1561,7 @@ And point to the file using the --config flag, as in
 
 * kubeadm now accepts `--apiserver-extra-args`, `--controller-manager-extra-args` and `--scheduler-extra-args`, making it possible to override / specify additional flags for control plane components. One good example is to deploy Kubernetes with a different admission-control flag on API server. ([#58080](https://github.com/kubernetes/kubernetes/pull/58080), [@simonferquel](https://github.com/simonferquel))
 
-* Alpha Initializers have been removed from kubadm admission control.  Kubeadm users who still want to use Initializers can use apiServerExtraArgs through the kubeadm config file to enable it when booting up the cluster. ([#58428](https://github.com/kubernetes/kubernetes/pull/58428), [@dixudx](https://github.com/dixudx))
+* Alpha Initializers have been removed from kubeadm admission control.  Kubeadm users who still want to use Initializers can use apiServerExtraArgs through the kubeadm config file to enable it when booting up the cluster. ([#58428](https://github.com/kubernetes/kubernetes/pull/58428), [@dixudx](https://github.com/dixudx))
 
 * ValidatingAdmissionWebhook and MutatingAdmissionWebhook are beta, and are enabled in kubeadm by default. ([#58255](https://github.com/kubernetes/kubernetes/pull/58255), [@dixudx](https://github.com/dixudx))
 
@@ -2882,7 +2882,7 @@ filename | sha256 hash
 * Reduce Metrics Server memory requirement ([#58391](https://github.com/kubernetes/kubernetes/pull/58391), [@kawych](https://github.com/kawych))
 * Fix a bug affecting nested data volumes such as secret, configmap, etc. ([#57422](https://github.com/kubernetes/kubernetes/pull/57422), [@joelsmith](https://github.com/joelsmith))
 * kubectl now enforces required flags at a more fundamental level ([#53631](https://github.com/kubernetes/kubernetes/pull/53631), [@dixudx](https://github.com/dixudx))
-* Remove alpha Initializers from kubadm admission control ([#58428](https://github.com/kubernetes/kubernetes/pull/58428), [@dixudx](https://github.com/dixudx))
+* Remove alpha Initializers from kubeadm admission control ([#58428](https://github.com/kubernetes/kubernetes/pull/58428), [@dixudx](https://github.com/dixudx))
 * Enable ValidatingAdmissionWebhook and MutatingAdmissionWebhook in kubeadm from v1.9 ([#58255](https://github.com/kubernetes/kubernetes/pull/58255), [@dixudx](https://github.com/dixudx))
 * Fixed encryption key and encryption provider rotation ([#58375](https://github.com/kubernetes/kubernetes/pull/58375), [@liggitt](https://github.com/liggitt))
 * set fsGroup by securityContext.fsGroup in azure file ([#58316](https://github.com/kubernetes/kubernetes/pull/58316), [@andyzhangx](https://github.com/andyzhangx))
