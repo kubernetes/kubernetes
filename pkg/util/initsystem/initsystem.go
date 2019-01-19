@@ -23,6 +23,9 @@ import (
 )
 
 type InitSystem interface {
+	// return a string describing how to enable a service
+	EnableCommand(service string) string
+
 	// ServiceStart tries to start a specific service
 	ServiceStart(service string) error
 
@@ -42,7 +45,62 @@ type InitSystem interface {
 	ServiceIsActive(service string) bool
 }
 
+type OpenRCInitSystem struct{}
+
+func (openrc OpenRCInitSystem) ServiceStart(service string) error {
+	args := []string{service, "start"}
+	return exec.Command("rc-service", args...).Run()
+}
+
+func (openrc OpenRCInitSystem) ServiceStop(service string) error {
+	args := []string{service, "stop"}
+	return exec.Command("rc-service", args...).Run()
+}
+
+func (openrc OpenRCInitSystem) ServiceRestart(service string) error {
+	args := []string{service, "restart"}
+	return exec.Command("rc-service", args...).Run()
+}
+
+// openrc writes to stderr if a service is not found or not enabled
+// this is in contrast to systemd which only writes to stdout.
+// Hence, we use the Combinedoutput, and ignore the error.
+func (openrc OpenRCInitSystem) ServiceExists(service string) bool {
+	args := []string{service, "status"}
+	outBytes, _ := exec.Command("rc-service", args...).CombinedOutput()
+	if strings.Contains(string(outBytes), "does not exist") {
+		return false
+	}
+	return true
+}
+
+func (openrc OpenRCInitSystem) ServiceIsEnabled(service string) bool {
+	args := []string{"show", "default"}
+	outBytes, _ := exec.Command("rc-update", args...).Output()
+	if strings.Contains(string(outBytes), service) {
+		return true
+	}
+	return false
+}
+
+func (openrc OpenRCInitSystem) ServiceIsActive(service string) bool {
+	args := []string{service, "status"}
+	outBytes, _ := exec.Command("rc-service", args...).Output()
+	if strings.Contains(string(outBytes), "stopped") {
+		return false
+	}
+	return true
+}
+
+func (openrc OpenRCInitSystem) EnableCommand(service string) string {
+	return fmt.Sprintf("rc-update add %s default", service)
+}
+
 type SystemdInitSystem struct{}
+
+func (sysd SystemdInitSystem) EnableCommand(service string) string {
+	return fmt.Sprintf("systemctl enable %s.service", service)
+}
 
 func (sysd SystemdInitSystem) reloadSystemd() error {
 	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
@@ -110,6 +168,10 @@ func (sysd SystemdInitSystem) ServiceIsActive(service string) bool {
 // WindowsInitSystem is the windows implementation of InitSystem
 type WindowsInitSystem struct{}
 
+func (sysd WindowsInitSystem) EnableCommand(service string) string {
+	return fmt.Sprintf("Set-Service '%s' -StartupType Automatic", service)
+}
+
 func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	args := []string{"Start-Service", service}
 	err := exec.Command("powershell", args...).Run()
@@ -170,6 +232,10 @@ func GetInitSystem() (InitSystem, error) {
 	_, err := exec.LookPath("systemctl")
 	if err == nil {
 		return &SystemdInitSystem{}, nil
+	}
+	_, err = exec.LookPath("openrc")
+	if err == nil {
+		return &OpenRCInitSystem{}, nil
 	}
 	_, err = exec.LookPath("wininit.exe")
 	if err == nil {
