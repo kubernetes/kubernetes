@@ -62,7 +62,7 @@ func TestCreatePdb(t *testing.T) {
 	printFlags.OutputFormat = &outputFormat
 
 	options := &PodDisruptionBudgetOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
+		CreateSubcommandOptions: &SubcommandOptions{
 			PrintFlags: printFlags,
 			Name:       pdbName,
 			IOStreams:  ioStreams,

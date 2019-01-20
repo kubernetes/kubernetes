@@ -38,7 +38,7 @@ var (
 
 // ServiceAccountOpts holds the options for 'create serviceaccount' sub command
 type ServiceAccountOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateServiceAccount is a macro command to create a new service account

@@ -38,7 +38,7 @@ var (
 
 // NamespaceOpts is the options for 'create namespare' sub command
 type NamespaceOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateNamespace is a macro command to create a new namespace

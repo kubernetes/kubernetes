@@ -41,7 +41,7 @@ var (
 
 // PriorityClassOpts holds the options for 'create priorityclass' sub command
 type PriorityClassOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreatePriorityClass is a macro command to create a new priorityClass.

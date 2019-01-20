@@ -75,7 +75,7 @@ var (
 
 // SecretGenericOpts holds the options for 'create secret' sub command
 type SecretGenericOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
@@ -162,7 +162,7 @@ var (
 
 // SecretDockerRegistryOpts holds the options for 'create secret docker-registry' sub command
 type SecretDockerRegistryOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
@@ -255,7 +255,7 @@ var (
 
 // SecretTLSOpts holds the options for 'create secret tls' sub command
 type SecretTLSOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries

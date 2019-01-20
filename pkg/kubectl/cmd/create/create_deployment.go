@@ -38,7 +38,7 @@ var (
 
 // DeploymentOpts is returned by NewCmdCreateDeployment
 type DeploymentOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateDeployment is a macro command to create a new deployment.

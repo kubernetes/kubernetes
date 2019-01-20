@@ -63,7 +63,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	printFlags.OutputFormat = &outputFormat
 
 	options := &PriorityClassOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
+		CreateSubcommandOptions: &SubcommandOptions{
 			PrintFlags: printFlags,
 			Name:       pcName,
 			IOStreams:  ioStreams,

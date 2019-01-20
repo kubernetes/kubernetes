@@ -43,7 +43,7 @@ var (
 
 // PodDisruptionBudgetOpts holds the command-line options for poddisruptionbudget sub command
 type PodDisruptionBudgetOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreatePodDisruptionBudget is a macro command to create a new pod disruption budget.

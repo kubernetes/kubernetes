@@ -58,18 +58,18 @@ var (
 	validNonResourceVerbs = []string{"*", "get", "post", "put", "delete", "patch", "head", "options"}
 )
 
-// CreateClusterRoleOptions is returned by NewCmdCreateClusterRole
-type CreateClusterRoleOptions struct {
-	*CreateRoleOptions
+// ClusterRoleOptions is returned by NewCmdCreateClusterRole
+type ClusterRoleOptions struct {
+	*RoleOptions
 	NonResourceURLs []string
 	AggregationRule map[string]string
 }
 
 // NewCmdCreateClusterRole initializes and returns new ClusterRoles command
 func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	c := &CreateClusterRoleOptions{
-		CreateRoleOptions: NewCreateRoleOptions(ioStreams),
-		AggregationRule:   map[string]string{},
+	c := &ClusterRoleOptions{
+		RoleOptions:     NewRoleOptions(ioStreams),
+		AggregationRule: map[string]string{},
 	}
 	cmd := &cobra.Command{
 		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
@@ -99,7 +99,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 }
 
 // Complete completes all the required options
-func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (c *ClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	// Remove duplicate nonResourceURLs
 	nonResourceURLs := []string{}
 	for _, n := range c.NonResourceURLs {
@@ -109,11 +109,11 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 	c.NonResourceURLs = nonResourceURLs
 
-	return c.CreateRoleOptions.Complete(f, cmd, args)
+	return c.RoleOptions.Complete(f, cmd, args)
 }
 
-// Validate makes sure there is no discrepency in CreateClusterRoleOptions
-func (c *CreateClusterRoleOptions) Validate() error {
+// Validate makes sure there is no discrepency in ClusterRoleOptions
+func (c *ClusterRoleOptions) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
@@ -174,7 +174,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 }
 
 // RunCreateRole creates a new clusterRole
-func (c *CreateClusterRoleOptions) RunCreateRole() error {
+func (c *ClusterRoleOptions) RunCreateRole() error {
 	clusterRole := &rbacv1.ClusterRole{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole"},

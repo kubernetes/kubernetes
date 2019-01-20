@@ -45,8 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
-// CreateOptions is the commandline options for 'create' sub command
-type CreateOptions struct {
+// Options is the commandline options for 'create' sub command
+type Options struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
@@ -80,9 +80,9 @@ var (
 		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
-// NewCreateOptions returns an initialized CreateOptions instance
-func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
-	return &CreateOptions{
+// NewOptions returns an initialized Options instance
+func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
+	return &Options{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -94,7 +94,7 @@ func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 
 // NewCmdCreate returns new initialized instance of create sub command
 func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateOptions(ioStreams)
+	o := NewOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "create -f FILENAME",
@@ -150,7 +150,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 }
 
 // ValidateArgs makes sure there is no discrepency in command options
-func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
+func (o *Options) ValidateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
@@ -182,7 +182,7 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 }
 
 // Complete completes all the required options
-func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
 	o.RecordFlags.Complete(cmd)
@@ -209,7 +209,7 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 // RunCreate performs the creation
-func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *Options) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
 	// the validator enforces this, so
 	if len(o.Raw) > 0 {
@@ -277,7 +277,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 // raw makes a simple HTTP request to the provided path on the server using the default
 // credentials.
-func (o *CreateOptions) raw(f cmdutil.Factory) error {
+func (o *Options) raw(f cmdutil.Factory) error {
 	restClient, err := f.RESTClient()
 	if err != nil {
 		return err
@@ -347,8 +347,8 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 	return args[0], nil
 }
 
-// CreateSubcommandOptions is an options struct to support create subcommands
-type CreateSubcommandOptions struct {
+// SubcommandOptions is an options struct to support create subcommands
+type SubcommandOptions struct {
 	// PrintFlags holds options necessary for obtaining a printer
 	PrintFlags *genericclioptions.PrintFlags
 	// Name of resource being created
@@ -371,15 +371,15 @@ type CreateSubcommandOptions struct {
 }
 
 // NewCreateSubcommandOptions returns initialized CreateSubcommandOptions
-func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
-	return &CreateSubcommandOptions{
+func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *SubcommandOptions {
+	return &SubcommandOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
 
 // Complete completes all the required options
-func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator generate.StructuredGenerator) error {
+func (o *SubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator generate.StructuredGenerator) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -421,7 +421,7 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 }
 
 // Run executes a create subcommand using the specified options
-func (o *CreateSubcommandOptions) Run() error {
+func (o *SubcommandOptions) Run() error {
 	obj, err := o.StructuredGenerator.StructuredGenerate()
 	if err != nil {
 		return err

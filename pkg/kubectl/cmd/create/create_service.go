@@ -19,7 +19,7 @@ package create
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/generate"
@@ -63,7 +63,7 @@ func addPortFlags(cmd *cobra.Command) {
 
 // ServiceClusterIPOpts holds the options for 'create service clusterip' sub command
 type ServiceClusterIPOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
@@ -137,7 +137,7 @@ var (
 
 // ServiceNodePortOpts holds the options for 'create service nodeport' sub command
 type ServiceNodePortOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
@@ -208,7 +208,7 @@ var (
 
 // ServiceLoadBalancerOpts holds the options for 'create service loadbalancer' sub command
 type ServiceLoadBalancerOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
@@ -281,7 +281,7 @@ var (
 
 // ServiceExternalNameOpts holds the options for 'create service externalname' sub command
 type ServiceExternalNameOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service

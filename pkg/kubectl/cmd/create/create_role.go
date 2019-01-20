@@ -112,8 +112,8 @@ type ResourceOptions struct {
 	SubResource string
 }
 
-// CreateRoleOptions holds the options for 'create role' sub command
-type CreateRoleOptions struct {
+// RoleOptions holds the options for 'create role' sub command
+type RoleOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
 	Name          string
@@ -131,9 +131,9 @@ type CreateRoleOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewCreateRoleOptions returns an initialized CreateRoleOptions instance
-func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
-	return &CreateRoleOptions{
+// NewRoleOptions returns an initialized RoleOptions instance
+func NewRoleOptions(ioStreams genericclioptions.IOStreams) *RoleOptions {
+	return &RoleOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
@@ -142,7 +142,7 @@ func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOpti
 
 // NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
 func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateRoleOptions(ioStreams)
+	o := NewRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
@@ -170,7 +170,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 }
 
 // Complete completes all the required options
-func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *RoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -260,7 +260,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 }
 
 // Validate makes sure there is no discrepency in provided option values
-func (o *CreateRoleOptions) Validate() error {
+func (o *RoleOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
@@ -284,7 +284,7 @@ func (o *CreateRoleOptions) Validate() error {
 	return o.validateResource()
 }
 
-func (o *CreateRoleOptions) validateResource() error {
+func (o *RoleOptions) validateResource() error {
 	for _, r := range o.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
@@ -323,7 +323,7 @@ func (o *CreateRoleOptions) validateResource() error {
 }
 
 // RunCreateRole performs the execution of 'create role' sub command
-func (o *CreateRoleOptions) RunCreateRole() error {
+func (o *RoleOptions) RunCreateRole() error {
 	role := &rbacv1.Role{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "Role"},
