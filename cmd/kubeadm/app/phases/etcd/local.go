@@ -40,7 +40,7 @@ const (
 	etcdVolumeName           = "etcd-data"
 	certsVolumeName          = "etcd-certs"
 	etcdHealthyCheckInterval = 5 * time.Second
-	etcdHealthyCheckRetries  = 20
+	etcdHealthyCheckRetries  = 8
 )
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
