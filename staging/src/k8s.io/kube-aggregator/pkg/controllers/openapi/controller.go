@@ -38,7 +38,7 @@ const (
 type syncAction int
 
 const (
-	syncRequeue            syncAction = iota
+	syncRequeue syncAction = iota
 	syncRequeueRateLimited
 	syncNothing
 )
