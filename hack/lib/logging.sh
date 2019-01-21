@@ -34,7 +34,7 @@ kube::log::errexit() {
     kube::log::error "Call tree:"
     for ((i=1;i<${#FUNCNAME[@]}-1;i++))
     do
-      kube::log::error " $i: ${BASH_SOURCE[$i+1]}:${BASH_LINENO[$i]} ${FUNCNAME[$i]}(...)"
+      kube::log::error " ${i}: ${BASH_SOURCE[${i}+1]}:${BASH_LINENO[${i}]} ${FUNCNAME[${i}]}(...)"
     done
   fi  
   kube::log::error_exit "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}. '${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
@@ -66,7 +66,7 @@ kube::log::stack() {
       local source_file=${BASH_SOURCE[$frame_no]}
       local source_lineno=${BASH_LINENO[$((frame_no - 1))]}
       local funcname=${FUNCNAME[$frame_no]}
-      echo "  $i: ${source_file}:${source_lineno} ${funcname}(...)" >&2
+      echo "  ${i}: ${source_file}:${source_lineno} ${funcname}(...)" >&2
     done
   fi
 }
