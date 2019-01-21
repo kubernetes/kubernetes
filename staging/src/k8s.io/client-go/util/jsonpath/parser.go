@@ -46,7 +46,7 @@ type Parser struct {
 var (
 	ErrSyntax        = errors.New("invalid syntax")
 	dictKeyRex       = regexp.MustCompile(`^'([^']*)'$`)
-	sliceOperatorRex = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
+	sliceOperatorRex = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:-?[\d]*)?$`)
 )
 
 // Parse parsed the given text and return a node Parser.
