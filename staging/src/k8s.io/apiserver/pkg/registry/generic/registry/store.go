@@ -841,21 +841,25 @@ func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, acces
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
-// DeletionTimestamp to "now". Finalizers are watching for such updates and will
+// DeletionTimestamp to "now" if there is no existing deletionTimestamp or if the existing
+// deletionTimestamp is further in future. Finalizers are watching for such updates and will
 // finalize the object if their IDs are present in the object's Finalizers list.
-func markAsDeleting(obj runtime.Object) (err error) {
+func markAsDeleting(obj runtime.Object, now time.Time) (err error) {
 	objectMeta, kerr := meta.Accessor(obj)
 	if kerr != nil {
 		return kerr
 	}
-	now := metav1.NewTime(time.Now())
 	// This handles Generation bump for resources that don't support graceful
 	// deletion. For resources that support graceful deletion is handle in
 	// pkg/api/rest/delete.go
 	if objectMeta.GetDeletionTimestamp() == nil && objectMeta.GetGeneration() > 0 {
 		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
-	objectMeta.SetDeletionTimestamp(&now)
+	existingDeletionTimestamp := objectMeta.GetDeletionTimestamp()
+	if existingDeletionTimestamp == nil || existingDeletionTimestamp.After(now) {
+		metaNow := metav1.NewTime(now)
+		objectMeta.SetDeletionTimestamp(&metaNow)
+	}
 	var zero int64 = 0
 	objectMeta.SetDeletionGracePeriodSeconds(&zero)
 	return nil
@@ -910,7 +914,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
 				if pendingFinalizers {
 					klog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
-					err = markAsDeleting(existing)
+					err = markAsDeleting(existing, time.Now())
 					if err != nil {
 						return nil, err
 					}
