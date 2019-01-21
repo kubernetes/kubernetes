@@ -37,7 +37,7 @@ kube::log::errexit() {
       kube::log::error " ${i}: ${BASH_SOURCE[${i}+1]}:${BASH_LINENO[${i}]} ${FUNCNAME[${i}]}(...)"
     done
   fi  
-  kube::log::error_exit "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}. '${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
+  kube::log::error_exit "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}. '${BASH_COMMAND}' exited with status ${err}" "${1:-1}" 1
 }
 
 kube::log::install_errexit() {
@@ -63,9 +63,9 @@ kube::log::stack() {
     for ((i=1 ; i <= ${#FUNCNAME[@]} - ${stack_skip} ; i++))
     do
       local frame_no=$((i - 1 + stack_skip))
-      local source_file=${BASH_SOURCE[$frame_no]}
+      local source_file=${BASH_SOURCE[${frame_no}]}
       local source_lineno=${BASH_LINENO[$((frame_no - 1))]}
-      local funcname=${FUNCNAME[$frame_no]}
+      local funcname=${FUNCNAME[${frame_no}]}
       echo "  ${i}: ${source_file}:${source_lineno} ${funcname}(...)" >&2
     done
   fi
@@ -83,7 +83,7 @@ kube::log::error_exit() {
   stack_skip=$((stack_skip + 1))
 
   if [[ ${KUBE_VERBOSE} -ge 4 ]]; then
-    local source_file=${BASH_SOURCE[$stack_skip]}
+    local source_file=${BASH_SOURCE[${stack_skip}]}
     local source_line=${BASH_LINENO[$((stack_skip - 1))]}
     echo "!!! Error in ${source_file}:${source_line}" >&2
     [[ -z ${1-} ]] || {
@@ -101,10 +101,10 @@ kube::log::error_exit() {
 # Log an error but keep going.  Don't dump the stack or exit.
 kube::log::error() {
   timestamp=$(date +"[%m%d %H:%M:%S]")
-  echo "!!! $timestamp ${1-}" >&2
+  echo "!!! ${timestamp} ${1-}" >&2
   shift
   for message; do
-    echo "    $message" >&2
+    echo "    ${message}" >&2
   done
 }
 
@@ -113,7 +113,7 @@ kube::log::usage() {
   echo >&2
   local message
   for message; do
-    echo "$message" >&2
+    echo "${message}" >&2
   done
   echo >&2
 }
@@ -121,7 +121,7 @@ kube::log::usage() {
 kube::log::usage_from_stdin() {
   local messages=()
   while read -r line; do
-    messages+=("$line")
+    messages+=("${line}")
   done
 
   kube::log::usage "${messages[@]}"
@@ -135,21 +135,21 @@ kube::log::info() {
   fi
 
   for message; do
-    echo "$message"
+    echo "${message}"
   done
 }
 
 # Just like kube::log::info, but no \n, so you can make a progress bar
 kube::log::progress() {
   for message; do
-    echo -e -n "$message"
+    echo -e -n "${message}"
   done
 }
 
 kube::log::info_from_stdin() {
   local messages=()
   while read -r line; do
-    messages+=("$line")
+    messages+=("${line}")
   done
 
   kube::log::info "${messages[@]}"
@@ -163,9 +163,9 @@ kube::log::status() {
   fi
 
   timestamp=$(date +"[%m%d %H:%M:%S]")
-  echo "+++ $timestamp $1"
+  echo "+++ ${timestamp} ${1}"
   shift
   for message; do
-    echo "    $message"
+    echo "    ${message}"
   done
 }

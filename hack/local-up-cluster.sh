@@ -965,9 +965,9 @@ create_csi_crd() {
     echo "create_csi_crd $1"
     YAML_FILE=${KUBE_ROOT}/cluster/addons/storage-crds/$1.yaml
 
-    if [ -e $YAML_FILE ]; then
+    if [ -e "${YAML_FILE}" ]; then
         echo "Create $1 crd"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $YAML_FILE
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${YAML_FILE}
     else
         echo "No $1 available."
     fi

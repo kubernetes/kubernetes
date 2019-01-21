@@ -35,8 +35,8 @@ kube::test::clear_all() {
 # Defaults to 2 levels so you can call this to find your own caller
 kube::test::get_caller() {
   local levels=${1:-2}
-  local caller_file="${BASH_SOURCE[$levels]}"
-  local caller_line="${BASH_LINENO[$levels-1]}"
+  local caller_file="${BASH_SOURCE[${levels}]}"
+  local caller_line="${BASH_LINENO[${levels}-1]}"
   echo "$(basename "${caller_file}"):${caller_line}"
 }
 

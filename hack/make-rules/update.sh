@@ -61,17 +61,17 @@ BASH_TARGETS="
 	update-bazel"
 
 for t in ${BASH_TARGETS}; do
-	echo -e "${color_yellow}Running $t${color_norm}"
+	echo -e "${color_yellow}Running ${t}${color_norm}"
 	if ${SILENT} ; then
-		if ! bash "${KUBE_ROOT}/hack/$t.sh" 1> /dev/null; then
-			echo -e "${color_red}Running $t FAILED${color_norm}"
+		if ! bash "${KUBE_ROOT}/hack/${t}.sh" 1> /dev/null; then
+			echo -e "${color_red}Running ${t} FAILED${color_norm}"
 			if ! ${ALL}; then
 				exit 1
 			fi
 		fi
 	else
-		if ! bash "${KUBE_ROOT}/hack/$t.sh"; then
-			echo -e "${color_red}Running $t FAILED${color_norm}"
+		if ! bash "${KUBE_ROOT}/hack/${t}.sh"; then
+			echo -e "${color_red}Running ${t} FAILED${color_norm}"
 			if ! ${ALL}; then
 				exit 1
 			fi
