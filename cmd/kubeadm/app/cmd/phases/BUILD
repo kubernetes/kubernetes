@@ -6,6 +6,7 @@ go_library(
         "addons.go",
         "bootstraptoken.go",
         "certs.go",
+        "checketcd.go",
         "controlplane.go",
         "etcd.go",
         "kubeconfig.go",
