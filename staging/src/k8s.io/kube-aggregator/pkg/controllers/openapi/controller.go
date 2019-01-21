@@ -38,7 +38,7 @@ const (
 type syncAction int
 
 const (
-	syncRequeue syncAction = iota
+	syncRequeue            syncAction = iota
 	syncRequeueRateLimited
 	syncNothing
 )
@@ -102,7 +102,7 @@ func (c *AggregationController) processNextWorkItem() bool {
 		return false
 	}
 
-	klog.Infof("OpenAPI AggregationController: Processing item %s", key)
+	klog.V(5).Infof("OpenAPI AggregationController: Processing item %s", key)
 
 	action, err := c.syncHandler(key.(string))
 	if err == nil {
@@ -113,13 +113,13 @@ func (c *AggregationController) processNextWorkItem() bool {
 
 	switch action {
 	case syncRequeue:
-		klog.Infof("OpenAPI AggregationController: action for item %s: Requeue.", key)
+		klog.V(5).Infof("OpenAPI AggregationController: action for item %s: Requeue.", key)
 		c.queue.AddAfter(key, successfulUpdateDelay)
 	case syncRequeueRateLimited:
-		klog.Infof("OpenAPI AggregationController: action for item %s: Rate Limited Requeue.", key)
+		klog.Warningf("OpenAPI AggregationController: action for item %s: Rate Limited Requeue.", key)
 		c.queue.AddRateLimited(key)
 	case syncNothing:
-		klog.Infof("OpenAPI AggregationController: action for item %s: Nothing (removed from the queue).", key)
+		klog.V(5).Infof("OpenAPI AggregationController: action for item %s: Nothing (removed from the queue).", key)
 	}
 
 	return true
