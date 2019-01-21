@@ -446,7 +446,7 @@ The IBM Cloud SIG was focused on defining its charter and working towards moving
 
 ### SIG Multicluster
 
-Moving Federation v2 from Alpha towards Beta has been the focus of our effort over the past quarter.  To this end we engaged with end users, and successfully enlisted additional contributors from companies including IBM, Amadeus, Cisco and others. Federation v2 provides a suite of decoupled API’s and  re-usable components for building multi-cluster control planes. We plan to start releasing Beta components in late 2018.  In addition, more minor updates were made to our cluster-registry and multi-cluster ingress sub-projects.
+Moving Federation v2 from Alpha towards Beta has been the focus of our effort over the past quarter.  To this end we engaged with end users, and successfully enlisted additional contributors from companies including IBM, Amadeus, Cisco and others. Federation v2 provides a suite of decoupled API’s and  re-usable components for building multi-cluster control planes. We plan to start releasing Beta components in late 2019.  In addition, more minor updates were made to our cluster-registry and multi-cluster ingress sub-projects.
 
 ### SIG Network
 
