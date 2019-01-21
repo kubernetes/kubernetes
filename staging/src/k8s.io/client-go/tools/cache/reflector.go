@@ -175,10 +175,31 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	options := metav1.ListOptions{ResourceVersion: "0"}
 	r.metrics.numberOfLists.Inc()
 	start := r.clock.Now()
-	list, err := r.listerWatcher.List(options)
+
+	var list runtime.Object
+	var err error
+	listCh := make(chan struct{}, 1)
+	panicCh := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+			}
+		}()
+		list, err = r.listerWatcher.List(options)
+		close(listCh)
+	}()
+	select {
+	case <-stopCh:
+		return nil
+	case r := <-panicCh:
+		panic(r)
+	case <-listCh:
+	}
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
+
 	r.metrics.listDuration.Observe(time.Since(start).Seconds())
 	listMetaInterface, err := meta.ListAccessor(list)
 	if err != nil {
