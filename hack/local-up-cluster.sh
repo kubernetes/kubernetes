@@ -672,14 +672,20 @@ function start_cloud_controller_manager {
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
     fi
 
+    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
+    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+      cloud_config_arg="--cloud-provider=external"
+      cloud_config_arg+=" --external-cloud-volume-plugin=${CLOUD_PROVIDER}"
+      cloud_config_arg+=" --cloud-config=${CLOUD_CONFIG}"
+    fi
+
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
     ${CONTROLPLANE_SUDO} ${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/hyperkube" cloud-controller-manager} \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
       ${node_cidr_args} \
       --feature-gates="${FEATURE_GATES}" \
-      --cloud-provider=${CLOUD_PROVIDER} \
-      --cloud-config=${CLOUD_CONFIG} \
+      ${cloud_config_arg} \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --leader-elect=false \
