@@ -110,7 +110,7 @@ func NewKubeletCommand(stopCh <-chan struct{}) *cobra.Command {
 	cleanFlagSet.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletConfig, err := options.NewKubeletConfiguration()
-	// programmer error
+	// Program error
 	if err != nil {
 		klog.Fatal(err)
 	}
