@@ -292,6 +292,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	var watcher *fsnotify.Watcher
 	var parse parseFunc
 	var stop bool
+	found := true
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	for {
@@ -305,6 +306,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 				return fmt.Errorf("failed to read log file %q: %v", path, err)
 			}
 			if opts.follow {
+				// The container is not running, we got to the end of the log.
+				if !found {
+					return nil
+				}
 				// Reset seek so that if this is an incomplete line,
 				// it will be read again.
 				if _, err := f.Seek(-int64(len(l)), io.SeekCurrent); err != nil {
@@ -323,8 +328,12 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					// the event.
 					continue
 				}
+				var recreated bool
 				// Wait until the next log change.
-				found, recreated, err := waitLogs(ctx, containerID, watcher, runtimeService)
+				found, recreated, err = waitLogs(ctx, containerID, watcher, runtimeService)
+				if err != nil {
+					return err
+				}
 				if recreated {
 					newF, err := os.Open(path)
 					if err != nil {
@@ -343,9 +352,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					}
 					r = bufio.NewReader(f)
 				}
-				if !found {
-					return err
-				}
+				// If the container exited consume data until the next EOF
 				continue
 			}
 			// Should stop after writing the remaining content.
