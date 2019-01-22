@@ -158,7 +158,8 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
 				}
-				values = zones.UnsortedList()
+				// zone values here are sorted for better testability.
+				values = zones.List()
 			} else {
 				values = []string{v}
 			}
