@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "annotations.go",
         "node_controller.go",
         "node_lifecycle_controller.go",
         "pvlcontroller.go",

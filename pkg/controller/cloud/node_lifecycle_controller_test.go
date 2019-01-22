@@ -43,7 +43,7 @@ func Test_NodesDeleted(t *testing.T) {
 		deleteNodes []*v1.Node
 	}{
 		{
-			name: "node is not ready and does not exist",
+			name: "managed node is not ready and does not exist",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -74,7 +74,41 @@ func Test_NodesDeleted(t *testing.T) {
 			},
 		},
 		{
-			name: "node is not ready and provider returns err",
+			name: "unmanaged node is not ready and does not exist",
+			fnh: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								UnmanagedNodeAnnotationKey: "true",
+							},
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				DeletedNodes: []*v1.Node{},
+				Clientset:    fake.NewSimpleClientset(),
+			},
+			fakeCloud: &fakecloud.FakeCloud{
+				ExistsByProviderID: false,
+			},
+			deleteNodes: []*v1.Node{
+				// No nodes should be deleted in this scenario.
+			},
+		},
+		{
+			name: "managed node is not ready and provider returns err",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -107,7 +141,7 @@ func Test_NodesDeleted(t *testing.T) {
 			deleteNodes: []*v1.Node{},
 		},
 		{
-			name: "node is not ready but still exists",
+			name: "managed node is not ready but still exists",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -139,7 +173,7 @@ func Test_NodesDeleted(t *testing.T) {
 			deleteNodes: []*v1.Node{},
 		},
 		{
-			name: "node ready condition is unknown, node doesn't exist",
+			name: "managed node ready condition is unknown, node doesn't exist",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -170,7 +204,7 @@ func Test_NodesDeleted(t *testing.T) {
 			},
 		},
 		{
-			name: "node ready condition is unknown, node exists",
+			name: "managed node ready condition is unknown, node exists",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -203,7 +237,7 @@ func Test_NodesDeleted(t *testing.T) {
 			deleteNodes: []*v1.Node{},
 		},
 		{
-			name: "node is ready, but provider said it is deleted (maybe a bug in provider)",
+			name: "managed node is ready, but provider said it is deleted (maybe a bug in provider)",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -274,7 +308,7 @@ func Test_NodesShutdown(t *testing.T) {
 		updatedNodes []*v1.Node
 	}{
 		{
-			name: "node is not ready and was shutdown",
+			name: "managed node is not ready and was shutdown",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -326,7 +360,42 @@ func Test_NodesShutdown(t *testing.T) {
 			},
 		},
 		{
-			name: "node is not ready, but there is error checking if node is shutdown",
+			name: "unmanaged node is not ready and was shutdown",
+			fnh: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								UnmanagedNodeAnnotationKey: "true",
+							},
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+								},
+							},
+						},
+					},
+				},
+				UpdatedNodes: []*v1.Node{},
+				Clientset:    fake.NewSimpleClientset(),
+			},
+			fakeCloud: &fakecloud.FakeCloud{
+				NodeShutdown:            true,
+				ErrShutdownByProviderID: nil,
+			},
+			updatedNodes: []*v1.Node{
+				// No nodes should be updated in this scenario.
+			},
+		},
+		{
+			name: "managed node is not ready, but there is error checking if node is shutdown",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -356,7 +425,7 @@ func Test_NodesShutdown(t *testing.T) {
 			updatedNodes: []*v1.Node{},
 		},
 		{
-			name: "node is not ready and is not shutdown",
+			name: "managed node is not ready and is not shutdown",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -386,7 +455,7 @@ func Test_NodesShutdown(t *testing.T) {
 			updatedNodes: []*v1.Node{},
 		},
 		{
-			name: "node is ready but provider says it's shutdown (maybe a bug by provider)",
+			name: "managed node is ready but provider says it's shutdown (maybe a bug by provider)",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{

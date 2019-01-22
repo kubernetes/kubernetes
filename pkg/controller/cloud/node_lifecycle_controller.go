@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -131,6 +132,21 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 	}
 
 	for _, node := range nodes {
+		// Check whether the node "unmanaged" annotation value is explicitly set to true, in which case the node is skipped.
+		// Otherwise, the node must be considered, and we proceed to checking whether we must delete it or apply the shutdown taint.
+		if value, exists := node.Annotations[UnmanagedNodeAnnotationKey]; exists {
+			unmanagedNode, err := strconv.ParseBool(value)
+			if err != nil {
+				// Skip node if annotation is present and an error occurs while decoding the value
+				klog.Warningf("failed to parse the value of the %q annotation: %v", UnmanagedNodeAnnotationKey, err)
+				continue
+			}
+			if unmanagedNode {
+				klog.V(6).Infof("skipping unmanaged node %q", node.Name)
+				continue
+			}
+		}
+
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
 		if _, c := nodeutilv1.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
