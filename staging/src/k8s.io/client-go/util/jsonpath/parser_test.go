@@ -140,7 +140,6 @@ func TestFailParser(t *testing.T) {
 		{"unrecognized character", "{*}", "unrecognized character in action: U+002A '*'"},
 		{"invalid number", "{+12.3.0}", "cannot parse number +12.3.0"},
 		{"unterminated array", "{[1}", "unterminated array"},
-		{"invalid index", "{[::-1]}", "invalid array index ::-1"},
 		{"unterminated filter", "{[?(.price]}", "unterminated filter"},
 	}
 	for _, test := range failParserTests {
